@@ -455,7 +455,7 @@ udpif_get_n_flows(struct udpif *udpif)
 
     now = time_msec();
     atomic_read(&udpif->n_flows_timestamp, &time);
-    if (time < now - 100 && !ovs_mutex_trylock(&udpif->n_flows_mutex)) {
+    if (time < now - 25 && !ovs_mutex_trylock(&udpif->n_flows_mutex)) {
         struct dpif_dp_stats stats;
 
         atomic_store(&udpif->n_flows_timestamp, now);
@@ -1373,11 +1373,12 @@ revalidate(struct revalidator *revalidator)
                                &mask_len, &actions, &actions_len, &stats)) {
         struct revalidator *ukey_revalidator;
         struct udpif_key *ukey;
-        bool mark, may_destroy;
+        bool mark, must_destroy, may_destroy;
         long long int used;
         uint32_t hash;
+        uint64_t n_flows;
 
-        mark = false;
+        must_destroy = mark = false;
         hash = hash_bytes(key, key_len, udpif->secret);
         ukey_revalidator = &udpif->revalidators[hash
             % udpif->n_revalidators];
@@ -1390,8 +1391,37 @@ revalidate(struct revalidator *revalidator)
             ovs_mutex_unlock(&ukey->mutex);
         }
 
+        n_flows = udpif_get_n_flows(udpif);
         if ((used && used < now - MAX_IDLE)
-            || udpif_get_n_flows(udpif) > flow_limit * 2) {
+            || n_flows > flow_limit * 2) {
+            must_destroy = true;
+        } else if (udpif->dump_duration > 500) {
+            int threshold, over, probability;
+
+            /* If the dump_duration is long, and we're in the "danger zone" of
+             * having the number of flows = 70% of our limit, decide to drop
+             * some flows before we hit that limit. */
+            threshold = flow_limit * 70 / 100;
+            over = n_flows - threshold;
+            if (over > 0) {
+                /* Delete this flow if it's unlucky. */
+                probability = threshold / over;
+
+                /* ...but only if it's reasonably old. */
+                if (now - used) {
+                    probability = probability * MAX_IDLE / (now - used);
+                }
+
+                if (probability < 1) {
+                    probability = 1;
+                }
+                if (probability && hash % probability == 0) {
+                    must_destroy = true;
+                }
+            }
+        }
+
+        if (must_destroy) {
             mark = false;
         } else {
             if (!ukey) {
