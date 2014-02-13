@@ -1401,11 +1401,11 @@ revalidate(struct revalidator *revalidator)
             /* If the dump_duration is long, and we're in the "danger zone" of
              * having the number of flows = 70% of our limit, decide to drop
              * some flows before we hit that limit. */
-            threshold = flow_limit * 70 / 100;
+            threshold = flow_limit * 50 / 100;
             over = n_flows - threshold;
             if (over > 0) {
                 /* Delete this flow if it's unlucky. */
-                probability = threshold / over;
+                probability = 3 * threshold / over;
 
                 /* ...but only if it's reasonably old. */
                 if (now - used) {
