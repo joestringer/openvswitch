@@ -338,6 +338,8 @@ static bool dscp_from_skb_priority(const struct xport *, uint32_t skb_priority,
 
 static struct xc_entry *xlate_cache_add_entry(struct xlate_cache *xc,
                                               enum xc_type type);
+static void xlate_push_stats__(struct xlate_cache *,
+                               const struct dpif_flow_stats *);
 static void xlate_xbridge_init(struct xlate_cfg *, struct xbridge *);
 static void xlate_xbundle_init(struct xlate_cfg *, struct xbundle *);
 static void xlate_xport_init(struct xlate_cfg *, struct xport *);
@@ -3886,10 +3888,46 @@ xlate_cache_normal(struct ofproto_dpif *ofproto, struct flow *flow, int vlan)
     update_learning_table(xbridge, flow, &wc, vlan, xbundle);
 }
 
-/* Push stats and perform side effects of flow translation. */
+/* Perform side effects of flow translation. */
 void
-xlate_push_stats(struct xlate_cache *xcache, bool may_learn,
-                 const struct dpif_flow_stats *stats)
+xlate_push_effects(struct xlate_cache *xcache,
+                   const struct dpif_flow_stats *stats)
+{
+    struct xc_entry *entry;
+    struct ofpbuf entries = xcache->entries;
+
+    XC_ENTRY_FOR_EACH (entry, entries, xcache) {
+        switch (entry->type) {
+        case XC_RULE:
+        case XC_BOND:
+        case XC_NETDEV:
+        case XC_NETFLOW:
+        case XC_MIRROR:
+        case XC_GROUP:
+            /* Handled by xlate_push_stats__(). */
+            break;
+
+        case XC_LEARN:
+            ofproto_dpif_flow_mod(entry->u.learn.ofproto, entry->u.learn.fm);
+            break;
+        case XC_NORMAL:
+            xlate_cache_normal(entry->u.normal.ofproto, entry->u.normal.flow,
+                               entry->u.normal.vlan);
+            break;
+        case XC_FIN_TIMEOUT:
+            xlate_fin_timeout__(entry->u.fin.rule, stats->tcp_flags,
+                                entry->u.fin.idle, entry->u.fin.hard);
+            break;
+        default:
+            OVS_NOT_REACHED();
+        }
+    }
+}
+
+/* Push stats using the cache provided. */
+static void
+xlate_push_stats__(struct xlate_cache *xcache,
+                   const struct dpif_flow_stats *stats)
 {
     struct xc_entry *entry;
     struct ofpbuf entries = xcache->entries;
@@ -3915,27 +3953,28 @@ xlate_push_stats(struct xlate_cache *xcache, bool may_learn,
                                 entry->u.mirror.mirrors,
                                 stats->n_packets, stats->n_bytes);
             break;
-        case XC_LEARN:
-            if (may_learn) {
-                ofproto_dpif_flow_mod(entry->u.learn.ofproto,
-                                      entry->u.learn.fm);
-            }
-            break;
-        case XC_NORMAL:
-            xlate_cache_normal(entry->u.normal.ofproto, entry->u.normal.flow,
-                               entry->u.normal.vlan);
-            break;
-        case XC_FIN_TIMEOUT:
-            xlate_fin_timeout__(entry->u.fin.rule, stats->tcp_flags,
-                                entry->u.fin.idle, entry->u.fin.hard);
-            break;
         case XC_GROUP:
             group_dpif_credit_stats(entry->u.group.group, entry->u.group.bucket,
                                     stats);
             break;
+        case XC_LEARN:
+        case XC_NORMAL:
+        case XC_FIN_TIMEOUT:
+            /* Handled by xlate_push_effects(). */
+            break;
         default:
             OVS_NOT_REACHED();
         }
+    }
+}
+
+void
+xlate_push_stats(struct xlate_cache *xcache, bool execute_side_effects,
+                 const struct dpif_flow_stats *stats)
+{
+    xlate_push_stats__(xcache, stats);
+    if (execute_side_effects) {
+        xlate_push_effects(xcache, stats);
     }
 }
 

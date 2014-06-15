@@ -1148,12 +1148,14 @@ revalidate_ukey(struct udpif *udpif, struct udpif_key *ukey,
 
     may_learn = push.n_packets > 0;
     if (ukey->xcache) {
-        xlate_push_stats(ukey->xcache, may_learn, &push);
+        /* Defer side-effects if the xcache might be out of date. */
+        bool execute_side_effects = may_learn && !udpif->need_revalidate;
+
+        xlate_push_stats(ukey->xcache, execute_side_effects, &push);
         if (udpif->need_revalidate) {
             xlate_cache_clear(ukey->xcache);
             push.n_packets = 0;
             push.n_bytes = 0;
-            may_learn = false;
         } else {
             ok = true;
             goto exit;
@@ -1173,7 +1175,6 @@ revalidate_ukey(struct udpif *udpif, struct udpif_key *ukey,
     xlate_in_init(&xin, ofproto, &flow, NULL, push.tcp_flags, NULL);
     xin.resubmit_stats = push.n_packets ? &push : NULL;
     xin.xcache = ukey->xcache;
-    xin.may_learn = may_learn;
     xin.skip_wildcards = !udpif->need_revalidate;
     xlate_actions(&xin, &xout);
     xoutp = &xout;
@@ -1214,6 +1215,9 @@ revalidate_ukey(struct udpif *udpif, struct udpif_key *ukey,
         }
     }
     ok = true;
+    if (may_learn) {
+        xlate_push_effects(ukey->xcache, &push);
+    }
 
 exit:
     if (netflow) {

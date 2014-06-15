@@ -182,8 +182,9 @@ void xlate_out_copy(struct xlate_out *dst, const struct xlate_out *src);
 int xlate_send_packet(const struct ofport_dpif *, struct ofpbuf *);
 
 struct xlate_cache *xlate_cache_new(void);
-void xlate_push_stats(struct xlate_cache *, bool may_learn,
+void xlate_push_stats(struct xlate_cache *, bool execute_side_effects,
                       const struct dpif_flow_stats *);
+void xlate_push_effects(struct xlate_cache *, const struct dpif_flow_stats *);
 void xlate_cache_clear(struct xlate_cache *);
 void xlate_cache_delete(struct xlate_cache *);
 
