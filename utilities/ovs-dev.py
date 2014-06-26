@@ -89,6 +89,10 @@ def conf():
     if options.optimize is None:
         options.optimize = 0
 
+    coverage = "" # Only apply to GCC builds.
+    if options.coverage:
+        coverage = "--enable-coverage"
+
     cflags += " -O%d" % options.optimize
 
     ENV["CFLAGS"] = cflags
@@ -101,7 +105,8 @@ def conf():
         pass # Directory exists.
 
     os.chdir(BUILD_GCC)
-    _sh(*(configure + ["--with-linux=/lib/modules/%s/build" % uname()]))
+    _sh(*(configure + ["--with-linux=/lib/modules/%s/build" % uname(),
+                       coverage]))
 
     clang = program_exists("clang")
     sparse = program_exists("sparse")
@@ -157,6 +162,30 @@ def check():
     ENV["TESTSUITEFLAGS"] = flags
     make("check")
 commands.append(check)
+
+
+def coverage():
+    _sh('lcov', '-q', '--zerocounters', '--directory', BUILD_GCC)
+
+    if not options.jobs:
+        # Decrease the chance of tests failing due to coverage collection.
+        options.jobs = 2
+    options.coverage = True
+    conf()
+
+    e = None
+    try:
+        check()
+    except Exception as e:
+        print e
+        pass
+
+    _sh('lcov', '-q', '--capture', '-b', BUILD_GCC, '--directory', BUILD_GCC,
+        '--output-file', '%s/coverage.info' % BUILD_GCC)
+    _sh('genhtml', '-q', '%s/coverage.info' % BUILD_GCC,
+        '--output-directory', '%s/coverage' % BUILD_GCC)
+    print("\nCoverage was successfully written to %s/coverage/." % BUILD_GCC)
+commands.append(coverage)
 
 
 def tag():
@@ -315,16 +344,17 @@ Basic Configuration:
     %(v)s run
 
 Commands:
-    conf    - Configure the ovs source.
-    make    - Build the source (must have been configured).
-    check   - Run the unit tests.
-    tag     - Run ctags and cscope over the source.
-    kill    - Kill all running instances of ovs.
-    reset   - Reset any runtime configuration in %(run)s.
-    run     - Run ovs.
-    modinst - Build ovs and install the kernel module.
-    env     - Print the required path environment variable.
-    doc     - Print this message.
+    conf     - Configure the ovs source.
+    make     - Build the source (must have been configured).
+    check    - Run the unit tests.
+    coverage - Run the unit tests and generate lcov output.
+    tag      - Run ctags and cscope over the source.
+    kill     - Kill all running instances of ovs.
+    reset    - Reset any runtime configuration in %(run)s.
+    run      - Run ovs.
+    modinst  - Build ovs and install the kernel module.
+    env      - Print the required path environment variable.
+    doc      - Print this message.
 """ % {"ovs": OVS_SRC, "v": sys.argv[0], "run": ROOT}
     sys.exit(0)
 commands.append(doc)
@@ -360,6 +390,8 @@ def main():
                      help="configure the man documentation install directory")
     group.add_option("--with-dpdk", dest="with_dpdk", metavar="DPDK_BUILD",
                      help="built with dpdk libraries located at DPDK_BUILD");
+    group.add_option("--enable-coverage", dest="coverage", action="store_true",
+                     default=False, help="enable gcov coverage collection.")
 
     for i in range(4):
         group.add_option("--O%d" % i, dest="optimize", action="store_const",
