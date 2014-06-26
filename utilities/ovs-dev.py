@@ -47,6 +47,14 @@ def _sh(*args, **kwargs):
         subprocess.call(args, shell=shell)
 
 
+def program_exists(prog):
+    try:
+        _sh("%s --version" % prog, check=True)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
 def uname():
     return _sh("uname", "-r", capture=True)[0].strip()
 
@@ -95,17 +103,8 @@ def conf():
     os.chdir(BUILD_GCC)
     _sh(*(configure + ["--with-linux=/lib/modules/%s/build" % uname()]))
 
-    try:
-        _sh("clang --version", check=True)
-        clang = True
-    except subprocess.CalledProcessError:
-        clang = False
-
-    try:
-        _sh("sparse --version", check=True)
-        sparse = True
-    except subprocess.CalledProcessError:
-        sparse = False
+    clang = program_exists("clang")
+    sparse = program_exists("sparse")
 
     if clang:
         try:
