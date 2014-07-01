@@ -1,0 +1,1202 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/cfm.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - cfm.c<span style="font-size: 80%;"> (source / <a href="cfm.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">417</td>
+            <td class="headerCovTableEntry">467</td>
+            <td class="headerCovTableEntryMed">89.3 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">37</td>
+            <td class="headerCovTableEntry">40</td>
+            <td class="headerCovTableEntryHi">92.5 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">190</td>
+            <td class="headerCovTableEntry">276</td>
+            <td class="headerCovTableEntryLo">68.8 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2010, 2011, 2012, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;cfm.h&quot;
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &lt;stdint.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      23 </span>                :            : 
+<span class="lineNum">      24 </span>                :            : #include &quot;byte-order.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;connectivity.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;dynamic-string.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;flow.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;hmap.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;netdev.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;packets.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;random.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;seq.h&quot;
+<span class="lineNum">      36 </span>                :            : #include &quot;timer.h&quot;
+<span class="lineNum">      37 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      38 </span>                :            : #include &quot;unixctl.h&quot;
+<a name="39"><span class="lineNum">      39 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      40 </span>                :            : 
+<span class="lineNum">      41 </span>                :<span class="lineCov">        525 : VLOG_DEFINE_THIS_MODULE(cfm);</span>
+<span class="lineNum">      42 </span>                :            : 
+<span class="lineNum">      43 </span>                :            : #define CFM_MAX_RMPS 256
+<span class="lineNum">      44 </span>                :            : 
+<span class="lineNum">      45 </span>                :            : /* Ethernet destination address of CCM packets. */
+<span class="lineNum">      46 </span>                :            : static const uint8_t eth_addr_ccm[6] = { 0x01, 0x80, 0xC2, 0x00, 0x00, 0x30 };
+<span class="lineNum">      47 </span>                :            : static const uint8_t eth_addr_ccm_x[6] = {
+<span class="lineNum">      48 </span>                :            :     0x01, 0x23, 0x20, 0x00, 0x00, 0x30
+<span class="lineNum">      49 </span>                :            : };
+<span class="lineNum">      50 </span>                :            : 
+<span class="lineNum">      51 </span>                :            : #define ETH_TYPE_CFM 0x8902
+<span class="lineNum">      52 </span>                :            : 
+<span class="lineNum">      53 </span>                :            : /* A 'ccm' represents a Continuity Check Message from the 802.1ag
+<span class="lineNum">      54 </span>                :            :  * specification.  Continuity Check Messages are broadcast periodically so that
+<span class="lineNum">      55 </span>                :            :  * hosts can determine whom they have connectivity to.
+<span class="lineNum">      56 </span>                :            :  *
+<span class="lineNum">      57 </span>                :            :  * The minimum length of a CCM as specified by IEEE 802.1ag is 75 bytes.
+<span class="lineNum">      58 </span>                :            :  * Previous versions of Open vSwitch generated 74-byte CCM messages, so we
+<span class="lineNum">      59 </span>                :            :  * accept such messages too. */
+<span class="lineNum">      60 </span>                :            : #define CCM_LEN 75
+<span class="lineNum">      61 </span>                :            : #define CCM_ACCEPT_LEN 74
+<span class="lineNum">      62 </span>                :            : #define CCM_MAID_LEN 48
+<span class="lineNum">      63 </span>                :            : #define CCM_OPCODE 1 /* CFM message opcode meaning CCM. */
+<span class="lineNum">      64 </span>                :            : #define CCM_RDI_MASK 0x80
+<span class="lineNum">      65 </span>                :            : #define CFM_HEALTH_INTERVAL 6
+<span class="lineNum">      66 </span>                :            : 
+<span class="lineNum">      67 </span>                :            : OVS_PACKED(
+<span class="lineNum">      68 </span>                :            : struct ccm {
+<span class="lineNum">      69 </span>                :            :     uint8_t mdlevel_version; /* MD Level and Version */
+<span class="lineNum">      70 </span>                :            :     uint8_t opcode;
+<span class="lineNum">      71 </span>                :            :     uint8_t flags;
+<span class="lineNum">      72 </span>                :            :     uint8_t tlv_offset;
+<span class="lineNum">      73 </span>                :            :     ovs_be32 seq;
+<span class="lineNum">      74 </span>                :            :     ovs_be16 mpid;
+<span class="lineNum">      75 </span>                :            :     uint8_t maid[CCM_MAID_LEN];
+<span class="lineNum">      76 </span>                :            : 
+<span class="lineNum">      77 </span>                :            :     /* Defined by ITU-T Y.1731 should be zero */
+<span class="lineNum">      78 </span>                :            :     ovs_be16 interval_ms_x;      /* Transmission interval in ms. */
+<span class="lineNum">      79 </span>                :            :     ovs_be64 mpid64;             /* MPID in extended mode. */
+<span class="lineNum">      80 </span>                :            :     uint8_t opdown;              /* Operationally down. */
+<span class="lineNum">      81 </span>                :            :     uint8_t zero[5];
+<span class="lineNum">      82 </span>                :            : 
+<span class="lineNum">      83 </span>                :            :     /* TLV space. */
+<span class="lineNum">      84 </span>                :            :     uint8_t end_tlv;
+<span class="lineNum">      85 </span>                :            : });
+<span class="lineNum">      86 </span>                :            : BUILD_ASSERT_DECL(CCM_LEN == sizeof(struct ccm));
+<span class="lineNum">      87 </span>                :            : 
+<span class="lineNum">      88 </span>                :            : struct cfm {
+<span class="lineNum">      89 </span>                :            :     const char *name;           /* Name of this CFM object. */
+<span class="lineNum">      90 </span>                :            :     struct hmap_node hmap_node; /* Node in all_cfms list. */
+<span class="lineNum">      91 </span>                :            : 
+<span class="lineNum">      92 </span>                :            :     struct netdev *netdev;
+<span class="lineNum">      93 </span>                :            :     uint64_t rx_packets;        /* Packets received by 'netdev'. */
+<span class="lineNum">      94 </span>                :            : 
+<span class="lineNum">      95 </span>                :            :     uint64_t mpid;
+<span class="lineNum">      96 </span>                :            :     bool demand;           /* Demand mode. */
+<span class="lineNum">      97 </span>                :            :     bool booted;           /* A full fault interval has occurred. */
+<span class="lineNum">      98 </span>                :            :     enum cfm_fault_reason fault;  /* Connectivity fault status. */
+<span class="lineNum">      99 </span>                :            :     enum cfm_fault_reason recv_fault;  /* Bit mask of faults occurring on
+<span class="lineNum">     100 </span>                :            :                                           receive. */
+<span class="lineNum">     101 </span>                :            :     bool opup;             /* Operational State. */
+<span class="lineNum">     102 </span>                :            :     bool remote_opup;      /* Remote Operational State. */
+<span class="lineNum">     103 </span>                :            : 
+<span class="lineNum">     104 </span>                :            :     int fault_override;    /* Manual override of 'fault' status.
+<span class="lineNum">     105 </span>                :            :                               Ignored if negative. */
+<span class="lineNum">     106 </span>                :            : 
+<span class="lineNum">     107 </span>                :            :     uint32_t seq;          /* The sequence number of our last CCM. */
+<span class="lineNum">     108 </span>                :            :     uint8_t ccm_interval;  /* The CCM transmission interval. */
+<span class="lineNum">     109 </span>                :            :     int ccm_interval_ms;   /* 'ccm_interval' in milliseconds. */
+<span class="lineNum">     110 </span>                :            :     uint16_t ccm_vlan;     /* Vlan tag of CCM PDUs.  CFM_RANDOM_VLAN if
+<span class="lineNum">     111 </span>                :            :                               random. */
+<span class="lineNum">     112 </span>                :            :     uint8_t ccm_pcp;       /* Priority of CCM PDUs. */
+<span class="lineNum">     113 </span>                :            :     uint8_t maid[CCM_MAID_LEN]; /* The MAID of this CFM. */
+<span class="lineNum">     114 </span>                :            : 
+<span class="lineNum">     115 </span>                :            :     struct timer tx_timer;    /* Send CCM when expired. */
+<span class="lineNum">     116 </span>                :            :     struct timer fault_timer; /* Check for faults when expired. */
+<span class="lineNum">     117 </span>                :            : 
+<span class="lineNum">     118 </span>                :            :     struct hmap remote_mps;   /* Remote MPs. */
+<span class="lineNum">     119 </span>                :            : 
+<span class="lineNum">     120 </span>                :            :     /* Result of cfm_get_remote_mpids(). Updated only during fault check to
+<span class="lineNum">     121 </span>                :            :      * avoid flapping. */
+<span class="lineNum">     122 </span>                :            :     uint64_t *rmps_array;     /* Cache of remote_mps. */
+<span class="lineNum">     123 </span>                :            :     size_t rmps_array_len;    /* Number of rmps in 'rmps_array'. */
+<span class="lineNum">     124 </span>                :            : 
+<span class="lineNum">     125 </span>                :            :     int health;               /* Percentage of the number of CCM frames
+<span class="lineNum">     126 </span>                :            :                                  received. */
+<span class="lineNum">     127 </span>                :            :     int health_interval;      /* Number of fault_intervals since health was
+<span class="lineNum">     128 </span>                :            :                                  recomputed. */
+<span class="lineNum">     129 </span>                :            :     long long int last_tx;    /* Last CCM transmission time. */
+<span class="lineNum">     130 </span>                :            : 
+<span class="lineNum">     131 </span>                :            :     atomic_bool check_tnl_key; /* Verify the tunnel key of inbound packets? */
+<span class="lineNum">     132 </span>                :            :     atomic_bool extended;      /* Extended mode. */
+<span class="lineNum">     133 </span>                :            :     struct ovs_refcount ref_cnt;
+<span class="lineNum">     134 </span>                :            : 
+<span class="lineNum">     135 </span>                :            :     uint64_t flap_count;       /* Count the flaps since boot. */
+<span class="lineNum">     136 </span>                :            : 
+<span class="lineNum">     137 </span>                :            :     /* True when the variables returned by cfm_get_*() are changed
+<span class="lineNum">     138 </span>                :            :      * since last check. */
+<span class="lineNum">     139 </span>                :            :     bool status_changed;
+<span class="lineNum">     140 </span>                :            : 
+<span class="lineNum">     141 </span>                :            :     /* When 'cfm-&gt;demand' is set, at least one ccm is required to be received
+<span class="lineNum">     142 </span>                :            :      * every 100 * cfm_interval.  If ccm is not received within this interval,
+<span class="lineNum">     143 </span>                :            :      * even if data packets are received, the cfm fault will be set. */
+<span class="lineNum">     144 </span>                :            :     struct timer demand_rx_ccm_t;
+<span class="lineNum">     145 </span>                :            : };
+<span class="lineNum">     146 </span>                :            : 
+<span class="lineNum">     147 </span>                :            : /* Remote MPs represent foreign network entities that are configured to have
+<span class="lineNum">     148 </span>                :            :  * the same MAID as this CFM instance. */
+<span class="lineNum">     149 </span>                :            : struct remote_mp {
+<span class="lineNum">     150 </span>                :            :     uint64_t mpid;         /* The Maintenance Point ID of this 'remote_mp'. */
+<span class="lineNum">     151 </span>                :            :     struct hmap_node node; /* Node in 'remote_mps' map. */
+<span class="lineNum">     152 </span>                :            : 
+<span class="lineNum">     153 </span>                :            :     bool recv;           /* CCM was received since last fault check. */
+<span class="lineNum">     154 </span>                :            :     bool opup;           /* Operational State. */
+<span class="lineNum">     155 </span>                :            :     uint32_t seq;        /* Most recently received sequence number. */
+<span class="lineNum">     156 </span>                :            :     uint8_t num_health_ccm; /* Number of received ccm frames every
+<span class="lineNum">     157 </span>                :            :                                CFM_HEALTH_INTERVAL * 'fault_interval'. */
+<span class="lineNum">     158 </span>                :            :     long long int last_rx; /* Last CCM reception time. */
+<span class="lineNum">     159 </span>                :            : 
+<span class="lineNum">     160 </span>                :            : };
+<span class="lineNum">     161 </span>                :            : 
+<span class="lineNum">     162 </span>                :            : static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(20, 30);
+<span class="lineNum">     163 </span>                :            : 
+<span class="lineNum">     164 </span>                :            : static struct ovs_mutex mutex = OVS_MUTEX_INITIALIZER;
+<span class="lineNum">     165 </span>                :            : static struct hmap all_cfms__ = HMAP_INITIALIZER(&amp;all_cfms__);
+<span class="lineNum">     166 </span>                :            : static struct hmap *const all_cfms OVS_GUARDED_BY(mutex) = &amp;all_cfms__;
+<span class="lineNum">     167 </span>                :            : 
+<span class="lineNum">     168 </span>                :            : static unixctl_cb_func cfm_unixctl_show;
+<span class="lineNum">     169 </span>                :            : static unixctl_cb_func cfm_unixctl_set_fault;
+<a name="170"><span class="lineNum">     170 </span>                :            : </a>
+<span class="lineNum">     171 </span>                :            : static uint64_t
+<span class="lineNum">     172 </span>                :<span class="lineCov">        110 : cfm_rx_packets(const struct cfm *cfm) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     173 </span>                :            : {
+<span class="lineNum">     174 </span>                :            :     struct netdev_stats stats;
+<span class="lineNum">     175 </span>                :            : 
+<span class="lineNum">     176 </span>        [<span class="branchCov" title="Branch 1 was taken 110 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        110 :     if (!netdev_get_stats(cfm-&gt;netdev, &amp;stats)) {</span>
+<span class="lineNum">     177 </span>                :<span class="lineCov">        110 :         return stats.rx_packets;</span>
+<span class="lineNum">     178 </span>                :            :     } else {
+<span class="lineNum">     179 </span>                :<span class="lineCov">        110 :         return 0;</span>
+<span class="lineNum">     180 </span>                :            :     }
+<span class="lineNum">     181 </span>                :            : }
+<a name="182"><span class="lineNum">     182 </span>                :            : </a>
+<span class="lineNum">     183 </span>                :            : static const uint8_t *
+<span class="lineNum">     184 </span>                :<span class="lineCov">       2138 : cfm_ccm_addr(struct cfm *cfm)</span>
+<span class="lineNum">     185 </span>                :            : {
+<span class="lineNum">     186 </span>                :            :     bool extended;
+<span class="lineNum">     187 </span>                :<span class="lineCov">       2138 :     atomic_read(&amp;cfm-&gt;extended, &amp;extended);</span>
+<span class="lineNum">     188 </span>        [<span class="branchCov" title="Branch 0 was taken 2120 times"> + </span><span class="branchCov" title="Branch 1 was taken 18 times"> + </span>]:<span class="lineCov">       2138 :     return extended ? eth_addr_ccm_x : eth_addr_ccm;</span>
+<span class="lineNum">     189 </span>                :            : }
+<span class="lineNum">     190 </span>                :            : 
+<a name="191"><span class="lineNum">     191 </span>                :            : /* Returns the string representation of the given cfm_fault_reason 'reason'. */</a>
+<span class="lineNum">     192 </span>                :            : const char *
+<span class="lineNum">     193 </span>                :<span class="lineCov">         33 : cfm_fault_reason_to_str(int reason)</span>
+<span class="lineNum">     194 </span>                :            : {
+<span class="lineNum">     195 </span>  [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span> :<span class="lineCov">         33 :     switch (reason) {</span>
+<span class="lineNum">         </span>      <span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 6 was not taken"> - </span>]
+<span class="lineNum">     196 </span>                :            : #define CFM_FAULT_REASON(NAME, STR) case CFM_FAULT_##NAME: return #STR;
+<span class="lineNum">     197 </span>                :<span class="lineCov">         33 :         CFM_FAULT_REASONS</span>
+<span class="lineNum">     198 </span>                :            : #undef CFM_FAULT_REASON
+<span class="lineNum">     199 </span>                :<span class="lineCov">         33 :     default: return &quot;&lt;unknown&gt;&quot;;</span>
+<span class="lineNum">     200 </span>                :            :     }
+<span class="lineNum">     201 </span>                :            : }
+<a name="202"><span class="lineNum">     202 </span>                :            : </a>
+<span class="lineNum">     203 </span>                :            : static void
+<span class="lineNum">     204 </span>                :<span class="lineCov">         30 : ds_put_cfm_fault(struct ds *ds, int fault)</span>
+<span class="lineNum">     205 </span>                :            : {
+<span class="lineNum">     206 </span>                :            :     int i;
+<span class="lineNum">     207 </span>                :            : 
+<span class="lineNum">     208 </span>        [<span class="branchCov" title="Branch 0 was taken 180 times"> + </span><span class="branchCov" title="Branch 1 was taken 30 times"> + </span>]:<span class="lineCov">        210 :     for (i = 0; i &lt; CFM_FAULT_N_REASONS; i++) {</span>
+<span class="lineNum">     209 </span>                :<span class="lineCov">        180 :         int reason = 1 &lt;&lt; i;</span>
+<span class="lineNum">     210 </span>                :            : 
+<span class="lineNum">     211 </span>        [<span class="branchCov" title="Branch 0 was taken 18 times"> + </span><span class="branchCov" title="Branch 1 was taken 162 times"> + </span>]:<span class="lineCov">        180 :         if (fault &amp; reason) {</span>
+<span class="lineNum">     212 </span>                :<span class="lineCov">         18 :             ds_put_format(ds, &quot;%s &quot;, cfm_fault_reason_to_str(reason));</span>
+<span class="lineNum">     213 </span>                :            :         }
+<span class="lineNum">     214 </span>                :            :     }
+<span class="lineNum">     215 </span>                :            : 
+<span class="lineNum">     216 </span>                :<span class="lineCov">         30 :     ds_chomp(ds, ' ');</span>
+<span class="lineNum">     217 </span>                :<span class="lineCov">         30 : }</span>
+<a name="218"><span class="lineNum">     218 </span>                :            : </a>
+<span class="lineNum">     219 </span>                :            : static void
+<span class="lineNum">     220 </span>                :<span class="lineCov">         16 : cfm_generate_maid(struct cfm *cfm) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     221 </span>                :            : {
+<span class="lineNum">     222 </span>                :<span class="lineCov">         16 :     const char *ovs_md_name = &quot;ovs&quot;;</span>
+<span class="lineNum">     223 </span>                :<span class="lineCov">         16 :     const char *ovs_ma_name = &quot;ovs&quot;;</span>
+<span class="lineNum">     224 </span>                :            :     uint8_t *ma_p;
+<span class="lineNum">     225 </span>                :            :     size_t md_len, ma_len;
+<span class="lineNum">     226 </span>                :            : 
+<span class="lineNum">     227 </span>                :<span class="lineCov">         16 :     memset(cfm-&gt;maid, 0, CCM_MAID_LEN);</span>
+<span class="lineNum">     228 </span>                :            : 
+<span class="lineNum">     229 </span>                :<span class="lineCov">         16 :     md_len = strlen(ovs_md_name);</span>
+<span class="lineNum">     230 </span>                :<span class="lineCov">         16 :     ma_len = strlen(ovs_ma_name);</span>
+<span class="lineNum">     231 </span>                :            : 
+<span class="lineNum">     232 </span>[<span class="branchCov" title="Branch 0 was taken 16 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 16 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         16 :     ovs_assert(md_len &amp;&amp; ma_len &amp;&amp; md_len + ma_len + 4 &lt;= CCM_MAID_LEN);</span>
+<span class="lineNum">         </span>[<span class="branchCov" title="Branch 4 was taken 16 times"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span>][<span class="branchNoCov" title="Branch 6 was not taken"> - </span><span class="branchCov" title="Branch 7 was taken 16 times"> + </span>]
+<span class="lineNum">     233 </span>                :            : 
+<span class="lineNum">     234 </span>                :<span class="lineCov">         16 :     cfm-&gt;maid[0] = 4;                           /* MD name string format. */</span>
+<span class="lineNum">     235 </span>                :<span class="lineCov">         16 :     cfm-&gt;maid[1] = md_len;                      /* MD name size. */</span>
+<span class="lineNum">     236 </span>                :<span class="lineCov">         16 :     memcpy(&amp;cfm-&gt;maid[2], ovs_md_name, md_len); /* MD name. */</span>
+<span class="lineNum">     237 </span>                :            : 
+<span class="lineNum">     238 </span>                :<span class="lineCov">         16 :     ma_p = cfm-&gt;maid + 2 + md_len;</span>
+<span class="lineNum">     239 </span>                :<span class="lineCov">         16 :     ma_p[0] = 2;                           /* MA name string format. */</span>
+<span class="lineNum">     240 </span>                :<span class="lineCov">         16 :     ma_p[1] = ma_len;                      /* MA name size. */</span>
+<span class="lineNum">     241 </span>                :<span class="lineCov">         16 :     memcpy(&amp;ma_p[2], ovs_ma_name, ma_len); /* MA name. */</span>
+<span class="lineNum">     242 </span>                :<span class="lineCov">         16 : }</span>
+<a name="243"><span class="lineNum">     243 </span>                :            : </a>
+<span class="lineNum">     244 </span>                :            : static int
+<span class="lineNum">     245 </span>                :<span class="lineCov">        184 : ccm_interval_to_ms(uint8_t interval)</span>
+<span class="lineNum">     246 </span>                :            : {
+<span class="lineNum">     247 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 48 times"> + </span> :<span class="lineCov">        184 :     switch (interval) {</span>
+<span class="lineNum">         </span>   <span class="branchCov" title="Branch 4 was taken 40 times"> + </span><span class="branchCov" title="Branch 5 was taken 32 times"> + </span><span class="branchCov" title="Branch 6 was taken 32 times"> + </span><span class="branchCov" title="Branch 7 was taken 32 times"> + </span> 
+<span class="lineNum">         </span>            <span class="branchNoCov" title="Branch 8 was not taken"> - </span>]
+<span class="lineNum">     248 </span>                :<span class="lineNoCov">          0 :     case 0:  OVS_NOT_REACHED(); /* Explicitly not supported by 802.1ag. */</span>
+<span class="lineNum">     249 </span>                :<span class="lineNoCov">          0 :     case 1:  return 3;      /* Not recommended due to timer resolution. */</span>
+<span class="lineNum">     250 </span>                :<span class="lineNoCov">          0 :     case 2:  return 10;     /* Not recommended due to timer resolution. */</span>
+<span class="lineNum">     251 </span>                :<span class="lineCov">         48 :     case 3:  return 100;</span>
+<span class="lineNum">     252 </span>                :<span class="lineCov">         40 :     case 4:  return 1000;</span>
+<span class="lineNum">     253 </span>                :<span class="lineCov">         32 :     case 5:  return 10000;</span>
+<span class="lineNum">     254 </span>                :<span class="lineCov">         32 :     case 6:  return 60000;</span>
+<span class="lineNum">     255 </span>                :<span class="lineCov">         32 :     case 7:  return 600000;</span>
+<span class="lineNum">     256 </span>                :<span class="lineCov">        184 :     default: OVS_NOT_REACHED(); /* Explicitly not supported by 802.1ag. */</span>
+<span class="lineNum">     257 </span>                :            :     }
+<span class="lineNum">     258 </span>                :            : 
+<span class="lineNum">     259 </span>                :            :     OVS_NOT_REACHED();
+<span class="lineNum">     260 </span>                :            : }
+<a name="261"><span class="lineNum">     261 </span>                :            : </a>
+<span class="lineNum">     262 </span>                :            : static long long int
+<span class="lineNum">     263 </span>                :<span class="lineCov">        265 : cfm_fault_interval(struct cfm *cfm) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     264 </span>                :            : {
+<span class="lineNum">     265 </span>                :            :     /* According to the 802.1ag specification we should assume every other MP
+<span class="lineNum">     266 </span>                :            :      * with the same MAID has the same transmission interval that we have.  If
+<span class="lineNum">     267 </span>                :            :      * an MP has a different interval, cfm_process_heartbeat will register it
+<span class="lineNum">     268 </span>                :            :      * as a fault (likely due to a configuration error).  Thus we can check all
+<span class="lineNum">     269 </span>                :            :      * MPs at once making this quite a bit simpler.
+<span class="lineNum">     270 </span>                :            :      *
+<span class="lineNum">     271 </span>                :            :      * When cfm is not in demand mode, we check when (ccm_interval_ms * 3.5) ms
+<span class="lineNum">     272 </span>                :            :      * have passed.  When cfm is in demand mode, we check when
+<span class="lineNum">     273 </span>                :            :      * (MAX(ccm_interval_ms, 500) * 3.5) ms have passed.  This ensures that
+<span class="lineNum">     274 </span>                :            :      * ovs-vswitchd has enough time to pull statistics from the datapath. */
+<span class="lineNum">     275 </span>                :            : 
+<span class="lineNum">     276 </span>        [<span class="branchCov" title="Branch 0 was taken 108 times"> + </span><span class="branchCov" title="Branch 1 was taken 157 times"> + </span>]:<span class="lineCov">        265 :     return (MAX(cfm-&gt;ccm_interval_ms, cfm-&gt;demand ? 500 : cfm-&gt;ccm_interval_ms)</span>
+<span class="lineNum">     277 </span>                :<span class="lineCov">        265 :             * 7) / 2;</span>
+<span class="lineNum">     278 </span>                :            : }
+<a name="279"><span class="lineNum">     279 </span>                :            : </a>
+<span class="lineNum">     280 </span>                :            : static uint8_t
+<span class="lineNum">     281 </span>                :<span class="lineCov">         32 : ms_to_ccm_interval(int interval_ms)</span>
+<span class="lineNum">     282 </span>                :            : {
+<span class="lineNum">     283 </span>                :            :     uint8_t i;
+<span class="lineNum">     284 </span>                :            : 
+<span class="lineNum">     285 </span>        [<span class="branchCov" title="Branch 0 was taken 152 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        152 :     for (i = 7; i &gt; 0; i--) {</span>
+<span class="lineNum">     286 </span>        [<span class="branchCov" title="Branch 1 was taken 32 times"> + </span><span class="branchCov" title="Branch 2 was taken 120 times"> + </span>]:<span class="lineCov">        152 :         if (ccm_interval_to_ms(i) &lt;= interval_ms) {</span>
+<span class="lineNum">     287 </span>                :<span class="lineCov">         32 :             return i;</span>
+<span class="lineNum">     288 </span>                :            :         }
+<span class="lineNum">     289 </span>                :            :     }
+<span class="lineNum">     290 </span>                :            : 
+<span class="lineNum">     291 </span>                :<span class="lineCov">         32 :     return 1;</span>
+<span class="lineNum">     292 </span>                :            : }
+<a name="293"><span class="lineNum">     293 </span>                :            : </a>
+<span class="lineNum">     294 </span>                :            : static uint32_t
+<span class="lineNum">     295 </span>                :<span class="lineCov">       2134 : hash_mpid(uint64_t mpid)</span>
+<span class="lineNum">     296 </span>                :            : {
+<span class="lineNum">     297 </span>                :<span class="lineCov">       2134 :     return hash_uint64(mpid);</span>
+<span class="lineNum">     298 </span>                :            : }
+<a name="299"><span class="lineNum">     299 </span>                :            : </a>
+<span class="lineNum">     300 </span>                :            : static bool
+<span class="lineNum">     301 </span>                :<span class="lineCov">         32 : cfm_is_valid_mpid(bool extended, uint64_t mpid)</span>
+<span class="lineNum">     302 </span>                :            : {
+<span class="lineNum">     303 </span>                :            :     /* 802.1ag specification requires MPIDs to be within the range [1, 8191].
+<span class="lineNum">     304 </span>                :            :      * In extended mode we relax this requirement. */
+<span class="lineNum">     305 </span>[<span class="branchCov" title="Branch 0 was taken 32 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 8 times"> + </span><span class="branchCov" title="Branch 3 was taken 24 times"> + </span>]:<span class="lineCov">         32 :     return mpid &gt;= 1 &amp;&amp; (extended || mpid &lt;= 8191);</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 4 was taken 8 times"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span>]
+<span class="lineNum">     306 </span>                :            : }
+<a name="307"><span class="lineNum">     307 </span>                :            : </a>
+<span class="lineNum">     308 </span>                :            : static struct remote_mp *
+<span class="lineNum">     309 </span>                :<span class="lineCov">        910 : lookup_remote_mp(const struct cfm *cfm, uint64_t mpid) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     310 </span>                :            : {
+<span class="lineNum">     311 </span>                :            :     struct remote_mp *rmp;
+<span class="lineNum">     312 </span>                :            : 
+<span class="lineNum">     313 </span>        [<span class="branchCov" title="Branch 3 was taken 896 times"> + </span><span class="branchCov" title="Branch 4 was taken 14 times"> + </span>]:<span class="lineCov">        910 :     HMAP_FOR_EACH_IN_BUCKET (rmp, node, hash_mpid(mpid), &amp;cfm-&gt;remote_mps) {</span>
+<span class="lineNum">     314 </span>        [<span class="branchCov" title="Branch 0 was taken 896 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        896 :         if (rmp-&gt;mpid == mpid) {</span>
+<span class="lineNum">     315 </span>                :<span class="lineCov">        896 :             return rmp;</span>
+<span class="lineNum">     316 </span>                :            :         }
+<span class="lineNum">     317 </span>                :            :     }
+<span class="lineNum">     318 </span>                :            : 
+<span class="lineNum">     319 </span>                :<span class="lineCov">        910 :     return NULL;</span>
+<span class="lineNum">     320 </span>                :            : }
+<a name="321"><span class="lineNum">     321 </span>                :            : </a>
+<span class="lineNum">     322 </span>                :            : void
+<span class="lineNum">     323 </span>                :<span class="lineCov">        257 : cfm_init(void)</span>
+<span class="lineNum">     324 </span>                :            : {
+<span class="lineNum">     325 </span>                :<span class="lineCov">        257 :     unixctl_command_register(&quot;cfm/show&quot;, &quot;[interface]&quot;, 0, 1, cfm_unixctl_show,</span>
+<span class="lineNum">     326 </span>                :            :                              NULL);
+<span class="lineNum">     327 </span>                :<span class="lineCov">        257 :     unixctl_command_register(&quot;cfm/set-fault&quot;, &quot;[interface] normal|false|true&quot;,</span>
+<span class="lineNum">     328 </span>                :            :                              1, 2, cfm_unixctl_set_fault, NULL);
+<span class="lineNum">     329 </span>                :<span class="lineCov">        257 : }</span>
+<span class="lineNum">     330 </span>                :            : 
+<a name="331"><span class="lineNum">     331 </span>                :            : /* Records the status change and changes the global connectivity seq. */</a>
+<span class="lineNum">     332 </span>                :            : static void
+<span class="lineNum">     333 </span>                :<span class="lineCov">         72 : cfm_status_changed(struct cfm *cfm) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     334 </span>                :            : {
+<span class="lineNum">     335 </span>                :<span class="lineCov">         72 :     seq_change(connectivity_seq_get());</span>
+<span class="lineNum">     336 </span>                :<span class="lineCov">         72 :     cfm-&gt;status_changed = true;</span>
+<span class="lineNum">     337 </span>                :<span class="lineCov">         72 : }</span>
+<span class="lineNum">     338 </span>                :            : 
+<span class="lineNum">     339 </span>                :            : /* Allocates a 'cfm' object called 'name'.  'cfm' should be initialized by
+<a name="340"><span class="lineNum">     340 </span>                :            :  * cfm_configure() before use. */</a>
+<span class="lineNum">     341 </span>                :            : struct cfm *
+<span class="lineNum">     342 </span>                :<span class="lineCov">         16 : cfm_create(const struct netdev *netdev) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     343 </span>                :            : {
+<span class="lineNum">     344 </span>                :            :     struct cfm *cfm;
+<span class="lineNum">     345 </span>                :            : 
+<span class="lineNum">     346 </span>                :<span class="lineCov">         16 :     cfm = xzalloc(sizeof *cfm);</span>
+<span class="lineNum">     347 </span>                :<span class="lineCov">         16 :     cfm-&gt;netdev = netdev_ref(netdev);</span>
+<span class="lineNum">     348 </span>                :<span class="lineCov">         16 :     cfm-&gt;name = netdev_get_name(cfm-&gt;netdev);</span>
+<span class="lineNum">     349 </span>                :<span class="lineCov">         16 :     hmap_init(&amp;cfm-&gt;remote_mps);</span>
+<span class="lineNum">     350 </span>                :<span class="lineCov">         16 :     cfm-&gt;remote_opup = true;</span>
+<span class="lineNum">     351 </span>                :<span class="lineCov">         16 :     cfm-&gt;fault_override = -1;</span>
+<span class="lineNum">     352 </span>                :<span class="lineCov">         16 :     cfm-&gt;health = -1;</span>
+<span class="lineNum">     353 </span>                :<span class="lineCov">         16 :     cfm-&gt;last_tx = 0;</span>
+<span class="lineNum">     354 </span>                :<span class="lineCov">         16 :     cfm-&gt;flap_count = 0;</span>
+<span class="lineNum">     355 </span>                :<span class="lineCov">         16 :     atomic_init(&amp;cfm-&gt;extended, false);</span>
+<span class="lineNum">     356 </span>                :<span class="lineCov">         16 :     atomic_init(&amp;cfm-&gt;check_tnl_key, false);</span>
+<span class="lineNum">     357 </span>                :<span class="lineCov">         16 :     ovs_refcount_init(&amp;cfm-&gt;ref_cnt);</span>
+<span class="lineNum">     358 </span>                :            : 
+<span class="lineNum">     359 </span>                :<span class="lineCov">         16 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     360 </span>                :<span class="lineCov">         16 :     cfm_status_changed(cfm);</span>
+<span class="lineNum">     361 </span>                :<span class="lineCov">         16 :     cfm_generate_maid(cfm);</span>
+<span class="lineNum">     362 </span>                :<span class="lineCov">         16 :     hmap_insert(all_cfms, &amp;cfm-&gt;hmap_node, hash_string(cfm-&gt;name, 0));</span>
+<span class="lineNum">     363 </span>                :<span class="lineCov">         16 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     364 </span>                :            : 
+<span class="lineNum">     365 </span>                :<span class="lineCov">         16 :     return cfm;</span>
+<span class="lineNum">     366 </span>                :            : }
+<a name="367"><span class="lineNum">     367 </span>                :            : </a>
+<span class="lineNum">     368 </span>                :            : void
+<span class="lineNum">     369 </span>                :<span class="lineCov">      18158 : cfm_unref(struct cfm *cfm) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     370 </span>                :            : {
+<span class="lineNum">     371 </span>                :            :     struct remote_mp *rmp, *rmp_next;
+<span class="lineNum">     372 </span>                :            : 
+<span class="lineNum">     373 </span>        [<span class="branchCov" title="Branch 0 was taken 17935 times"> + </span><span class="branchCov" title="Branch 1 was taken 223 times"> + </span>]:<span class="lineCov">      18158 :     if (!cfm) {</span>
+<span class="lineNum">     374 </span>                :<span class="lineCov">      17935 :         return;</span>
+<span class="lineNum">     375 </span>                :            :     }
+<span class="lineNum">     376 </span>                :            : 
+<span class="lineNum">     377 </span>        [<span class="branchCov" title="Branch 1 was taken 207 times"> + </span><span class="branchCov" title="Branch 2 was taken 16 times"> + </span>]:<span class="lineCov">        223 :     if (ovs_refcount_unref(&amp;cfm-&gt;ref_cnt) != 1) {</span>
+<span class="lineNum">     378 </span>                :<span class="lineCov">        207 :         return;</span>
+<span class="lineNum">     379 </span>                :            :     }
+<span class="lineNum">     380 </span>                :            : 
+<span class="lineNum">     381 </span>                :<span class="lineCov">         16 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     382 </span>                :<span class="lineCov">         16 :     cfm_status_changed(cfm);</span>
+<span class="lineNum">     383 </span>                :<span class="lineCov">         16 :     hmap_remove(all_cfms, &amp;cfm-&gt;hmap_node);</span>
+<span class="lineNum">     384 </span>                :<span class="lineCov">         16 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     385 </span>                :            : 
+<span class="lineNum">     386 </span>[<span class="branchCov" title="Branch 1 was taken 10 times"> + </span><span class="branchCov" title="Branch 2 was taken 16 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 10 times"> + </span><span class="branchCov" title="Branch 5 was taken 16 times"> + </span>]:<span class="lineCov">         26 :     HMAP_FOR_EACH_SAFE (rmp, rmp_next, node, &amp;cfm-&gt;remote_mps) {</span>
+<span class="lineNum">     387 </span>                :<span class="lineCov">         10 :         hmap_remove(&amp;cfm-&gt;remote_mps, &amp;rmp-&gt;node);</span>
+<span class="lineNum">     388 </span>                :<span class="lineCov">         10 :         free(rmp);</span>
+<span class="lineNum">     389 </span>                :            :     }
+<span class="lineNum">     390 </span>                :            : 
+<span class="lineNum">     391 </span>                :<span class="lineCov">         16 :     hmap_destroy(&amp;cfm-&gt;remote_mps);</span>
+<span class="lineNum">     392 </span>                :<span class="lineCov">         16 :     netdev_close(cfm-&gt;netdev);</span>
+<span class="lineNum">     393 </span>                :<span class="lineCov">         16 :     free(cfm-&gt;rmps_array);</span>
+<span class="lineNum">     394 </span>                :            : 
+<span class="lineNum">     395 </span>                :<span class="lineCov">      18158 :     free(cfm);</span>
+<span class="lineNum">     396 </span>                :            : }
+<a name="397"><span class="lineNum">     397 </span>                :            : </a>
+<span class="lineNum">     398 </span>                :            : struct cfm *
+<span class="lineNum">     399 </span>                :<span class="lineCov">        230 : cfm_ref(const struct cfm *cfm_)</span>
+<span class="lineNum">     400 </span>                :            : {
+<span class="lineNum">     401 </span>                :<span class="lineCov">        230 :     struct cfm *cfm = CONST_CAST(struct cfm *, cfm_);</span>
+<span class="lineNum">     402 </span>        [<span class="branchCov" title="Branch 0 was taken 207 times"> + </span><span class="branchCov" title="Branch 1 was taken 23 times"> + </span>]:<span class="lineCov">        230 :     if (cfm) {</span>
+<span class="lineNum">     403 </span>                :<span class="lineCov">        207 :         ovs_refcount_ref(&amp;cfm-&gt;ref_cnt);</span>
+<span class="lineNum">     404 </span>                :            :     }
+<span class="lineNum">     405 </span>                :<span class="lineCov">        230 :     return cfm;</span>
+<span class="lineNum">     406 </span>                :            : }
+<span class="lineNum">     407 </span>                :            : 
+<a name="408"><span class="lineNum">     408 </span>                :            : /* Should be run periodically to update fault statistics messages. */</a>
+<span class="lineNum">     409 </span>                :            : void
+<span class="lineNum">     410 </span>                :<span class="lineCov">       1321 : cfm_run(struct cfm *cfm) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     411 </span>                :            : {
+<span class="lineNum">     412 </span>                :<span class="lineCov">       1321 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     413 </span>        [<span class="branchCov" title="Branch 1 was taken 249 times"> + </span><span class="branchCov" title="Branch 2 was taken 1072 times"> + </span>]:<span class="lineCov">       1321 :     if (timer_expired(&amp;cfm-&gt;fault_timer)) {</span>
+<span class="lineNum">     414 </span>                :<span class="lineCov">        249 :         long long int interval = cfm_fault_interval(cfm);</span>
+<span class="lineNum">     415 </span>                :            :         struct remote_mp *rmp, *rmp_next;
+<span class="lineNum">     416 </span>                :<span class="lineCov">        249 :         enum cfm_fault_reason old_cfm_fault = cfm-&gt;fault;</span>
+<span class="lineNum">     417 </span>                :<span class="lineCov">        249 :         uint64_t old_flap_count = cfm-&gt;flap_count;</span>
+<span class="lineNum">     418 </span>                :<span class="lineCov">        249 :         int old_health = cfm-&gt;health;</span>
+<span class="lineNum">     419 </span>                :<span class="lineCov">        249 :         size_t old_rmps_array_len = cfm-&gt;rmps_array_len;</span>
+<span class="lineNum">     420 </span>                :<span class="lineCov">        249 :         bool old_rmps_deleted = false;</span>
+<span class="lineNum">     421 </span>                :<span class="lineCov">        249 :         bool old_rmp_opup = cfm-&gt;remote_opup;</span>
+<span class="lineNum">     422 </span>                :            :         bool demand_override;
+<span class="lineNum">     423 </span>                :<span class="lineCov">        249 :         bool rmp_set_opup = false;</span>
+<span class="lineNum">     424 </span>                :<span class="lineCov">        249 :         bool rmp_set_opdown = false;</span>
+<span class="lineNum">     425 </span>                :            : 
+<span class="lineNum">     426 </span>                :<span class="lineCov">        249 :         cfm-&gt;fault = cfm-&gt;recv_fault;</span>
+<span class="lineNum">     427 </span>                :<span class="lineCov">        249 :         cfm-&gt;recv_fault = 0;</span>
+<span class="lineNum">     428 </span>                :            : 
+<span class="lineNum">     429 </span>                :<span class="lineCov">        249 :         cfm-&gt;rmps_array_len = 0;</span>
+<span class="lineNum">     430 </span>                :<span class="lineCov">        249 :         free(cfm-&gt;rmps_array);</span>
+<span class="lineNum">     431 </span>                :<span class="lineCov">        249 :         cfm-&gt;rmps_array = xmalloc(hmap_count(&amp;cfm-&gt;remote_mps) *</span>
+<span class="lineNum">     432 </span>                :            :                                   sizeof *cfm-&gt;rmps_array);
+<span class="lineNum">     433 </span>                :            : 
+<span class="lineNum">     434 </span>        [<span class="branchCov" title="Branch 0 was taken 34 times"> + </span><span class="branchCov" title="Branch 1 was taken 215 times"> + </span>]:<span class="lineCov">        249 :         if (cfm-&gt;health_interval == CFM_HEALTH_INTERVAL) {</span>
+<span class="lineNum">     435 </span>                :            :             /* Calculate the cfm health of the interface.  If the number of
+<span class="lineNum">     436 </span>                :            :              * remote_mpids of a cfm interface is &gt; 1, the cfm health is
+<span class="lineNum">     437 </span>                :            :              * undefined. If the number of remote_mpids is 1, the cfm health is
+<span class="lineNum">     438 </span>                :            :              * the percentage of the ccm frames received in the
+<span class="lineNum">     439 </span>                :            :              * (CFM_HEALTH_INTERVAL * 3.5)ms, else it is 0. */
+<span class="lineNum">     440 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 34 times"> + </span>]:<span class="lineCov">         34 :             if (hmap_count(&amp;cfm-&gt;remote_mps) &gt; 1) {</span>
+<span class="lineNum">     441 </span>                :<span class="lineNoCov">          0 :                 cfm-&gt;health = -1;</span>
+<span class="lineNum">     442 </span>        [<span class="branchCov" title="Branch 1 was taken 1 time"> + </span><span class="branchCov" title="Branch 2 was taken 33 times"> + </span>]:<span class="lineCov">         34 :             } else if (hmap_is_empty(&amp;cfm-&gt;remote_mps)) {</span>
+<span class="lineNum">     443 </span>                :<span class="lineCov">          1 :                 cfm-&gt;health = 0;</span>
+<span class="lineNum">     444 </span>                :            :             } else {
+<span class="lineNum">     445 </span>                :            :                 int exp_ccm_recvd;
+<span class="lineNum">     446 </span>                :            : 
+<span class="lineNum">     447 </span>                :<span class="lineCov">         33 :                 rmp = CONTAINER_OF(hmap_first(&amp;cfm-&gt;remote_mps),</span>
+<span class="lineNum">     448 </span>                :            :                                    struct remote_mp, node);
+<span class="lineNum">     449 </span>                :<span class="lineCov">         33 :                 exp_ccm_recvd = (CFM_HEALTH_INTERVAL * 7) / 2;</span>
+<span class="lineNum">     450 </span>                :            :                 /* Calculate the percentage of healthy ccm frames received.
+<span class="lineNum">     451 </span>                :            :                  * Since the 'fault_interval' is (3.5 * cfm_interval), and
+<span class="lineNum">     452 </span>                :            :                  * 1 CCM packet must be received every cfm_interval,
+<span class="lineNum">     453 </span>                :            :                  * the 'remote_mpid' health reports the percentage of
+<span class="lineNum">     454 </span>                :            :                  * healthy CCM frames received every
+<span class="lineNum">     455 </span>                :            :                  * 'CFM_HEALTH_INTERVAL'th 'fault_interval'. */
+<span class="lineNum">     456 </span>                :<span class="lineCov">         33 :                 cfm-&gt;health = (rmp-&gt;num_health_ccm * 100) / exp_ccm_recvd;</span>
+<span class="lineNum">     457 </span>                :<span class="lineCov">         33 :                 cfm-&gt;health = MIN(cfm-&gt;health, 100);</span>
+<span class="lineNum">     458 </span>                :<span class="lineCov">         33 :                 rmp-&gt;num_health_ccm = 0;</span>
+<span class="lineNum">     459 </span>[<span class="branchCov" title="Branch 0 was taken 33 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 33 times"> + </span>]:<span class="lineCov">         33 :                 ovs_assert(cfm-&gt;health &gt;= 0 &amp;&amp; cfm-&gt;health &lt;= 100);</span>
+<span class="lineNum">     460 </span>                :            :             }
+<span class="lineNum">     461 </span>                :<span class="lineCov">         34 :             cfm-&gt;health_interval = 0;</span>
+<span class="lineNum">     462 </span>                :            :         }
+<span class="lineNum">     463 </span>                :<span class="lineCov">        249 :         cfm-&gt;health_interval++;</span>
+<span class="lineNum">     464 </span>                :            : 
+<span class="lineNum">     465 </span>                :<span class="lineCov">        249 :         demand_override = false;</span>
+<span class="lineNum">     466 </span>        [<span class="branchCov" title="Branch 0 was taken 105 times"> + </span><span class="branchCov" title="Branch 1 was taken 144 times"> + </span>]:<span class="lineCov">        249 :         if (cfm-&gt;demand) {</span>
+<span class="lineNum">     467 </span>                :<span class="lineCov">        105 :             uint64_t rx_packets = cfm_rx_packets(cfm);</span>
+<span class="lineNum">     468 </span>                :<span class="lineCov">        105 :             demand_override = hmap_count(&amp;cfm-&gt;remote_mps) == 1</span>
+<span class="lineNum">     469 </span>        [<span class="branchCov" title="Branch 0 was taken 96 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         96 :                 &amp;&amp; rx_packets &gt; cfm-&gt;rx_packets</span>
+<span class="lineNum">     470 </span>[<span class="branchCov" title="Branch 0 was taken 96 times"> + </span><span class="branchCov" title="Branch 1 was taken 9 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 94 times"> + </span><span class="branchCov" title="Branch 4 was taken 2 times"> + </span>]:<span class="lineCov">        201 :                 &amp;&amp; !timer_expired(&amp;cfm-&gt;demand_rx_ccm_t);</span>
+<span class="lineNum">     471 </span>                :<span class="lineCov">        105 :             cfm-&gt;rx_packets = rx_packets;</span>
+<span class="lineNum">     472 </span>                :            :         }
+<span class="lineNum">     473 </span>                :            : 
+<span class="lineNum">     474 </span>[<span class="branchCov" title="Branch 1 was taken 233 times"> + </span><span class="branchCov" title="Branch 2 was taken 249 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 233 times"> + </span><span class="branchCov" title="Branch 5 was taken 249 times"> + </span>]:<span class="lineCov">        482 :         HMAP_FOR_EACH_SAFE (rmp, rmp_next, node, &amp;cfm-&gt;remote_mps) {</span>
+<span class="lineNum">     475 </span>        [<span class="branchCov" title="Branch 0 was taken 35 times"> + </span><span class="branchCov" title="Branch 1 was taken 198 times"> + </span>]:<span class="lineCov">        233 :             if (!rmp-&gt;recv) {</span>
+<span class="lineNum">     476 </span>        [<span class="branchCov" title="Branch 0 was taken 35 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         35 :                 VLOG_INFO(&quot;%s: Received no CCM from RMP %&quot;PRIu64&quot; in the last&quot;</span>
+<span class="lineNum">     477 </span>                :            :                           &quot; %lldms&quot;, cfm-&gt;name, rmp-&gt;mpid,
+<span class="lineNum">     478 </span>                :            :                           time_msec() - rmp-&gt;last_rx);
+<span class="lineNum">     479 </span>        [<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchCov" title="Branch 1 was taken 31 times"> + </span>]:<span class="lineCov">         35 :                 if (!demand_override) {</span>
+<span class="lineNum">     480 </span>                :<span class="lineCov">          4 :                     old_rmps_deleted = true;</span>
+<span class="lineNum">     481 </span>                :<span class="lineCov">          4 :                     hmap_remove(&amp;cfm-&gt;remote_mps, &amp;rmp-&gt;node);</span>
+<span class="lineNum">     482 </span>                :<span class="lineCov">          4 :                     free(rmp);</span>
+<span class="lineNum">     483 </span>                :            :                 }
+<span class="lineNum">     484 </span>                :            :             } else {
+<span class="lineNum">     485 </span>                :<span class="lineCov">        198 :                 rmp-&gt;recv = false;</span>
+<span class="lineNum">     486 </span>                :            : 
+<span class="lineNum">     487 </span>        [<span class="branchCov" title="Branch 0 was taken 198 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        198 :                 if (rmp-&gt;opup) {</span>
+<span class="lineNum">     488 </span>                :<span class="lineCov">        198 :                     rmp_set_opup = true;</span>
+<span class="lineNum">     489 </span>                :            :                 } else {
+<span class="lineNum">     490 </span>                :<span class="lineNoCov">          0 :                     rmp_set_opdown = true;</span>
+<span class="lineNum">     491 </span>                :            :                 }
+<span class="lineNum">     492 </span>                :            : 
+<span class="lineNum">     493 </span>                :<span class="lineCov">        198 :                 cfm-&gt;rmps_array[cfm-&gt;rmps_array_len++] = rmp-&gt;mpid;</span>
+<span class="lineNum">     494 </span>                :            :             }
+<span class="lineNum">     495 </span>                :            :         }
+<span class="lineNum">     496 </span>                :            : 
+<span class="lineNum">     497 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 249 times"> + </span>]:<span class="lineCov">        249 :         if (rmp_set_opdown) {</span>
+<span class="lineNum">     498 </span>                :<span class="lineNoCov">          0 :             cfm-&gt;remote_opup = false;</span>
+<span class="lineNum">     499 </span>                :            :         }
+<span class="lineNum">     500 </span>        [<span class="branchCov" title="Branch 0 was taken 198 times"> + </span><span class="branchCov" title="Branch 1 was taken 51 times"> + </span>]:<span class="lineCov">        249 :         else if (rmp_set_opup) {</span>
+<span class="lineNum">     501 </span>                :<span class="lineCov">        198 :             cfm-&gt;remote_opup = true;</span>
+<span class="lineNum">     502 </span>                :            :         }
+<span class="lineNum">     503 </span>                :            : 
+<span class="lineNum">     504 </span>        [<span class="branchCov" title="Branch 1 was taken 20 times"> + </span><span class="branchCov" title="Branch 2 was taken 229 times"> + </span>]:<span class="lineCov">        249 :         if (hmap_is_empty(&amp;cfm-&gt;remote_mps)) {</span>
+<span class="lineNum">     505 </span>                :<span class="lineCov">         20 :             cfm-&gt;fault |= CFM_FAULT_RECV;</span>
+<span class="lineNum">     506 </span>                :            :         }
+<span class="lineNum">     507 </span>                :            : 
+<span class="lineNum">     508 </span>        [<span class="branchCov" title="Branch 0 was taken 12 times"> + </span><span class="branchCov" title="Branch 1 was taken 237 times"> + </span>]:<span class="lineCov">        249 :         if (old_cfm_fault != cfm-&gt;fault) {</span>
+<span class="lineNum">     509 </span>        [<span class="branchCov" title="Branch 1 was taken 12 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">         12 :             if (!VLOG_DROP_INFO(&amp;rl)) {</span>
+<span class="lineNum">     510 </span>                :<span class="lineCov">         12 :                 struct ds ds = DS_EMPTY_INITIALIZER;</span>
+<span class="lineNum">     511 </span>                :            : 
+<span class="lineNum">     512 </span>                :<span class="lineCov">         12 :                 ds_put_cstr(&amp;ds, &quot;from [&quot;);</span>
+<span class="lineNum">     513 </span>                :<span class="lineCov">         12 :                 ds_put_cfm_fault(&amp;ds, old_cfm_fault);</span>
+<span class="lineNum">     514 </span>                :<span class="lineCov">         12 :                 ds_put_cstr(&amp;ds, &quot;] to [&quot;);</span>
+<span class="lineNum">     515 </span>                :<span class="lineCov">         12 :                 ds_put_cfm_fault(&amp;ds, cfm-&gt;fault);</span>
+<span class="lineNum">     516 </span>                :<span class="lineCov">         12 :                 ds_put_char(&amp;ds, ']');</span>
+<span class="lineNum">     517 </span>        [<span class="branchCov" title="Branch 0 was taken 12 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         12 :                 VLOG_INFO(&quot;%s: CFM faults changed %s.&quot;, cfm-&gt;name, ds_cstr(&amp;ds));</span>
+<span class="lineNum">     518 </span>                :<span class="lineCov">         12 :                 ds_destroy(&amp;ds);</span>
+<span class="lineNum">     519 </span>                :            :             }
+<span class="lineNum">     520 </span>                :            : 
+<span class="lineNum">     521 </span>                :            :             /* If there is a flap, increments the counter. */
+<span class="lineNum">     522 </span>[<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 4 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         12 :             if (old_cfm_fault == 0 || cfm-&gt;fault == 0) {</span>
+<span class="lineNum">     523 </span>                :<span class="lineCov">         12 :                 cfm-&gt;flap_count++;</span>
+<span class="lineNum">     524 </span>                :            :             }
+<span class="lineNum">     525 </span>                :            :         }
+<span class="lineNum">     526 </span>                :            : 
+<span class="lineNum">     527 </span>                :            :         /* These variables represent the cfm session status, it is desirable
+<span class="lineNum">     528 </span>                :            :          * to update them to database immediately after change. */
+<span class="lineNum">     529 </span>        [<span class="branchCov" title="Branch 0 was taken 236 times"> + </span><span class="branchCov" title="Branch 1 was taken 13 times"> + </span>]:<span class="lineCov">        249 :         if (old_health != cfm-&gt;health</span>
+<span class="lineNum">     530 </span>        [<span class="branchCov" title="Branch 0 was taken 236 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        236 :             || old_rmp_opup != cfm-&gt;remote_opup</span>
+<span class="lineNum">     531 </span>[<span class="branchCov" title="Branch 0 was taken 218 times"> + </span><span class="branchCov" title="Branch 1 was taken 18 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 216 times"> + </span><span class="branchCov" title="Branch 3 was taken 2 times"> + </span>]:<span class="lineCov">        236 :             || (old_rmps_array_len != cfm-&gt;rmps_array_len || old_rmps_deleted)</span>
+<span class="lineNum">     532 </span>        [<span class="branchCov" title="Branch 0 was taken 212 times"> + </span><span class="branchCov" title="Branch 1 was taken 4 times"> + </span>]:<span class="lineCov">        216 :             || old_cfm_fault != cfm-&gt;fault</span>
+<span class="lineNum">     533 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 212 times"> + </span>]:<span class="lineCov">        212 :             || old_flap_count != cfm-&gt;flap_count) {</span>
+<span class="lineNum">     534 </span>                :<span class="lineCov">         37 :             cfm_status_changed(cfm);</span>
+<span class="lineNum">     535 </span>                :            :         }
+<span class="lineNum">     536 </span>                :            : 
+<span class="lineNum">     537 </span>                :<span class="lineCov">        249 :         cfm-&gt;booted = true;</span>
+<span class="lineNum">     538 </span>                :<span class="lineCov">        249 :         timer_set_duration(&amp;cfm-&gt;fault_timer, interval);</span>
+<span class="lineNum">     539 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 249 times"> + </span>]:<span class="lineCov">        249 :         VLOG_DBG(&quot;%s: new fault interval&quot;, cfm-&gt;name);</span>
+<span class="lineNum">     540 </span>                :            :     }
+<span class="lineNum">     541 </span>                :<span class="lineCov">       1321 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     542 </span>                :<span class="lineCov">       1321 : }</span>
+<span class="lineNum">     543 </span>                :            : 
+<span class="lineNum">     544 </span>                :            : /* Should be run periodically to check if the CFM module has a CCM message it
+<a name="545"><span class="lineNum">     545 </span>                :            :  * wishes to send. */</a>
+<span class="lineNum">     546 </span>                :            : bool
+<span class="lineNum">     547 </span>                :<span class="lineCov">       1321 : cfm_should_send_ccm(struct cfm *cfm) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     548 </span>                :            : {
+<span class="lineNum">     549 </span>                :            :     bool ret;
+<span class="lineNum">     550 </span>                :            : 
+<span class="lineNum">     551 </span>                :<span class="lineCov">       1321 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     552 </span>                :<span class="lineCov">       1321 :     ret = timer_expired(&amp;cfm-&gt;tx_timer);</span>
+<span class="lineNum">     553 </span>                :<span class="lineCov">       1321 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     554 </span>                :<span class="lineCov">       1321 :     return ret;</span>
+<span class="lineNum">     555 </span>                :            : }
+<span class="lineNum">     556 </span>                :            : 
+<span class="lineNum">     557 </span>                :            : /* Composes a CCM message into 'packet'.  Messages generated with this function
+<a name="558"><span class="lineNum">     558 </span>                :            :  * should be sent whenever cfm_should_send_ccm() indicates. */</a>
+<span class="lineNum">     559 </span>                :            : void
+<span class="lineNum">     560 </span>                :<span class="lineCov">       1228 : cfm_compose_ccm(struct cfm *cfm, struct ofpbuf *packet,</span>
+<span class="lineNum">     561 </span>                :            :                 uint8_t eth_src[ETH_ADDR_LEN]) OVS_EXCLUDED(mutex)
+<span class="lineNum">     562 </span>                :            : {
+<span class="lineNum">     563 </span>                :            :     uint16_t ccm_vlan;
+<span class="lineNum">     564 </span>                :            :     struct ccm *ccm;
+<span class="lineNum">     565 </span>                :            :     bool extended;
+<span class="lineNum">     566 </span>                :            : 
+<span class="lineNum">     567 </span>                :<span class="lineCov">       1228 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     568 </span>                :<span class="lineCov">       1228 :     timer_set_duration(&amp;cfm-&gt;tx_timer, cfm-&gt;ccm_interval_ms);</span>
+<span class="lineNum">     569 </span>                :<span class="lineCov">       1228 :     eth_compose(packet, cfm_ccm_addr(cfm), eth_src, ETH_TYPE_CFM, sizeof *ccm);</span>
+<span class="lineNum">     570 </span>                :            : 
+<span class="lineNum">     571 </span>        [<span class="branchCov" title="Branch 0 was taken 1228 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       1228 :     ccm_vlan = (cfm-&gt;ccm_vlan != CFM_RANDOM_VLAN</span>
+<span class="lineNum">     572 </span>                :            :                 ? cfm-&gt;ccm_vlan
+<span class="lineNum">     573 </span>                :            :                 : random_uint16());
+<span class="lineNum">     574 </span>                :<span class="lineCov">       1228 :     ccm_vlan = ccm_vlan &amp; VLAN_VID_MASK;</span>
+<span class="lineNum">     575 </span>                :            : 
+<span class="lineNum">     576 </span>[<span class="branchCov" title="Branch 0 was taken 1228 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 1228 times"> + </span>]:<span class="lineCov">       1228 :     if (ccm_vlan || cfm-&gt;ccm_pcp) {</span>
+<span class="lineNum">     577 </span>                :<span class="lineNoCov">          0 :         uint16_t tci = ccm_vlan | (cfm-&gt;ccm_pcp &lt;&lt; VLAN_PCP_SHIFT);</span>
+<span class="lineNum">     578 </span>                :<span class="lineNoCov">          0 :         eth_push_vlan(packet, htons(ETH_TYPE_VLAN), htons(tci));</span>
+<span class="lineNum">     579 </span>                :            :     }
+<span class="lineNum">     580 </span>                :            : 
+<span class="lineNum">     581 </span>                :<span class="lineCov">       1228 :     ccm = ofpbuf_l3(packet);</span>
+<span class="lineNum">     582 </span>                :<span class="lineCov">       1228 :     ccm-&gt;mdlevel_version = 0;</span>
+<span class="lineNum">     583 </span>                :<span class="lineCov">       1228 :     ccm-&gt;opcode = CCM_OPCODE;</span>
+<span class="lineNum">     584 </span>                :<span class="lineCov">       1228 :     ccm-&gt;tlv_offset = 70;</span>
+<span class="lineNum">     585 </span>                :<span class="lineCov">       1228 :     ccm-&gt;seq = htonl(++cfm-&gt;seq);</span>
+<span class="lineNum">     586 </span>                :<span class="lineCov">       1228 :     ccm-&gt;flags = cfm-&gt;ccm_interval;</span>
+<span class="lineNum">     587 </span>                :<span class="lineCov">       1228 :     memcpy(ccm-&gt;maid, cfm-&gt;maid, sizeof ccm-&gt;maid);</span>
+<span class="lineNum">     588 </span>                :<span class="lineCov">       1228 :     memset(ccm-&gt;zero, 0, sizeof ccm-&gt;zero);</span>
+<span class="lineNum">     589 </span>                :<span class="lineCov">       1228 :     ccm-&gt;end_tlv = 0;</span>
+<span class="lineNum">     590 </span>                :            : 
+<span class="lineNum">     591 </span>                :<span class="lineCov">       1228 :     atomic_read(&amp;cfm-&gt;extended, &amp;extended);</span>
+<span class="lineNum">     592 </span>        [<span class="branchCov" title="Branch 0 was taken 1210 times"> + </span><span class="branchCov" title="Branch 1 was taken 18 times"> + </span>]:<span class="lineCov">       1228 :     if (extended) {</span>
+<span class="lineNum">     593 </span>                :<span class="lineCov">       1210 :         ccm-&gt;mpid = htons(hash_mpid(cfm-&gt;mpid));</span>
+<span class="lineNum">     594 </span>                :<span class="lineCov">       1210 :         ccm-&gt;mpid64 = htonll(cfm-&gt;mpid);</span>
+<span class="lineNum">     595 </span>                :<span class="lineCov">       1210 :         ccm-&gt;opdown = !cfm-&gt;opup;</span>
+<span class="lineNum">     596 </span>                :            :     } else {
+<span class="lineNum">     597 </span>                :<span class="lineCov">         18 :         ccm-&gt;mpid = htons(cfm-&gt;mpid);</span>
+<span class="lineNum">     598 </span>                :<span class="lineCov">         18 :         ccm-&gt;mpid64 = htonll(0);</span>
+<span class="lineNum">     599 </span>                :<span class="lineCov">         18 :         ccm-&gt;opdown = 0;</span>
+<span class="lineNum">     600 </span>                :            :     }
+<span class="lineNum">     601 </span>                :            : 
+<span class="lineNum">     602 </span>        [<span class="branchCov" title="Branch 0 was taken 767 times"> + </span><span class="branchCov" title="Branch 1 was taken 461 times"> + </span>]:<span class="lineCov">       1228 :     if (cfm-&gt;ccm_interval == 0) {</span>
+<span class="lineNum">     603 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 767 times"> + </span>]:<span class="lineCov">        767 :         ovs_assert(extended);</span>
+<span class="lineNum">     604 </span>                :<span class="lineCov">        767 :         ccm-&gt;interval_ms_x = htons(cfm-&gt;ccm_interval_ms);</span>
+<span class="lineNum">     605 </span>                :            :     } else {
+<span class="lineNum">     606 </span>                :<span class="lineCov">        461 :         ccm-&gt;interval_ms_x = htons(0);</span>
+<span class="lineNum">     607 </span>                :            :     }
+<span class="lineNum">     608 </span>                :            : 
+<span class="lineNum">     609 </span>[<span class="branchCov" title="Branch 0 was taken 1161 times"> + </span><span class="branchCov" title="Branch 1 was taken 67 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 85 times"> + </span><span class="branchCov" title="Branch 4 was taken 1076 times"> + </span>]:<span class="lineCov">       1228 :     if (cfm-&gt;booted &amp;&amp; hmap_is_empty(&amp;cfm-&gt;remote_mps)) {</span>
+<span class="lineNum">     610 </span>                :<span class="lineCov">         85 :         ccm-&gt;flags |= CCM_RDI_MASK;</span>
+<span class="lineNum">     611 </span>                :            :     }
+<span class="lineNum">     612 </span>                :            : 
+<span class="lineNum">     613 </span>        [<span class="branchCov" title="Branch 0 was taken 1212 times"> + </span><span class="branchCov" title="Branch 1 was taken 16 times"> + </span>]:<span class="lineCov">       1228 :     if (cfm-&gt;last_tx) {</span>
+<span class="lineNum">     614 </span>                :<span class="lineCov">       1212 :         long long int delay = time_msec() - cfm-&gt;last_tx;</span>
+<span class="lineNum">     615 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1212 times"> + </span>]:<span class="lineCov">       1212 :         if (delay &gt; (cfm-&gt;ccm_interval_ms * 3 / 2)) {</span>
+<span class="lineNum">     616 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN(&quot;%s: long delay of %lldms (expected %dms) sending CCM&quot;</span>
+<span class="lineNum">     617 </span>                :            :                       &quot; seq %&quot;PRIu32, cfm-&gt;name, delay, cfm-&gt;ccm_interval_ms,
+<span class="lineNum">     618 </span>                :            :                       cfm-&gt;seq);
+<span class="lineNum">     619 </span>                :            :         }
+<span class="lineNum">     620 </span>                :            :     }
+<span class="lineNum">     621 </span>                :<span class="lineCov">       1228 :     cfm-&gt;last_tx = time_msec();</span>
+<span class="lineNum">     622 </span>                :<span class="lineCov">       1228 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     623 </span>                :<span class="lineCov">       1228 : }</span>
+<a name="624"><span class="lineNum">     624 </span>                :            : </a>
+<span class="lineNum">     625 </span>                :            : void
+<span class="lineNum">     626 </span>                :<span class="lineCov">       1321 : cfm_wait(struct cfm *cfm) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     627 </span>                :            : {
+<span class="lineNum">     628 </span>                :<span class="lineCov">       1321 :     poll_timer_wait_until(cfm_wake_time(cfm));</span>
+<span class="lineNum">     629 </span>                :<span class="lineCov">       1321 : }</span>
+<span class="lineNum">     630 </span>                :            : 
+<span class="lineNum">     631 </span>                :            : 
+<a name="632"><span class="lineNum">     632 </span>                :            : /* Returns the next cfm wakeup time. */</a>
+<span class="lineNum">     633 </span>                :            : long long int
+<span class="lineNum">     634 </span>                :<span class="lineCov">       5293 : cfm_wake_time(struct cfm *cfm) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     635 </span>                :            : {
+<span class="lineNum">     636 </span>                :            :     long long int retval;
+<span class="lineNum">     637 </span>                :            : 
+<span class="lineNum">     638 </span>        [<span class="branchCov" title="Branch 0 was taken 1350 times"> + </span><span class="branchCov" title="Branch 1 was taken 3943 times"> + </span>]:<span class="lineCov">       5293 :     if (!cfm) {</span>
+<span class="lineNum">     639 </span>                :<span class="lineCov">       1350 :         return LLONG_MAX;</span>
+<span class="lineNum">     640 </span>                :            :     }
+<span class="lineNum">     641 </span>                :            : 
+<span class="lineNum">     642 </span>                :<span class="lineCov">       3943 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     643 </span>                :<span class="lineCov">       3943 :     retval = MIN(cfm-&gt;tx_timer.t, cfm-&gt;fault_timer.t);</span>
+<span class="lineNum">     644 </span>                :<span class="lineCov">       3943 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     645 </span>                :<span class="lineCov">       5293 :     return retval;</span>
+<span class="lineNum">     646 </span>                :            : }
+<span class="lineNum">     647 </span>                :            : 
+<span class="lineNum">     648 </span>                :            : 
+<a name="649"><span class="lineNum">     649 </span>                :            : /* Configures 'cfm' with settings from 's'. */</a>
+<span class="lineNum">     650 </span>                :            : bool
+<span class="lineNum">     651 </span>                :<span class="lineCov">         32 : cfm_configure(struct cfm *cfm, const struct cfm_settings *s)</span>
+<span class="lineNum">     652 </span>                :            :     OVS_EXCLUDED(mutex)
+<span class="lineNum">     653 </span>                :            : {
+<span class="lineNum">     654 </span>                :            :     uint8_t interval;
+<span class="lineNum">     655 </span>                :            :     int interval_ms;
+<span class="lineNum">     656 </span>                :            : 
+<span class="lineNum">     657 </span>[<span class="branchCov" title="Branch 1 was taken 32 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 32 times"> + </span>]:<span class="lineCov">         32 :     if (!cfm_is_valid_mpid(s-&gt;extended, s-&gt;mpid) || s-&gt;interval &lt;= 0) {</span>
+<span class="lineNum">     658 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     659 </span>                :            :     }
+<span class="lineNum">     660 </span>                :            : 
+<span class="lineNum">     661 </span>                :<span class="lineCov">         32 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     662 </span>                :<span class="lineCov">         32 :     cfm-&gt;mpid = s-&gt;mpid;</span>
+<span class="lineNum">     663 </span>                :<span class="lineCov">         32 :     cfm-&gt;opup = s-&gt;opup;</span>
+<span class="lineNum">     664 </span>                :<span class="lineCov">         32 :     interval = ms_to_ccm_interval(s-&gt;interval);</span>
+<span class="lineNum">     665 </span>                :<span class="lineCov">         32 :     interval_ms = ccm_interval_to_ms(interval);</span>
+<span class="lineNum">     666 </span>                :            : 
+<span class="lineNum">     667 </span>                :<span class="lineCov">         32 :     atomic_store(&amp;cfm-&gt;check_tnl_key, s-&gt;check_tnl_key);</span>
+<span class="lineNum">     668 </span>                :<span class="lineCov">         32 :     atomic_store(&amp;cfm-&gt;extended, s-&gt;extended);</span>
+<span class="lineNum">     669 </span>                :            : 
+<span class="lineNum">     670 </span>                :<span class="lineCov">         32 :     cfm-&gt;ccm_vlan = s-&gt;ccm_vlan;</span>
+<span class="lineNum">     671 </span>                :<span class="lineCov">         32 :     cfm-&gt;ccm_pcp = s-&gt;ccm_pcp &amp; (VLAN_PCP_MASK &gt;&gt; VLAN_PCP_SHIFT);</span>
+<span class="lineNum">     672 </span>[<span class="branchCov" title="Branch 0 was taken 24 times"> + </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 17 times"> + </span><span class="branchCov" title="Branch 3 was taken 7 times"> + </span>]:<span class="lineCov">         32 :     if (s-&gt;extended &amp;&amp; interval_ms != s-&gt;interval) {</span>
+<span class="lineNum">     673 </span>                :<span class="lineCov">         17 :         interval = 0;</span>
+<span class="lineNum">     674 </span>                :<span class="lineCov">         17 :         interval_ms = MIN(s-&gt;interval, UINT16_MAX);</span>
+<span class="lineNum">     675 </span>                :            :     }
+<span class="lineNum">     676 </span>                :            : 
+<span class="lineNum">     677 </span>[<span class="branchCov" title="Branch 0 was taken 24 times"> + </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 9 times"> + </span><span class="branchCov" title="Branch 3 was taken 15 times"> + </span>]:<span class="lineCov">         32 :     if (s-&gt;extended &amp;&amp; s-&gt;demand) {</span>
+<span class="lineNum">     678 </span>        [<span class="branchCov" title="Branch 0 was taken 5 times"> + </span><span class="branchCov" title="Branch 1 was taken 4 times"> + </span>]:<span class="lineCov">         14 :         if (!cfm-&gt;demand) {</span>
+<span class="lineNum">     679 </span>                :<span class="lineCov">          5 :             cfm-&gt;demand = true;</span>
+<span class="lineNum">     680 </span>                :<span class="lineCov">          5 :             cfm-&gt;rx_packets = cfm_rx_packets(cfm);</span>
+<span class="lineNum">     681 </span>                :            :         }
+<span class="lineNum">     682 </span>                :            :     } else {
+<span class="lineNum">     683 </span>                :<span class="lineCov">         23 :         cfm-&gt;demand = false;</span>
+<span class="lineNum">     684 </span>                :            :     }
+<span class="lineNum">     685 </span>                :            : 
+<span class="lineNum">     686 </span>[<span class="branchCov" title="Branch 0 was taken 24 times"> + </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 8 times"> + </span><span class="branchCov" title="Branch 3 was taken 16 times"> + </span>]:<span class="lineCov">         32 :     if (interval != cfm-&gt;ccm_interval || interval_ms != cfm-&gt;ccm_interval_ms) {</span>
+<span class="lineNum">     687 </span>                :<span class="lineCov">         16 :         cfm-&gt;ccm_interval = interval;</span>
+<span class="lineNum">     688 </span>                :<span class="lineCov">         16 :         cfm-&gt;ccm_interval_ms = interval_ms;</span>
+<span class="lineNum">     689 </span>                :            : 
+<span class="lineNum">     690 </span>                :<span class="lineCov">         16 :         timer_set_expired(&amp;cfm-&gt;tx_timer);</span>
+<span class="lineNum">     691 </span>                :<span class="lineCov">         16 :         timer_set_duration(&amp;cfm-&gt;fault_timer, cfm_fault_interval(cfm));</span>
+<span class="lineNum">     692 </span>                :            :     }
+<span class="lineNum">     693 </span>                :            : 
+<span class="lineNum">     694 </span>                :<span class="lineCov">         32 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     695 </span>                :<span class="lineCov">         32 :     return true;</span>
+<span class="lineNum">     696 </span>                :            : }
+<span class="lineNum">     697 </span>                :            : 
+<a name="698"><span class="lineNum">     698 </span>                :            : /* Must be called when the netdev owned by 'cfm' should change. */</a>
+<span class="lineNum">     699 </span>                :            : void
+<span class="lineNum">     700 </span>                :<span class="lineCov">         23 : cfm_set_netdev(struct cfm *cfm, const struct netdev *netdev)</span>
+<span class="lineNum">     701 </span>                :            :     OVS_EXCLUDED(mutex)
+<span class="lineNum">     702 </span>                :            : {
+<span class="lineNum">     703 </span>                :<span class="lineCov">         23 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     704 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 23 times"> + </span>]:<span class="lineCov">         23 :     if (cfm-&gt;netdev != netdev) {</span>
+<span class="lineNum">     705 </span>                :<span class="lineNoCov">          0 :         netdev_close(cfm-&gt;netdev);</span>
+<span class="lineNum">     706 </span>                :<span class="lineNoCov">          0 :         cfm-&gt;netdev = netdev_ref(netdev);</span>
+<span class="lineNum">     707 </span>                :            :     }
+<span class="lineNum">     708 </span>                :<span class="lineCov">         23 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     709 </span>                :<span class="lineCov">         23 : }</span>
+<span class="lineNum">     710 </span>                :            : 
+<span class="lineNum">     711 </span>                :            : /* Returns true if 'cfm' should process packets from 'flow'.  Sets
+<a name="712"><span class="lineNum">     712 </span>                :            :  * fields in 'wc' that were used to make the determination. */</a>
+<span class="lineNum">     713 </span>                :            : bool
+<span class="lineNum">     714 </span>                :<span class="lineCov">       1728 : cfm_should_process_flow(const struct cfm *cfm_, const struct flow *flow,</span>
+<span class="lineNum">     715 </span>                :            :                         struct flow_wildcards *wc)
+<span class="lineNum">     716 </span>                :            : {
+<span class="lineNum">     717 </span>                :<span class="lineCov">       1728 :     struct cfm *cfm = CONST_CAST(struct cfm *, cfm_);</span>
+<span class="lineNum">     718 </span>                :            :     bool check_tnl_key;
+<span class="lineNum">     719 </span>                :            : 
+<span class="lineNum">     720 </span>                :<span class="lineCov">       1728 :     atomic_read(&amp;cfm-&gt;check_tnl_key, &amp;check_tnl_key);</span>
+<span class="lineNum">     721 </span>                :<span class="lineCov">       1728 :     memset(&amp;wc-&gt;masks.dl_dst, 0xff, sizeof wc-&gt;masks.dl_dst);</span>
+<span class="lineNum">     722 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1728 times"> + </span>]:<span class="lineCov">       1728 :     if (check_tnl_key) {</span>
+<span class="lineNum">     723 </span>                :<span class="lineNoCov">          0 :         memset(&amp;wc-&gt;masks.tunnel.tun_id, 0xff, sizeof wc-&gt;masks.tunnel.tun_id);</span>
+<span class="lineNum">     724 </span>                :            :     }
+<span class="lineNum">     725 </span>                :<span class="lineCov">       3456 :     return (ntohs(flow-&gt;dl_type) == ETH_TYPE_CFM</span>
+<span class="lineNum">     726 </span>        [<span class="branchCov" title="Branch 2 was taken 910 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        910 :             &amp;&amp; eth_addr_equals(flow-&gt;dl_dst, cfm_ccm_addr(cfm))</span>
+<span class="lineNum">     727 </span>[<span class="branchCov" title="Branch 0 was taken 910 times"> + </span><span class="branchCov" title="Branch 1 was taken 818 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 910 times"> + </span>]:<span class="lineCov">       2638 :             &amp;&amp; (!check_tnl_key || flow-&gt;tunnel.tun_id == htonll(0)));</span>
+<span class="lineNum">         </span>        [<span class="branchNoExec" title="Branch 5 was not executed"> # </span><span class="branchNoExec" title="Branch 6 was not executed"> # </span>]
+<span class="lineNum">     728 </span>                :            : }
+<span class="lineNum">     729 </span>                :            : 
+<span class="lineNum">     730 </span>                :            : /* Updates internal statistics relevant to packet 'p'.  Should be called on
+<span class="lineNum">     731 </span>                :            :  * every packet whose flow returned true when passed to
+<a name="732"><span class="lineNum">     732 </span>                :            :  * cfm_should_process_flow. */</a>
+<span class="lineNum">     733 </span>                :            : void
+<span class="lineNum">     734 </span>                :<span class="lineCov">        910 : cfm_process_heartbeat(struct cfm *cfm, const struct ofpbuf *p)</span>
+<span class="lineNum">     735 </span>                :            :     OVS_EXCLUDED(mutex)
+<span class="lineNum">     736 </span>                :            : {
+<span class="lineNum">     737 </span>                :            :     struct ccm *ccm;
+<span class="lineNum">     738 </span>                :            :     struct eth_header *eth;
+<span class="lineNum">     739 </span>                :            : 
+<span class="lineNum">     740 </span>                :<span class="lineCov">        910 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     741 </span>                :            : 
+<span class="lineNum">     742 </span>                :<span class="lineCov">        910 :     eth = ofpbuf_l2(p);</span>
+<span class="lineNum">     743 </span>                :<span class="lineCov">        910 :     ccm = ofpbuf_at(p, (uint8_t *)ofpbuf_l3(p) - (uint8_t *)ofpbuf_data(p),</span>
+<span class="lineNum">     744 </span>                :            :                     CCM_ACCEPT_LEN);
+<span class="lineNum">     745 </span>                :            : 
+<span class="lineNum">     746 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 910 times"> + </span>]:<span class="lineCov">        910 :     if (!ccm) {</span>
+<span class="lineNum">     747 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_INFO_RL(&amp;rl, &quot;%s: Received an unparseable 802.1ag CCM heartbeat.&quot;,</span>
+<span class="lineNum">     748 </span>                :            :                      cfm-&gt;name);
+<span class="lineNum">     749 </span>                :<span class="lineNoCov">          0 :         goto out;</span>
+<span class="lineNum">     750 </span>                :            :     }
+<span class="lineNum">     751 </span>                :            : 
+<span class="lineNum">     752 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 910 times"> + </span>]:<span class="lineCov">        910 :     if (ccm-&gt;opcode != CCM_OPCODE) {</span>
+<span class="lineNum">     753 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_INFO_RL(&amp;rl, &quot;%s: Received an unsupported 802.1ag message. &quot;</span>
+<span class="lineNum">     754 </span>                :            :                      &quot;(opcode %u)&quot;, cfm-&gt;name, ccm-&gt;opcode);
+<span class="lineNum">     755 </span>                :<span class="lineNoCov">          0 :         goto out;</span>
+<span class="lineNum">     756 </span>                :            :     }
+<span class="lineNum">     757 </span>                :            : 
+<span class="lineNum">     758 </span>                :            :     /* According to the 802.1ag specification, reception of a CCM with an
+<span class="lineNum">     759 </span>                :            :      * incorrect ccm_interval, unexpected MAID, or unexpected MPID should
+<span class="lineNum">     760 </span>                :            :      * trigger a fault.  We ignore this requirement for several reasons.
+<span class="lineNum">     761 </span>                :            :      *
+<span class="lineNum">     762 </span>                :            :      * Faults can cause a controller or Open vSwitch to make potentially
+<span class="lineNum">     763 </span>                :            :      * expensive changes to the network topology.  It seems prudent to trigger
+<span class="lineNum">     764 </span>                :            :      * them judiciously, especially when CFM is used to check slave status of
+<span class="lineNum">     765 </span>                :            :      * bonds. Furthermore, faults can be maliciously triggered by crafting
+<span class="lineNum">     766 </span>                :            :      * unexpected CCMs. */
+<span class="lineNum">     767 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 910 times"> + </span>]:<span class="lineCov">        910 :     if (memcmp(ccm-&gt;maid, cfm-&gt;maid, sizeof ccm-&gt;maid)) {</span>
+<span class="lineNum">     768 </span>                :<span class="lineNoCov">          0 :         cfm-&gt;recv_fault |= CFM_FAULT_MAID;</span>
+<span class="lineNum">     769 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;%s: Received unexpected remote MAID from MAC &quot;</span>
+<span class="lineNum">     770 </span>                :            :                      ETH_ADDR_FMT, cfm-&gt;name, ETH_ADDR_ARGS(eth-&gt;eth_src));
+<span class="lineNum">     771 </span>                :            :     } else {
+<span class="lineNum">     772 </span>                :<span class="lineCov">        910 :         uint8_t ccm_interval = ccm-&gt;flags &amp; 0x7;</span>
+<span class="lineNum">     773 </span>                :<span class="lineCov">        910 :         bool ccm_rdi = ccm-&gt;flags &amp; CCM_RDI_MASK;</span>
+<span class="lineNum">     774 </span>                :<span class="lineCov">        910 :         uint16_t ccm_interval_ms_x = ntohs(ccm-&gt;interval_ms_x);</span>
+<span class="lineNum">     775 </span>                :            : 
+<span class="lineNum">     776 </span>                :            :         struct remote_mp *rmp;
+<span class="lineNum">     777 </span>                :            :         uint64_t ccm_mpid;
+<span class="lineNum">     778 </span>                :            :         uint32_t ccm_seq;
+<span class="lineNum">     779 </span>                :            :         bool ccm_opdown;
+<span class="lineNum">     780 </span>                :            :         bool extended;
+<span class="lineNum">     781 </span>                :<span class="lineCov">        910 :         enum cfm_fault_reason cfm_fault = 0;</span>
+<span class="lineNum">     782 </span>                :            : 
+<span class="lineNum">     783 </span>                :<span class="lineCov">        910 :         atomic_read(&amp;cfm-&gt;extended, &amp;extended);</span>
+<span class="lineNum">     784 </span>        [<span class="branchCov" title="Branch 0 was taken 910 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        910 :         if (extended) {</span>
+<span class="lineNum">     785 </span>                :<span class="lineCov">        910 :             ccm_mpid = ntohll(ccm-&gt;mpid64);</span>
+<span class="lineNum">     786 </span>                :<span class="lineCov">        910 :             ccm_opdown = ccm-&gt;opdown;</span>
+<span class="lineNum">     787 </span>                :            :         } else {
+<span class="lineNum">     788 </span>                :<span class="lineNoCov">          0 :             ccm_mpid = ntohs(ccm-&gt;mpid);</span>
+<span class="lineNum">     789 </span>                :<span class="lineNoCov">          0 :             ccm_opdown = false;</span>
+<span class="lineNum">     790 </span>                :            :         }
+<span class="lineNum">     791 </span>                :<span class="lineCov">        910 :         ccm_seq = ntohl(ccm-&gt;seq);</span>
+<span class="lineNum">     792 </span>                :            : 
+<span class="lineNum">     793 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 910 times"> + </span>]:<span class="lineCov">        910 :         if (ccm_interval != cfm-&gt;ccm_interval) {</span>
+<span class="lineNum">     794 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN_RL(&amp;rl, &quot;%s: received a CCM with an unexpected interval&quot;</span>
+<span class="lineNum">     795 </span>                :            :                          &quot; (%&quot;PRIu8&quot;) from RMP %&quot;PRIu64, cfm-&gt;name,
+<span class="lineNum">     796 </span>                :            :                          ccm_interval, ccm_mpid);
+<span class="lineNum">     797 </span>                :            :         }
+<span class="lineNum">     798 </span>                :            : 
+<span class="lineNum">     799 </span>[<span class="branchCov" title="Branch 0 was taken 910 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 480 times"> + </span><span class="branchCov" title="Branch 3 was taken 430 times"> + </span>]:<span class="lineCov">        910 :         if (extended &amp;&amp; ccm_interval == 0</span>
+<span class="lineNum">     800 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 480 times"> + </span>]:<span class="lineCov">        480 :             &amp;&amp; ccm_interval_ms_x != cfm-&gt;ccm_interval_ms) {</span>
+<span class="lineNum">     801 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN_RL(&amp;rl, &quot;%s: received a CCM with an unexpected extended&quot;</span>
+<span class="lineNum">     802 </span>                :            :                          &quot; interval (%&quot;PRIu16&quot;ms) from RMP %&quot;PRIu64, cfm-&gt;name,
+<span class="lineNum">     803 </span>                :            :                          ccm_interval_ms_x, ccm_mpid);
+<span class="lineNum">     804 </span>                :            :         }
+<span class="lineNum">     805 </span>                :            : 
+<span class="lineNum">     806 </span>                :<span class="lineCov">        910 :         rmp = lookup_remote_mp(cfm, ccm_mpid);</span>
+<span class="lineNum">     807 </span>        [<span class="branchCov" title="Branch 0 was taken 14 times"> + </span><span class="branchCov" title="Branch 1 was taken 896 times"> + </span>]:<span class="lineCov">        910 :         if (!rmp) {</span>
+<span class="lineNum">     808 </span>        [<span class="branchCov" title="Branch 1 was taken 14 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">         14 :             if (hmap_count(&amp;cfm-&gt;remote_mps) &lt; CFM_MAX_RMPS) {</span>
+<span class="lineNum">     809 </span>                :<span class="lineCov">         14 :                 rmp = xzalloc(sizeof *rmp);</span>
+<span class="lineNum">     810 </span>                :<span class="lineCov">         14 :                 hmap_insert(&amp;cfm-&gt;remote_mps, &amp;rmp-&gt;node, hash_mpid(ccm_mpid));</span>
+<span class="lineNum">     811 </span>                :            :             } else {
+<span class="lineNum">     812 </span>                :<span class="lineNoCov">          0 :                 cfm_fault |= CFM_FAULT_OVERFLOW;</span>
+<span class="lineNum">     813 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_WARN_RL(&amp;rl,</span>
+<span class="lineNum">     814 </span>                :            :                              &quot;%s: dropped CCM with MPID %&quot;PRIu64&quot; from MAC &quot;
+<span class="lineNum">     815 </span>                :            :                              ETH_ADDR_FMT, cfm-&gt;name, ccm_mpid,
+<span class="lineNum">     816 </span>                :            :                              ETH_ADDR_ARGS(eth-&gt;eth_src));
+<span class="lineNum">     817 </span>                :            :             }
+<span class="lineNum">     818 </span>                :            :         }
+<span class="lineNum">     819 </span>                :            : 
+<span class="lineNum">     820 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 909 times"> + </span>]:<span class="lineCov">        910 :         if (ccm_rdi) {</span>
+<span class="lineNum">     821 </span>                :<span class="lineCov">          1 :             cfm_fault |= CFM_FAULT_RDI;</span>
+<span class="lineNum">     822 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :             VLOG_DBG(&quot;%s: RDI bit flagged from RMP %&quot;PRIu64, cfm-&gt;name,</span>
+<span class="lineNum">     823 </span>                :            :                      ccm_mpid);
+<span class="lineNum">     824 </span>                :            :         }
+<span class="lineNum">     825 </span>                :            : 
+<span class="lineNum">     826 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 910 times"> + </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">        910 :         VLOG_DBG(&quot;%s: received CCM (seq %&quot;PRIu32&quot;) (mpid %&quot;PRIu64&quot;)&quot;</span>
+<span class="lineNum">     827 </span>                :            :                  &quot; (interval %&quot;PRIu8&quot;) (RDI %s)&quot;, cfm-&gt;name, ccm_seq,
+<span class="lineNum">     828 </span>                :            :                  ccm_mpid, ccm_interval, ccm_rdi ? &quot;true&quot; : &quot;false&quot;);
+<span class="lineNum">     829 </span>                :            : 
+<span class="lineNum">     830 </span>        [<span class="branchCov" title="Branch 0 was taken 910 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        910 :         if (rmp) {</span>
+<span class="lineNum">     831 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 910 times"> + </span>]:<span class="lineCov">        910 :             if (rmp-&gt;mpid == cfm-&gt;mpid) {</span>
+<span class="lineNum">     832 </span>                :<span class="lineNoCov">          0 :                 cfm_fault |= CFM_FAULT_LOOPBACK;</span>
+<span class="lineNum">     833 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_WARN_RL(&amp;rl,&quot;%s: received CCM with local MPID&quot;</span>
+<span class="lineNum">     834 </span>                :            :                              &quot; %&quot;PRIu64, cfm-&gt;name, rmp-&gt;mpid);
+<span class="lineNum">     835 </span>                :            :             }
+<span class="lineNum">     836 </span>                :            : 
+<span class="lineNum">     837 </span>[<span class="branchCov" title="Branch 0 was taken 896 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 896 times"> + </span>]:<span class="lineCov">        910 :             if (rmp-&gt;seq &amp;&amp; ccm_seq != (rmp-&gt;seq + 1)) {</span>
+<span class="lineNum">     838 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_WARN_RL(&amp;rl, &quot;%s: (mpid %&quot;PRIu64&quot;) detected sequence&quot;</span>
+<span class="lineNum">     839 </span>                :            :                              &quot; numbers which indicate possible connectivity&quot;
+<span class="lineNum">     840 </span>                :            :                              &quot; problems (previous %&quot;PRIu32&quot;) (current %&quot;PRIu32
+<span class="lineNum">     841 </span>                :            :                              &quot;)&quot;, cfm-&gt;name, ccm_mpid, rmp-&gt;seq, ccm_seq);
+<span class="lineNum">     842 </span>                :            :             }
+<span class="lineNum">     843 </span>                :            : 
+<span class="lineNum">     844 </span>                :<span class="lineCov">        910 :             rmp-&gt;mpid = ccm_mpid;</span>
+<span class="lineNum">     845 </span>        [<span class="branchCov" title="Branch 0 was taken 909 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">        910 :             if (!cfm_fault) {</span>
+<span class="lineNum">     846 </span>                :<span class="lineCov">        909 :                 rmp-&gt;num_health_ccm++;</span>
+<span class="lineNum">     847 </span>        [<span class="branchCov" title="Branch 0 was taken 369 times"> + </span><span class="branchCov" title="Branch 1 was taken 540 times"> + </span>]:<span class="lineCov">        909 :                 if (cfm-&gt;demand) {</span>
+<span class="lineNum">     848 </span>                :<span class="lineCov">        369 :                     timer_set_duration(&amp;cfm-&gt;demand_rx_ccm_t,</span>
+<span class="lineNum">     849 </span>                :<span class="lineCov">        369 :                                        100 * cfm-&gt;ccm_interval_ms);</span>
+<span class="lineNum">     850 </span>                :            :                 }
+<span class="lineNum">     851 </span>                :            :             }
+<span class="lineNum">     852 </span>                :<span class="lineCov">        910 :             rmp-&gt;recv = true;</span>
+<span class="lineNum">     853 </span>                :<span class="lineCov">        910 :             cfm-&gt;recv_fault |= cfm_fault;</span>
+<span class="lineNum">     854 </span>                :<span class="lineCov">        910 :             rmp-&gt;seq = ccm_seq;</span>
+<span class="lineNum">     855 </span>                :<span class="lineCov">        910 :             rmp-&gt;opup = !ccm_opdown;</span>
+<span class="lineNum">     856 </span>                :<span class="lineCov">        910 :             rmp-&gt;last_rx = time_msec();</span>
+<span class="lineNum">     857 </span>                :            :         }
+<span class="lineNum">     858 </span>                :            :     }
+<span class="lineNum">     859 </span>                :            : 
+<span class="lineNum">     860 </span>                :            : out:
+<span class="lineNum">     861 </span>                :<span class="lineCov">        910 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     862 </span>                :<span class="lineCov">        910 : }</span>
+<span class="lineNum">     863 </span>                :            : 
+<a name="864"><span class="lineNum">     864 </span>                :            : /* Returns and resets the 'cfm-&gt;status_changed'. */</a>
+<span class="lineNum">     865 </span>                :            : bool
+<span class="lineNum">     866 </span>                :<span class="lineCov">         93 : cfm_check_status_change(struct cfm *cfm) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     867 </span>                :            : {
+<span class="lineNum">     868 </span>                :            :     bool ret;
+<span class="lineNum">     869 </span>                :            : 
+<span class="lineNum">     870 </span>                :<span class="lineCov">         93 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     871 </span>                :<span class="lineCov">         93 :     ret = cfm-&gt;status_changed;</span>
+<span class="lineNum">     872 </span>                :<span class="lineCov">         93 :     cfm-&gt;status_changed = false;</span>
+<span class="lineNum">     873 </span>                :<span class="lineCov">         93 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     874 </span>                :            : 
+<span class="lineNum">     875 </span>                :<span class="lineCov">         93 :     return ret;</span>
+<span class="lineNum">     876 </span>                :            : }
+<a name="877"><span class="lineNum">     877 </span>                :            : </a>
+<span class="lineNum">     878 </span>                :            : static int
+<span class="lineNum">     879 </span>                :<span class="lineCov">        589 : cfm_get_fault__(const struct cfm *cfm) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     880 </span>                :            : {
+<span class="lineNum">     881 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 586 times"> + </span>]:<span class="lineCov">        589 :     if (cfm-&gt;fault_override &gt;= 0) {</span>
+<span class="lineNum">     882 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          3 :         return cfm-&gt;fault_override ? CFM_FAULT_OVERRIDE : 0;</span>
+<span class="lineNum">     883 </span>                :            :     }
+<span class="lineNum">     884 </span>                :<span class="lineCov">        589 :     return cfm-&gt;fault;</span>
+<span class="lineNum">     885 </span>                :            : }
+<span class="lineNum">     886 </span>                :            : 
+<span class="lineNum">     887 </span>                :            : /* Gets the fault status of 'cfm'.  Returns a bit mask of 'cfm_fault_reason's
+<span class="lineNum">     888 </span>                :            :  * indicating the cause of the connectivity fault, or zero if there is no
+<a name="889"><span class="lineNum">     889 </span>                :            :  * fault. */</a>
+<span class="lineNum">     890 </span>                :            : int
+<span class="lineNum">     891 </span>                :<span class="lineCov">         94 : cfm_get_fault(const struct cfm *cfm) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     892 </span>                :            : {
+<span class="lineNum">     893 </span>                :            :     int fault;
+<span class="lineNum">     894 </span>                :            : 
+<span class="lineNum">     895 </span>                :<span class="lineCov">         94 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     896 </span>                :<span class="lineCov">         94 :     fault = cfm_get_fault__(cfm);</span>
+<span class="lineNum">     897 </span>                :<span class="lineCov">         94 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     898 </span>                :<span class="lineCov">         94 :     return fault;</span>
+<span class="lineNum">     899 </span>                :            : }
+<span class="lineNum">     900 </span>                :            : 
+<a name="901"><span class="lineNum">     901 </span>                :            : /* Gets the number of cfm fault flapping since start. */</a>
+<span class="lineNum">     902 </span>                :            : uint64_t
+<span class="lineNum">     903 </span>                :<span class="lineNoCov">          0 : cfm_get_flap_count(const struct cfm *cfm) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     904 </span>                :            : {
+<span class="lineNum">     905 </span>                :            :     uint64_t flap_count;
+<span class="lineNum">     906 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     907 </span>                :<span class="lineNoCov">          0 :     flap_count = cfm-&gt;flap_count;</span>
+<span class="lineNum">     908 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     909 </span>                :<span class="lineNoCov">          0 :     return flap_count;</span>
+<span class="lineNum">     910 </span>                :            : }
+<span class="lineNum">     911 </span>                :            : 
+<span class="lineNum">     912 </span>                :            : /* Gets the health of 'cfm'.  Returns an integer between 0 and 100 indicating
+<span class="lineNum">     913 </span>                :            :  * the health of the link as a percentage of ccm frames received in
+<span class="lineNum">     914 </span>                :            :  * CFM_HEALTH_INTERVAL * 'fault_interval' if there is only 1 remote_mpid,
+<span class="lineNum">     915 </span>                :            :  * returns 0 if there are no remote_mpids, and returns -1 if there are more
+<a name="916"><span class="lineNum">     916 </span>                :            :  * than 1 remote_mpids. */</a>
+<span class="lineNum">     917 </span>                :            : int
+<span class="lineNum">     918 </span>                :<span class="lineNoCov">          0 : cfm_get_health(const struct cfm *cfm) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     919 </span>                :            : {
+<span class="lineNum">     920 </span>                :            :     int health;
+<span class="lineNum">     921 </span>                :            : 
+<span class="lineNum">     922 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     923 </span>                :<span class="lineNoCov">          0 :     health = cfm-&gt;health;</span>
+<span class="lineNum">     924 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     925 </span>                :<span class="lineNoCov">          0 :     return health;</span>
+<span class="lineNum">     926 </span>                :            : }
+<a name="927"><span class="lineNum">     927 </span>                :            : </a>
+<span class="lineNum">     928 </span>                :            : static int
+<span class="lineNum">     929 </span>                :<span class="lineCov">        166 : cfm_get_opup__(const struct cfm *cfm_) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     930 </span>                :            : {
+<span class="lineNum">     931 </span>                :<span class="lineCov">        166 :     struct cfm *cfm = CONST_CAST(struct cfm *, cfm_);</span>
+<span class="lineNum">     932 </span>                :            :     bool extended;
+<span class="lineNum">     933 </span>                :            : 
+<span class="lineNum">     934 </span>                :<span class="lineCov">        166 :     atomic_read(&amp;cfm-&gt;extended, &amp;extended);</span>
+<span class="lineNum">     935 </span>                :            : 
+<span class="lineNum">     936 </span>        [<span class="branchCov" title="Branch 0 was taken 138 times"> + </span><span class="branchCov" title="Branch 1 was taken 28 times"> + </span>]:<span class="lineCov">        166 :     return extended ? cfm-&gt;remote_opup : -1;</span>
+<span class="lineNum">     937 </span>                :            : }
+<span class="lineNum">     938 </span>                :            : 
+<span class="lineNum">     939 </span>                :            : /* Gets the operational state of 'cfm'.  'cfm' is considered operationally down
+<span class="lineNum">     940 </span>                :            :  * if it has received a CCM with the operationally down bit set from any of its
+<span class="lineNum">     941 </span>                :            :  * remote maintenance points. Returns 1 if 'cfm' is operationally up, 0 if
+<span class="lineNum">     942 </span>                :            :  * 'cfm' is operationally down, or -1 if 'cfm' has no operational state
+<a name="943"><span class="lineNum">     943 </span>                :            :  * (because it isn't in extended mode). */</a>
+<span class="lineNum">     944 </span>                :            : int
+<span class="lineNum">     945 </span>                :<span class="lineCov">         94 : cfm_get_opup(const struct cfm *cfm) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     946 </span>                :            : {
+<span class="lineNum">     947 </span>                :            :     int opup;
+<span class="lineNum">     948 </span>                :            : 
+<span class="lineNum">     949 </span>                :<span class="lineCov">         94 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     950 </span>                :<span class="lineCov">         94 :     opup = cfm_get_opup__(cfm);</span>
+<span class="lineNum">     951 </span>                :<span class="lineCov">         94 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     952 </span>                :            : 
+<span class="lineNum">     953 </span>                :<span class="lineCov">         94 :     return opup;</span>
+<span class="lineNum">     954 </span>                :            : }
+<a name="955"><span class="lineNum">     955 </span>                :            : </a>
+<span class="lineNum">     956 </span>                :            : static void
+<span class="lineNum">     957 </span>                :<span class="lineCov">         72 : cfm_get_remote_mpids__(const struct cfm *cfm, uint64_t **rmps, size_t *n_rmps)</span>
+<span class="lineNum">     958 </span>                :            :     OVS_REQUIRES(mutex)
+<span class="lineNum">     959 </span>                :            : {
+<span class="lineNum">     960 </span>                :<span class="lineCov">         72 :     *rmps = xmemdup(cfm-&gt;rmps_array, cfm-&gt;rmps_array_len * sizeof **rmps);</span>
+<span class="lineNum">     961 </span>                :<span class="lineCov">         72 :     *n_rmps = cfm-&gt;rmps_array_len;</span>
+<span class="lineNum">     962 </span>                :<span class="lineCov">         72 : }</span>
+<span class="lineNum">     963 </span>                :            : 
+<span class="lineNum">     964 </span>                :            : /* Populates 'rmps' with an array of remote maintenance points reachable by
+<span class="lineNum">     965 </span>                :            :  * 'cfm'. The number of remote maintenance points is written to 'n_rmps'.
+<a name="966"><span class="lineNum">     966 </span>                :            :  * 'cfm' retains ownership of the array written to 'rmps' */</a>
+<span class="lineNum">     967 </span>                :            : void
+<span class="lineNum">     968 </span>                :<span class="lineNoCov">          0 : cfm_get_remote_mpids(const struct cfm *cfm, uint64_t **rmps, size_t *n_rmps)</span>
+<span class="lineNum">     969 </span>                :            :     OVS_EXCLUDED(mutex)
+<span class="lineNum">     970 </span>                :            : {
+<span class="lineNum">     971 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     972 </span>                :<span class="lineNoCov">          0 :     cfm_get_remote_mpids__(cfm, rmps, n_rmps);</span>
+<span class="lineNum">     973 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     974 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     975 </span>                :            : 
+<a name="976"><span class="lineNum">     976 </span>                :            : /* Extracts the status of 'cfm' and fills in the 's'. */</a>
+<span class="lineNum">     977 </span>                :            : void
+<span class="lineNum">     978 </span>                :<span class="lineCov">         72 : cfm_get_status(const struct cfm *cfm, struct cfm_status *s) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     979 </span>                :            : {
+<span class="lineNum">     980 </span>                :<span class="lineCov">         72 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     981 </span>                :<span class="lineCov">         72 :     s-&gt;faults = cfm_get_fault__(cfm);</span>
+<span class="lineNum">     982 </span>                :<span class="lineCov">         72 :     s-&gt;remote_opstate = cfm_get_opup__(cfm);</span>
+<span class="lineNum">     983 </span>                :<span class="lineCov">         72 :     s-&gt;flap_count = cfm-&gt;flap_count;</span>
+<span class="lineNum">     984 </span>                :<span class="lineCov">         72 :     s-&gt;health = cfm-&gt;health;</span>
+<span class="lineNum">     985 </span>                :<span class="lineCov">         72 :     cfm_get_remote_mpids__(cfm, &amp;s-&gt;rmps, &amp;s-&gt;n_rmps);</span>
+<span class="lineNum">     986 </span>                :<span class="lineCov">         72 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     987 </span>                :<span class="lineCov">         72 : }</span>
+<a name="988"><span class="lineNum">     988 </span>                :            : </a>
+<span class="lineNum">     989 </span>                :            : static struct cfm *
+<span class="lineNum">     990 </span>                :<span class="lineCov">        421 : cfm_find(const char *name) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     991 </span>                :            : {
+<span class="lineNum">     992 </span>                :            :     struct cfm *cfm;
+<span class="lineNum">     993 </span>                :            : 
+<span class="lineNum">     994 </span>        [<span class="branchCov" title="Branch 3 was taken 421 times"> + </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span>]:<span class="lineCov">        421 :     HMAP_FOR_EACH_WITH_HASH (cfm, hmap_node, hash_string(name, 0), all_cfms) {</span>
+<span class="lineNum">     995 </span>        [<span class="branchCov" title="Branch 0 was taken 421 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        421 :         if (!strcmp(cfm-&gt;name, name)) {</span>
+<span class="lineNum">     996 </span>                :<span class="lineCov">        421 :             return cfm;</span>
+<span class="lineNum">     997 </span>                :            :         }
+<span class="lineNum">     998 </span>                :            :     }
+<span class="lineNum">     999 </span>                :<span class="lineCov">        421 :     return NULL;</span>
+<span class="lineNum">    1000 </span>                :            : }
+<a name="1001"><span class="lineNum">    1001 </span>                :            : </a>
+<span class="lineNum">    1002 </span>                :            : static void
+<span class="lineNum">    1003 </span>                :<span class="lineCov">        423 : cfm_print_details(struct ds *ds, struct cfm *cfm) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">    1004 </span>                :            : {
+<span class="lineNum">    1005 </span>                :            :     struct remote_mp *rmp;
+<span class="lineNum">    1006 </span>                :            :     bool extended;
+<span class="lineNum">    1007 </span>                :            :     int fault;
+<span class="lineNum">    1008 </span>                :            : 
+<span class="lineNum">    1009 </span>                :<span class="lineCov">        423 :     atomic_read(&amp;cfm-&gt;extended, &amp;extended);</span>
+<span class="lineNum">    1010 </span>                :            : 
+<span class="lineNum">    1011 </span>                :<span class="lineCov">        423 :     ds_put_format(ds, &quot;---- %s ----\n&quot;, cfm-&gt;name);</span>
+<span class="lineNum">    1012 </span>[<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 422 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 420 times"> + </span><span class="branchCov" title="Branch 3 was taken 3 times"> + </span>]:<span class="lineCov">        423 :     ds_put_format(ds, &quot;MPID %&quot;PRIu64&quot;:%s%s\n&quot;, cfm-&gt;mpid,</span>
+<span class="lineNum">    1013 </span>                :            :                   extended ? &quot; extended&quot; : &quot;&quot;,
+<span class="lineNum">    1014 </span>                :<span class="lineCov">        423 :                   cfm-&gt;fault_override &gt;= 0 ? &quot; fault_override&quot; : &quot;&quot;);</span>
+<span class="lineNum">    1015 </span>                :            : 
+<span class="lineNum">    1016 </span>                :<span class="lineCov">        423 :     fault = cfm_get_fault__(cfm);</span>
+<span class="lineNum">    1017 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 417 times"> + </span>]:<span class="lineCov">        423 :     if (fault) {</span>
+<span class="lineNum">    1018 </span>                :<span class="lineCov">          6 :         ds_put_cstr(ds, &quot;\tfault: &quot;);</span>
+<span class="lineNum">    1019 </span>                :<span class="lineCov">          6 :         ds_put_cfm_fault(ds, fault);</span>
+<span class="lineNum">    1020 </span>                :<span class="lineCov">          6 :         ds_put_cstr(ds, &quot;\n&quot;);</span>
+<span class="lineNum">    1021 </span>                :            :     }
+<span class="lineNum">    1022 </span>                :            : 
+<span class="lineNum">    1023 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 420 times"> + </span>]:<span class="lineCov">        423 :     if (cfm-&gt;health == -1) {</span>
+<span class="lineNum">    1024 </span>                :<span class="lineCov">          3 :         ds_put_format(ds, &quot;\taverage health: undefined\n&quot;);</span>
+<span class="lineNum">    1025 </span>                :            :     } else {
+<span class="lineNum">    1026 </span>                :<span class="lineCov">        420 :         ds_put_format(ds, &quot;\taverage health: %d\n&quot;, cfm-&gt;health);</span>
+<span class="lineNum">    1027 </span>                :            :     }
+<span class="lineNum">    1028 </span>        [<span class="branchCov" title="Branch 0 was taken 423 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        423 :     ds_put_format(ds, &quot;\topstate: %s\n&quot;, cfm-&gt;opup ? &quot;up&quot; : &quot;down&quot;);</span>
+<span class="lineNum">    1029 </span>        [<span class="branchCov" title="Branch 0 was taken 423 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        423 :     ds_put_format(ds, &quot;\tremote_opstate: %s\n&quot;,</span>
+<span class="lineNum">    1030 </span>                :<span class="lineCov">        423 :                   cfm-&gt;remote_opup ? &quot;up&quot; : &quot;down&quot;);</span>
+<span class="lineNum">    1031 </span>                :<span class="lineCov">        423 :     ds_put_format(ds, &quot;\tinterval: %dms\n&quot;, cfm-&gt;ccm_interval_ms);</span>
+<span class="lineNum">    1032 </span>                :<span class="lineCov">        423 :     ds_put_format(ds, &quot;\tnext CCM tx: %lldms\n&quot;,</span>
+<span class="lineNum">    1033 </span>                :<span class="lineCov">        423 :                   timer_msecs_until_expired(&amp;cfm-&gt;tx_timer));</span>
+<span class="lineNum">    1034 </span>                :<span class="lineCov">        423 :     ds_put_format(ds, &quot;\tnext fault check: %lldms\n&quot;,</span>
+<span class="lineNum">    1035 </span>                :<span class="lineCov">        423 :                   timer_msecs_until_expired(&amp;cfm-&gt;fault_timer));</span>
+<span class="lineNum">    1036 </span>                :            : 
+<span class="lineNum">    1037 </span>        [<span class="branchCov" title="Branch 2 was taken 418 times"> + </span><span class="branchCov" title="Branch 3 was taken 423 times"> + </span>]:<span class="lineCov">        841 :     HMAP_FOR_EACH (rmp, node, &amp;cfm-&gt;remote_mps) {</span>
+<span class="lineNum">    1038 </span>                :<span class="lineCov">        418 :         ds_put_format(ds, &quot;Remote MPID %&quot;PRIu64&quot;\n&quot;, rmp-&gt;mpid);</span>
+<span class="lineNum">    1039 </span>        [<span class="branchCov" title="Branch 0 was taken 380 times"> + </span><span class="branchCov" title="Branch 1 was taken 38 times"> + </span>]:<span class="lineCov">        418 :         ds_put_format(ds, &quot;\trecv since check: %s\n&quot;,</span>
+<span class="lineNum">    1040 </span>                :<span class="lineCov">        418 :                       rmp-&gt;recv ? &quot;true&quot; : &quot;false&quot;);</span>
+<span class="lineNum">    1041 </span>        [<span class="branchCov" title="Branch 0 was taken 418 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        418 :         ds_put_format(ds, &quot;\topstate: %s\n&quot;, rmp-&gt;opup? &quot;up&quot; : &quot;down&quot;);</span>
+<span class="lineNum">    1042 </span>                :            :     }
+<span class="lineNum">    1043 </span>                :<span class="lineCov">        423 : }</span>
+<a name="1044"><span class="lineNum">    1044 </span>                :            : </a>
+<span class="lineNum">    1045 </span>                :            : static void
+<span class="lineNum">    1046 </span>                :<span class="lineCov">        423 : cfm_unixctl_show(struct unixctl_conn *conn, int argc, const char *argv[],</span>
+<span class="lineNum">    1047 </span>                :            :                  void *aux OVS_UNUSED) OVS_EXCLUDED(mutex)
+<span class="lineNum">    1048 </span>                :            : {
+<span class="lineNum">    1049 </span>                :<span class="lineCov">        423 :     struct ds ds = DS_EMPTY_INITIALIZER;</span>
+<span class="lineNum">    1050 </span>                :            :     struct cfm *cfm;
+<span class="lineNum">    1051 </span>                :            : 
+<span class="lineNum">    1052 </span>                :<span class="lineCov">        423 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">    1053 </span>        [<span class="branchCov" title="Branch 0 was taken 420 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">        423 :     if (argc &gt; 1) {</span>
+<span class="lineNum">    1054 </span>                :<span class="lineCov">        420 :         cfm = cfm_find(argv[1]);</span>
+<span class="lineNum">    1055 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 420 times"> + </span>]:<span class="lineCov">        420 :         if (!cfm) {</span>
+<span class="lineNum">    1056 </span>                :<span class="lineNoCov">          0 :             unixctl_command_reply_error(conn, &quot;no such CFM object&quot;);</span>
+<span class="lineNum">    1057 </span>                :<span class="lineNoCov">          0 :             goto out;</span>
+<span class="lineNum">    1058 </span>                :            :         }
+<span class="lineNum">    1059 </span>                :<span class="lineCov">        420 :         cfm_print_details(&amp;ds, cfm);</span>
+<span class="lineNum">    1060 </span>                :            :     } else {
+<span class="lineNum">    1061 </span>        [<span class="branchCov" title="Branch 2 was taken 3 times"> + </span><span class="branchCov" title="Branch 3 was taken 3 times"> + </span>]:<span class="lineCov">          6 :         HMAP_FOR_EACH (cfm, hmap_node, all_cfms) {</span>
+<span class="lineNum">    1062 </span>                :<span class="lineCov">          3 :             cfm_print_details(&amp;ds, cfm);</span>
+<span class="lineNum">    1063 </span>                :            :         }
+<span class="lineNum">    1064 </span>                :            :     }
+<span class="lineNum">    1065 </span>                :            : 
+<span class="lineNum">    1066 </span>                :<span class="lineCov">        423 :     unixctl_command_reply(conn, ds_cstr(&amp;ds));</span>
+<span class="lineNum">    1067 </span>                :<span class="lineCov">        423 :     ds_destroy(&amp;ds);</span>
+<span class="lineNum">    1068 </span>                :            : out:
+<span class="lineNum">    1069 </span>                :<span class="lineCov">        423 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">    1070 </span>                :<span class="lineCov">        423 : }</span>
+<a name="1071"><span class="lineNum">    1071 </span>                :            : </a>
+<span class="lineNum">    1072 </span>                :            : static void
+<span class="lineNum">    1073 </span>                :<span class="lineCov">          2 : cfm_unixctl_set_fault(struct unixctl_conn *conn, int argc, const char *argv[],</span>
+<span class="lineNum">    1074 </span>                :            :                       void *aux OVS_UNUSED) OVS_EXCLUDED(mutex)
+<span class="lineNum">    1075 </span>                :            : {
+<span class="lineNum">    1076 </span>                :<span class="lineCov">          2 :     const char *fault_str = argv[argc - 1];</span>
+<span class="lineNum">    1077 </span>                :            :     int fault_override;
+<span class="lineNum">    1078 </span>                :            :     struct cfm *cfm;
+<span class="lineNum">    1079 </span>                :            : 
+<span class="lineNum">    1080 </span>                :<span class="lineCov">          2 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">    1081 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          2 :     if (!strcasecmp(&quot;true&quot;, fault_str)) {</span>
+<span class="lineNum">    1082 </span>                :<span class="lineCov">          1 :         fault_override = 1;</span>
+<span class="lineNum">    1083 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     } else if (!strcasecmp(&quot;false&quot;, fault_str)) {</span>
+<span class="lineNum">    1084 </span>                :<span class="lineNoCov">          0 :         fault_override = 0;</span>
+<span class="lineNum">    1085 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          1 :     } else if (!strcasecmp(&quot;normal&quot;, fault_str)) {</span>
+<span class="lineNum">    1086 </span>                :<span class="lineCov">          1 :         fault_override = -1;</span>
+<span class="lineNum">    1087 </span>                :            :     } else {
+<span class="lineNum">    1088 </span>                :<span class="lineNoCov">          0 :         unixctl_command_reply_error(conn, &quot;unknown fault string&quot;);</span>
+<span class="lineNum">    1089 </span>                :<span class="lineNoCov">          0 :         goto out;</span>
+<span class="lineNum">    1090 </span>                :            :     }
+<span class="lineNum">    1091 </span>                :            : 
+<span class="lineNum">    1092 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          2 :     if (argc &gt; 2) {</span>
+<span class="lineNum">    1093 </span>                :<span class="lineCov">          1 :         cfm = cfm_find(argv[1]);</span>
+<span class="lineNum">    1094 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :         if (!cfm) {</span>
+<span class="lineNum">    1095 </span>                :<span class="lineNoCov">          0 :             unixctl_command_reply_error(conn, &quot;no such CFM object&quot;);</span>
+<span class="lineNum">    1096 </span>                :<span class="lineNoCov">          0 :             goto out;</span>
+<span class="lineNum">    1097 </span>                :            :         }
+<span class="lineNum">    1098 </span>                :<span class="lineCov">          1 :         cfm-&gt;fault_override = fault_override;</span>
+<span class="lineNum">    1099 </span>                :<span class="lineCov">          1 :         cfm_status_changed(cfm);</span>
+<span class="lineNum">    1100 </span>                :            :     } else {
+<span class="lineNum">    1101 </span>        [<span class="branchCov" title="Branch 2 was taken 2 times"> + </span><span class="branchCov" title="Branch 3 was taken 1 time"> + </span>]:<span class="lineCov">          3 :         HMAP_FOR_EACH (cfm, hmap_node, all_cfms) {</span>
+<span class="lineNum">    1102 </span>                :<span class="lineCov">          2 :             cfm-&gt;fault_override = fault_override;</span>
+<span class="lineNum">    1103 </span>                :<span class="lineCov">          2 :             cfm_status_changed(cfm);</span>
+<span class="lineNum">    1104 </span>                :            :         }
+<span class="lineNum">    1105 </span>                :            :     }
+<span class="lineNum">    1106 </span>                :            : 
+<span class="lineNum">    1107 </span>                :<span class="lineCov">          2 :     unixctl_command_reply(conn, &quot;OK&quot;);</span>
+<span class="lineNum">    1108 </span>                :            : 
+<span class="lineNum">    1109 </span>                :            : out:
+<span class="lineNum">    1110 </span>                :<span class="lineCov">          2 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">    1111 </span>                :<span class="lineCov">          2 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

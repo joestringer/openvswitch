@@ -1,0 +1,275 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ofproto/ofproto-dpif-rid.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">ofproto</a> - ofproto-dpif-rid.c<span style="font-size: 80%;"> (source / <a href="ofproto-dpif-rid.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">59</td>
+            <td class="headerCovTableEntry">65</td>
+            <td class="headerCovTableEntryHi">90.8 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">10</td>
+            <td class="headerCovTableEntry">10</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">14</td>
+            <td class="headerCovTableEntry">24</td>
+            <td class="headerCovTableEntryLo">58.3 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &quot;hmap.h&quot;
+<span class="lineNum">      20 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      21 </span>                :            : #include &quot;ovs-thread.h&quot;
+<span class="lineNum">      22 </span>                :            : #include &quot;ofproto-dpif-rid.h&quot;
+<span class="lineNum">      23 </span>                :            : 
+<span class="lineNum">      24 </span>                :            : struct rid_map {
+<span class="lineNum">      25 </span>                :            :     struct hmap map;
+<span class="lineNum">      26 </span>                :            : };
+<span class="lineNum">      27 </span>                :            : 
+<span class="lineNum">      28 </span>                :            : struct rid_node {
+<span class="lineNum">      29 </span>                :            :     struct hmap_node node;
+<span class="lineNum">      30 </span>                :            :     uint32_t recirc_id;
+<span class="lineNum">      31 </span>                :            : };
+<span class="lineNum">      32 </span>                :            : 
+<span class="lineNum">      33 </span>                :            : struct rid_pool {
+<span class="lineNum">      34 </span>                :            :     struct rid_map ridmap;
+<span class="lineNum">      35 </span>                :            :     uint32_t base;         /* IDs in the range of [base, base + n_ids). */
+<span class="lineNum">      36 </span>                :            :     uint32_t n_ids;        /* Total number of ids in the pool. */
+<span class="lineNum">      37 </span>                :            :     uint32_t next_free_id; /* Possible next free id. */
+<span class="lineNum">      38 </span>                :            : };
+<span class="lineNum">      39 </span>                :            : 
+<span class="lineNum">      40 </span>                :            : struct recirc_id_pool {
+<span class="lineNum">      41 </span>                :            :     struct ovs_mutex lock;
+<span class="lineNum">      42 </span>                :            :     struct rid_pool rids;
+<span class="lineNum">      43 </span>                :            : };
+<span class="lineNum">      44 </span>                :            : 
+<span class="lineNum">      45 </span>                :            : #define RECIRC_ID_BASE  300
+<span class="lineNum">      46 </span>                :            : #define RECIRC_ID_N_IDS  1024
+<span class="lineNum">      47 </span>                :            : 
+<span class="lineNum">      48 </span>                :            : static void rid_pool_init(struct rid_pool *rids,
+<span class="lineNum">      49 </span>                :            :                          uint32_t base, uint32_t n_ids);
+<span class="lineNum">      50 </span>                :            : static void rid_pool_uninit(struct rid_pool *pool);
+<span class="lineNum">      51 </span>                :            : static uint32_t rid_pool_alloc_id(struct rid_pool *pool);
+<span class="lineNum">      52 </span>                :            : static void rid_pool_free_id(struct rid_pool *rids, uint32_t rid);
+<span class="lineNum">      53 </span>                :            : static struct rid_node *rid_pool_find(struct rid_pool *rids, uint32_t id);
+<span class="lineNum">      54 </span>                :            : static struct rid_node *rid_pool_add(struct rid_pool *rids, uint32_t id);
+<a name="55"><span class="lineNum">      55 </span>                :            : </a>
+<span class="lineNum">      56 </span>                :            : struct recirc_id_pool *
+<span class="lineNum">      57 </span>                :<span class="lineCov">        257 : recirc_id_pool_create(void)</span>
+<span class="lineNum">      58 </span>                :            : {
+<span class="lineNum">      59 </span>                :            :     struct recirc_id_pool *pool;
+<span class="lineNum">      60 </span>                :            : 
+<span class="lineNum">      61 </span>                :<span class="lineCov">        257 :     pool = xmalloc(sizeof *pool);</span>
+<span class="lineNum">      62 </span>                :<span class="lineCov">        257 :     rid_pool_init(&amp;pool-&gt;rids, RECIRC_ID_BASE, RECIRC_ID_N_IDS);</span>
+<span class="lineNum">      63 </span>                :<span class="lineCov">        257 :     ovs_mutex_init(&amp;pool-&gt;lock);</span>
+<span class="lineNum">      64 </span>                :            : 
+<span class="lineNum">      65 </span>                :<span class="lineCov">        257 :     return pool;</span>
+<span class="lineNum">      66 </span>                :            : }
+<a name="67"><span class="lineNum">      67 </span>                :            : </a>
+<span class="lineNum">      68 </span>                :            : void
+<span class="lineNum">      69 </span>                :<span class="lineCov">        257 : recirc_id_pool_destroy(struct recirc_id_pool *pool)</span>
+<span class="lineNum">      70 </span>                :            : {
+<span class="lineNum">      71 </span>                :<span class="lineCov">        257 :     rid_pool_uninit(&amp;pool-&gt;rids);</span>
+<span class="lineNum">      72 </span>                :<span class="lineCov">        257 :     ovs_mutex_destroy(&amp;pool-&gt;lock);</span>
+<span class="lineNum">      73 </span>                :<span class="lineCov">        257 :     free(pool);</span>
+<span class="lineNum">      74 </span>                :<span class="lineCov">        257 : }</span>
+<a name="75"><span class="lineNum">      75 </span>                :            : </a>
+<span class="lineNum">      76 </span>                :            : uint32_t
+<span class="lineNum">      77 </span>                :<span class="lineCov">         25 : recirc_id_alloc(struct recirc_id_pool *pool)</span>
+<span class="lineNum">      78 </span>                :            : {
+<span class="lineNum">      79 </span>                :            :     uint32_t id;
+<span class="lineNum">      80 </span>                :            : 
+<span class="lineNum">      81 </span>                :<span class="lineCov">         25 :     ovs_mutex_lock(&amp;pool-&gt;lock);</span>
+<span class="lineNum">      82 </span>                :<span class="lineCov">         25 :     id = rid_pool_alloc_id(&amp;pool-&gt;rids);</span>
+<span class="lineNum">      83 </span>                :<span class="lineCov">         25 :     ovs_mutex_unlock(&amp;pool-&gt;lock);</span>
+<span class="lineNum">      84 </span>                :            : 
+<span class="lineNum">      85 </span>                :<span class="lineCov">         25 :     return id;</span>
+<span class="lineNum">      86 </span>                :            : }
+<a name="87"><span class="lineNum">      87 </span>                :            : </a>
+<span class="lineNum">      88 </span>                :            : void
+<span class="lineNum">      89 </span>                :<span class="lineCov">          7 : recirc_id_free(struct recirc_id_pool *pool, uint32_t id)</span>
+<span class="lineNum">      90 </span>                :            : {
+<span class="lineNum">      91 </span>                :<span class="lineCov">          7 :     ovs_mutex_lock(&amp;pool-&gt;lock);</span>
+<span class="lineNum">      92 </span>                :<span class="lineCov">          7 :     rid_pool_free_id(&amp;pool-&gt;rids, id);</span>
+<span class="lineNum">      93 </span>                :<span class="lineCov">          7 :     ovs_mutex_unlock(&amp;pool-&gt;lock);</span>
+<span class="lineNum">      94 </span>                :<span class="lineCov">          7 : }</span>
+<a name="95"><span class="lineNum">      95 </span>                :            : </a>
+<span class="lineNum">      96 </span>                :            : static void
+<span class="lineNum">      97 </span>                :<span class="lineCov">        257 : rid_pool_init(struct rid_pool *rids, uint32_t base, uint32_t n_ids)</span>
+<span class="lineNum">      98 </span>                :            : {
+<span class="lineNum">      99 </span>                :<span class="lineCov">        257 :     rids-&gt;base = base;</span>
+<span class="lineNum">     100 </span>                :<span class="lineCov">        257 :     rids-&gt;n_ids = n_ids;</span>
+<span class="lineNum">     101 </span>                :<span class="lineCov">        257 :     rids-&gt;next_free_id = base;</span>
+<span class="lineNum">     102 </span>                :<span class="lineCov">        257 :     hmap_init(&amp;rids-&gt;ridmap.map);</span>
+<span class="lineNum">     103 </span>                :<span class="lineCov">        257 : }</span>
+<a name="104"><span class="lineNum">     104 </span>                :            : </a>
+<span class="lineNum">     105 </span>                :            : static void
+<span class="lineNum">     106 </span>                :<span class="lineCov">        257 : rid_pool_uninit(struct rid_pool *rids)</span>
+<span class="lineNum">     107 </span>                :            : {
+<span class="lineNum">     108 </span>                :            :     struct rid_node *rid, *next;
+<span class="lineNum">     109 </span>                :            : 
+<span class="lineNum">     110 </span>[<span class="branchCov" title="Branch 1 was taken 22 times"> + </span><span class="branchCov" title="Branch 2 was taken 257 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 22 times"> + </span><span class="branchCov" title="Branch 5 was taken 257 times"> + </span>]:<span class="lineCov">        279 :     HMAP_FOR_EACH_SAFE(rid, next, node, &amp;rids-&gt;ridmap.map) {</span>
+<span class="lineNum">     111 </span>                :<span class="lineCov">         22 :         hmap_remove(&amp;rids-&gt;ridmap.map, &amp;rid-&gt;node);</span>
+<span class="lineNum">     112 </span>                :<span class="lineCov">         22 :         free(rid);</span>
+<span class="lineNum">     113 </span>                :            :     }
+<span class="lineNum">     114 </span>                :            : 
+<span class="lineNum">     115 </span>                :<span class="lineCov">        257 :     hmap_destroy(&amp;rids-&gt;ridmap.map);</span>
+<span class="lineNum">     116 </span>                :<span class="lineCov">        257 : }</span>
+<a name="117"><span class="lineNum">     117 </span>                :            : </a>
+<span class="lineNum">     118 </span>                :            : static struct rid_node *
+<span class="lineNum">     119 </span>                :<span class="lineCov">         28 : rid_pool_find(struct rid_pool *rids, uint32_t id)</span>
+<span class="lineNum">     120 </span>                :            : {
+<span class="lineNum">     121 </span>                :            :     size_t hash;
+<span class="lineNum">     122 </span>                :            :     struct rid_node *rid;
+<span class="lineNum">     123 </span>                :            : 
+<span class="lineNum">     124 </span>                :<span class="lineCov">         28 :     hash = hash_int(id, 0);</span>
+<span class="lineNum">     125 </span>        [<span class="branchCov" title="Branch 2 was taken 3 times"> + </span><span class="branchCov" title="Branch 3 was taken 25 times"> + </span>]:<span class="lineCov">         28 :     HMAP_FOR_EACH_WITH_HASH(rid, node, hash, &amp;rids-&gt;ridmap.map) {</span>
+<span class="lineNum">     126 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          3 :         if (id == rid-&gt;recirc_id) {</span>
+<span class="lineNum">     127 </span>                :<span class="lineCov">          3 :             return rid;</span>
+<span class="lineNum">     128 </span>                :            :         }
+<span class="lineNum">     129 </span>                :            :     }
+<span class="lineNum">     130 </span>                :<span class="lineCov">         28 :     return NULL;</span>
+<span class="lineNum">     131 </span>                :            : }
+<a name="132"><span class="lineNum">     132 </span>                :            : </a>
+<span class="lineNum">     133 </span>                :            : static struct rid_node *
+<span class="lineNum">     134 </span>                :<span class="lineCov">         25 : rid_pool_add(struct rid_pool *rids, uint32_t id)</span>
+<span class="lineNum">     135 </span>                :            : {
+<span class="lineNum">     136 </span>                :<span class="lineCov">         25 :     struct rid_node *rid = xmalloc(sizeof *rid);</span>
+<span class="lineNum">     137 </span>                :            :     size_t hash;
+<span class="lineNum">     138 </span>                :            : 
+<span class="lineNum">     139 </span>                :<span class="lineCov">         25 :     rid-&gt;recirc_id = id;</span>
+<span class="lineNum">     140 </span>                :<span class="lineCov">         25 :     hash = hash_int(id, 0);</span>
+<span class="lineNum">     141 </span>                :<span class="lineCov">         25 :     hmap_insert(&amp;rids-&gt;ridmap.map, &amp;rid-&gt;node, hash);</span>
+<span class="lineNum">     142 </span>                :<span class="lineCov">         25 :     return rid;</span>
+<span class="lineNum">     143 </span>                :            : }
+<a name="144"><span class="lineNum">     144 </span>                :            : </a>
+<span class="lineNum">     145 </span>                :            : static uint32_t
+<span class="lineNum">     146 </span>                :<span class="lineCov">         25 : rid_pool_alloc_id(struct rid_pool *rids)</span>
+<span class="lineNum">     147 </span>                :            : {
+<span class="lineNum">     148 </span>                :            :     uint32_t id;
+<span class="lineNum">     149 </span>                :            : 
+<span class="lineNum">     150 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 25 times"> + </span>]:<span class="lineCov">         25 :     if (rids-&gt;n_ids == 0) {</span>
+<span class="lineNum">     151 </span>                :<span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     152 </span>                :            :     }
+<span class="lineNum">     153 </span>                :            : 
+<span class="lineNum">     154 </span>        [<span class="branchCov" title="Branch 1 was taken 25 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">         25 :     if (!(rid_pool_find(rids, rids-&gt;next_free_id))) {</span>
+<span class="lineNum">     155 </span>                :<span class="lineCov">         25 :         id = rids-&gt;next_free_id;</span>
+<span class="lineNum">     156 </span>                :<span class="lineCov">         25 :         goto found_free_id;</span>
+<span class="lineNum">     157 </span>                :            :     }
+<span class="lineNum">     158 </span>                :            : 
+<span class="lineNum">     159 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for(id = rids-&gt;base; id &lt; rids-&gt;base + rids-&gt;n_ids; id++) {</span>
+<span class="lineNum">     160 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (rid_pool_find(rids, id)) {</span>
+<span class="lineNum">     161 </span>                :<span class="lineNoCov">          0 :             goto found_free_id;</span>
+<span class="lineNum">     162 </span>                :            :         }
+<span class="lineNum">     163 </span>                :            :     }
+<span class="lineNum">     164 </span>                :            : 
+<span class="lineNum">     165 </span>                :            :     /* Not available. */
+<span class="lineNum">     166 </span>                :<span class="lineNoCov">          0 :     return 0;</span>
+<span class="lineNum">     167 </span>                :            : 
+<span class="lineNum">     168 </span>                :            : found_free_id:
+<span class="lineNum">     169 </span>                :<span class="lineCov">         25 :     rid_pool_add(rids, id);</span>
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>        [<span class="branchCov" title="Branch 0 was taken 25 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         25 :     if (id &lt; rids-&gt;base + rids-&gt;n_ids) {</span>
+<span class="lineNum">     172 </span>                :<span class="lineCov">         25 :         rids-&gt;next_free_id = id + 1;</span>
+<span class="lineNum">     173 </span>                :            :     } else {
+<span class="lineNum">     174 </span>                :<span class="lineNoCov">          0 :         rids-&gt;next_free_id = rids-&gt;base;</span>
+<span class="lineNum">     175 </span>                :            :     }
+<span class="lineNum">     176 </span>                :            : 
+<span class="lineNum">     177 </span>                :<span class="lineCov">         25 :     return id;</span>
+<span class="lineNum">     178 </span>                :            : }
+<a name="179"><span class="lineNum">     179 </span>                :            : </a>
+<span class="lineNum">     180 </span>                :            : static void
+<span class="lineNum">     181 </span>                :<span class="lineCov">          7 : rid_pool_free_id(struct rid_pool *rids, uint32_t id)</span>
+<span class="lineNum">     182 </span>                :            : {
+<span class="lineNum">     183 </span>                :            :     struct rid_node *rid;
+<span class="lineNum">     184 </span>[<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 4 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">          7 :     if (id &gt; rids-&gt;base &amp;&amp; (id &lt;= rids-&gt;base + rids-&gt;n_ids)) {</span>
+<span class="lineNum">     185 </span>                :<span class="lineCov">          3 :         rid = rid_pool_find(rids, id);</span>
+<span class="lineNum">     186 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          3 :         if (rid) {</span>
+<span class="lineNum">     187 </span>                :<span class="lineCov">          3 :             hmap_remove(&amp;rids-&gt;ridmap.map, &amp;rid-&gt;node);</span>
+<span class="lineNum">     188 </span>                :            :         }
+<span class="lineNum">     189 </span>                :            :     }
+<span class="lineNum">     190 </span>                :<span class="lineCov">          7 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

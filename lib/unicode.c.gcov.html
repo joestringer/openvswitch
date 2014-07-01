@@ -1,0 +1,249 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/unicode.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - unicode.c<span style="font-size: 80%;"> (source / <a href="unicode.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">37</td>
+            <td class="headerCovTableEntry">42</td>
+            <td class="headerCovTableEntryMed">88.1 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntry">5</td>
+            <td class="headerCovTableEntryMed">80.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">21</td>
+            <td class="headerCovTableEntry">26</td>
+            <td class="headerCovTableEntryMed">80.8 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2009, 2010 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &quot;unicode.h&quot;
+<span class="lineNum">      20 </span>                :            : 
+<span class="lineNum">      21 </span>                :            : #include &lt;inttypes.h&gt;
+<span class="lineNum">      22 </span>                :            : 
+<span class="lineNum">      23 </span>                :            : #include &quot;dynamic-string.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      25 </span>                :            : 
+<span class="lineNum">      26 </span>                :            : /* Returns the unicode code point corresponding to leading surrogate 'leading'
+<span class="lineNum">      27 </span>                :            :  * and trailing surrogate 'trailing'.  The return value will not make any
+<span class="lineNum">      28 </span>                :            :  * sense if 'leading' or 'trailing' are not in the correct ranges for leading
+<a name="29"><span class="lineNum">      29 </span>                :            :  * or trailing surrogates. */</a>
+<span class="lineNum">      30 </span>                :            : int
+<span class="lineNum">      31 </span>                :<span class="lineCov">          2 : utf16_decode_surrogate_pair(int leading, int trailing)</span>
+<span class="lineNum">      32 </span>                :            : {
+<span class="lineNum">      33 </span>                :            :     /*
+<span class="lineNum">      34 </span>                :            :      *  Leading surrogate:         110110wwwwxxxxxx
+<span class="lineNum">      35 </span>                :            :      * Trailing surrogate:         110111xxxxxxxxxx
+<span class="lineNum">      36 </span>                :            :      *         Code point: 000uuuuuxxxxxxxxxxxxxxxx
+<span class="lineNum">      37 </span>                :            :      */
+<span class="lineNum">      38 </span>                :<span class="lineCov">          2 :     int w = (leading &gt;&gt; 6) &amp; 0xf;</span>
+<span class="lineNum">      39 </span>                :<span class="lineCov">          2 :     int u = w + 1;</span>
+<span class="lineNum">      40 </span>                :<span class="lineCov">          2 :     int x0 = leading &amp; 0x3f;</span>
+<span class="lineNum">      41 </span>                :<span class="lineCov">          2 :     int x1 = trailing &amp; 0x3ff;</span>
+<span class="lineNum">      42 </span>                :<span class="lineCov">          2 :     return (u &lt;&lt; 16) | (x0 &lt;&lt; 10) | x1;</span>
+<span class="lineNum">      43 </span>                :            : }
+<span class="lineNum">      44 </span>                :            : 
+<a name="45"><span class="lineNum">      45 </span>                :            : /* Returns the number of Unicode characters in UTF-8 string 's'. */</a>
+<span class="lineNum">      46 </span>                :            : size_t
+<span class="lineNum">      47 </span>                :<span class="lineNoCov">          0 : utf8_length(const char *s_)</span>
+<span class="lineNum">      48 </span>                :            : {
+<span class="lineNum">      49 </span>                :            :     const uint8_t *s;
+<span class="lineNum">      50 </span>                :            :     size_t length;
+<span class="lineNum">      51 </span>                :            : 
+<span class="lineNum">      52 </span>                :<span class="lineNoCov">          0 :     length = 0;</span>
+<span class="lineNum">      53 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (s = (const uint8_t *) s_; *s != '\0'; s++) {</span>
+<span class="lineNum">      54 </span>                :            :         /* The most-significant bits of the first byte in a character are one
+<span class="lineNum">      55 </span>                :            :          * of 2#01, 2#00, or 2#11.  2#10 is a continuation byte. */
+<span class="lineNum">      56 </span>                :<span class="lineNoCov">          0 :         length += (*s &amp; 0xc0) != 0x80;</span>
+<span class="lineNum">      57 </span>                :            :     }
+<span class="lineNum">      58 </span>                :<span class="lineNoCov">          0 :     return length;</span>
+<span class="lineNum">      59 </span>                :            : }
+<a name="60"><span class="lineNum">      60 </span>                :            : </a>
+<span class="lineNum">      61 </span>                :            : static char *
+<span class="lineNum">      62 </span>                :<span class="lineCov">          2 : invalid_utf8_sequence(const uint8_t *s, int n, size_t *lengthp)</span>
+<span class="lineNum">      63 </span>                :            : {
+<span class="lineNum">      64 </span>                :            :     struct ds msg;
+<span class="lineNum">      65 </span>                :            :     int i;
+<span class="lineNum">      66 </span>                :            : 
+<span class="lineNum">      67 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :     if (lengthp) {</span>
+<span class="lineNum">      68 </span>                :<span class="lineCov">          2 :         *lengthp = 0;</span>
+<span class="lineNum">      69 </span>                :            :     }
+<span class="lineNum">      70 </span>                :            : 
+<span class="lineNum">      71 </span>                :<span class="lineCov">          2 :     ds_init(&amp;msg);</span>
+<span class="lineNum">      72 </span>                :<span class="lineCov">          2 :     ds_put_cstr(&amp;msg, &quot;invalid UTF-8 sequence&quot;);</span>
+<span class="lineNum">      73 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          5 :     for (i = 0; i &lt; n; i++) {</span>
+<span class="lineNum">      74 </span>                :<span class="lineCov">          3 :         ds_put_format(&amp;msg, &quot; 0x%02&quot;PRIx8, s[i]);</span>
+<span class="lineNum">      75 </span>                :            :     }
+<span class="lineNum">      76 </span>                :<span class="lineCov">          2 :     return ds_steal_cstr(&amp;msg);</span>
+<span class="lineNum">      77 </span>                :            : }
+<span class="lineNum">      78 </span>                :            : 
+<span class="lineNum">      79 </span>                :            : struct utf8_sequence {
+<span class="lineNum">      80 </span>                :            :     uint8_t octets[5][2];
+<span class="lineNum">      81 </span>                :            : };
+<a name="82"><span class="lineNum">      82 </span>                :            : </a>
+<span class="lineNum">      83 </span>                :            : static const struct utf8_sequence *
+<span class="lineNum">      84 </span>                :<span class="lineCov">          3 : lookup_utf8_sequence(uint8_t c)</span>
+<span class="lineNum">      85 </span>                :            : {
+<span class="lineNum">      86 </span>                :            :     static const struct utf8_sequence seqs[] = {
+<span class="lineNum">      87 </span>                :            :         { { { 0x01, 0x7f },
+<span class="lineNum">      88 </span>                :            :             { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } },
+<span class="lineNum">      89 </span>                :            : 
+<span class="lineNum">      90 </span>                :            :         { { { 0xc2, 0xdf }, { 0x80, 0xbf },
+<span class="lineNum">      91 </span>                :            :             { 0, 0 }, { 0, 0 }, { 0, 0 } } },
+<span class="lineNum">      92 </span>                :            : 
+<span class="lineNum">      93 </span>                :            :         { { { 0xe0, 0xe0 }, { 0xa0, 0xbf }, { 0x80, 0xbf },
+<span class="lineNum">      94 </span>                :            :             {0,0}, {0, 0 } } },
+<span class="lineNum">      95 </span>                :            : 
+<span class="lineNum">      96 </span>                :            :         { { { 0xe1, 0xec }, { 0x80, 0xbf }, { 0x80, 0xbf },
+<span class="lineNum">      97 </span>                :            :             { 0, 0 }, { 0, 0 } } },
+<span class="lineNum">      98 </span>                :            : 
+<span class="lineNum">      99 </span>                :            :         { { { 0xed, 0xed }, { 0x80, 0x9f }, { 0x80, 0xbf },
+<span class="lineNum">     100 </span>                :            :             { 0, 0 }, { 0, 0 } } },
+<span class="lineNum">     101 </span>                :            : 
+<span class="lineNum">     102 </span>                :            :         { { { 0xee, 0xef }, { 0x80, 0xbf }, { 0x80, 0xbf },
+<span class="lineNum">     103 </span>                :            :             { 0, 0 }, { 0, 0 } } },
+<span class="lineNum">     104 </span>                :            : 
+<span class="lineNum">     105 </span>                :            :         { { { 0xf0, 0xf0 }, { 0x90, 0xbf }, { 0x80, 0xbf }, { 0x80, 0xbf },
+<span class="lineNum">     106 </span>                :            :             { 0, 0 } } },
+<span class="lineNum">     107 </span>                :            : 
+<span class="lineNum">     108 </span>                :            :         { { { 0xf1, 0xf3 }, { 0x80, 0xbf }, { 0x80, 0xbf }, { 0x80, 0xbf },
+<span class="lineNum">     109 </span>                :            :             { 0, 0 } } },
+<span class="lineNum">     110 </span>                :            : 
+<span class="lineNum">     111 </span>                :            :         { { { 0xf4, 0xf4 }, { 0x80, 0x8f }, { 0x80, 0xbf }, { 0x80, 0xbf },
+<span class="lineNum">     112 </span>                :            :             { 0, 0 } } },
+<span class="lineNum">     113 </span>                :            :     };
+<span class="lineNum">     114 </span>                :            : 
+<span class="lineNum">     115 </span>                :            :     size_t i;
+<span class="lineNum">     116 </span>                :            : 
+<span class="lineNum">     117 </span>        [<span class="branchCov" title="Branch 0 was taken 21 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">         22 :     for (i = 0; i &lt; ARRAY_SIZE(seqs); i++) {</span>
+<span class="lineNum">     118 </span>                :<span class="lineCov">         21 :         const uint8_t *o = seqs[i].octets[0];</span>
+<span class="lineNum">     119 </span>[<span class="branchCov" title="Branch 0 was taken 13 times"> + </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 2 times"> + </span><span class="branchCov" title="Branch 3 was taken 11 times"> + </span>]:<span class="lineCov">         21 :         if (c &gt;= o[0] &amp;&amp; c &lt;= o[1]) {</span>
+<span class="lineNum">     120 </span>                :<span class="lineCov">          2 :             return &amp;seqs[i];</span>
+<span class="lineNum">     121 </span>                :            :         }
+<span class="lineNum">     122 </span>                :            :     }
+<span class="lineNum">     123 </span>                :<span class="lineCov">          3 :     return NULL;</span>
+<span class="lineNum">     124 </span>                :            : }
+<span class="lineNum">     125 </span>                :            : 
+<span class="lineNum">     126 </span>                :            : /* Checks that 's' is a valid, null-terminated UTF-8 string.  If so, returns a
+<span class="lineNum">     127 </span>                :            :  * null pointer and sets '*lengthp' to the number of Unicode characters in
+<span class="lineNum">     128 </span>                :            :  * 's'.  If not, returns an error message that the caller must free and sets
+<span class="lineNum">     129 </span>                :            :  * '*lengthp' to 0.
+<span class="lineNum">     130 </span>                :            :  *
+<a name="131"><span class="lineNum">     131 </span>                :            :  * 'lengthp' may be NULL if the length is not needed. */</a>
+<span class="lineNum">     132 </span>                :            : char *
+<span class="lineNum">     133 </span>                :<span class="lineCov">     348383 : utf8_validate(const char *s_, size_t *lengthp)</span>
+<span class="lineNum">     134 </span>                :            : {
+<span class="lineNum">     135 </span>                :<span class="lineCov">     348383 :     size_t length = 0;</span>
+<span class="lineNum">     136 </span>                :            :     const uint8_t *s;
+<span class="lineNum">     137 </span>                :            : 
+<span class="lineNum">     138 </span>        [<span class="branchCov" title="Branch 0 was taken 2108828 times"> + </span><span class="branchCov" title="Branch 1 was taken 348381 times"> + </span>]:<span class="lineCov">    2457209 :     for (s = (const uint8_t *) s_; *s != '\0'; ) {</span>
+<span class="lineNum">     139 </span>                :<span class="lineCov">    2108828 :         length++;</span>
+<span class="lineNum">     140 </span>        [<span class="branchCov" title="Branch 0 was taken 2108825 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">    2108828 :         if (s[0] &lt; 0x80) {</span>
+<span class="lineNum">     141 </span>                :<span class="lineCov">    2108825 :             s++;</span>
+<span class="lineNum">     142 </span>                :            :         } else {
+<span class="lineNum">     143 </span>                :            :             const struct utf8_sequence *seq;
+<span class="lineNum">     144 </span>                :            :             int i;
+<span class="lineNum">     145 </span>                :            : 
+<span class="lineNum">     146 </span>                :<span class="lineCov">          3 :             seq = lookup_utf8_sequence(s[0]);</span>
+<span class="lineNum">     147 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          3 :             if (!seq) {</span>
+<span class="lineNum">     148 </span>                :<span class="lineCov">          1 :                 return invalid_utf8_sequence(s, 1, lengthp);</span>
+<span class="lineNum">     149 </span>                :            :             }
+<span class="lineNum">     150 </span>                :            : 
+<span class="lineNum">     151 </span>        [<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          5 :             for (i = 1; seq-&gt;octets[i][0]; i++) {</span>
+<span class="lineNum">     152 </span>                :<span class="lineCov">          4 :                 const uint8_t *o = seq-&gt;octets[i];</span>
+<span class="lineNum">     153 </span>[<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchCov" title="Branch 3 was taken 3 times"> + </span>]:<span class="lineCov">          4 :                 if (s[i] &lt; o[0] || s[i] &gt; o[1]) {</span>
+<span class="lineNum">     154 </span>                :<span class="lineCov">          1 :                     return invalid_utf8_sequence(s, i + 1, lengthp);</span>
+<span class="lineNum">     155 </span>                :            :                 }
+<span class="lineNum">     156 </span>                :            :             }
+<span class="lineNum">     157 </span>                :<span class="lineCov">          1 :             s += i;</span>
+<span class="lineNum">     158 </span>                :            :         }
+<span class="lineNum">     159 </span>                :            :     }
+<span class="lineNum">     160 </span>        [<span class="branchCov" title="Branch 0 was taken 348381 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">     348381 :     if (lengthp) {</span>
+<span class="lineNum">     161 </span>                :<span class="lineCov">     348381 :         *lengthp = length;</span>
+<span class="lineNum">     162 </span>                :            :     }
+<span class="lineNum">     163 </span>                :<span class="lineCov">     348383 :     return NULL;</span>
+<span class="lineNum">     164 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

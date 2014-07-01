@@ -1,0 +1,348 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/simap.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - simap.c<span style="font-size: 80%;"> (source / <a href="simap.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">79</td>
+            <td class="headerCovTableEntry">91</td>
+            <td class="headerCovTableEntryMed">86.8 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">18</td>
+            <td class="headerCovTableEntry">20</td>
+            <td class="headerCovTableEntryHi">90.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">19</td>
+            <td class="headerCovTableEntry">28</td>
+            <td class="headerCovTableEntryLo">67.9 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2009, 2010, 2011, 2012 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;simap.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      20 </span>                :            : 
+<span class="lineNum">      21 </span>                :            : static size_t hash_name(const char *, size_t length);
+<span class="lineNum">      22 </span>                :            : static struct simap_node *simap_find__(const struct simap *,
+<span class="lineNum">      23 </span>                :            :                                        const char *name, size_t name_len,
+<span class="lineNum">      24 </span>                :            :                                        size_t hash);
+<span class="lineNum">      25 </span>                :            : static struct simap_node *simap_add_nocopy__(struct simap *,
+<span class="lineNum">      26 </span>                :            :                                              char *name, unsigned int data,
+<span class="lineNum">      27 </span>                :            :                                              size_t hash);
+<span class="lineNum">      28 </span>                :            : static int compare_nodes_by_name(const void *a_, const void *b_);
+<span class="lineNum">      29 </span>                :            : 
+<a name="30"><span class="lineNum">      30 </span>                :            : /* Initializes 'simap' as an empty string-to-integer map. */</a>
+<span class="lineNum">      31 </span>                :            : void
+<span class="lineNum">      32 </span>                :<span class="lineCov">       4800 : simap_init(struct simap *simap)</span>
+<span class="lineNum">      33 </span>                :            : {
+<span class="lineNum">      34 </span>                :<span class="lineCov">       4800 :     hmap_init(&amp;simap-&gt;map);</span>
+<span class="lineNum">      35 </span>                :<span class="lineCov">       4800 : }</span>
+<span class="lineNum">      36 </span>                :            : 
+<a name="37"><span class="lineNum">      37 </span>                :            : /* Frees all the data that 'simap' contains. */</a>
+<span class="lineNum">      38 </span>                :            : void
+<span class="lineNum">      39 </span>                :<span class="lineCov">       4829 : simap_destroy(struct simap *simap)</span>
+<span class="lineNum">      40 </span>                :            : {
+<span class="lineNum">      41 </span>        [<span class="branchCov" title="Branch 0 was taken 4829 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       4829 :     if (simap) {</span>
+<span class="lineNum">      42 </span>                :<span class="lineCov">       4829 :         simap_clear(simap);</span>
+<span class="lineNum">      43 </span>                :<span class="lineCov">       4829 :         hmap_destroy(&amp;simap-&gt;map);</span>
+<span class="lineNum">      44 </span>                :            :     }
+<span class="lineNum">      45 </span>                :<span class="lineCov">       4829 : }</span>
+<span class="lineNum">      46 </span>                :            : 
+<a name="47"><span class="lineNum">      47 </span>                :            : /* Exchanges the contents of 'a' and 'b'. */</a>
+<span class="lineNum">      48 </span>                :            : void
+<span class="lineNum">      49 </span>                :<span class="lineCov">       4026 : simap_swap(struct simap *a, struct simap *b)</span>
+<span class="lineNum">      50 </span>                :            : {
+<span class="lineNum">      51 </span>                :<span class="lineCov">       4026 :     hmap_swap(&amp;a-&gt;map, &amp;b-&gt;map);</span>
+<span class="lineNum">      52 </span>                :<span class="lineCov">       4026 : }</span>
+<span class="lineNum">      53 </span>                :            : 
+<span class="lineNum">      54 </span>                :            : /* Adjusts 'simap' so that it is still valid after it has been moved around in
+<a name="55"><span class="lineNum">      55 </span>                :            :  * memory (e.g. due to realloc()). */</a>
+<span class="lineNum">      56 </span>                :            : void
+<span class="lineNum">      57 </span>                :<span class="lineNoCov">          0 : simap_moved(struct simap *simap)</span>
+<span class="lineNum">      58 </span>                :            : {
+<span class="lineNum">      59 </span>                :<span class="lineNoCov">          0 :     hmap_moved(&amp;simap-&gt;map);</span>
+<span class="lineNum">      60 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      61 </span>                :            : 
+<a name="62"><span class="lineNum">      62 </span>                :            : /* Removes all of the mappings from 'simap' and frees them. */</a>
+<span class="lineNum">      63 </span>                :            : void
+<span class="lineNum">      64 </span>                :<span class="lineCov">       4829 : simap_clear(struct simap *simap)</span>
+<span class="lineNum">      65 </span>                :            : {
+<span class="lineNum">      66 </span>                :            :     struct simap_node *node, *next;
+<span class="lineNum">      67 </span>                :            : 
+<span class="lineNum">      68 </span>[<span class="branchCov" title="Branch 1 was taken 1785 times"> + </span><span class="branchCov" title="Branch 2 was taken 4829 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 1785 times"> + </span><span class="branchCov" title="Branch 5 was taken 4829 times"> + </span>]:<span class="lineCov">       6614 :     SIMAP_FOR_EACH_SAFE (node, next, simap) {</span>
+<span class="lineNum">      69 </span>                :<span class="lineCov">       1785 :         hmap_remove(&amp;simap-&gt;map, &amp;node-&gt;node);</span>
+<span class="lineNum">      70 </span>                :<span class="lineCov">       1785 :         free(node-&gt;name);</span>
+<span class="lineNum">      71 </span>                :<span class="lineCov">       1785 :         free(node);</span>
+<span class="lineNum">      72 </span>                :            :     }
+<span class="lineNum">      73 </span>                :<span class="lineCov">       4829 : }</span>
+<span class="lineNum">      74 </span>                :            : 
+<span class="lineNum">      75 </span>                :            : /* Returns true if 'simap' contains no mappings, false if it contains at least
+<a name="76"><span class="lineNum">      76 </span>                :            :  * one. */</a>
+<span class="lineNum">      77 </span>                :            : bool
+<span class="lineNum">      78 </span>                :<span class="lineCov">         30 : simap_is_empty(const struct simap *simap)</span>
+<span class="lineNum">      79 </span>                :            : {
+<span class="lineNum">      80 </span>                :<span class="lineCov">         30 :     return hmap_is_empty(&amp;simap-&gt;map);</span>
+<span class="lineNum">      81 </span>                :            : }
+<span class="lineNum">      82 </span>                :            : 
+<a name="83"><span class="lineNum">      83 </span>                :            : /* Returns the number of mappings in 'simap'. */</a>
+<span class="lineNum">      84 </span>                :            : size_t
+<span class="lineNum">      85 </span>                :<span class="lineCov">         60 : simap_count(const struct simap *simap)</span>
+<span class="lineNum">      86 </span>                :            : {
+<span class="lineNum">      87 </span>                :<span class="lineCov">         60 :     return hmap_count(&amp;simap-&gt;map);</span>
+<span class="lineNum">      88 </span>                :            : }
+<span class="lineNum">      89 </span>                :            : 
+<span class="lineNum">      90 </span>                :            : /* Inserts a mapping from 'name' to 'data' into 'simap', replacing any
+<span class="lineNum">      91 </span>                :            :  * existing mapping for 'name'.  Returns true if a new mapping was added,
+<span class="lineNum">      92 </span>                :            :  * false if an existing mapping's value was replaced.
+<span class="lineNum">      93 </span>                :            :  *
+<a name="94"><span class="lineNum">      94 </span>                :            :  * The caller retains ownership of 'name'. */</a>
+<span class="lineNum">      95 </span>                :            : bool
+<span class="lineNum">      96 </span>                :<span class="lineCov">       2671 : simap_put(struct simap *simap, const char *name, unsigned int data)</span>
+<span class="lineNum">      97 </span>                :            : {
+<span class="lineNum">      98 </span>                :<span class="lineCov">       2671 :     size_t length = strlen(name);</span>
+<span class="lineNum">      99 </span>                :<span class="lineCov">       2671 :     size_t hash = hash_name(name, length);</span>
+<span class="lineNum">     100 </span>                :            :     struct simap_node *node;
+<span class="lineNum">     101 </span>                :            : 
+<span class="lineNum">     102 </span>                :<span class="lineCov">       2671 :     node = simap_find__(simap, name, length, hash);</span>
+<span class="lineNum">     103 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2671 times"> + </span>]:<span class="lineCov">       2671 :     if (node) {</span>
+<span class="lineNum">     104 </span>                :<span class="lineNoCov">          0 :         node-&gt;data = data;</span>
+<span class="lineNum">     105 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     106 </span>                :            :     } else {
+<span class="lineNum">     107 </span>                :<span class="lineCov">       2671 :         simap_add_nocopy__(simap, xmemdup0(name, length), data, hash);</span>
+<span class="lineNum">     108 </span>                :<span class="lineCov">       2671 :         return true;</span>
+<span class="lineNum">     109 </span>                :            :     }
+<span class="lineNum">     110 </span>                :            : }
+<span class="lineNum">     111 </span>                :            : 
+<span class="lineNum">     112 </span>                :            : /* Increases the data value in the mapping for 'name' by 'amt', or inserts a
+<span class="lineNum">     113 </span>                :            :  * mapping from 'name' to 'amt' if no such mapping exists.  Returns the
+<span class="lineNum">     114 </span>                :            :  * new total data value for the mapping.
+<span class="lineNum">     115 </span>                :            :  *
+<span class="lineNum">     116 </span>                :            :  * If 'amt' is zero, this function does nothing and returns 0.  That is, this
+<span class="lineNum">     117 </span>                :            :  * function won't create a mapping with a initial value of 0.
+<span class="lineNum">     118 </span>                :            :  *
+<a name="119"><span class="lineNum">     119 </span>                :            :  * The caller retains ownership of 'name'. */</a>
+<span class="lineNum">     120 </span>                :            : unsigned int
+<span class="lineNum">     121 </span>                :<span class="lineCov">        251 : simap_increase(struct simap *simap, const char *name, unsigned int amt)</span>
+<span class="lineNum">     122 </span>                :            : {
+<span class="lineNum">     123 </span>        [<span class="branchCov" title="Branch 0 was taken 133 times"> + </span><span class="branchCov" title="Branch 1 was taken 118 times"> + </span>]:<span class="lineCov">        251 :     if (amt) {</span>
+<span class="lineNum">     124 </span>                :<span class="lineCov">        133 :         size_t length = strlen(name);</span>
+<span class="lineNum">     125 </span>                :<span class="lineCov">        133 :         size_t hash = hash_name(name, length);</span>
+<span class="lineNum">     126 </span>                :            :         struct simap_node *node;
+<span class="lineNum">     127 </span>                :            : 
+<span class="lineNum">     128 </span>                :<span class="lineCov">        133 :         node = simap_find__(simap, name, length, hash);</span>
+<span class="lineNum">     129 </span>        [<span class="branchCov" title="Branch 0 was taken 17 times"> + </span><span class="branchCov" title="Branch 1 was taken 116 times"> + </span>]:<span class="lineCov">        133 :         if (node) {</span>
+<span class="lineNum">     130 </span>                :<span class="lineCov">         17 :             node-&gt;data += amt;</span>
+<span class="lineNum">     131 </span>                :            :         } else {
+<span class="lineNum">     132 </span>                :<span class="lineCov">        116 :             node = simap_add_nocopy__(simap, xmemdup0(name, length),</span>
+<span class="lineNum">     133 </span>                :            :                                       amt, hash);
+<span class="lineNum">     134 </span>                :            :         }
+<span class="lineNum">     135 </span>                :<span class="lineCov">        133 :         return node-&gt;data;</span>
+<span class="lineNum">     136 </span>                :            :     } else {
+<span class="lineNum">     137 </span>                :<span class="lineCov">        251 :         return 0;</span>
+<span class="lineNum">     138 </span>                :            :     }
+<span class="lineNum">     139 </span>                :            : }
+<span class="lineNum">     140 </span>                :            : 
+<a name="141"><span class="lineNum">     141 </span>                :            : /* Deletes 'node' from 'simap' and frees its associated memory. */</a>
+<span class="lineNum">     142 </span>                :            : void
+<span class="lineNum">     143 </span>                :<span class="lineCov">        373 : simap_delete(struct simap *simap, struct simap_node *node)</span>
+<span class="lineNum">     144 </span>                :            : {
+<span class="lineNum">     145 </span>                :<span class="lineCov">        373 :     hmap_remove(&amp;simap-&gt;map, &amp;node-&gt;node);</span>
+<span class="lineNum">     146 </span>                :<span class="lineCov">        373 :     free(node-&gt;name);</span>
+<span class="lineNum">     147 </span>                :<span class="lineCov">        373 :     free(node);</span>
+<span class="lineNum">     148 </span>                :<span class="lineCov">        373 : }</span>
+<span class="lineNum">     149 </span>                :            : 
+<span class="lineNum">     150 </span>                :            : /* Searches for 'name' in 'simap'.  If found, deletes it and returns true.  If
+<a name="151"><span class="lineNum">     151 </span>                :            :  * not found, returns false without modifying 'simap'. */</a>
+<span class="lineNum">     152 </span>                :            : bool
+<span class="lineNum">     153 </span>                :<span class="lineNoCov">          0 : simap_find_and_delete(struct simap *simap, const char *name)</span>
+<span class="lineNum">     154 </span>                :            : {
+<span class="lineNum">     155 </span>                :<span class="lineNoCov">          0 :     struct simap_node *node = simap_find(simap, name);</span>
+<span class="lineNum">     156 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (node) {</span>
+<span class="lineNum">     157 </span>                :<span class="lineNoCov">          0 :         simap_delete(simap, node);</span>
+<span class="lineNum">     158 </span>                :<span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">     159 </span>                :            :     }
+<span class="lineNum">     160 </span>                :<span class="lineNoCov">          0 :     return false;</span>
+<span class="lineNum">     161 </span>                :            : }
+<span class="lineNum">     162 </span>                :            : 
+<span class="lineNum">     163 </span>                :            : /* Searches 'simap' for a mapping with the given 'name'.  Returns it, if found,
+<a name="164"><span class="lineNum">     164 </span>                :            :  * or a null pointer if not. */</a>
+<span class="lineNum">     165 </span>                :            : struct simap_node *
+<span class="lineNum">     166 </span>                :<span class="lineCov">       2831 : simap_find(const struct simap *simap, const char *name)</span>
+<span class="lineNum">     167 </span>                :            : {
+<span class="lineNum">     168 </span>                :<span class="lineCov">       2831 :     return simap_find_len(simap, name, strlen(name));</span>
+<span class="lineNum">     169 </span>                :            : }
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>                :            : /* Searches 'simap' for a mapping whose name is the first 'name_len' bytes
+<a name="172"><span class="lineNum">     172 </span>                :            :  * starting at 'name'.  Returns it, if found, or a null pointer if not. */</a>
+<span class="lineNum">     173 </span>                :            : struct simap_node *
+<span class="lineNum">     174 </span>                :<span class="lineCov">       3068 : simap_find_len(const struct simap *simap, const char *name, size_t len)</span>
+<span class="lineNum">     175 </span>                :            : {
+<span class="lineNum">     176 </span>                :<span class="lineCov">       3068 :     return simap_find__(simap, name, len, hash_name(name, len));</span>
+<span class="lineNum">     177 </span>                :            : }
+<span class="lineNum">     178 </span>                :            : 
+<span class="lineNum">     179 </span>                :            : /* Searches 'simap' for a mapping with the given 'name'.  Returns the
+<a name="180"><span class="lineNum">     180 </span>                :            :  * associated data value, if found, otherwise zero. */</a>
+<span class="lineNum">     181 </span>                :            : unsigned int
+<span class="lineNum">     182 </span>                :<span class="lineCov">        661 : simap_get(const struct simap *simap, const char *name)</span>
+<span class="lineNum">     183 </span>                :            : {
+<span class="lineNum">     184 </span>                :<span class="lineCov">        661 :     struct simap_node *node = simap_find(simap, name);</span>
+<span class="lineNum">     185 </span>        [<span class="branchCov" title="Branch 0 was taken 661 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        661 :     return node ? node-&gt;data : 0;</span>
+<span class="lineNum">     186 </span>                :            : }
+<span class="lineNum">     187 </span>                :            : 
+<a name="188"><span class="lineNum">     188 </span>                :            : /* Returns true if 'simap' contains a copy of 'name', false otherwise. */</a>
+<span class="lineNum">     189 </span>                :            : bool
+<span class="lineNum">     190 </span>                :<span class="lineCov">       1479 : simap_contains(const struct simap *simap, const char *name)</span>
+<span class="lineNum">     191 </span>                :            : {
+<span class="lineNum">     192 </span>                :<span class="lineCov">       1479 :     return simap_find(simap, name) != NULL;</span>
+<span class="lineNum">     193 </span>                :            : }
+<span class="lineNum">     194 </span>                :            : 
+<span class="lineNum">     195 </span>                :            : /* Returns an array that contains a pointer to each mapping in 'simap',
+<span class="lineNum">     196 </span>                :            :  * ordered alphabetically by name.  The returned array has simap_count(simap)
+<span class="lineNum">     197 </span>                :            :  * elements.
+<span class="lineNum">     198 </span>                :            :  *
+<span class="lineNum">     199 </span>                :            :  * The caller is responsible for freeing the returned array (with free()).  It
+<span class="lineNum">     200 </span>                :            :  * should not free the individual &quot;simap_node&quot;s in the array, because they are
+<a name="201"><span class="lineNum">     201 </span>                :            :  * still part of 'simap'. */</a>
+<span class="lineNum">     202 </span>                :            : const struct simap_node **
+<span class="lineNum">     203 </span>                :<span class="lineCov">         30 : simap_sort(const struct simap *simap)</span>
+<span class="lineNum">     204 </span>                :            : {
+<span class="lineNum">     205 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 30 times"> + </span>]:<span class="lineCov">         30 :     if (simap_is_empty(simap)) {</span>
+<span class="lineNum">     206 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     207 </span>                :            :     } else {
+<span class="lineNum">     208 </span>                :            :         const struct simap_node **nodes;
+<span class="lineNum">     209 </span>                :            :         struct simap_node *node;
+<span class="lineNum">     210 </span>                :            :         size_t i, n;
+<span class="lineNum">     211 </span>                :            : 
+<span class="lineNum">     212 </span>                :<span class="lineCov">         30 :         n = simap_count(simap);</span>
+<span class="lineNum">     213 </span>                :<span class="lineCov">         30 :         nodes = xmalloc(n * sizeof *nodes);</span>
+<span class="lineNum">     214 </span>                :<span class="lineCov">         30 :         i = 0;</span>
+<span class="lineNum">     215 </span>        [<span class="branchCov" title="Branch 2 was taken 116 times"> + </span><span class="branchCov" title="Branch 3 was taken 30 times"> + </span>]:<span class="lineCov">        146 :         SIMAP_FOR_EACH (node, simap) {</span>
+<span class="lineNum">     216 </span>                :<span class="lineCov">        116 :             nodes[i++] = node;</span>
+<span class="lineNum">     217 </span>                :            :         }
+<span class="lineNum">     218 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 30 times"> + </span>]:<span class="lineCov">         30 :         ovs_assert(i == n);</span>
+<span class="lineNum">     219 </span>                :            : 
+<span class="lineNum">     220 </span>                :<span class="lineCov">         30 :         qsort(nodes, n, sizeof *nodes, compare_nodes_by_name);</span>
+<span class="lineNum">     221 </span>                :            : 
+<span class="lineNum">     222 </span>                :<span class="lineCov">         30 :         return nodes;</span>
+<span class="lineNum">     223 </span>                :            :     }
+<span class="lineNum">     224 </span>                :            : }
+<a name="225"><span class="lineNum">     225 </span>                :            : </a>
+<span class="lineNum">     226 </span>                :            : static size_t
+<span class="lineNum">     227 </span>                :<span class="lineCov">       5872 : hash_name(const char *name, size_t length)</span>
+<span class="lineNum">     228 </span>                :            : {
+<span class="lineNum">     229 </span>                :<span class="lineCov">       5872 :     return hash_bytes(name, length, 0);</span>
+<span class="lineNum">     230 </span>                :            : }
+<a name="231"><span class="lineNum">     231 </span>                :            : </a>
+<span class="lineNum">     232 </span>                :            : static struct simap_node *
+<span class="lineNum">     233 </span>                :<span class="lineCov">       5872 : simap_find__(const struct simap *simap, const char *name, size_t name_len,</span>
+<span class="lineNum">     234 </span>                :            :              size_t hash)
+<span class="lineNum">     235 </span>                :            : {
+<span class="lineNum">     236 </span>                :            :     struct simap_node *node;
+<span class="lineNum">     237 </span>                :            : 
+<span class="lineNum">     238 </span>        [<span class="branchCov" title="Branch 2 was taken 1255 times"> + </span><span class="branchCov" title="Branch 3 was taken 4617 times"> + </span>]:<span class="lineCov">       5872 :     HMAP_FOR_EACH_WITH_HASH (node, node, hash, &amp;simap-&gt;map) {</span>
+<span class="lineNum">     239 </span>[<span class="branchCov" title="Branch 0 was taken 1255 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 1255 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">       1255 :         if (!strncmp(node-&gt;name, name, name_len) &amp;&amp; !node-&gt;name[name_len]) {</span>
+<span class="lineNum">     240 </span>                :<span class="lineCov">       1255 :             return node;</span>
+<span class="lineNum">     241 </span>                :            :         }
+<span class="lineNum">     242 </span>                :            :     }
+<span class="lineNum">     243 </span>                :<span class="lineCov">       5872 :     return NULL;</span>
+<span class="lineNum">     244 </span>                :            : }
+<a name="245"><span class="lineNum">     245 </span>                :            : </a>
+<span class="lineNum">     246 </span>                :            : static struct simap_node *
+<span class="lineNum">     247 </span>                :<span class="lineCov">       2787 : simap_add_nocopy__(struct simap *simap, char *name, unsigned int data,</span>
+<span class="lineNum">     248 </span>                :            :                    size_t hash)
+<span class="lineNum">     249 </span>                :            : {
+<span class="lineNum">     250 </span>                :<span class="lineCov">       2787 :     struct simap_node *node = xmalloc(sizeof *node);</span>
+<span class="lineNum">     251 </span>                :<span class="lineCov">       2787 :     node-&gt;name = name;</span>
+<span class="lineNum">     252 </span>                :<span class="lineCov">       2787 :     node-&gt;data = data;</span>
+<span class="lineNum">     253 </span>                :<span class="lineCov">       2787 :     hmap_insert(&amp;simap-&gt;map, &amp;node-&gt;node, hash);</span>
+<span class="lineNum">     254 </span>                :<span class="lineCov">       2787 :     return node;</span>
+<span class="lineNum">     255 </span>                :            : }
+<a name="256"><span class="lineNum">     256 </span>                :            : </a>
+<span class="lineNum">     257 </span>                :            : static int
+<span class="lineNum">     258 </span>                :<span class="lineCov">        142 : compare_nodes_by_name(const void *a_, const void *b_)</span>
+<span class="lineNum">     259 </span>                :            : {
+<span class="lineNum">     260 </span>                :<span class="lineCov">        142 :     const struct simap_node *const *a = a_;</span>
+<span class="lineNum">     261 </span>                :<span class="lineCov">        142 :     const struct simap_node *const *b = b_;</span>
+<span class="lineNum">     262 </span>                :<span class="lineCov">        142 :     return strcmp((*a)-&gt;name, (*b)-&gt;name);</span>
+<span class="lineNum">     263 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

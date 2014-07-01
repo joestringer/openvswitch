@@ -1,0 +1,479 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/fatal-signal.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - fatal-signal.c<span style="font-size: 80%;"> (source / <a href="fatal-signal.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">99</td>
+            <td class="headerCovTableEntry">112</td>
+            <td class="headerCovTableEntryMed">88.4 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">16</td>
+            <td class="headerCovTableEntry">17</td>
+            <td class="headerCovTableEntryHi">94.1 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">34</td>
+            <td class="headerCovTableEntry">44</td>
+            <td class="headerCovTableEntryMed">77.3 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2008, 2009, 2010, 2011, 2012, 2013 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      17 </span>                :            : #include &quot;fatal-signal.h&quot;
+<span class="lineNum">      18 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      19 </span>                :            : #include &lt;signal.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &lt;stdbool.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;stdio.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;stdint.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      25 </span>                :            : #include &lt;unistd.h&gt;
+<span class="lineNum">      26 </span>                :            : #include &quot;ovs-thread.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;shash.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;sset.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;signals.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;socket-util.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;vlog.h&quot;
+<span class="lineNum">      34 </span>                :            : 
+<span class="lineNum">      35 </span>                :            : #include &quot;type-props.h&quot;
+<span class="lineNum">      36 </span>                :            : 
+<span class="lineNum">      37 </span>                :            : #ifndef SIG_ATOMIC_MAX
+<span class="lineNum">      38 </span>                :            : #define SIG_ATOMIC_MAX TYPE_MAXIMUM(sig_atomic_t)
+<a name="39"><span class="lineNum">      39 </span>                :            : #endif</a>
+<span class="lineNum">      40 </span>                :            : 
+<span class="lineNum">      41 </span>                :<span class="lineCov">      15103 : VLOG_DEFINE_THIS_MODULE(fatal_signal);</span>
+<span class="lineNum">      42 </span>                :            : 
+<span class="lineNum">      43 </span>                :            : /* Signals to catch. */
+<span class="lineNum">      44 </span>                :            : #ifndef _WIN32
+<span class="lineNum">      45 </span>                :            : static const int fatal_signals[] = { SIGTERM, SIGINT, SIGHUP, SIGALRM };
+<span class="lineNum">      46 </span>                :            : #else
+<span class="lineNum">      47 </span>                :            : static const int fatal_signals[] = { SIGTERM };
+<span class="lineNum">      48 </span>                :            : #endif
+<span class="lineNum">      49 </span>                :            : 
+<span class="lineNum">      50 </span>                :            : /* Hooks to call upon catching a signal */
+<span class="lineNum">      51 </span>                :            : struct hook {
+<span class="lineNum">      52 </span>                :            :     void (*hook_cb)(void *aux);
+<span class="lineNum">      53 </span>                :            :     void (*cancel_cb)(void *aux);
+<span class="lineNum">      54 </span>                :            :     void *aux;
+<span class="lineNum">      55 </span>                :            :     bool run_at_exit;
+<span class="lineNum">      56 </span>                :            : };
+<span class="lineNum">      57 </span>                :            : #define MAX_HOOKS 32
+<span class="lineNum">      58 </span>                :            : static struct hook hooks[MAX_HOOKS];
+<span class="lineNum">      59 </span>                :            : static size_t n_hooks;
+<span class="lineNum">      60 </span>                :            : 
+<span class="lineNum">      61 </span>                :            : static int signal_fds[2];
+<span class="lineNum">      62 </span>                :            : static HANDLE wevent;
+<span class="lineNum">      63 </span>                :            : static volatile sig_atomic_t stored_sig_nr = SIG_ATOMIC_MAX;
+<span class="lineNum">      64 </span>                :            : 
+<span class="lineNum">      65 </span>                :            : static struct ovs_mutex mutex;
+<span class="lineNum">      66 </span>                :            : 
+<span class="lineNum">      67 </span>                :            : static void call_hooks(int sig_nr);
+<span class="lineNum">      68 </span>                :            : #ifdef _WIN32
+<span class="lineNum">      69 </span>                :            : static BOOL WINAPI ConsoleHandlerRoutine(DWORD dwCtrlType);
+<span class="lineNum">      70 </span>                :            : #endif
+<span class="lineNum">      71 </span>                :            : 
+<span class="lineNum">      72 </span>                :            : /* Initializes the fatal signal handling module.  Calling this function is
+<span class="lineNum">      73 </span>                :            :  * optional, because calling any other function in the module will also
+<span class="lineNum">      74 </span>                :            :  * initialize it.  However, in a multithreaded program, the module must be
+<a name="75"><span class="lineNum">      75 </span>                :            :  * initialized while the process is still single-threaded. */</a>
+<span class="lineNum">      76 </span>                :            : void
+<span class="lineNum">      77 </span>                :<span class="lineCov">     368367 : fatal_signal_init(void)</span>
+<span class="lineNum">      78 </span>                :            : {
+<span class="lineNum">      79 </span>                :            :     static bool inited = false;
+<span class="lineNum">      80 </span>                :            : 
+<span class="lineNum">      81 </span>        [<span class="branchCov" title="Branch 0 was taken 12178 times"> + </span><span class="branchCov" title="Branch 1 was taken 356189 times"> + </span>]:<span class="lineCov">     368367 :     if (!inited) {</span>
+<span class="lineNum">      82 </span>                :            :         size_t i;
+<span class="lineNum">      83 </span>                :            : 
+<span class="lineNum">      84 </span>                :<span class="lineCov">      12178 :         assert_single_threaded();</span>
+<span class="lineNum">      85 </span>                :<span class="lineCov">      12178 :         inited = true;</span>
+<span class="lineNum">      86 </span>                :            : 
+<span class="lineNum">      87 </span>                :<span class="lineCov">      12178 :         ovs_mutex_init_recursive(&amp;mutex);</span>
+<span class="lineNum">      88 </span>                :            : #ifndef _WIN32
+<span class="lineNum">      89 </span>                :<span class="lineCov">      12178 :         xpipe_nonblocking(signal_fds);</span>
+<span class="lineNum">      90 </span>                :            : #else
+<span class="lineNum">      91 </span>                :            :         wevent = CreateEvent(NULL, TRUE, FALSE, NULL);
+<span class="lineNum">      92 </span>                :            :         if (!wevent) {
+<span class="lineNum">      93 </span>                :            :             char *msg_buf = ovs_lasterror_to_string();
+<span class="lineNum">      94 </span>                :            :             VLOG_FATAL(&quot;Failed to create a event (%s).&quot;, msg_buf);
+<span class="lineNum">      95 </span>                :            :         }
+<span class="lineNum">      96 </span>                :            : 
+<span class="lineNum">      97 </span>                :            :         /* Register a function to handle Ctrl+C. */
+<span class="lineNum">      98 </span>                :            :         SetConsoleCtrlHandler(ConsoleHandlerRoutine, true);
+<span class="lineNum">      99 </span>                :            : #endif
+<span class="lineNum">     100 </span>                :            : 
+<span class="lineNum">     101 </span>        [<span class="branchCov" title="Branch 0 was taken 48712 times"> + </span><span class="branchCov" title="Branch 1 was taken 12178 times"> + </span>]:<span class="lineCov">      60890 :         for (i = 0; i &lt; ARRAY_SIZE(fatal_signals); i++) {</span>
+<span class="lineNum">     102 </span>                :<span class="lineCov">      48712 :             int sig_nr = fatal_signals[i];</span>
+<span class="lineNum">     103 </span>                :            : #ifndef _WIN32
+<span class="lineNum">     104 </span>                :            :             struct sigaction old_sa;
+<span class="lineNum">     105 </span>                :            : 
+<span class="lineNum">     106 </span>                :<span class="lineCov">      48712 :             xsigaction(sig_nr, NULL, &amp;old_sa);</span>
+<span class="lineNum">     107 </span>        [<span class="branchCov" title="Branch 0 was taken 48708 times"> + </span><span class="branchCov" title="Branch 1 was taken 4 times"> + </span>]:<span class="lineCov">      48712 :             if (old_sa.sa_handler == SIG_DFL</span>
+<span class="lineNum">     108 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 48708 times"> + </span>]:<span class="lineCov">      48708 :                 &amp;&amp; signal(sig_nr, fatal_signal_handler) == SIG_ERR) {</span>
+<span class="lineNum">     109 </span>                :<span class="lineNoCov">          0 :                 VLOG_FATAL(&quot;signal failed (%s)&quot;, ovs_strerror(errno));</span>
+<span class="lineNum">     110 </span>                :            :             }
+<span class="lineNum">     111 </span>                :            : #else
+<span class="lineNum">     112 </span>                :            :             if (signal(sig_nr, fatal_signal_handler) == SIG_ERR) {
+<span class="lineNum">     113 </span>                :            :                 VLOG_FATAL(&quot;signal failed (%s)&quot;, ovs_strerror(errno));
+<span class="lineNum">     114 </span>                :            :             }
+<span class="lineNum">     115 </span>                :            : #endif
+<span class="lineNum">     116 </span>                :            :         }
+<span class="lineNum">     117 </span>                :<span class="lineCov">      12178 :         atexit(fatal_signal_atexit_handler);</span>
+<span class="lineNum">     118 </span>                :            :     }
+<span class="lineNum">     119 </span>                :<span class="lineCov">     368367 : }</span>
+<span class="lineNum">     120 </span>                :            : 
+<span class="lineNum">     121 </span>                :            : /* Registers 'hook_cb' to be called from inside poll_block() following a fatal
+<span class="lineNum">     122 </span>                :            :  * signal.  'hook_cb' does not need to be async-signal-safe.  In a
+<span class="lineNum">     123 </span>                :            :  * multithreaded program 'hook_cb' might be called from any thread, with
+<span class="lineNum">     124 </span>                :            :  * threads other than the one running 'hook_cb' in unknown states.
+<span class="lineNum">     125 </span>                :            :  *
+<span class="lineNum">     126 </span>                :            :  * If 'run_at_exit' is true, 'hook_cb' is also called during normal process
+<span class="lineNum">     127 </span>                :            :  * termination, e.g. when exit() is called or when main() returns.
+<span class="lineNum">     128 </span>                :            :  *
+<span class="lineNum">     129 </span>                :            :  * If the current process forks, fatal_signal_fork() may be called to clear the
+<span class="lineNum">     130 </span>                :            :  * parent process's fatal signal hooks, so that 'hook_cb' is only called when
+<span class="lineNum">     131 </span>                :            :  * the child terminates, not when the parent does.  When fatal_signal_fork() is
+<span class="lineNum">     132 </span>                :            :  * called, it calls the 'cancel_cb' function if it is nonnull, passing 'aux',
+<span class="lineNum">     133 </span>                :            :  * to notify that the hook has been canceled.  This allows the hook to free
+<a name="134"><span class="lineNum">     134 </span>                :            :  * memory, etc. */</a>
+<span class="lineNum">     135 </span>                :            : void
+<span class="lineNum">     136 </span>                :<span class="lineCov">       1247 : fatal_signal_add_hook(void (*hook_cb)(void *aux), void (*cancel_cb)(void *aux),</span>
+<span class="lineNum">     137 </span>                :            :                       void *aux, bool run_at_exit)
+<span class="lineNum">     138 </span>                :            : {
+<span class="lineNum">     139 </span>                :<span class="lineCov">       1247 :     fatal_signal_init();</span>
+<span class="lineNum">     140 </span>                :            : 
+<span class="lineNum">     141 </span>                :<span class="lineCov">       1247 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     142 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1247 times"> + </span>]:<span class="lineCov">       1247 :     ovs_assert(n_hooks &lt; MAX_HOOKS);</span>
+<span class="lineNum">     143 </span>                :<span class="lineCov">       1247 :     hooks[n_hooks].hook_cb = hook_cb;</span>
+<span class="lineNum">     144 </span>                :<span class="lineCov">       1247 :     hooks[n_hooks].cancel_cb = cancel_cb;</span>
+<span class="lineNum">     145 </span>                :<span class="lineCov">       1247 :     hooks[n_hooks].aux = aux;</span>
+<span class="lineNum">     146 </span>                :<span class="lineCov">       1247 :     hooks[n_hooks].run_at_exit = run_at_exit;</span>
+<span class="lineNum">     147 </span>                :<span class="lineCov">       1247 :     n_hooks++;</span>
+<span class="lineNum">     148 </span>                :<span class="lineCov">       1247 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     149 </span>                :<span class="lineCov">       1247 : }</span>
+<span class="lineNum">     150 </span>                :            : 
+<span class="lineNum">     151 </span>                :            : /* Handles fatal signal number 'sig_nr'.
+<span class="lineNum">     152 </span>                :            :  *
+<span class="lineNum">     153 </span>                :            :  * Ordinarily this is the actual signal handler.  When other code needs to
+<span class="lineNum">     154 </span>                :            :  * handle one of our signals, however, it can register for that signal and, if
+<span class="lineNum">     155 </span>                :            :  * and when necessary, call this function to do fatal signal processing for it
+<span class="lineNum">     156 </span>                :            :  * and terminate the process.  Currently only timeval.c does this, for SIGALRM.
+<span class="lineNum">     157 </span>                :            :  * (It is not important whether the other code sets up its signal handler
+<span class="lineNum">     158 </span>                :            :  * before or after this file, because this file will only set up a signal
+<a name="159"><span class="lineNum">     159 </span>                :            :  * handler in the case where the signal has its default handling.)  */</a>
+<span class="lineNum">     160 </span>                :            : void
+<span class="lineNum">     161 </span>                :<span class="lineNoCov">          0 : fatal_signal_handler(int sig_nr)</span>
+<span class="lineNum">     162 </span>                :            : {
+<span class="lineNum">     163 </span>                :            : #ifndef _WIN32
+<span class="lineNum">     164 </span>                :<span class="lineNoCov">          0 :     ignore(write(signal_fds[1], &quot;&quot;, 1));</span>
+<span class="lineNum">     165 </span>                :            : #else
+<span class="lineNum">     166 </span>                :            :     SetEvent(wevent);
+<span class="lineNum">     167 </span>                :            : #endif
+<span class="lineNum">     168 </span>                :<span class="lineNoCov">          0 :     stored_sig_nr = sig_nr;</span>
+<span class="lineNum">     169 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>                :            : /* Check whether a fatal signal has occurred and, if so, call the fatal signal
+<span class="lineNum">     172 </span>                :            :  * hooks and exit.
+<span class="lineNum">     173 </span>                :            :  *
+<span class="lineNum">     174 </span>                :            :  * This function is called automatically by poll_block(), but specialized
+<span class="lineNum">     175 </span>                :            :  * programs that may not always call poll_block() on a regular basis should
+<span class="lineNum">     176 </span>                :            :  * also call it periodically.  (Therefore, any function with &quot;block&quot; in its
+<span class="lineNum">     177 </span>                :            :  * name should call fatal_signal_run() each time it is called, either directly
+<span class="lineNum">     178 </span>                :            :  * or through poll_block(), because such functions can only used by specialized
+<span class="lineNum">     179 </span>                :            :  * programs that can afford to block outside their main loop around
+<span class="lineNum">     180 </span>                :            :  * poll_block().)
+<a name="181"><span class="lineNum">     181 </span>                :            :  */</a>
+<span class="lineNum">     182 </span>                :            : void
+<span class="lineNum">     183 </span>                :<span class="lineCov">     206543 : fatal_signal_run(void)</span>
+<span class="lineNum">     184 </span>                :            : {
+<span class="lineNum">     185 </span>                :            :     sig_atomic_t sig_nr;
+<span class="lineNum">     186 </span>                :            : 
+<span class="lineNum">     187 </span>                :<span class="lineCov">     206543 :     fatal_signal_init();</span>
+<span class="lineNum">     188 </span>                :            : 
+<span class="lineNum">     189 </span>                :<span class="lineCov">     206542 :     sig_nr = stored_sig_nr;</span>
+<span class="lineNum">     190 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 206542 times"> + </span>]:<span class="lineCov">     206542 :     if (sig_nr != SIG_ATOMIC_MAX) {</span>
+<span class="lineNum">     191 </span>                :            :         char namebuf[SIGNAL_NAME_BUFSIZE];
+<span class="lineNum">     192 </span>                :            : 
+<span class="lineNum">     193 </span>                :<span class="lineNoCov">          0 :         ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     194 </span>                :            : 
+<span class="lineNum">     195 </span>                :            : #ifndef _WIN32
+<span class="lineNum">     196 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN(&quot;terminating with signal %d (%s)&quot;,</span>
+<span class="lineNum">     197 </span>                :            :                   (int)sig_nr, signal_name(sig_nr, namebuf, sizeof namebuf));
+<span class="lineNum">     198 </span>                :            : #else
+<span class="lineNum">     199 </span>                :            :         VLOG_WARN(&quot;terminating with signal %d&quot;, (int)sig_nr);
+<span class="lineNum">     200 </span>                :            : #endif
+<span class="lineNum">     201 </span>                :<span class="lineNoCov">          0 :         call_hooks(sig_nr);</span>
+<span class="lineNum">     202 </span>                :            : 
+<span class="lineNum">     203 </span>                :            :         /* Re-raise the signal with the default handling so that the program
+<span class="lineNum">     204 </span>                :            :          * termination status reflects that we were killed by this signal */
+<span class="lineNum">     205 </span>                :<span class="lineNoCov">          0 :         signal(sig_nr, SIG_DFL);</span>
+<span class="lineNum">     206 </span>                :<span class="lineNoCov">          0 :         raise(sig_nr);</span>
+<span class="lineNum">     207 </span>                :            : 
+<span class="lineNum">     208 </span>                :<span class="lineNoCov">          0 :         ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     209 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     210 </span>                :            :     }
+<span class="lineNum">     211 </span>                :<span class="lineCov">     206542 : }</span>
+<a name="212"><span class="lineNum">     212 </span>                :            : </a>
+<span class="lineNum">     213 </span>                :            : void
+<span class="lineNum">     214 </span>                :<span class="lineCov">     152851 : fatal_signal_wait(void)</span>
+<span class="lineNum">     215 </span>                :            : {
+<span class="lineNum">     216 </span>                :<span class="lineCov">     152851 :     fatal_signal_init();</span>
+<span class="lineNum">     217 </span>                :<span class="lineCov">     152852 :     poll_fd_wait_event(signal_fds[0], wevent, POLLIN);</span>
+<span class="lineNum">     218 </span>                :<span class="lineCov">     152856 : }</span>
+<a name="219"><span class="lineNum">     219 </span>                :            : </a>
+<span class="lineNum">     220 </span>                :            : void
+<span class="lineNum">     221 </span>                :<span class="lineCov">       8685 : fatal_ignore_sigpipe(void)</span>
+<span class="lineNum">     222 </span>                :            : {
+<span class="lineNum">     223 </span>                :            : #ifndef _WIN32
+<span class="lineNum">     224 </span>                :<span class="lineCov">       8685 :     signal(SIGPIPE, SIG_IGN);</span>
+<span class="lineNum">     225 </span>                :            : #endif
+<span class="lineNum">     226 </span>                :<span class="lineCov">       8685 : }</span>
+<a name="227"><span class="lineNum">     227 </span>                :            : </a>
+<span class="lineNum">     228 </span>                :            : void
+<span class="lineNum">     229 </span>                :<span class="lineCov">      12178 : fatal_signal_atexit_handler(void)</span>
+<span class="lineNum">     230 </span>                :            : {
+<span class="lineNum">     231 </span>                :<span class="lineCov">      12178 :     call_hooks(0);</span>
+<span class="lineNum">     232 </span>                :<span class="lineCov">      12178 : }</span>
+<a name="233"><span class="lineNum">     233 </span>                :            : </a>
+<span class="lineNum">     234 </span>                :            : static void
+<span class="lineNum">     235 </span>                :<span class="lineCov">      12178 : call_hooks(int sig_nr)</span>
+<span class="lineNum">     236 </span>                :            : {
+<span class="lineNum">     237 </span>                :            :     static volatile sig_atomic_t recurse = 0;
+<span class="lineNum">     238 </span>        [<span class="branchCov" title="Branch 0 was taken 12178 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      12178 :     if (!recurse) {</span>
+<span class="lineNum">     239 </span>                :            :         size_t i;
+<span class="lineNum">     240 </span>                :            : 
+<span class="lineNum">     241 </span>                :<span class="lineCov">      12178 :         recurse = 1;</span>
+<span class="lineNum">     242 </span>                :            : 
+<span class="lineNum">     243 </span>        [<span class="branchCov" title="Branch 0 was taken 1243 times"> + </span><span class="branchCov" title="Branch 1 was taken 12178 times"> + </span>]:<span class="lineCov">      13421 :         for (i = 0; i &lt; n_hooks; i++) {</span>
+<span class="lineNum">     244 </span>                :<span class="lineCov">       1243 :             struct hook *h = &amp;hooks[i];</span>
+<span class="lineNum">     245 </span>[<span class="branchCov" title="Branch 0 was taken 1243 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 1243 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">       1243 :             if (sig_nr || h-&gt;run_at_exit) {</span>
+<span class="lineNum">     246 </span>                :<span class="lineCov">       1243 :                 h-&gt;hook_cb(h-&gt;aux);</span>
+<span class="lineNum">     247 </span>                :            :             }
+<span class="lineNum">     248 </span>                :            :         }
+<span class="lineNum">     249 </span>                :            :     }
+<span class="lineNum">     250 </span>                :<span class="lineCov">      12178 : }</span>
+<span class="lineNum">     251 </span>                :            : 
+<span class="lineNum">     252 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     253 </span>                :            : BOOL WINAPI ConsoleHandlerRoutine(DWORD dwCtrlType)
+<span class="lineNum">     254 </span>                :            : {
+<span class="lineNum">     255 </span>                :            :     stored_sig_nr = SIGINT;
+<span class="lineNum">     256 </span>                :            :     SetEvent(wevent);
+<span class="lineNum">     257 </span>                :            :     return true;
+<span class="lineNum">     258 </span>                :            : }
+<span class="lineNum">     259 </span>                :            : #endif
+<span class="lineNum">     260 </span>                :            : 
+<span class="lineNum">     261 </span>                :            : /* Files to delete on exit. */
+<span class="lineNum">     262 </span>                :            : static struct sset files = SSET_INITIALIZER(&amp;files);
+<span class="lineNum">     263 </span>                :            : 
+<span class="lineNum">     264 </span>                :            : /* Has a hook function been registered with fatal_signal_add_hook() (and not
+<span class="lineNum">     265 </span>                :            :  * cleared by fatal_signal_fork())? */
+<span class="lineNum">     266 </span>                :            : static bool added_hook;
+<span class="lineNum">     267 </span>                :            : 
+<span class="lineNum">     268 </span>                :            : static void unlink_files(void *aux);
+<span class="lineNum">     269 </span>                :            : static void cancel_files(void *aux);
+<span class="lineNum">     270 </span>                :            : static void do_unlink_files(void);
+<span class="lineNum">     271 </span>                :            : 
+<span class="lineNum">     272 </span>                :            : /* Registers 'file' to be unlinked when the program terminates via exit() or a
+<a name="273"><span class="lineNum">     273 </span>                :            :  * fatal signal. */</a>
+<span class="lineNum">     274 </span>                :            : void
+<span class="lineNum">     275 </span>                :<span class="lineCov">       3806 : fatal_signal_add_file_to_unlink(const char *file)</span>
+<span class="lineNum">     276 </span>                :            : {
+<span class="lineNum">     277 </span>                :<span class="lineCov">       3806 :     fatal_signal_init();</span>
+<span class="lineNum">     278 </span>                :            : 
+<span class="lineNum">     279 </span>                :<span class="lineCov">       3806 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     280 </span>        [<span class="branchCov" title="Branch 0 was taken 989 times"> + </span><span class="branchCov" title="Branch 1 was taken 2817 times"> + </span>]:<span class="lineCov">       3806 :     if (!added_hook) {</span>
+<span class="lineNum">     281 </span>                :<span class="lineCov">        989 :         added_hook = true;</span>
+<span class="lineNum">     282 </span>                :<span class="lineCov">        989 :         fatal_signal_add_hook(unlink_files, cancel_files, NULL, true);</span>
+<span class="lineNum">     283 </span>                :            :     }
+<span class="lineNum">     284 </span>                :            : 
+<span class="lineNum">     285 </span>                :<span class="lineCov">       3806 :     sset_add(&amp;files, file);</span>
+<span class="lineNum">     286 </span>                :<span class="lineCov">       3806 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     287 </span>                :<span class="lineCov">       3806 : }</span>
+<span class="lineNum">     288 </span>                :            : 
+<span class="lineNum">     289 </span>                :            : /* Unregisters 'file' from being unlinked when the program terminates via
+<a name="290"><span class="lineNum">     290 </span>                :            :  * exit() or a fatal signal. */</a>
+<span class="lineNum">     291 </span>                :            : void
+<span class="lineNum">     292 </span>                :<span class="lineCov">       2403 : fatal_signal_remove_file_to_unlink(const char *file)</span>
+<span class="lineNum">     293 </span>                :            : {
+<span class="lineNum">     294 </span>                :<span class="lineCov">       2403 :     fatal_signal_init();</span>
+<span class="lineNum">     295 </span>                :            : 
+<span class="lineNum">     296 </span>                :<span class="lineCov">       2403 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     297 </span>                :<span class="lineCov">       2403 :     sset_find_and_delete(&amp;files, file);</span>
+<span class="lineNum">     298 </span>                :<span class="lineCov">       2403 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     299 </span>                :<span class="lineCov">       2403 : }</span>
+<span class="lineNum">     300 </span>                :            : 
+<span class="lineNum">     301 </span>                :            : /* Like fatal_signal_remove_file_to_unlink(), but also unlinks 'file'.
+<a name="302"><span class="lineNum">     302 </span>                :            :  * Returns 0 if successful, otherwise a positive errno value. */</a>
+<span class="lineNum">     303 </span>                :            : int
+<span class="lineNum">     304 </span>                :<span class="lineCov">       1539 : fatal_signal_unlink_file_now(const char *file)</span>
+<span class="lineNum">     305 </span>                :            : {
+<span class="lineNum">     306 </span>                :            :     int error;
+<span class="lineNum">     307 </span>                :            : 
+<span class="lineNum">     308 </span>                :<span class="lineCov">       1539 :     fatal_signal_init();</span>
+<span class="lineNum">     309 </span>                :            : 
+<span class="lineNum">     310 </span>                :<span class="lineCov">       1539 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     311 </span>                :            : 
+<span class="lineNum">     312 </span>        [<span class="branchCov" title="Branch 1 was taken 2 times"> + </span><span class="branchCov" title="Branch 2 was taken 1537 times"> + </span>]:<span class="lineCov">       1539 :     error = unlink(file) ? errno : 0;</span>
+<span class="lineNum">     313 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 1537 times"> + </span>]:<span class="lineCov">       1539 :     if (error) {</span>
+<span class="lineNum">     314 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :         VLOG_WARN(&quot;could not unlink \&quot;%s\&quot; (%s)&quot;, file, ovs_strerror(error));</span>
+<span class="lineNum">     315 </span>                :            :     }
+<span class="lineNum">     316 </span>                :            : 
+<span class="lineNum">     317 </span>                :<span class="lineCov">       1539 :     fatal_signal_remove_file_to_unlink(file);</span>
+<span class="lineNum">     318 </span>                :            : 
+<span class="lineNum">     319 </span>                :<span class="lineCov">       1539 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     320 </span>                :            : 
+<span class="lineNum">     321 </span>                :<span class="lineCov">       1539 :     return error;</span>
+<span class="lineNum">     322 </span>                :            : }
+<a name="323"><span class="lineNum">     323 </span>                :            : </a>
+<span class="lineNum">     324 </span>                :            : static void
+<span class="lineNum">     325 </span>                :<span class="lineCov">        986 : unlink_files(void *aux OVS_UNUSED)</span>
+<span class="lineNum">     326 </span>                :            : {
+<span class="lineNum">     327 </span>                :<span class="lineCov">        986 :     do_unlink_files();</span>
+<span class="lineNum">     328 </span>                :<span class="lineCov">        986 : }</span>
+<a name="329"><span class="lineNum">     329 </span>                :            : </a>
+<span class="lineNum">     330 </span>                :            : static void
+<span class="lineNum">     331 </span>                :<span class="lineCov">          3 : cancel_files(void *aux OVS_UNUSED)</span>
+<span class="lineNum">     332 </span>                :            : {
+<span class="lineNum">     333 </span>                :<span class="lineCov">          3 :     sset_clear(&amp;files);</span>
+<span class="lineNum">     334 </span>                :<span class="lineCov">          3 :     added_hook = false;</span>
+<span class="lineNum">     335 </span>                :<span class="lineCov">          3 : }</span>
+<a name="336"><span class="lineNum">     336 </span>                :            : </a>
+<span class="lineNum">     337 </span>                :            : static void
+<span class="lineNum">     338 </span>                :<span class="lineCov">        986 : do_unlink_files(void)</span>
+<span class="lineNum">     339 </span>                :            : {
+<span class="lineNum">     340 </span>                :            :     const char *file;
+<span class="lineNum">     341 </span>                :            : 
+<span class="lineNum">     342 </span>[<span class="branchCov" title="Branch 1 was taken 866 times"> + </span><span class="branchCov" title="Branch 2 was taken 120 times"> + </span>][<span class="branchCov" title="Branch 5 was taken 534 times"> + </span><span class="branchCov" title="Branch 6 was taken 866 times"> + </span>]:<span class="lineCov">       2386 :     SSET_FOR_EACH (file, &amp;files) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 8 was taken 1400 times"> + </span><span class="branchCov" title="Branch 9 was taken 986 times"> + </span>]
+<span class="lineNum">     343 </span>                :<span class="lineCov">       1400 :         unlink(file);</span>
+<span class="lineNum">     344 </span>                :            :     }
+<span class="lineNum">     345 </span>                :<span class="lineCov">        986 : }</span>
+<span class="lineNum">     346 </span>                :            : 
+<span class="lineNum">     347 </span>                :            : /* Clears all of the fatal signal hooks without executing them.  If any of the
+<span class="lineNum">     348 </span>                :            :  * hooks passed a 'cancel_cb' function to fatal_signal_add_hook(), then those
+<span class="lineNum">     349 </span>                :            :  * functions will be called, allowing them to free resources, etc.
+<span class="lineNum">     350 </span>                :            :  *
+<span class="lineNum">     351 </span>                :            :  * Following a fork, one of the resulting processes can call this function to
+<span class="lineNum">     352 </span>                :            :  * allow it to terminate without calling the hooks registered before calling
+<span class="lineNum">     353 </span>                :            :  * this function.  New hooks registered after calling this function will take
+<a name="354"><span class="lineNum">     354 </span>                :            :  * effect normally. */</a>
+<span class="lineNum">     355 </span>                :            : void
+<span class="lineNum">     356 </span>                :<span class="lineCov">        908 : fatal_signal_fork(void)</span>
+<span class="lineNum">     357 </span>                :            : {
+<span class="lineNum">     358 </span>                :            :     size_t i;
+<span class="lineNum">     359 </span>                :            : 
+<span class="lineNum">     360 </span>                :<span class="lineCov">        908 :     assert_single_threaded();</span>
+<span class="lineNum">     361 </span>                :            : 
+<span class="lineNum">     362 </span>        [<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchCov" title="Branch 1 was taken 908 times"> + </span>]:<span class="lineCov">        912 :     for (i = 0; i &lt; n_hooks; i++) {</span>
+<span class="lineNum">     363 </span>                :<span class="lineCov">          4 :         struct hook *h = &amp;hooks[i];</span>
+<span class="lineNum">     364 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          4 :         if (h-&gt;cancel_cb) {</span>
+<span class="lineNum">     365 </span>                :<span class="lineCov">          3 :             h-&gt;cancel_cb(h-&gt;aux);</span>
+<span class="lineNum">     366 </span>                :            :         }
+<span class="lineNum">     367 </span>                :            :     }
+<span class="lineNum">     368 </span>                :<span class="lineCov">        908 :     n_hooks = 0;</span>
+<span class="lineNum">     369 </span>                :            : 
+<span class="lineNum">     370 </span>                :            :     /* Raise any signals that we have already received with the default
+<span class="lineNum">     371 </span>                :            :      * handler. */
+<span class="lineNum">     372 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 908 times"> + </span>]:<span class="lineCov">        908 :     if (stored_sig_nr != SIG_ATOMIC_MAX) {</span>
+<span class="lineNum">     373 </span>                :<span class="lineNoCov">          0 :         raise(stored_sig_nr);</span>
+<span class="lineNum">     374 </span>                :            :     }
+<span class="lineNum">     375 </span>                :<span class="lineCov">        908 : }</span>
+<span class="lineNum">     376 </span>                :            : 
+<span class="lineNum">     377 </span>                :            : #ifndef _WIN32
+<span class="lineNum">     378 </span>                :            : /* Blocks all fatal signals and returns previous signal mask into
+<a name="379"><span class="lineNum">     379 </span>                :            :  * 'prev_mask'. */</a>
+<span class="lineNum">     380 </span>                :            : void
+<span class="lineNum">     381 </span>                :<span class="lineCov">        112 : fatal_signal_block(sigset_t *prev_mask)</span>
+<span class="lineNum">     382 </span>                :            : {
+<span class="lineNum">     383 </span>                :            :     int i;
+<span class="lineNum">     384 </span>                :            :     sigset_t block_mask;
+<span class="lineNum">     385 </span>                :            : 
+<span class="lineNum">     386 </span>                :<span class="lineCov">        112 :     sigemptyset(&amp;block_mask);</span>
+<span class="lineNum">     387 </span>        [<span class="branchCov" title="Branch 0 was taken 448 times"> + </span><span class="branchCov" title="Branch 1 was taken 112 times"> + </span>]:<span class="lineCov">        560 :     for (i = 0; i &lt; ARRAY_SIZE(fatal_signals); i++) {</span>
+<span class="lineNum">     388 </span>                :<span class="lineCov">        448 :         int sig_nr = fatal_signals[i];</span>
+<span class="lineNum">     389 </span>                :<span class="lineCov">        448 :         sigaddset(&amp;block_mask, sig_nr);</span>
+<span class="lineNum">     390 </span>                :            :     }
+<span class="lineNum">     391 </span>                :<span class="lineCov">        112 :     xpthread_sigmask(SIG_BLOCK, &amp;block_mask, prev_mask);</span>
+<span class="lineNum">     392 </span>                :<span class="lineCov">        112 : }</span>
+<span class="lineNum">     393 </span>                :            : #endif
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

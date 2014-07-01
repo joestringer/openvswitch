@@ -1,0 +1,261 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/hindex.h</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - hindex.h<span style="font-size: 80%;"> (source / <a href="hindex.h.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">7</td>
+            <td class="headerCovTableEntry">7</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">2</td>
+            <td class="headerCovTableEntry">2</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2013 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #ifndef HINDEX_H
+<span class="lineNum">      18 </span>                :            : #define HINDEX_H 1
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : /* Hashed multimap.
+<span class="lineNum">      21 </span>                :            :  *
+<span class="lineNum">      22 </span>                :            :  * hindex is a hash table data structure that gracefully handles duplicates.
+<span class="lineNum">      23 </span>                :            :  * With a high-quality hash function, insertion, deletion, and search are O(1)
+<span class="lineNum">      24 </span>                :            :  * expected time, regardless of the number of duplicates for a given key.  */
+<span class="lineNum">      25 </span>                :            : 
+<span class="lineNum">      26 </span>                :            : #include &lt;stdbool.h&gt;
+<span class="lineNum">      27 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      28 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      29 </span>                :            : 
+<span class="lineNum">      30 </span>                :            : /* A hash index node, to embed inside the data structure being indexed.
+<span class="lineNum">      31 </span>                :            :  *
+<span class="lineNum">      32 </span>                :            :  * Nodes are linked together like this (the boxes are labeled with hash
+<span class="lineNum">      33 </span>                :            :  * values):
+<span class="lineNum">      34 </span>                :            :  *
+<span class="lineNum">      35 </span>                :            :  *             +--------+ d   +--------+ d   +--------+ d
+<span class="lineNum">      36 </span>                :            :  *  bucket---&gt; |    6   |----&gt;|   20   |----&gt;|   15   |----&gt;null
+<span class="lineNum">      37 </span>                :            :  *             +-|------+     +-|------+     +-|------+
+<span class="lineNum">      38 </span>                :            :  *               |    ^         |              |    ^
+<span class="lineNum">      39 </span>                :            :  *              s|    |d        |s            s|    |d
+<span class="lineNum">      40 </span>                :            :  *               V    |         V              V    |
+<span class="lineNum">      41 </span>                :            :  *             +------|-+      null          +------|-+
+<span class="lineNum">      42 </span>                :            :  *             |    6   |                    |   15   |
+<span class="lineNum">      43 </span>                :            :  *             +-|------+                    +-|------+
+<span class="lineNum">      44 </span>                :            :  *               |    ^                        |
+<span class="lineNum">      45 </span>                :            :  *              s|    |d                      s|
+<span class="lineNum">      46 </span>                :            :  *               V    |                        V
+<span class="lineNum">      47 </span>                :            :  *             +------|-+                     null
+<span class="lineNum">      48 </span>                :            :  *             |    6   |
+<span class="lineNum">      49 </span>                :            :  *             +-|------+
+<span class="lineNum">      50 </span>                :            :  *               |
+<span class="lineNum">      51 </span>                :            :  *              s|
+<span class="lineNum">      52 </span>                :            :  *               V
+<span class="lineNum">      53 </span>                :            :  *              null
+<span class="lineNum">      54 </span>                :            :  *
+<span class="lineNum">      55 </span>                :            :  * The basic usage is:
+<span class="lineNum">      56 </span>                :            :  *
+<span class="lineNum">      57 </span>                :            :  *     - To visit the unique hash values in the hindex, follow the 'd'
+<span class="lineNum">      58 </span>                :            :  *       (&quot;different&quot;) pointers starting from each bucket.  The nodes visited
+<span class="lineNum">      59 </span>                :            :  *       this way are called &quot;head&quot; nodes, because they are at the head of the
+<span class="lineNum">      60 </span>                :            :  *       vertical chains.
+<span class="lineNum">      61 </span>                :            :  *
+<span class="lineNum">      62 </span>                :            :  *     - To visit the nodes with hash value H, follow the 'd' pointers in the
+<span class="lineNum">      63 </span>                :            :  *       appropriate bucket until you find one with hash H, then follow the 's'
+<span class="lineNum">      64 </span>                :            :  *       (&quot;same&quot;) pointers until you hit a null pointer.  The non-head nodes
+<span class="lineNum">      65 </span>                :            :  *       visited this way are called &quot;body&quot; nodes.
+<span class="lineNum">      66 </span>                :            :  *
+<span class="lineNum">      67 </span>                :            :  *     - The 'd' pointers in body nodes point back to the previous body node
+<span class="lineNum">      68 </span>                :            :  *       or, for the first body node, to the head node.  (This makes it
+<span class="lineNum">      69 </span>                :            :  *       possible to remove a body node without traversing all the way downward
+<span class="lineNum">      70 </span>                :            :  *       from the head).
+<span class="lineNum">      71 </span>                :            :  */
+<span class="lineNum">      72 </span>                :            : struct hindex_node {
+<span class="lineNum">      73 </span>                :            :     /* Hash value. */
+<span class="lineNum">      74 </span>                :            :     size_t hash;
+<span class="lineNum">      75 </span>                :            : 
+<span class="lineNum">      76 </span>                :            :     /* In a head node, the next head node (with a hash different from this
+<span class="lineNum">      77 </span>                :            :      * node), or NULL if this is the last node in this bucket.
+<span class="lineNum">      78 </span>                :            :      *
+<span class="lineNum">      79 </span>                :            :      * In a body node, the previous head or body node (with the same hash as
+<span class="lineNum">      80 </span>                :            :      * this node).  Never null. */
+<span class="lineNum">      81 </span>                :            :     struct hindex_node *d;
+<span class="lineNum">      82 </span>                :            : 
+<span class="lineNum">      83 </span>                :            :     /* In a head or a body node, the next body node with the same hash as this
+<span class="lineNum">      84 </span>                :            :      * node.  NULL if this is the last node with this hash. */
+<span class="lineNum">      85 </span>                :            :     struct hindex_node *s;
+<span class="lineNum">      86 </span>                :            : };
+<span class="lineNum">      87 </span>                :            : 
+<span class="lineNum">      88 </span>                :            : /* A hash index. */
+<span class="lineNum">      89 </span>                :            : struct hindex {
+<span class="lineNum">      90 </span>                :            :     struct hindex_node **buckets; /* Must point to 'one' iff 'mask' == 0. */
+<span class="lineNum">      91 </span>                :            :     struct hindex_node *one;
+<span class="lineNum">      92 </span>                :            :     size_t mask;      /* 0 or more lowest-order bits set, others cleared. */
+<span class="lineNum">      93 </span>                :            :     size_t n_unique;  /* Number of unique hashes (the number of head nodes). */
+<span class="lineNum">      94 </span>                :            : };
+<span class="lineNum">      95 </span>                :            : 
+<span class="lineNum">      96 </span>                :            : /* Initializer for an empty hash index. */
+<span class="lineNum">      97 </span>                :            : #define HINDEX_INITIALIZER(HINDEX) \
+<span class="lineNum">      98 </span>                :            :     { (struct hindex_node **const) &amp;(HINDEX)-&gt;one, NULL, 0, 0 }
+<span class="lineNum">      99 </span>                :            : 
+<span class="lineNum">     100 </span>                :            : /* Initialization. */
+<span class="lineNum">     101 </span>                :            : void hindex_init(struct hindex *);
+<span class="lineNum">     102 </span>                :            : void hindex_destroy(struct hindex *);
+<span class="lineNum">     103 </span>                :            : void hindex_clear(struct hindex *);
+<span class="lineNum">     104 </span>                :            : void hindex_swap(struct hindex *a, struct hindex *b);
+<span class="lineNum">     105 </span>                :            : void hindex_moved(struct hindex *hindex);
+<span class="lineNum">     106 </span>                :            : static inline bool hindex_is_empty(const struct hindex *);
+<span class="lineNum">     107 </span>                :            : 
+<span class="lineNum">     108 </span>                :            : /* Adjusting capacity. */
+<span class="lineNum">     109 </span>                :            : void hindex_expand(struct hindex *);
+<span class="lineNum">     110 </span>                :            : void hindex_shrink(struct hindex *);
+<span class="lineNum">     111 </span>                :            : void hindex_reserve(struct hindex *, size_t capacity);
+<span class="lineNum">     112 </span>                :            : 
+<span class="lineNum">     113 </span>                :            : /* Insertion and deletion. */
+<span class="lineNum">     114 </span>                :            : void hindex_insert_fast(struct hindex *, struct hindex_node *, size_t hash);
+<span class="lineNum">     115 </span>                :            : void hindex_insert(struct hindex *, struct hindex_node *, size_t hash);
+<span class="lineNum">     116 </span>                :            : void hindex_remove(struct hindex *, struct hindex_node *);
+<span class="lineNum">     117 </span>                :            : 
+<span class="lineNum">     118 </span>                :            : /* Search.
+<span class="lineNum">     119 </span>                :            :  *
+<span class="lineNum">     120 </span>                :            :  * HINDEX_FOR_EACH_WITH_HASH iterates NODE over all of the nodes in HINDEX that
+<span class="lineNum">     121 </span>                :            :  * have hash value equal to HASH.  MEMBER must be the name of the 'struct
+<span class="lineNum">     122 </span>                :            :  * hindex_node' member within NODE.
+<span class="lineNum">     123 </span>                :            :  *
+<span class="lineNum">     124 </span>                :            :  * The loop should not change NODE to point to a different node or insert or
+<span class="lineNum">     125 </span>                :            :  * delete nodes in HINDEX (unless it &quot;break&quot;s out of the loop to terminate
+<span class="lineNum">     126 </span>                :            :  * iteration).
+<span class="lineNum">     127 </span>                :            :  *
+<span class="lineNum">     128 </span>                :            :  * Evaluates HASH only once.
+<span class="lineNum">     129 </span>                :            :  */
+<span class="lineNum">     130 </span>                :            : #define HINDEX_FOR_EACH_WITH_HASH(NODE, MEMBER, HASH, HINDEX)               \
+<span class="lineNum">     131 </span>                :            :     for (ASSIGN_CONTAINER(NODE, hindex_node_with_hash(HINDEX, HASH), MEMBER); \
+<span class="lineNum">     132 </span>                :            :          NODE != OBJECT_CONTAINING(NULL, NODE, MEMBER);                     \
+<span class="lineNum">     133 </span>                :            :          ASSIGN_CONTAINER(NODE, (NODE)-&gt;MEMBER.s, MEMBER))
+<span class="lineNum">     134 </span>                :            : 
+<span class="lineNum">     135 </span>                :            : /* Returns the head node in 'hindex' with the given 'hash', or a null pointer
+<a name="136"><span class="lineNum">     136 </span>                :            :  * if no nodes have that hash value. */</a>
+<span class="lineNum">     137 </span>                :            : static inline struct hindex_node *
+<span class="lineNum">     138 </span>                :<span class="lineCov">   13889571 : hindex_node_with_hash(const struct hindex *hindex, size_t hash)</span>
+<span class="lineNum">     139 </span>                :            : {
+<span class="lineNum">     140 </span>                :<span class="lineCov">   13889571 :     struct hindex_node *node = hindex-&gt;buckets[hash &amp; hindex-&gt;mask];</span>
+<span class="lineNum">     141 </span>                :            : 
+<span class="lineNum">     142 </span>[<span class="branchCov" title="Branch 0 was taken 16117925 times"> + </span><span class="branchCov" title="Branch 1 was taken 7566391 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 9794745 times"> + </span><span class="branchCov" title="Branch 3 was taken 6323180 times"> + </span>]:<span class="lineCov">   23684316 :     while (node &amp;&amp; node-&gt;hash != hash) {</span>
+<span class="lineNum">     143 </span>                :<span class="lineCov">    9794745 :         node = node-&gt;d;</span>
+<span class="lineNum">     144 </span>                :            :     }
+<span class="lineNum">     145 </span>                :<span class="lineCov">   13889571 :     return node;</span>
+<span class="lineNum">     146 </span>                :            : }
+<span class="lineNum">     147 </span>                :            : 
+<span class="lineNum">     148 </span>                :            : /* Iteration. */
+<span class="lineNum">     149 </span>                :            : 
+<span class="lineNum">     150 </span>                :            : /* Iterates through every node in HINDEX. */
+<span class="lineNum">     151 </span>                :            : #define HINDEX_FOR_EACH(NODE, MEMBER, HINDEX)                           \
+<span class="lineNum">     152 </span>                :            :     for (ASSIGN_CONTAINER(NODE, hindex_first(HINDEX), MEMBER);          \
+<span class="lineNum">     153 </span>                :            :          NODE != OBJECT_CONTAINING(NULL, NODE, MEMBER);                 \
+<span class="lineNum">     154 </span>                :            :          ASSIGN_CONTAINER(NODE, hindex_next(HINDEX, &amp;(NODE)-&gt;MEMBER), MEMBER))
+<span class="lineNum">     155 </span>                :            : 
+<span class="lineNum">     156 </span>                :            : /* Safe when NODE may be freed (not needed when NODE may be removed from the
+<span class="lineNum">     157 </span>                :            :  * hash index but its members remain accessible and intact). */
+<span class="lineNum">     158 </span>                :            : #define HINDEX_FOR_EACH_SAFE(NODE, NEXT, MEMBER, HINDEX)                \
+<span class="lineNum">     159 </span>                :            :     for (ASSIGN_CONTAINER(NODE, hindex_first(HINDEX), MEMBER);          \
+<span class="lineNum">     160 </span>                :            :          (NODE != OBJECT_CONTAINING(NULL, NODE, MEMBER)                 \
+<span class="lineNum">     161 </span>                :            :           ? ASSIGN_CONTAINER(NEXT, hindex_next(HINDEX, &amp;(NODE)-&gt;MEMBER), MEMBER), 1 \
+<span class="lineNum">     162 </span>                :            :           : 0);                                                         \
+<span class="lineNum">     163 </span>                :            :          (NODE) = (NEXT))
+<span class="lineNum">     164 </span>                :            : 
+<span class="lineNum">     165 </span>                :            : struct hindex_node *hindex_first(const struct hindex *);
+<span class="lineNum">     166 </span>                :            : struct hindex_node *hindex_next(const struct hindex *,
+<span class="lineNum">     167 </span>                :            :                                 const struct hindex_node *);
+<span class="lineNum">     168 </span>                :            : 
+<a name="169"><span class="lineNum">     169 </span>                :            : /* Returns true if 'hindex' currently contains no nodes, false otherwise. */</a>
+<span class="lineNum">     170 </span>                :            : static inline bool
+<span class="lineNum">     171 </span>                :<span class="lineCov">     144797 : hindex_is_empty(const struct hindex *hindex)</span>
+<span class="lineNum">     172 </span>                :            : {
+<span class="lineNum">     173 </span>                :<span class="lineCov">     144797 :     return hindex-&gt;n_unique == 0;</span>
+<span class="lineNum">     174 </span>                :            : }
+<span class="lineNum">     175 </span>                :            : 
+<span class="lineNum">     176 </span>                :            : #endif /* hindex.h */
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

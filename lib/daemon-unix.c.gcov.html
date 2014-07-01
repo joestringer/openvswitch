@@ -1,0 +1,752 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/daemon-unix.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - daemon-unix.c<span style="font-size: 80%;"> (source / <a href="daemon-unix.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">175</td>
+            <td class="headerCovTableEntry">248</td>
+            <td class="headerCovTableEntryLo">70.6 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">22</td>
+            <td class="headerCovTableEntry">24</td>
+            <td class="headerCovTableEntryHi">91.7 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">72</td>
+            <td class="headerCovTableEntry">166</td>
+            <td class="headerCovTableEntryLo">43.4 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2008, 2009, 2010, 2011, 2012, 2013 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;daemon.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &quot;daemon-private.h&quot;
+<span class="lineNum">      20 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;fcntl.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;signal.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      25 </span>                :            : #include &lt;sys/resource.h&gt;
+<span class="lineNum">      26 </span>                :            : #include &lt;sys/wait.h&gt;
+<span class="lineNum">      27 </span>                :            : #include &lt;sys/stat.h&gt;
+<span class="lineNum">      28 </span>                :            : #include &lt;unistd.h&gt;
+<span class="lineNum">      29 </span>                :            : #include &quot;command-line.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;fatal-signal.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;dirs.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;lockfile.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;ovs-thread.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;process.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;socket-util.h&quot;
+<span class="lineNum">      36 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      37 </span>                :            : #include &quot;util.h&quot;
+<a name="38"><span class="lineNum">      38 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      39 </span>                :            : 
+<span class="lineNum">      40 </span>                :<span class="lineCov">      13685 : VLOG_DEFINE_THIS_MODULE(daemon_unix);</span>
+<span class="lineNum">      41 </span>                :            : 
+<span class="lineNum">      42 </span>                :            : /* --detach: Should we run in the background? */
+<span class="lineNum">      43 </span>                :            : bool detach;                    /* Was --detach specified? */
+<span class="lineNum">      44 </span>                :            : static bool detached;           /* Have we already detached? */
+<span class="lineNum">      45 </span>                :            : 
+<span class="lineNum">      46 </span>                :            : /* --pidfile: Name of pidfile (null if none). */
+<span class="lineNum">      47 </span>                :            : char *pidfile;
+<span class="lineNum">      48 </span>                :            : 
+<span class="lineNum">      49 </span>                :            : /* Device and inode of pidfile, so we can avoid reopening it. */
+<span class="lineNum">      50 </span>                :            : static dev_t pidfile_dev;
+<span class="lineNum">      51 </span>                :            : static ino_t pidfile_ino;
+<span class="lineNum">      52 </span>                :            : 
+<span class="lineNum">      53 </span>                :            : /* --overwrite-pidfile: Create pidfile even if one already exists and is
+<span class="lineNum">      54 </span>                :            :    locked? */
+<span class="lineNum">      55 </span>                :            : static bool overwrite_pidfile;
+<span class="lineNum">      56 </span>                :            : 
+<span class="lineNum">      57 </span>                :            : /* --no-chdir: Should we chdir to &quot;/&quot;? */
+<span class="lineNum">      58 </span>                :            : static bool chdir_ = true;
+<span class="lineNum">      59 </span>                :            : 
+<span class="lineNum">      60 </span>                :            : /* File descriptor used by daemonize_start() and daemonize_complete(). */
+<span class="lineNum">      61 </span>                :            : static int daemonize_fd = -1;
+<span class="lineNum">      62 </span>                :            : 
+<span class="lineNum">      63 </span>                :            : /* --monitor: Should a supervisory process monitor the daemon and restart it if
+<span class="lineNum">      64 </span>                :            :  * it dies due to an error signal? */
+<span class="lineNum">      65 </span>                :            : static bool monitor;
+<span class="lineNum">      66 </span>                :            : 
+<span class="lineNum">      67 </span>                :            : static void check_already_running(void);
+<span class="lineNum">      68 </span>                :            : static int lock_pidfile(FILE *, int command);
+<span class="lineNum">      69 </span>                :            : static pid_t fork_and_clean_up(void);
+<span class="lineNum">      70 </span>                :            : static void daemonize_post_detach(void);
+<span class="lineNum">      71 </span>                :            : 
+<span class="lineNum">      72 </span>                :            : /* Returns the file name that would be used for a pidfile if 'name' were
+<a name="73"><span class="lineNum">      73 </span>                :            :  * provided to set_pidfile().  The caller must free the returned string. */</a>
+<span class="lineNum">      74 </span>                :            : char *
+<span class="lineNum">      75 </span>                :<span class="lineCov">       1766 : make_pidfile_name(const char *name)</span>
+<span class="lineNum">      76 </span>                :            : {
+<span class="lineNum">      77 </span>                :<span class="lineCov">       1766 :     return (!name</span>
+<span class="lineNum">      78 </span>                :<span class="lineCov">       1291 :             ? xasprintf(&quot;%s/%s.pid&quot;, ovs_rundir(), program_name)</span>
+<span class="lineNum">      79 </span>        [<span class="branchCov" title="Branch 0 was taken 1291 times"> + </span><span class="branchCov" title="Branch 1 was taken 475 times"> + </span>]:<span class="lineCov">       3057 :             : abs_file_name(ovs_rundir(), name));</span>
+<span class="lineNum">      80 </span>                :            : }
+<span class="lineNum">      81 </span>                :            : 
+<a name="82"><span class="lineNum">      82 </span>                :            : /* Sets that we do not chdir to &quot;/&quot;. */</a>
+<span class="lineNum">      83 </span>                :            : void
+<span class="lineNum">      84 </span>                :<span class="lineCov">       1655 : set_no_chdir(void)</span>
+<span class="lineNum">      85 </span>                :            : {
+<span class="lineNum">      86 </span>                :<span class="lineCov">       1655 :     chdir_ = false;</span>
+<span class="lineNum">      87 </span>                :<span class="lineCov">       1655 : }</span>
+<span class="lineNum">      88 </span>                :            : 
+<span class="lineNum">      89 </span>                :            : /* Normally, daemonize() or damonize_start() will terminate the program with a
+<span class="lineNum">      90 </span>                :            :  * message if a locked pidfile already exists.  If this function is called, an
+<a name="91"><span class="lineNum">      91 </span>                :            :  * existing pidfile will be replaced, with a warning. */</a>
+<span class="lineNum">      92 </span>                :            : void
+<span class="lineNum">      93 </span>                :<span class="lineNoCov">          0 : ignore_existing_pidfile(void)</span>
+<span class="lineNum">      94 </span>                :            : {
+<span class="lineNum">      95 </span>                :<span class="lineNoCov">          0 :     overwrite_pidfile = true;</span>
+<span class="lineNum">      96 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      97 </span>                :            : 
+<span class="lineNum">      98 </span>                :            : /* Sets up a following call to daemonize() to detach from the foreground
+<a name="99"><span class="lineNum">      99 </span>                :            :  * session, running this process in the background.  */</a>
+<span class="lineNum">     100 </span>                :            : void
+<span class="lineNum">     101 </span>                :<span class="lineCov">       1765 : set_detach(void)</span>
+<span class="lineNum">     102 </span>                :            : {
+<span class="lineNum">     103 </span>                :<span class="lineCov">       1765 :     detach = true;</span>
+<span class="lineNum">     104 </span>                :<span class="lineCov">       1765 : }</span>
+<span class="lineNum">     105 </span>                :            : 
+<span class="lineNum">     106 </span>                :            : /* Sets up a following call to daemonize() to fork a supervisory process to
+<a name="107"><span class="lineNum">     107 </span>                :            :  * monitor the daemon and restart it if it dies due to an error signal.  */</a>
+<span class="lineNum">     108 </span>                :            : void
+<span class="lineNum">     109 </span>                :<span class="lineCov">         14 : daemon_set_monitor(void)</span>
+<span class="lineNum">     110 </span>                :            : {
+<span class="lineNum">     111 </span>                :<span class="lineCov">         14 :     monitor = true;</span>
+<span class="lineNum">     112 </span>                :<span class="lineCov">         14 : }</span>
+<span class="lineNum">     113 </span>                :            : 
+<span class="lineNum">     114 </span>                :            : /* If a pidfile has been configured, creates it and stores the running
+<span class="lineNum">     115 </span>                :            :  * process's pid in it.  Ensures that the pidfile will be deleted when the
+<a name="116"><span class="lineNum">     116 </span>                :            :  * process exits. */</a>
+<span class="lineNum">     117 </span>                :            : static void
+<span class="lineNum">     118 </span>                :<span class="lineCov">        864 : make_pidfile(void)</span>
+<span class="lineNum">     119 </span>                :            : {
+<span class="lineNum">     120 </span>                :<span class="lineCov">        864 :     long int pid = getpid();</span>
+<span class="lineNum">     121 </span>                :            :     struct stat s;
+<span class="lineNum">     122 </span>                :            :     char *tmpfile;
+<span class="lineNum">     123 </span>                :            :     FILE *file;
+<span class="lineNum">     124 </span>                :            :     int error;
+<span class="lineNum">     125 </span>                :            : 
+<span class="lineNum">     126 </span>                :            :     /* Create a temporary pidfile. */
+<span class="lineNum">     127 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 864 times"> + </span>]:<span class="lineCov">        864 :     if (overwrite_pidfile) {</span>
+<span class="lineNum">     128 </span>                :<span class="lineNoCov">          0 :         tmpfile = xasprintf(&quot;%s.tmp%ld&quot;, pidfile, pid);</span>
+<span class="lineNum">     129 </span>                :<span class="lineNoCov">          0 :         fatal_signal_add_file_to_unlink(tmpfile);</span>
+<span class="lineNum">     130 </span>                :            :     } else {
+<span class="lineNum">     131 </span>                :            :         /* Everyone shares the same file which will be treated as a lock.  To
+<span class="lineNum">     132 </span>                :            :          * avoid some uncomfortable race conditions, we can't set up the fatal
+<span class="lineNum">     133 </span>                :            :          * signal unlink until we've acquired it. */
+<span class="lineNum">     134 </span>                :<span class="lineCov">        864 :         tmpfile = xasprintf(&quot;%s.tmp&quot;, pidfile);</span>
+<span class="lineNum">     135 </span>                :            :     }
+<span class="lineNum">     136 </span>                :            : 
+<span class="lineNum">     137 </span>                :<span class="lineCov">        864 :     file = fopen(tmpfile, &quot;a+&quot;);</span>
+<span class="lineNum">     138 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 864 times"> + </span>]:<span class="lineCov">        864 :     if (!file) {</span>
+<span class="lineNum">     139 </span>                :<span class="lineNoCov">          0 :         VLOG_FATAL(&quot;%s: create failed (%s)&quot;, tmpfile, ovs_strerror(errno));</span>
+<span class="lineNum">     140 </span>                :            :     }
+<span class="lineNum">     141 </span>                :            : 
+<span class="lineNum">     142 </span>                :<span class="lineCov">        864 :     error = lock_pidfile(file, F_SETLK);</span>
+<span class="lineNum">     143 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 864 times"> + </span>]:<span class="lineCov">        864 :     if (error) {</span>
+<span class="lineNum">     144 </span>                :            :         /* Looks like we failed to acquire the lock.  Note that, if we failed
+<span class="lineNum">     145 </span>                :            :          * for some other reason (and '!overwrite_pidfile'), we will have
+<span class="lineNum">     146 </span>                :            :          * left 'tmpfile' as garbage in the file system. */
+<span class="lineNum">     147 </span>                :<span class="lineNoCov">          0 :         VLOG_FATAL(&quot;%s: fcntl(F_SETLK) failed (%s)&quot;, tmpfile,</span>
+<span class="lineNum">     148 </span>                :            :                    ovs_strerror(error));
+<span class="lineNum">     149 </span>                :            :     }
+<span class="lineNum">     150 </span>                :            : 
+<span class="lineNum">     151 </span>        [<span class="branchCov" title="Branch 0 was taken 864 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        864 :     if (!overwrite_pidfile) {</span>
+<span class="lineNum">     152 </span>                :            :         /* We acquired the lock.  Make sure to clean up on exit, and verify
+<span class="lineNum">     153 </span>                :            :          * that we're allowed to create the actual pidfile. */
+<span class="lineNum">     154 </span>                :<span class="lineCov">        864 :         fatal_signal_add_file_to_unlink(tmpfile);</span>
+<span class="lineNum">     155 </span>                :<span class="lineCov">        864 :         check_already_running();</span>
+<span class="lineNum">     156 </span>                :            :     }
+<span class="lineNum">     157 </span>                :            : 
+<span class="lineNum">     158 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 864 times"> + </span>]:<span class="lineCov">        864 :     if (fstat(fileno(file), &amp;s) == -1) {</span>
+<span class="lineNum">     159 </span>                :<span class="lineNoCov">          0 :         VLOG_FATAL(&quot;%s: fstat failed (%s)&quot;, tmpfile, ovs_strerror(errno));</span>
+<span class="lineNum">     160 </span>                :            :     }
+<span class="lineNum">     161 </span>                :            : 
+<span class="lineNum">     162 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 864 times"> + </span>]:<span class="lineCov">        864 :     if (ftruncate(fileno(file), 0) == -1) {</span>
+<span class="lineNum">     163 </span>                :<span class="lineNoCov">          0 :         VLOG_FATAL(&quot;%s: truncate failed (%s)&quot;, tmpfile, ovs_strerror(errno));</span>
+<span class="lineNum">     164 </span>                :            :     }
+<span class="lineNum">     165 </span>                :            : 
+<span class="lineNum">     166 </span>                :<span class="lineCov">        864 :     fprintf(file, &quot;%ld\n&quot;, pid);</span>
+<span class="lineNum">     167 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 864 times"> + </span>]:<span class="lineCov">        864 :     if (fflush(file) == EOF) {</span>
+<span class="lineNum">     168 </span>                :<span class="lineNoCov">          0 :         VLOG_FATAL(&quot;%s: write failed (%s)&quot;, tmpfile, ovs_strerror(errno));</span>
+<span class="lineNum">     169 </span>                :            :     }
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>                :<span class="lineCov">        864 :     error = rename(tmpfile, pidfile);</span>
+<span class="lineNum">     172 </span>                :            : 
+<span class="lineNum">     173 </span>                :            :     /* Due to a race, 'tmpfile' may be owned by a different process, so we
+<span class="lineNum">     174 </span>                :            :      * shouldn't delete it on exit. */
+<span class="lineNum">     175 </span>                :<span class="lineCov">        864 :     fatal_signal_remove_file_to_unlink(tmpfile);</span>
+<span class="lineNum">     176 </span>                :            : 
+<span class="lineNum">     177 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 864 times"> + </span>]:<span class="lineCov">        864 :     if (error &lt; 0) {</span>
+<span class="lineNum">     178 </span>                :<span class="lineNoCov">          0 :         VLOG_FATAL(&quot;failed to rename \&quot;%s\&quot; to \&quot;%s\&quot; (%s)&quot;,</span>
+<span class="lineNum">     179 </span>                :            :                    tmpfile, pidfile, ovs_strerror(errno));
+<span class="lineNum">     180 </span>                :            :     }
+<span class="lineNum">     181 </span>                :            : 
+<span class="lineNum">     182 </span>                :            :     /* Ensure that the pidfile will get deleted on exit. */
+<span class="lineNum">     183 </span>                :<span class="lineCov">        864 :     fatal_signal_add_file_to_unlink(pidfile);</span>
+<span class="lineNum">     184 </span>                :            : 
+<span class="lineNum">     185 </span>                :            :     /* Clean up.
+<span class="lineNum">     186 </span>                :            :      *
+<span class="lineNum">     187 </span>                :            :      * We don't close 'file' because its file descriptor must remain open to
+<span class="lineNum">     188 </span>                :            :      * hold the lock. */
+<span class="lineNum">     189 </span>                :<span class="lineCov">        864 :     pidfile_dev = s.st_dev;</span>
+<span class="lineNum">     190 </span>                :<span class="lineCov">        864 :     pidfile_ino = s.st_ino;</span>
+<span class="lineNum">     191 </span>                :<span class="lineCov">        864 :     free(tmpfile);</span>
+<span class="lineNum">     192 </span>                :<span class="lineCov">        864 : }</span>
+<span class="lineNum">     193 </span>                :            : 
+<span class="lineNum">     194 </span>                :            : /* Calls fork() and on success returns its return value.  On failure, logs an
+<span class="lineNum">     195 </span>                :            :  * error and exits unsuccessfully.
+<span class="lineNum">     196 </span>                :            :  *
+<span class="lineNum">     197 </span>                :            :  * Post-fork, but before returning, this function calls a few other functions
+<span class="lineNum">     198 </span>                :            :  * that are generally useful if the child isn't planning to exec a new
+<a name="199"><span class="lineNum">     199 </span>                :            :  * process. */</a>
+<span class="lineNum">     200 </span>                :            : static pid_t
+<span class="lineNum">     201 </span>                :<span class="lineCov">       1779 : fork_and_clean_up(void)</span>
+<span class="lineNum">     202 </span>                :            : {
+<span class="lineNum">     203 </span>                :<span class="lineCov">       1779 :     pid_t pid = xfork();</span>
+<span class="lineNum">     204 </span>        [<span class="branchCov" title="Branch 0 was taken 908 times"> + </span><span class="branchCov" title="Branch 1 was taken 871 times"> + </span>]:<span class="lineCov">       1779 :     if (pid &gt; 0) {</span>
+<span class="lineNum">     205 </span>                :            :         /* Running in parent process. */
+<span class="lineNum">     206 </span>                :<span class="lineCov">        908 :         fatal_signal_fork();</span>
+<span class="lineNum">     207 </span>        [<span class="branchCov" title="Branch 0 was taken 871 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        871 :     } else if (!pid) {</span>
+<span class="lineNum">     208 </span>                :            :         /* Running in child process. */
+<span class="lineNum">     209 </span>                :<span class="lineCov">        871 :         lockfile_postfork();</span>
+<span class="lineNum">     210 </span>                :            :     }
+<span class="lineNum">     211 </span>                :<span class="lineCov">       1779 :     return pid;</span>
+<span class="lineNum">     212 </span>                :            : }
+<span class="lineNum">     213 </span>                :            : 
+<span class="lineNum">     214 </span>                :            : /* Forks, then:
+<span class="lineNum">     215 </span>                :            :  *
+<span class="lineNum">     216 </span>                :            :  *   - In the parent, waits for the child to signal that it has completed its
+<span class="lineNum">     217 </span>                :            :  *     startup sequence.  Then stores -1 in '*fdp' and returns the child's pid.
+<span class="lineNum">     218 </span>                :            :  *
+<span class="lineNum">     219 </span>                :            :  *   - In the child, stores a fd in '*fdp' and returns 0.  The caller should
+<span class="lineNum">     220 </span>                :            :  *     pass the fd to fork_notify_startup() after it finishes its startup
+<span class="lineNum">     221 </span>                :            :  *     sequence.
+<span class="lineNum">     222 </span>                :            :  *
+<span class="lineNum">     223 </span>                :            :  * If something goes wrong with the fork, logs a critical error and aborts the
+<a name="224"><span class="lineNum">     224 </span>                :            :  * process. */</a>
+<span class="lineNum">     225 </span>                :            : static pid_t
+<span class="lineNum">     226 </span>                :<span class="lineCov">       1779 : fork_and_wait_for_startup(int *fdp)</span>
+<span class="lineNum">     227 </span>                :            : {
+<span class="lineNum">     228 </span>                :            :     int fds[2];
+<span class="lineNum">     229 </span>                :            :     pid_t pid;
+<span class="lineNum">     230 </span>                :            : 
+<span class="lineNum">     231 </span>                :<span class="lineCov">       1779 :     xpipe(fds);</span>
+<span class="lineNum">     232 </span>                :            : 
+<span class="lineNum">     233 </span>                :<span class="lineCov">       1779 :     pid = fork_and_clean_up();</span>
+<span class="lineNum">     234 </span>        [<span class="branchCov" title="Branch 0 was taken 908 times"> + </span><span class="branchCov" title="Branch 1 was taken 871 times"> + </span>]:<span class="lineCov">       1779 :     if (pid &gt; 0) {</span>
+<span class="lineNum">     235 </span>                :            :         /* Running in parent process. */
+<span class="lineNum">     236 </span>                :            :         size_t bytes_read;
+<span class="lineNum">     237 </span>                :            :         char c;
+<span class="lineNum">     238 </span>                :            : 
+<span class="lineNum">     239 </span>                :<span class="lineCov">        908 :         close(fds[1]);</span>
+<span class="lineNum">     240 </span>        [<span class="branchCov" title="Branch 1 was taken 3 times"> + </span><span class="branchCov" title="Branch 2 was taken 905 times"> + </span>]:<span class="lineCov">        908 :         if (read_fully(fds[0], &amp;c, 1, &amp;bytes_read) != 0) {</span>
+<span class="lineNum">     241 </span>                :            :             int retval;
+<span class="lineNum">     242 </span>                :            :             int status;
+<span class="lineNum">     243 </span>                :            : 
+<span class="lineNum">     244 </span>                :            :             do {
+<span class="lineNum">     245 </span>                :<span class="lineCov">          3 :                 retval = waitpid(pid, &amp;status, 0);</span>
+<span class="lineNum">     246 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineCov">          3 :             } while (retval == -1 &amp;&amp; errno == EINTR);</span>
+<span class="lineNum">     247 </span>                :            : 
+<span class="lineNum">     248 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          3 :             if (retval == pid) {</span>
+<span class="lineNum">     249 </span>[<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">          3 :                 if (WIFEXITED(status) &amp;&amp; WEXITSTATUS(status)) {</span>
+<span class="lineNum">     250 </span>                :            :                     /* Child exited with an error.  Convey the same error
+<span class="lineNum">     251 </span>                :            :                      * to our parent process as a courtesy. */
+<span class="lineNum">     252 </span>                :<span class="lineCov">          3 :                     exit(WEXITSTATUS(status));</span>
+<span class="lineNum">     253 </span>                :            :                 } else {
+<span class="lineNum">     254 </span>                :<span class="lineNoCov">          0 :                     char *status_msg = process_status_msg(status);</span>
+<span class="lineNum">     255 </span>                :<span class="lineNoCov">          0 :                     VLOG_FATAL(&quot;fork child died before signaling startup (%s)&quot;,</span>
+<span class="lineNum">     256 </span>                :            :                                status_msg);
+<span class="lineNum">     257 </span>                :            :                 }
+<span class="lineNum">     258 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             } else if (retval &lt; 0) {</span>
+<span class="lineNum">     259 </span>                :<span class="lineNoCov">          0 :                 VLOG_FATAL(&quot;waitpid failed (%s)&quot;, ovs_strerror(errno));</span>
+<span class="lineNum">     260 </span>                :            :             } else {
+<span class="lineNum">     261 </span>                :<span class="lineNoCov">          0 :                 OVS_NOT_REACHED();</span>
+<span class="lineNum">     262 </span>                :            :             }
+<span class="lineNum">     263 </span>                :            :         }
+<span class="lineNum">     264 </span>                :<span class="lineCov">        905 :         close(fds[0]);</span>
+<span class="lineNum">     265 </span>                :<span class="lineCov">        905 :         *fdp = -1;</span>
+<span class="lineNum">     266 </span>        [<span class="branchCov" title="Branch 0 was taken 871 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        871 :     } else if (!pid) {</span>
+<span class="lineNum">     267 </span>                :            :         /* Running in child process. */
+<span class="lineNum">     268 </span>                :<span class="lineCov">        871 :         close(fds[0]);</span>
+<span class="lineNum">     269 </span>                :<span class="lineCov">        871 :         *fdp = fds[1];</span>
+<span class="lineNum">     270 </span>                :            :     }
+<span class="lineNum">     271 </span>                :            : 
+<span class="lineNum">     272 </span>                :<span class="lineCov">       1776 :     return pid;</span>
+<span class="lineNum">     273 </span>                :            : }
+<a name="274"><span class="lineNum">     274 </span>                :            : </a>
+<span class="lineNum">     275 </span>                :            : static void
+<span class="lineNum">     276 </span>                :<span class="lineCov">        980 : fork_notify_startup(int fd)</span>
+<span class="lineNum">     277 </span>                :            : {
+<span class="lineNum">     278 </span>        [<span class="branchCov" title="Branch 0 was taken 867 times"> + </span><span class="branchCov" title="Branch 1 was taken 113 times"> + </span>]:<span class="lineCov">        980 :     if (fd != -1) {</span>
+<span class="lineNum">     279 </span>                :            :         size_t bytes_written;
+<span class="lineNum">     280 </span>                :            :         int error;
+<span class="lineNum">     281 </span>                :            : 
+<span class="lineNum">     282 </span>                :<span class="lineCov">        867 :         error = write_fully(fd, &quot;&quot;, 1, &amp;bytes_written);</span>
+<span class="lineNum">     283 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 867 times"> + </span>]:<span class="lineCov">        867 :         if (error) {</span>
+<span class="lineNum">     284 </span>                :<span class="lineNoCov">          0 :             VLOG_FATAL(&quot;pipe write failed (%s)&quot;, ovs_strerror(error));</span>
+<span class="lineNum">     285 </span>                :            :         }
+<span class="lineNum">     286 </span>                :            : 
+<span class="lineNum">     287 </span>                :<span class="lineCov">        867 :         close(fd);</span>
+<span class="lineNum">     288 </span>                :            :     }
+<span class="lineNum">     289 </span>                :<span class="lineCov">        980 : }</span>
+<a name="290"><span class="lineNum">     290 </span>                :            : </a>
+<span class="lineNum">     291 </span>                :            : static bool
+<span class="lineNum">     292 </span>                :<span class="lineCov">         12 : should_restart(int status)</span>
+<span class="lineNum">     293 </span>                :            : {
+<span class="lineNum">     294 </span>        [<span class="branchCov" title="Branch 0 was taken 12 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         12 :     if (WIFSIGNALED(status)) {</span>
+<span class="lineNum">     295 </span>                :            :         static const int error_signals[] = {
+<span class="lineNum">     296 </span>                :            :             /* This list of signals is documented in daemon.man.  If you
+<span class="lineNum">     297 </span>                :            :              * change the list, update the documentation too. */
+<span class="lineNum">     298 </span>                :            :             SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGILL, SIGPIPE, SIGSEGV,
+<span class="lineNum">     299 </span>                :            :             SIGXCPU, SIGXFSZ
+<span class="lineNum">     300 </span>                :            :         };
+<span class="lineNum">     301 </span>                :            : 
+<span class="lineNum">     302 </span>                :            :         size_t i;
+<span class="lineNum">     303 </span>                :            : 
+<span class="lineNum">     304 </span>        [<span class="branchCov" title="Branch 0 was taken 96 times"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">        102 :         for (i = 0; i &lt; ARRAY_SIZE(error_signals); i++) {</span>
+<span class="lineNum">     305 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 90 times"> + </span>]:<span class="lineCov">         96 :             if (error_signals[i] == WTERMSIG(status)) {</span>
+<span class="lineNum">     306 </span>                :<span class="lineCov">          6 :                 return true;</span>
+<span class="lineNum">     307 </span>                :            :             }
+<span class="lineNum">     308 </span>                :            :         }
+<span class="lineNum">     309 </span>                :            :     }
+<span class="lineNum">     310 </span>                :<span class="lineCov">         12 :     return false;</span>
+<span class="lineNum">     311 </span>                :            : }
+<a name="312"><span class="lineNum">     312 </span>                :            : </a>
+<span class="lineNum">     313 </span>                :            : static void
+<span class="lineNum">     314 </span>                :<span class="lineCov">          6 : monitor_daemon(pid_t daemon_pid)</span>
+<span class="lineNum">     315 </span>                :            : {
+<span class="lineNum">     316 </span>                :            :     /* XXX Should log daemon's stderr output at startup time. */
+<span class="lineNum">     317 </span>                :            :     time_t last_restart;
+<span class="lineNum">     318 </span>                :            :     char *status_msg;
+<span class="lineNum">     319 </span>                :            :     int crashes;
+<span class="lineNum">     320 </span>                :            : 
+<span class="lineNum">     321 </span>                :<span class="lineCov">          6 :     set_subprogram_name(&quot;monitor&quot;);</span>
+<span class="lineNum">     322 </span>                :<span class="lineCov">          6 :     status_msg = xstrdup(&quot;healthy&quot;);</span>
+<span class="lineNum">     323 </span>                :<span class="lineCov">          6 :     last_restart = TIME_MIN;</span>
+<span class="lineNum">     324 </span>                :<span class="lineCov">          6 :     crashes = 0;</span>
+<span class="lineNum">     325 </span>                :            :     for (;;) {
+<span class="lineNum">     326 </span>                :            :         int retval;
+<span class="lineNum">     327 </span>                :            :         int status;
+<span class="lineNum">     328 </span>                :            : 
+<span class="lineNum">     329 </span>                :<span class="lineCov">         12 :         proctitle_set(&quot;monitoring pid %lu (%s)&quot;,</span>
+<span class="lineNum">     330 </span>                :            :                       (unsigned long int) daemon_pid, status_msg);
+<span class="lineNum">     331 </span>                :            : 
+<span class="lineNum">     332 </span>                :            :         do {
+<span class="lineNum">     333 </span>                :<span class="lineCov">         12 :             retval = waitpid(daemon_pid, &amp;status, 0);</span>
+<span class="lineNum">     334 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 12 times"> + </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineCov">         12 :         } while (retval == -1 &amp;&amp; errno == EINTR);</span>
+<span class="lineNum">     335 </span>                :            : 
+<span class="lineNum">     336 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 12 times"> + </span>]:<span class="lineCov">         12 :         if (retval == -1) {</span>
+<span class="lineNum">     337 </span>                :<span class="lineNoCov">          0 :             VLOG_FATAL(&quot;waitpid failed (%s)&quot;, ovs_strerror(errno));</span>
+<span class="lineNum">     338 </span>        [<span class="branchCov" title="Branch 0 was taken 12 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         12 :         } else if (retval == daemon_pid) {</span>
+<span class="lineNum">     339 </span>                :<span class="lineCov">         12 :             char *s = process_status_msg(status);</span>
+<span class="lineNum">     340 </span>        [<span class="branchCov" title="Branch 1 was taken 6 times"> + </span><span class="branchCov" title="Branch 2 was taken 6 times"> + </span>]:<span class="lineCov">         12 :             if (should_restart(status)) {</span>
+<span class="lineNum">     341 </span>                :<span class="lineCov">          6 :                 free(status_msg);</span>
+<span class="lineNum">     342 </span>                :<span class="lineCov">          6 :                 status_msg = xasprintf(&quot;%d crashes: pid %lu died, %s&quot;,</span>
+<span class="lineNum">     343 </span>                :            :                                        ++crashes,
+<span class="lineNum">     344 </span>                :            :                                        (unsigned long int) daemon_pid, s);
+<span class="lineNum">     345 </span>                :<span class="lineCov">          6 :                 free(s);</span>
+<span class="lineNum">     346 </span>                :            : 
+<span class="lineNum">     347 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          6 :                 if (WCOREDUMP(status)) {</span>
+<span class="lineNum">     348 </span>                :            :                     /* Disable further core dumps to save disk space. */
+<span class="lineNum">     349 </span>                :            :                     struct rlimit r;
+<span class="lineNum">     350 </span>                :            : 
+<span class="lineNum">     351 </span>                :<span class="lineCov">          6 :                     r.rlim_cur = 0;</span>
+<span class="lineNum">     352 </span>                :<span class="lineCov">          6 :                     r.rlim_max = 0;</span>
+<span class="lineNum">     353 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 6 times"> + </span>]:<span class="lineCov">          6 :                     if (setrlimit(RLIMIT_CORE, &amp;r) == -1) {</span>
+<span class="lineNum">     354 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineCov">          6 :                         VLOG_WARN(&quot;failed to disable core dumps: %s&quot;,</span>
+<span class="lineNum">     355 </span>                :            :                                   ovs_strerror(errno));
+<span class="lineNum">     356 </span>                :            :                     }
+<span class="lineNum">     357 </span>                :            :                 }
+<span class="lineNum">     358 </span>                :            : 
+<span class="lineNum">     359 </span>                :            :                 /* Throttle restarts to no more than once every 10 seconds. */
+<span class="lineNum">     360 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 6 times"> + </span>]:<span class="lineCov">          6 :                 if (time(NULL) &lt; last_restart + 10) {</span>
+<span class="lineNum">     361 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                     VLOG_WARN(&quot;%s, waiting until 10 seconds since last &quot;</span>
+<span class="lineNum">     362 </span>                :            :                               &quot;restart&quot;, status_msg);
+<span class="lineNum">     363 </span>                :            :                     for (;;) {
+<span class="lineNum">     364 </span>                :<span class="lineNoCov">          0 :                         time_t now = time(NULL);</span>
+<span class="lineNum">     365 </span>                :<span class="lineNoCov">          0 :                         time_t wakeup = last_restart + 10;</span>
+<span class="lineNum">     366 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                         if (now &gt;= wakeup) {</span>
+<span class="lineNum">     367 </span>                :<span class="lineNoCov">          0 :                             break;</span>
+<span class="lineNum">     368 </span>                :            :                         }
+<span class="lineNum">     369 </span>                :<span class="lineNoCov">          0 :                         xsleep(wakeup - now);</span>
+<span class="lineNum">     370 </span>                :<span class="lineNoCov">          0 :                     }</span>
+<span class="lineNum">     371 </span>                :            :                 }
+<span class="lineNum">     372 </span>                :<span class="lineCov">          6 :                 last_restart = time(NULL);</span>
+<span class="lineNum">     373 </span>                :            : 
+<span class="lineNum">     374 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          6 :                 VLOG_ERR(&quot;%s, restarting&quot;, status_msg);</span>
+<span class="lineNum">     375 </span>                :<span class="lineCov">          6 :                 daemon_pid = fork_and_wait_for_startup(&amp;daemonize_fd);</span>
+<span class="lineNum">     376 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          6 :                 if (!daemon_pid) {</span>
+<span class="lineNum">     377 </span>                :            :                     break;
+<span class="lineNum">     378 </span>                :            :                 }
+<span class="lineNum">     379 </span>                :            :             } else {
+<span class="lineNum">     380 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          6 :                 VLOG_INFO(&quot;pid %lu died, %s, exiting&quot;,</span>
+<span class="lineNum">     381 </span>                :            :                           (unsigned long int) daemon_pid, s);
+<span class="lineNum">     382 </span>                :<span class="lineCov">          6 :                 free(s);</span>
+<span class="lineNum">     383 </span>                :<span class="lineCov">          6 :                 exit(0);</span>
+<span class="lineNum">     384 </span>                :            :             }
+<span class="lineNum">     385 </span>                :            :         }
+<span class="lineNum">     386 </span>                :<span class="lineCov">          6 :     }</span>
+<span class="lineNum">     387 </span>                :<span class="lineNoCov">          0 :     free(status_msg);</span>
+<span class="lineNum">     388 </span>                :            : 
+<span class="lineNum">     389 </span>                :            :     /* Running in new daemon process. */
+<span class="lineNum">     390 </span>                :<span class="lineNoCov">          0 :     proctitle_restore();</span>
+<span class="lineNum">     391 </span>                :<span class="lineNoCov">          0 :     set_subprogram_name(&quot;&quot;);</span>
+<span class="lineNum">     392 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     393 </span>                :            : 
+<span class="lineNum">     394 </span>                :            : /* If daemonization is configured, then starts daemonization, by forking and
+<span class="lineNum">     395 </span>                :            :  * returning in the child process.  The parent process hangs around until the
+<span class="lineNum">     396 </span>                :            :  * child lets it know either that it completed startup successfully (by calling
+<span class="lineNum">     397 </span>                :            :  * daemon_complete()) or that it failed to start up (by exiting with a nonzero
+<a name="398"><span class="lineNum">     398 </span>                :            :  * exit code). */</a>
+<span class="lineNum">     399 </span>                :            : void
+<span class="lineNum">     400 </span>                :<span class="lineCov">       1878 : daemonize_start(void)</span>
+<span class="lineNum">     401 </span>                :            : {
+<span class="lineNum">     402 </span>                :<span class="lineCov">       1878 :     assert_single_threaded();</span>
+<span class="lineNum">     403 </span>                :<span class="lineCov">       1878 :     daemonize_fd = -1;</span>
+<span class="lineNum">     404 </span>                :            : 
+<span class="lineNum">     405 </span>        [<span class="branchCov" title="Branch 0 was taken 1765 times"> + </span><span class="branchCov" title="Branch 1 was taken 113 times"> + </span>]:<span class="lineCov">       1878 :     if (detach) {</span>
+<span class="lineNum">     406 </span>        [<span class="branchCov" title="Branch 1 was taken 893 times"> + </span><span class="branchCov" title="Branch 2 was taken 870 times"> + </span>]:<span class="lineCov">       1765 :         if (fork_and_wait_for_startup(&amp;daemonize_fd) &gt; 0) {</span>
+<span class="lineNum">     407 </span>                :            :             /* Running in parent process. */
+<span class="lineNum">     408 </span>                :<span class="lineCov">        893 :             exit(0);</span>
+<span class="lineNum">     409 </span>                :            :         }
+<span class="lineNum">     410 </span>                :            : 
+<span class="lineNum">     411 </span>                :            :         /* Running in daemon or monitor process. */
+<span class="lineNum">     412 </span>                :<span class="lineCov">        870 :         setsid();</span>
+<span class="lineNum">     413 </span>                :            :     }
+<span class="lineNum">     414 </span>                :            : 
+<span class="lineNum">     415 </span>        [<span class="branchCov" title="Branch 0 was taken 8 times"> + </span><span class="branchCov" title="Branch 1 was taken 975 times"> + </span>]:<span class="lineCov">        983 :     if (monitor) {</span>
+<span class="lineNum">     416 </span>                :<span class="lineCov">          8 :         int saved_daemonize_fd = daemonize_fd;</span>
+<span class="lineNum">     417 </span>                :            :         pid_t daemon_pid;
+<span class="lineNum">     418 </span>                :            : 
+<span class="lineNum">     419 </span>                :<span class="lineCov">          8 :         daemon_pid = fork_and_wait_for_startup(&amp;daemonize_fd);</span>
+<span class="lineNum">     420 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          7 :         if (daemon_pid &gt; 0) {</span>
+<span class="lineNum">     421 </span>                :            :             /* Running in monitor process. */
+<span class="lineNum">     422 </span>                :<span class="lineCov">          6 :             fork_notify_startup(saved_daemonize_fd);</span>
+<span class="lineNum">     423 </span>                :<span class="lineCov">          6 :             close_standard_fds();</span>
+<span class="lineNum">     424 </span>                :<span class="lineCov">          6 :             monitor_daemon(daemon_pid);</span>
+<span class="lineNum">     425 </span>                :            :         }
+<span class="lineNum">     426 </span>                :            :         /* Running in daemon process. */
+<span class="lineNum">     427 </span>                :            :     }
+<span class="lineNum">     428 </span>                :            : 
+<span class="lineNum">     429 </span>                :<span class="lineCov">        976 :     forbid_forking(&quot;running in daemon process&quot;);</span>
+<span class="lineNum">     430 </span>                :            : 
+<span class="lineNum">     431 </span>        [<span class="branchCov" title="Branch 0 was taken 864 times"> + </span><span class="branchCov" title="Branch 1 was taken 112 times"> + </span>]:<span class="lineCov">        976 :     if (pidfile) {</span>
+<span class="lineNum">     432 </span>                :<span class="lineCov">        864 :         make_pidfile();</span>
+<span class="lineNum">     433 </span>                :            :     }
+<span class="lineNum">     434 </span>                :            : 
+<span class="lineNum">     435 </span>                :            :     /* Make sure that the unixctl commands for vlog get registered in a
+<span class="lineNum">     436 </span>                :            :      * daemon, even before the first log message. */
+<span class="lineNum">     437 </span>                :<span class="lineCov">        976 :     vlog_init();</span>
+<span class="lineNum">     438 </span>                :<span class="lineCov">        976 : }</span>
+<span class="lineNum">     439 </span>                :            : 
+<span class="lineNum">     440 </span>                :            : /* If daemonization is configured, then this function notifies the parent
+<span class="lineNum">     441 </span>                :            :  * process that the child process has completed startup successfully.  It also
+<span class="lineNum">     442 </span>                :            :  * call daemonize_post_detach().
+<span class="lineNum">     443 </span>                :            :  *
+<a name="444"><span class="lineNum">     444 </span>                :            :  * Calling this function more than once has no additional effect. */</a>
+<span class="lineNum">     445 </span>                :            : void
+<span class="lineNum">     446 </span>                :<span class="lineCov">        974 : daemonize_complete(void)</span>
+<span class="lineNum">     447 </span>                :            : {
+<span class="lineNum">     448 </span>        [<span class="branchCov" title="Branch 0 was taken 862 times"> + </span><span class="branchCov" title="Branch 1 was taken 112 times"> + </span>]:<span class="lineCov">        974 :     if (pidfile) {</span>
+<span class="lineNum">     449 </span>                :<span class="lineCov">        862 :         free(pidfile);</span>
+<span class="lineNum">     450 </span>                :<span class="lineCov">        862 :         pidfile = NULL;</span>
+<span class="lineNum">     451 </span>                :            :     }
+<span class="lineNum">     452 </span>                :            : 
+<span class="lineNum">     453 </span>        [<span class="branchCov" title="Branch 0 was taken 974 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        974 :     if (!detached) {</span>
+<span class="lineNum">     454 </span>                :<span class="lineCov">        974 :         detached = true;</span>
+<span class="lineNum">     455 </span>                :            : 
+<span class="lineNum">     456 </span>                :<span class="lineCov">        974 :         fork_notify_startup(daemonize_fd);</span>
+<span class="lineNum">     457 </span>                :<span class="lineCov">        974 :         daemonize_fd = -1;</span>
+<span class="lineNum">     458 </span>                :<span class="lineCov">        974 :         daemonize_post_detach();</span>
+<span class="lineNum">     459 </span>                :            :     }
+<span class="lineNum">     460 </span>                :<span class="lineCov">        974 : }</span>
+<span class="lineNum">     461 </span>                :            : 
+<span class="lineNum">     462 </span>                :            : /* If daemonization is configured, then this function does traditional Unix
+<span class="lineNum">     463 </span>                :            :  * daemonization behavior: join a new session, chdir to the root (if not
+<span class="lineNum">     464 </span>                :            :  * disabled), and close the standard file descriptors.
+<span class="lineNum">     465 </span>                :            :  *
+<span class="lineNum">     466 </span>                :            :  * It only makes sense to call this function as part of an implementation of a
+<span class="lineNum">     467 </span>                :            :  * special daemon subprocess.  A normal daemon should just call
+<a name="468"><span class="lineNum">     468 </span>                :            :  * daemonize_complete(). */</a>
+<span class="lineNum">     469 </span>                :            : static void
+<span class="lineNum">     470 </span>                :<span class="lineCov">        974 : daemonize_post_detach(void)</span>
+<span class="lineNum">     471 </span>                :            : {
+<span class="lineNum">     472 </span>        [<span class="branchCov" title="Branch 0 was taken 862 times"> + </span><span class="branchCov" title="Branch 1 was taken 112 times"> + </span>]:<span class="lineCov">        974 :     if (detach) {</span>
+<span class="lineNum">     473 </span>        [<span class="branchCov" title="Branch 0 was taken 55 times"> + </span><span class="branchCov" title="Branch 1 was taken 807 times"> + </span>]:<span class="lineCov">        862 :         if (chdir_) {</span>
+<span class="lineNum">     474 </span>                :<span class="lineCov">         55 :             ignore(chdir(&quot;/&quot;));</span>
+<span class="lineNum">     475 </span>                :            :         }
+<span class="lineNum">     476 </span>                :<span class="lineCov">        862 :         close_standard_fds();</span>
+<span class="lineNum">     477 </span>                :            :     }
+<span class="lineNum">     478 </span>                :<span class="lineCov">        974 : }</span>
+<a name="479"><span class="lineNum">     479 </span>                :            : </a>
+<span class="lineNum">     480 </span>                :            : void
+<span class="lineNum">     481 </span>                :<span class="lineNoCov">          0 : daemon_usage(void)</span>
+<span class="lineNum">     482 </span>                :            : {
+<span class="lineNum">     483 </span>                :<span class="lineNoCov">          0 :     printf(</span>
+<span class="lineNum">     484 </span>                :            :         &quot;\nDaemon options:\n&quot;
+<span class="lineNum">     485 </span>                :            :         &quot;  --detach                run in background as daemon\n&quot;
+<span class="lineNum">     486 </span>                :            :         &quot;  --no-chdir              do not chdir to '/'\n&quot;
+<span class="lineNum">     487 </span>                :            :         &quot;  --pidfile[=FILE]        create pidfile (default: %s/%s.pid)\n&quot;
+<span class="lineNum">     488 </span>                :            :         &quot;  --overwrite-pidfile     with --pidfile, start even if already &quot;
+<span class="lineNum">     489 </span>                :            :                                    &quot;running\n&quot;,
+<span class="lineNum">     490 </span>                :            :         ovs_rundir(), program_name);
+<span class="lineNum">     491 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="492"><span class="lineNum">     492 </span>                :            : </a>
+<span class="lineNum">     493 </span>                :            : static int
+<span class="lineNum">     494 </span>                :<span class="lineCov">       6310 : lock_pidfile__(FILE *file, int command, struct flock *lck)</span>
+<span class="lineNum">     495 </span>                :            : {
+<span class="lineNum">     496 </span>                :            :     int error;
+<span class="lineNum">     497 </span>                :            : 
+<span class="lineNum">     498 </span>                :<span class="lineCov">       6310 :     lck-&gt;l_type = F_WRLCK;</span>
+<span class="lineNum">     499 </span>                :<span class="lineCov">       6310 :     lck-&gt;l_whence = SEEK_SET;</span>
+<span class="lineNum">     500 </span>                :<span class="lineCov">       6310 :     lck-&gt;l_start = 0;</span>
+<span class="lineNum">     501 </span>                :<span class="lineCov">       6310 :     lck-&gt;l_len = 0;</span>
+<span class="lineNum">     502 </span>                :<span class="lineCov">       6310 :     lck-&gt;l_pid = 0;</span>
+<span class="lineNum">     503 </span>                :            : 
+<span class="lineNum">     504 </span>                :            :     do {
+<span class="lineNum">     505 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 6310 times"> + </span>]:<span class="lineCov">       6310 :         error = fcntl(fileno(file), command, lck) == -1 ? errno : 0;</span>
+<span class="lineNum">     506 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 6310 times"> + </span>]:<span class="lineCov">       6310 :     } while (error == EINTR);</span>
+<span class="lineNum">     507 </span>                :<span class="lineCov">       6310 :     return error;</span>
+<span class="lineNum">     508 </span>                :            : }
+<a name="509"><span class="lineNum">     509 </span>                :            : </a>
+<span class="lineNum">     510 </span>                :            : static int
+<span class="lineNum">     511 </span>                :<span class="lineCov">        864 : lock_pidfile(FILE *file, int command)</span>
+<span class="lineNum">     512 </span>                :            : {
+<span class="lineNum">     513 </span>                :            :     struct flock lck;
+<span class="lineNum">     514 </span>                :            : 
+<span class="lineNum">     515 </span>                :<span class="lineCov">        864 :     return lock_pidfile__(file, command, &amp;lck);</span>
+<span class="lineNum">     516 </span>                :            : }
+<a name="517"><span class="lineNum">     517 </span>                :            : </a>
+<span class="lineNum">     518 </span>                :            : static pid_t
+<span class="lineNum">     519 </span>                :<span class="lineCov">       6310 : read_pidfile__(const char *pidfile, bool delete_if_stale)</span>
+<span class="lineNum">     520 </span>                :            : {
+<span class="lineNum">     521 </span>                :            :     struct stat s, s2;
+<span class="lineNum">     522 </span>                :            :     struct flock lck;
+<span class="lineNum">     523 </span>                :            :     char line[128];
+<span class="lineNum">     524 </span>                :            :     FILE *file;
+<span class="lineNum">     525 </span>                :            :     int error;
+<span class="lineNum">     526 </span>                :            : 
+<span class="lineNum">     527 </span>[<span class="branchCov" title="Branch 0 was taken 6310 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 6310 times"> + </span>]:<span class="lineCov">       6310 :     if ((pidfile_ino || pidfile_dev)</span>
+<span class="lineNum">     528 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         &amp;&amp; !stat(pidfile, &amp;s)</span>
+<span class="lineNum">     529 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         &amp;&amp; s.st_ino == pidfile_ino &amp;&amp; s.st_dev == pidfile_dev) {</span>
+<span class="lineNum">     530 </span>                :            :         /* It's our own pidfile.  We can't afford to open it, because closing
+<span class="lineNum">     531 </span>                :            :          * *any* fd for a file that a process has locked also releases all the
+<span class="lineNum">     532 </span>                :            :          * locks on that file.
+<span class="lineNum">     533 </span>                :            :          *
+<span class="lineNum">     534 </span>                :            :          * Fortunately, we know the associated pid anyhow: */
+<span class="lineNum">     535 </span>                :<span class="lineNoCov">          0 :         return getpid();</span>
+<span class="lineNum">     536 </span>                :            :     }
+<span class="lineNum">     537 </span>                :            : 
+<span class="lineNum">     538 </span>                :<span class="lineCov">       6310 :     file = fopen(pidfile, &quot;r+&quot;);</span>
+<span class="lineNum">     539 </span>        [<span class="branchCov" title="Branch 0 was taken 864 times"> + </span><span class="branchCov" title="Branch 1 was taken 5446 times"> + </span>]:<span class="lineCov">       6310 :     if (!file) {</span>
+<span class="lineNum">     540 </span>[<span class="branchCov" title="Branch 1 was taken 864 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>][<span class="branchCov" title="Branch 3 was taken 864 times"> + </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span>]:<span class="lineCov">        864 :         if (errno == ENOENT &amp;&amp; delete_if_stale) {</span>
+<span class="lineNum">     541 </span>                :<span class="lineCov">        864 :             return 0;</span>
+<span class="lineNum">     542 </span>                :            :         }
+<span class="lineNum">     543 </span>                :<span class="lineNoCov">          0 :         error = errno;</span>
+<span class="lineNum">     544 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN(&quot;%s: open: %s&quot;, pidfile, ovs_strerror(error));</span>
+<span class="lineNum">     545 </span>                :<span class="lineNoCov">          0 :         goto error;</span>
+<span class="lineNum">     546 </span>                :            :     }
+<span class="lineNum">     547 </span>                :            : 
+<span class="lineNum">     548 </span>                :<span class="lineCov">       5446 :     error = lock_pidfile__(file, F_GETLK, &amp;lck);</span>
+<span class="lineNum">     549 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 5446 times"> + </span>]:<span class="lineCov">       5446 :     if (error) {</span>
+<span class="lineNum">     550 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN(&quot;%s: fcntl: %s&quot;, pidfile, ovs_strerror(error));</span>
+<span class="lineNum">     551 </span>                :<span class="lineNoCov">          0 :         goto error;</span>
+<span class="lineNum">     552 </span>                :            :     }
+<span class="lineNum">     553 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 5446 times"> + </span>]:<span class="lineCov">       5446 :     if (lck.l_type == F_UNLCK) {</span>
+<span class="lineNum">     554 </span>                :            :         /* pidfile exists but it isn't locked by anyone.  We need to delete it
+<span class="lineNum">     555 </span>                :            :          * so that a new pidfile can go in its place.  But just calling
+<span class="lineNum">     556 </span>                :            :          * unlink(pidfile) makes a nasty race: what if someone else unlinks it
+<span class="lineNum">     557 </span>                :            :          * before we do and then replaces it by a valid pidfile?  We'd unlink
+<span class="lineNum">     558 </span>                :            :          * their valid pidfile.  We do a little dance to avoid the race, by
+<span class="lineNum">     559 </span>                :            :          * locking the invalid pidfile.  Only one process can have the invalid
+<span class="lineNum">     560 </span>                :            :          * pidfile locked, and only that process has the right to unlink it. */
+<span class="lineNum">     561 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!delete_if_stale) {</span>
+<span class="lineNum">     562 </span>                :<span class="lineNoCov">          0 :             error = ESRCH;</span>
+<span class="lineNum">     563 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_DBG(&quot;%s: pid file is stale&quot;, pidfile);</span>
+<span class="lineNum">     564 </span>                :<span class="lineNoCov">          0 :             goto error;</span>
+<span class="lineNum">     565 </span>                :            :         }
+<span class="lineNum">     566 </span>                :            : 
+<span class="lineNum">     567 </span>                :            :         /* Get the lock. */
+<span class="lineNum">     568 </span>                :<span class="lineNoCov">          0 :         error = lock_pidfile(file, F_SETLK);</span>
+<span class="lineNum">     569 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (error) {</span>
+<span class="lineNum">     570 </span>                :            :             /* We lost a race with someone else doing the same thing. */
+<span class="lineNum">     571 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN(&quot;%s: lost race to lock pidfile&quot;, pidfile);</span>
+<span class="lineNum">     572 </span>                :<span class="lineNoCov">          0 :             goto error;</span>
+<span class="lineNum">     573 </span>                :            :         }
+<span class="lineNum">     574 </span>                :            : 
+<span class="lineNum">     575 </span>                :            :         /* Is the file we have locked still named 'pidfile'? */
+<span class="lineNum">     576 </span>[<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>][<span class="branchNoExec" title="Branch 5 was not executed"> # </span><span class="branchNoExec" title="Branch 6 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (stat(pidfile, &amp;s) || fstat(fileno(file), &amp;s2)</span>
+<span class="lineNum">     577 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :             || s.st_ino != s2.st_ino || s.st_dev != s2.st_dev) {</span>
+<span class="lineNum">     578 </span>                :            :             /* No.  We lost a race with someone else who got the lock before
+<span class="lineNum">     579 </span>                :            :              * us, deleted the pidfile, and closed it (releasing the lock). */
+<span class="lineNum">     580 </span>                :<span class="lineNoCov">          0 :             error = EALREADY;</span>
+<span class="lineNum">     581 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN(&quot;%s: lost race to delete pidfile&quot;, pidfile);</span>
+<span class="lineNum">     582 </span>                :<span class="lineNoCov">          0 :             goto error;</span>
+<span class="lineNum">     583 </span>                :            :         }
+<span class="lineNum">     584 </span>                :            : 
+<span class="lineNum">     585 </span>                :            :         /* We won the right to delete the stale pidfile. */
+<span class="lineNum">     586 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (unlink(pidfile)) {</span>
+<span class="lineNum">     587 </span>                :<span class="lineNoCov">          0 :             error = errno;</span>
+<span class="lineNum">     588 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN(&quot;%s: failed to delete stale pidfile (%s)&quot;,</span>
+<span class="lineNum">     589 </span>                :            :                       pidfile, ovs_strerror(error));
+<span class="lineNum">     590 </span>                :<span class="lineNoCov">          0 :             goto error;</span>
+<span class="lineNum">     591 </span>                :            :         }
+<span class="lineNum">     592 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_DBG(&quot;%s: deleted stale pidfile&quot;, pidfile);</span>
+<span class="lineNum">     593 </span>                :<span class="lineNoCov">          0 :         fclose(file);</span>
+<span class="lineNum">     594 </span>                :<span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     595 </span>                :            :     }
+<span class="lineNum">     596 </span>                :            : 
+<span class="lineNum">     597 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 5446 times"> + </span>]:<span class="lineCov">       5446 :     if (!fgets(line, sizeof line, file)) {</span>
+<span class="lineNum">     598 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (ferror(file)) {</span>
+<span class="lineNum">     599 </span>                :<span class="lineNoCov">          0 :             error = errno;</span>
+<span class="lineNum">     600 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN(&quot;%s: read: %s&quot;, pidfile, ovs_strerror(error));</span>
+<span class="lineNum">     601 </span>                :            :         } else {
+<span class="lineNum">     602 </span>                :<span class="lineNoCov">          0 :             error = ESRCH;</span>
+<span class="lineNum">     603 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN(&quot;%s: read: unexpected end of file&quot;, pidfile);</span>
+<span class="lineNum">     604 </span>                :            :         }
+<span class="lineNum">     605 </span>                :<span class="lineNoCov">          0 :         goto error;</span>
+<span class="lineNum">     606 </span>                :            :     }
+<span class="lineNum">     607 </span>                :            : 
+<span class="lineNum">     608 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 5446 times"> + </span>]:<span class="lineCov">       5446 :     if (lck.l_pid != strtoul(line, NULL, 10)) {</span>
+<span class="lineNum">     609 </span>                :            :         /* The process that has the pidfile locked is not the process that
+<span class="lineNum">     610 </span>                :            :          * created it.  It must be stale, with the process that has it locked
+<span class="lineNum">     611 </span>                :            :          * preparing to delete it. */
+<span class="lineNum">     612 </span>                :<span class="lineNoCov">          0 :         error = ESRCH;</span>
+<span class="lineNum">     613 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN(&quot;%s: stale pidfile for pid %s being deleted by pid %ld&quot;,</span>
+<span class="lineNum">     614 </span>                :            :                   pidfile, line, (long int) lck.l_pid);
+<span class="lineNum">     615 </span>                :<span class="lineNoCov">          0 :         goto error;</span>
+<span class="lineNum">     616 </span>                :            :     }
+<span class="lineNum">     617 </span>                :            : 
+<span class="lineNum">     618 </span>                :<span class="lineCov">       5446 :     fclose(file);</span>
+<span class="lineNum">     619 </span>                :<span class="lineCov">       5446 :     return lck.l_pid;</span>
+<span class="lineNum">     620 </span>                :            : 
+<span class="lineNum">     621 </span>                :            : error:
+<span class="lineNum">     622 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (file) {</span>
+<span class="lineNum">     623 </span>                :<span class="lineNoCov">          0 :         fclose(file);</span>
+<span class="lineNum">     624 </span>                :            :     }
+<span class="lineNum">     625 </span>                :<span class="lineCov">       6310 :     return -error;</span>
+<span class="lineNum">     626 </span>                :            : }
+<span class="lineNum">     627 </span>                :            : 
+<span class="lineNum">     628 </span>                :            : /* Opens and reads a PID from 'pidfile'.  Returns the positive PID if
+<a name="629"><span class="lineNum">     629 </span>                :            :  * successful, otherwise a negative errno value. */</a>
+<span class="lineNum">     630 </span>                :            : pid_t
+<span class="lineNum">     631 </span>                :<span class="lineCov">       5446 : read_pidfile(const char *pidfile)</span>
+<span class="lineNum">     632 </span>                :            : {
+<span class="lineNum">     633 </span>                :<span class="lineCov">       5446 :     return read_pidfile__(pidfile, false);</span>
+<span class="lineNum">     634 </span>                :            : }
+<span class="lineNum">     635 </span>                :            : 
+<span class="lineNum">     636 </span>                :            : /* Checks whether a process with the given 'pidfile' is already running and,
+<a name="637"><span class="lineNum">     637 </span>                :            :  * if so, aborts.  If 'pidfile' is stale, deletes it. */</a>
+<span class="lineNum">     638 </span>                :            : static void
+<span class="lineNum">     639 </span>                :<span class="lineCov">        864 : check_already_running(void)</span>
+<span class="lineNum">     640 </span>                :            : {
+<span class="lineNum">     641 </span>                :<span class="lineCov">        864 :     long int pid = read_pidfile__(pidfile, true);</span>
+<span class="lineNum">     642 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 864 times"> + </span>]:<span class="lineCov">        864 :     if (pid &gt; 0) {</span>
+<span class="lineNum">     643 </span>                :<span class="lineNoCov">          0 :         VLOG_FATAL(&quot;%s: already running as pid %ld, aborting&quot;, pidfile, pid);</span>
+<span class="lineNum">     644 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 864 times"> + </span>]:<span class="lineCov">        864 :     } else if (pid &lt; 0) {</span>
+<span class="lineNum">     645 </span>                :<span class="lineNoCov">          0 :         VLOG_FATAL(&quot;%s: pidfile check failed (%s), aborting&quot;,</span>
+<span class="lineNum">     646 </span>                :            :                    pidfile, ovs_strerror(-pid));
+<span class="lineNum">     647 </span>                :            :     }
+<span class="lineNum">     648 </span>                :<span class="lineCov">        864 : }</span>
+<span class="lineNum">     649 </span>                :            : 
+<span class="lineNum">     650 </span>                :            : 
+<span class="lineNum">     651 </span>                :            : /* stub functions for non-windows platform. */
+<a name="652"><span class="lineNum">     652 </span>                :            : </a>
+<span class="lineNum">     653 </span>                :            : void
+<span class="lineNum">     654 </span>                :<span class="lineCov">       4293 : service_start(int *argc OVS_UNUSED, char **argv[] OVS_UNUSED)</span>
+<span class="lineNum">     655 </span>                :            : {
+<span class="lineNum">     656 </span>                :<span class="lineCov">       4293 : }</span>
+<a name="657"><span class="lineNum">     657 </span>                :            : </a>
+<span class="lineNum">     658 </span>                :            : void
+<span class="lineNum">     659 </span>                :<span class="lineCov">        846 : service_stop(void)</span>
+<span class="lineNum">     660 </span>                :            : {
+<span class="lineNum">     661 </span>                :<span class="lineCov">        846 : }</span>
+<a name="662"><span class="lineNum">     662 </span>                :            : </a>
+<span class="lineNum">     663 </span>                :            : bool
+<span class="lineNum">     664 </span>                :<span class="lineCov">      48220 : should_service_stop(void)</span>
+<span class="lineNum">     665 </span>                :            : {
+<span class="lineNum">     666 </span>                :<span class="lineCov">      48220 :     return false;</span>
+<span class="lineNum">     667 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,1233 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/jsonrpc.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - jsonrpc.c<span style="font-size: 80%;"> (source / <a href="jsonrpc.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">411</td>
+            <td class="headerCovTableEntry">512</td>
+            <td class="headerCovTableEntryMed">80.3 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">53</td>
+            <td class="headerCovTableEntry">56</td>
+            <td class="headerCovTableEntryHi">94.6 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">175</td>
+            <td class="headerCovTableEntry">278</td>
+            <td class="headerCovTableEntryLo">62.9 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2009, 2010, 2011, 2012, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &quot;jsonrpc.h&quot;
+<span class="lineNum">      20 </span>                :            : 
+<span class="lineNum">      21 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      22 </span>                :            : 
+<span class="lineNum">      23 </span>                :            : #include &quot;byteq.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;dynamic-string.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;fatal-signal.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;json.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;list.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;ovs-thread.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;reconnect.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;stream.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;timeval.h&quot;
+<a name="34"><span class="lineNum">      34 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      35 </span>                :            : 
+<span class="lineNum">      36 </span>                :<span class="lineCov">      15103 : VLOG_DEFINE_THIS_MODULE(jsonrpc);</span>
+<span class="lineNum">      37 </span>                :            : 
+<span class="lineNum">      38 </span>                :            : struct jsonrpc {
+<span class="lineNum">      39 </span>                :            :     struct stream *stream;
+<span class="lineNum">      40 </span>                :            :     char *name;
+<span class="lineNum">      41 </span>                :            :     int status;
+<span class="lineNum">      42 </span>                :            : 
+<span class="lineNum">      43 </span>                :            :     /* Input. */
+<span class="lineNum">      44 </span>                :            :     struct byteq input;
+<span class="lineNum">      45 </span>                :            :     uint8_t input_buffer[512];
+<span class="lineNum">      46 </span>                :            :     struct json_parser *parser;
+<span class="lineNum">      47 </span>                :            : 
+<span class="lineNum">      48 </span>                :            :     /* Output. */
+<span class="lineNum">      49 </span>                :            :     struct list output;         /* Contains &quot;struct ofpbuf&quot;s. */
+<span class="lineNum">      50 </span>                :            :     size_t backlog;
+<span class="lineNum">      51 </span>                :            : };
+<span class="lineNum">      52 </span>                :            : 
+<span class="lineNum">      53 </span>                :            : /* Rate limit for error messages. */
+<span class="lineNum">      54 </span>                :            : static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 5);
+<span class="lineNum">      55 </span>                :            : 
+<span class="lineNum">      56 </span>                :            : static struct jsonrpc_msg *jsonrpc_parse_received_message(struct jsonrpc *);
+<span class="lineNum">      57 </span>                :            : static void jsonrpc_cleanup(struct jsonrpc *);
+<span class="lineNum">      58 </span>                :            : static void jsonrpc_error(struct jsonrpc *, int error);
+<span class="lineNum">      59 </span>                :            : 
+<span class="lineNum">      60 </span>                :            : /* This is just the same as stream_open() except that it uses the default
+<a name="61"><span class="lineNum">      61 </span>                :            :  * JSONRPC port if none is specified. */</a>
+<span class="lineNum">      62 </span>                :            : int
+<span class="lineNum">      63 </span>                :<span class="lineCov">       3647 : jsonrpc_stream_open(const char *name, struct stream **streamp, uint8_t dscp)</span>
+<span class="lineNum">      64 </span>                :            : {
+<span class="lineNum">      65 </span>                :<span class="lineCov">       3647 :     return stream_open_with_default_port(name, OVSDB_OLD_PORT,</span>
+<span class="lineNum">      66 </span>                :            :                                          streamp, dscp);
+<span class="lineNum">      67 </span>                :            : }
+<span class="lineNum">      68 </span>                :            : 
+<span class="lineNum">      69 </span>                :            : /* This is just the same as pstream_open() except that it uses the default
+<a name="70"><span class="lineNum">      70 </span>                :            :  * JSONRPC port if none is specified. */</a>
+<span class="lineNum">      71 </span>                :            : int
+<span class="lineNum">      72 </span>                :<span class="lineCov">        605 : jsonrpc_pstream_open(const char *name, struct pstream **pstreamp, uint8_t dscp)</span>
+<span class="lineNum">      73 </span>                :            : {
+<span class="lineNum">      74 </span>                :<span class="lineCov">        605 :     return pstream_open_with_default_port(name, OVSDB_OLD_PORT,</span>
+<span class="lineNum">      75 </span>                :            :                                           pstreamp, dscp);
+<span class="lineNum">      76 </span>                :            : }
+<span class="lineNum">      77 </span>                :            : 
+<span class="lineNum">      78 </span>                :            : /* Returns a new JSON-RPC stream that uses 'stream' for input and output.  The
+<a name="79"><span class="lineNum">      79 </span>                :            :  * new jsonrpc object takes ownership of 'stream'. */</a>
+<span class="lineNum">      80 </span>                :            : struct jsonrpc *
+<span class="lineNum">      81 </span>                :<span class="lineCov">      18025 : jsonrpc_open(struct stream *stream)</span>
+<span class="lineNum">      82 </span>                :            : {
+<span class="lineNum">      83 </span>                :            :     struct jsonrpc *rpc;
+<span class="lineNum">      84 </span>                :            : 
+<span class="lineNum">      85 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 18025 times"> + </span>]:<span class="lineCov">      18025 :     ovs_assert(stream != NULL);</span>
+<span class="lineNum">      86 </span>                :            : 
+<span class="lineNum">      87 </span>                :<span class="lineCov">      18025 :     rpc = xzalloc(sizeof *rpc);</span>
+<span class="lineNum">      88 </span>                :<span class="lineCov">      18025 :     rpc-&gt;name = xstrdup(stream_get_name(stream));</span>
+<span class="lineNum">      89 </span>                :<span class="lineCov">      18025 :     rpc-&gt;stream = stream;</span>
+<span class="lineNum">      90 </span>                :<span class="lineCov">      18025 :     byteq_init(&amp;rpc-&gt;input, rpc-&gt;input_buffer, sizeof rpc-&gt;input_buffer);</span>
+<span class="lineNum">      91 </span>                :<span class="lineCov">      18025 :     list_init(&amp;rpc-&gt;output);</span>
+<span class="lineNum">      92 </span>                :            : 
+<span class="lineNum">      93 </span>                :<span class="lineCov">      18025 :     return rpc;</span>
+<span class="lineNum">      94 </span>                :            : }
+<span class="lineNum">      95 </span>                :            : 
+<span class="lineNum">      96 </span>                :            : /* Destroys 'rpc', closing the stream on which it is based, and frees its
+<a name="97"><span class="lineNum">      97 </span>                :            :  * memory. */</a>
+<span class="lineNum">      98 </span>                :            : void
+<span class="lineNum">      99 </span>                :<span class="lineCov">      21541 : jsonrpc_close(struct jsonrpc *rpc)</span>
+<span class="lineNum">     100 </span>                :            : {
+<span class="lineNum">     101 </span>        [<span class="branchCov" title="Branch 0 was taken 17987 times"> + </span><span class="branchCov" title="Branch 1 was taken 3554 times"> + </span>]:<span class="lineCov">      21541 :     if (rpc) {</span>
+<span class="lineNum">     102 </span>                :<span class="lineCov">      17987 :         jsonrpc_cleanup(rpc);</span>
+<span class="lineNum">     103 </span>                :<span class="lineCov">      17987 :         free(rpc-&gt;name);</span>
+<span class="lineNum">     104 </span>                :<span class="lineCov">      17987 :         free(rpc);</span>
+<span class="lineNum">     105 </span>                :            :     }
+<span class="lineNum">     106 </span>                :<span class="lineCov">      21541 : }</span>
+<span class="lineNum">     107 </span>                :            : 
+<a name="108"><span class="lineNum">     108 </span>                :            : /* Performs periodic maintenance on 'rpc', such as flushing output buffers. */</a>
+<span class="lineNum">     109 </span>                :            : void
+<span class="lineNum">     110 </span>                :<span class="lineCov">     123520 : jsonrpc_run(struct jsonrpc *rpc)</span>
+<span class="lineNum">     111 </span>                :            : {
+<span class="lineNum">     112 </span>        [<span class="branchCov" title="Branch 0 was taken 3545 times"> + </span><span class="branchCov" title="Branch 1 was taken 119975 times"> + </span>]:<span class="lineCov">     123520 :     if (rpc-&gt;status) {</span>
+<span class="lineNum">     113 </span>                :<span class="lineCov">     123520 :         return;</span>
+<span class="lineNum">     114 </span>                :            :     }
+<span class="lineNum">     115 </span>                :            : 
+<span class="lineNum">     116 </span>                :<span class="lineCov">     119975 :     stream_run(rpc-&gt;stream);</span>
+<span class="lineNum">     117 </span>        [<span class="branchCov" title="Branch 1 was taken 31178 times"> + </span><span class="branchCov" title="Branch 2 was taken 119584 times"> + </span>]:<span class="lineCov">     150762 :     while (!list_is_empty(&amp;rpc-&gt;output)) {</span>
+<span class="lineNum">     118 </span>                :<span class="lineCov">      31178 :         struct ofpbuf *buf = ofpbuf_from_list(rpc-&gt;output.next);</span>
+<span class="lineNum">     119 </span>                :            :         int retval;
+<span class="lineNum">     120 </span>                :            : 
+<span class="lineNum">     121 </span>                :<span class="lineCov">      31178 :         retval = stream_send(rpc-&gt;stream, ofpbuf_data(buf), ofpbuf_size(buf));</span>
+<span class="lineNum">     122 </span>        [<span class="branchCov" title="Branch 0 was taken 30787 times"> + </span><span class="branchCov" title="Branch 1 was taken 391 times"> + </span>]:<span class="lineCov">      31178 :         if (retval &gt;= 0) {</span>
+<span class="lineNum">     123 </span>                :<span class="lineCov">      30787 :             rpc-&gt;backlog -= retval;</span>
+<span class="lineNum">     124 </span>                :<span class="lineCov">      30787 :             ofpbuf_pull(buf, retval);</span>
+<span class="lineNum">     125 </span>        [<span class="branchCov" title="Branch 1 was taken 30396 times"> + </span><span class="branchCov" title="Branch 2 was taken 391 times"> + </span>]:<span class="lineCov">      30787 :             if (!ofpbuf_size(buf)) {</span>
+<span class="lineNum">     126 </span>                :<span class="lineCov">      30396 :                 list_remove(&amp;buf-&gt;list_node);</span>
+<span class="lineNum">     127 </span>                :<span class="lineCov">      30396 :                 ofpbuf_delete(buf);</span>
+<span class="lineNum">     128 </span>                :            :             }
+<span class="lineNum">     129 </span>                :            :         } else {
+<span class="lineNum">     130 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 391 times"> + </span>]:<span class="lineCov">        391 :             if (retval != -EAGAIN) {</span>
+<span class="lineNum">     131 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_WARN_RL(&amp;rl, &quot;%s: send error: %s&quot;,</span>
+<span class="lineNum">     132 </span>                :            :                              rpc-&gt;name, ovs_strerror(-retval));
+<span class="lineNum">     133 </span>                :<span class="lineNoCov">          0 :                 jsonrpc_error(rpc, -retval);</span>
+<span class="lineNum">     134 </span>                :            :             }
+<span class="lineNum">     135 </span>                :<span class="lineCov">        391 :             break;</span>
+<span class="lineNum">     136 </span>                :            :         }
+<span class="lineNum">     137 </span>                :            :     }
+<span class="lineNum">     138 </span>                :            : }
+<span class="lineNum">     139 </span>                :            : 
+<span class="lineNum">     140 </span>                :            : /* Arranges for the poll loop to wake up when 'rpc' needs to perform
+<a name="141"><span class="lineNum">     141 </span>                :            :  * maintenance activities. */</a>
+<span class="lineNum">     142 </span>                :            : void
+<span class="lineNum">     143 </span>                :<span class="lineCov">      78234 : jsonrpc_wait(struct jsonrpc *rpc)</span>
+<span class="lineNum">     144 </span>                :            : {
+<span class="lineNum">     145 </span>        [<span class="branchCov" title="Branch 0 was taken 74651 times"> + </span><span class="branchCov" title="Branch 1 was taken 3583 times"> + </span>]:<span class="lineCov">      78234 :     if (!rpc-&gt;status) {</span>
+<span class="lineNum">     146 </span>                :<span class="lineCov">      74651 :         stream_run_wait(rpc-&gt;stream);</span>
+<span class="lineNum">     147 </span>        [<span class="branchCov" title="Branch 1 was taken 391 times"> + </span><span class="branchCov" title="Branch 2 was taken 74260 times"> + </span>]:<span class="lineCov">      74651 :         if (!list_is_empty(&amp;rpc-&gt;output)) {</span>
+<span class="lineNum">     148 </span>                :<span class="lineCov">        391 :             stream_send_wait(rpc-&gt;stream);</span>
+<span class="lineNum">     149 </span>                :            :         }
+<span class="lineNum">     150 </span>                :            :     }
+<span class="lineNum">     151 </span>                :<span class="lineCov">      78234 : }</span>
+<span class="lineNum">     152 </span>                :            : 
+<span class="lineNum">     153 </span>                :            : /*
+<span class="lineNum">     154 </span>                :            :  * Returns the current status of 'rpc'.  The possible return values are:
+<span class="lineNum">     155 </span>                :            :  * - 0: no error yet
+<span class="lineNum">     156 </span>                :            :  * - &gt;0: errno value
+<span class="lineNum">     157 </span>                :            :  * - EOF: end of file (remote end closed connection; not necessarily an error).
+<span class="lineNum">     158 </span>                :            :  *
+<span class="lineNum">     159 </span>                :            :  * When this functions nonzero, 'rpc' is effectively out of commission.  'rpc'
+<span class="lineNum">     160 </span>                :            :  * will not receive any more messages and any further messages that one
+<span class="lineNum">     161 </span>                :            :  * attempts to send with 'rpc' will be discarded.  The caller can keep 'rpc'
+<span class="lineNum">     162 </span>                :            :  * around as long as it wants, but it's not going to provide any more useful
+<span class="lineNum">     163 </span>                :            :  * services.
+<a name="164"><span class="lineNum">     164 </span>                :            :  */</a>
+<span class="lineNum">     165 </span>                :            : int
+<span class="lineNum">     166 </span>                :<span class="lineCov">     124302 : jsonrpc_get_status(const struct jsonrpc *rpc)</span>
+<span class="lineNum">     167 </span>                :            : {
+<span class="lineNum">     168 </span>                :<span class="lineCov">     124302 :     return rpc-&gt;status;</span>
+<span class="lineNum">     169 </span>                :            : }
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>                :            : /* Returns the number of bytes buffered by 'rpc' to be written to the
+<span class="lineNum">     172 </span>                :            :  * underlying stream.  Always returns 0 if 'rpc' has encountered an error or if
+<a name="173"><span class="lineNum">     173 </span>                :            :  * the remote end closed the connection. */</a>
+<span class="lineNum">     174 </span>                :            : size_t
+<span class="lineNum">     175 </span>                :<span class="lineCov">     187155 : jsonrpc_get_backlog(const struct jsonrpc *rpc)</span>
+<span class="lineNum">     176 </span>                :            : {
+<span class="lineNum">     177 </span>        [<span class="branchCov" title="Branch 0 was taken 176482 times"> + </span><span class="branchCov" title="Branch 1 was taken 10673 times"> + </span>]:<span class="lineCov">     187155 :     return rpc-&gt;status ? 0 : rpc-&gt;backlog;</span>
+<span class="lineNum">     178 </span>                :            : }
+<span class="lineNum">     179 </span>                :            : 
+<span class="lineNum">     180 </span>                :            : /* Returns the number of bytes that have been received on 'rpc''s underlying
+<a name="181"><span class="lineNum">     181 </span>                :            :  * stream.  (The value wraps around if it exceeds UINT_MAX.) */</a>
+<span class="lineNum">     182 </span>                :            : unsigned int
+<span class="lineNum">     183 </span>                :<span class="lineCov">     139550 : jsonrpc_get_received_bytes(const struct jsonrpc *rpc)</span>
+<span class="lineNum">     184 </span>                :            : {
+<span class="lineNum">     185 </span>                :<span class="lineCov">     139550 :     return rpc-&gt;input.head;</span>
+<span class="lineNum">     186 </span>                :            : }
+<span class="lineNum">     187 </span>                :            : 
+<span class="lineNum">     188 </span>                :            : /* Returns 'rpc''s name, that is, the name returned by stream_get_name() for
+<a name="189"><span class="lineNum">     189 </span>                :            :  * the stream underlying 'rpc' when 'rpc' was created. */</a>
+<span class="lineNum">     190 </span>                :            : const char *
+<span class="lineNum">     191 </span>                :<span class="lineCov">       3666 : jsonrpc_get_name(const struct jsonrpc *rpc)</span>
+<span class="lineNum">     192 </span>                :            : {
+<span class="lineNum">     193 </span>                :<span class="lineCov">       3666 :     return rpc-&gt;name;</span>
+<span class="lineNum">     194 </span>                :            : }
+<a name="195"><span class="lineNum">     195 </span>                :            : </a>
+<span class="lineNum">     196 </span>                :            : static void
+<span class="lineNum">     197 </span>                :<span class="lineCov">      60163 : jsonrpc_log_msg(const struct jsonrpc *rpc, const char *title,</span>
+<span class="lineNum">     198 </span>                :            :                 const struct jsonrpc_msg *msg)
+<span class="lineNum">     199 </span>                :            : {
+<span class="lineNum">     200 </span>        [<span class="branchCov" title="Branch 1 was taken 241 times"> + </span><span class="branchCov" title="Branch 2 was taken 59922 times"> + </span>]:<span class="lineCov">      60163 :     if (VLOG_IS_DBG_ENABLED()) {</span>
+<span class="lineNum">     201 </span>                :<span class="lineCov">        241 :         struct ds s = DS_EMPTY_INITIALIZER;</span>
+<span class="lineNum">     202 </span>        [<span class="branchCov" title="Branch 0 was taken 141 times"> + </span><span class="branchCov" title="Branch 1 was taken 100 times"> + </span>]:<span class="lineCov">        241 :         if (msg-&gt;method) {</span>
+<span class="lineNum">     203 </span>                :<span class="lineCov">        141 :             ds_put_format(&amp;s, &quot;, method=\&quot;%s\&quot;&quot;, msg-&gt;method);</span>
+<span class="lineNum">     204 </span>                :            :         }
+<span class="lineNum">     205 </span>        [<span class="branchCov" title="Branch 0 was taken 141 times"> + </span><span class="branchCov" title="Branch 1 was taken 100 times"> + </span>]:<span class="lineCov">        241 :         if (msg-&gt;params) {</span>
+<span class="lineNum">     206 </span>                :<span class="lineCov">        141 :             ds_put_cstr(&amp;s, &quot;, params=&quot;);</span>
+<span class="lineNum">     207 </span>                :<span class="lineCov">        141 :             json_to_ds(msg-&gt;params, 0, &amp;s);</span>
+<span class="lineNum">     208 </span>                :            :         }
+<span class="lineNum">     209 </span>        [<span class="branchCov" title="Branch 0 was taken 100 times"> + </span><span class="branchCov" title="Branch 1 was taken 141 times"> + </span>]:<span class="lineCov">        241 :         if (msg-&gt;result) {</span>
+<span class="lineNum">     210 </span>                :<span class="lineCov">        100 :             ds_put_cstr(&amp;s, &quot;, result=&quot;);</span>
+<span class="lineNum">     211 </span>                :<span class="lineCov">        100 :             json_to_ds(msg-&gt;result, 0, &amp;s);</span>
+<span class="lineNum">     212 </span>                :            :         }
+<span class="lineNum">     213 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 241 times"> + </span>]:<span class="lineCov">        241 :         if (msg-&gt;error) {</span>
+<span class="lineNum">     214 </span>                :<span class="lineNoCov">          0 :             ds_put_cstr(&amp;s, &quot;, error=&quot;);</span>
+<span class="lineNum">     215 </span>                :<span class="lineNoCov">          0 :             json_to_ds(msg-&gt;error, 0, &amp;s);</span>
+<span class="lineNum">     216 </span>                :            :         }
+<span class="lineNum">     217 </span>        [<span class="branchCov" title="Branch 0 was taken 200 times"> + </span><span class="branchCov" title="Branch 1 was taken 41 times"> + </span>]:<span class="lineCov">        241 :         if (msg-&gt;id) {</span>
+<span class="lineNum">     218 </span>                :<span class="lineCov">        200 :             ds_put_cstr(&amp;s, &quot;, id=&quot;);</span>
+<span class="lineNum">     219 </span>                :<span class="lineCov">        200 :             json_to_ds(msg-&gt;id, 0, &amp;s);</span>
+<span class="lineNum">     220 </span>                :            :         }
+<span class="lineNum">     221 </span>        [<span class="branchCov" title="Branch 0 was taken 241 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        241 :         VLOG_DBG(&quot;%s: %s %s%s&quot;, rpc-&gt;name, title,</span>
+<span class="lineNum">     222 </span>                :            :                  jsonrpc_msg_type_to_string(msg-&gt;type), ds_cstr(&amp;s));
+<span class="lineNum">     223 </span>                :<span class="lineCov">        241 :         ds_destroy(&amp;s);</span>
+<span class="lineNum">     224 </span>                :            :     }
+<span class="lineNum">     225 </span>                :<span class="lineCov">      60163 : }</span>
+<span class="lineNum">     226 </span>                :            : 
+<span class="lineNum">     227 </span>                :            : /* Schedules 'msg' to be sent on 'rpc' and returns 'rpc''s status (as with
+<span class="lineNum">     228 </span>                :            :  * jsonrpc_get_status()).
+<span class="lineNum">     229 </span>                :            :  *
+<span class="lineNum">     230 </span>                :            :  * If 'msg' cannot be sent immediately, it is appended to a buffer.  The caller
+<span class="lineNum">     231 </span>                :            :  * is responsible for ensuring that the amount of buffered data is somehow
+<span class="lineNum">     232 </span>                :            :  * limited.  (jsonrpc_get_backlog() returns the amount of data currently
+<span class="lineNum">     233 </span>                :            :  * buffered in 'rpc'.)
+<span class="lineNum">     234 </span>                :            :  *
+<a name="235"><span class="lineNum">     235 </span>                :            :  * Always takes ownership of 'msg', regardless of success. */</a>
+<span class="lineNum">     236 </span>                :            : int
+<span class="lineNum">     237 </span>                :<span class="lineCov">      30396 : jsonrpc_send(struct jsonrpc *rpc, struct jsonrpc_msg *msg)</span>
+<span class="lineNum">     238 </span>                :            : {
+<span class="lineNum">     239 </span>                :            :     struct ofpbuf *buf;
+<span class="lineNum">     240 </span>                :            :     struct json *json;
+<span class="lineNum">     241 </span>                :            :     size_t length;
+<span class="lineNum">     242 </span>                :            :     char *s;
+<span class="lineNum">     243 </span>                :            : 
+<span class="lineNum">     244 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 30396 times"> + </span>]:<span class="lineCov">      30396 :     if (rpc-&gt;status) {</span>
+<span class="lineNum">     245 </span>                :<span class="lineNoCov">          0 :         jsonrpc_msg_destroy(msg);</span>
+<span class="lineNum">     246 </span>                :<span class="lineNoCov">          0 :         return rpc-&gt;status;</span>
+<span class="lineNum">     247 </span>                :            :     }
+<span class="lineNum">     248 </span>                :            : 
+<span class="lineNum">     249 </span>                :<span class="lineCov">      30396 :     jsonrpc_log_msg(rpc, &quot;send&quot;, msg);</span>
+<span class="lineNum">     250 </span>                :            : 
+<span class="lineNum">     251 </span>                :<span class="lineCov">      30396 :     json = jsonrpc_msg_to_json(msg);</span>
+<span class="lineNum">     252 </span>                :<span class="lineCov">      30396 :     s = json_to_string(json, 0);</span>
+<span class="lineNum">     253 </span>                :<span class="lineCov">      30396 :     length = strlen(s);</span>
+<span class="lineNum">     254 </span>                :<span class="lineCov">      30396 :     json_destroy(json);</span>
+<span class="lineNum">     255 </span>                :            : 
+<span class="lineNum">     256 </span>                :<span class="lineCov">      30396 :     buf = xmalloc(sizeof *buf);</span>
+<span class="lineNum">     257 </span>                :<span class="lineCov">      30396 :     ofpbuf_use(buf, s, length);</span>
+<span class="lineNum">     258 </span>                :<span class="lineCov">      30396 :     ofpbuf_set_size(buf, length);</span>
+<span class="lineNum">     259 </span>                :<span class="lineCov">      30396 :     list_push_back(&amp;rpc-&gt;output, &amp;buf-&gt;list_node);</span>
+<span class="lineNum">     260 </span>                :<span class="lineCov">      30396 :     rpc-&gt;backlog += length;</span>
+<span class="lineNum">     261 </span>                :            : 
+<span class="lineNum">     262 </span>        [<span class="branchCov" title="Branch 0 was taken 30396 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      30396 :     if (rpc-&gt;backlog == length) {</span>
+<span class="lineNum">     263 </span>                :<span class="lineCov">      30396 :         jsonrpc_run(rpc);</span>
+<span class="lineNum">     264 </span>                :            :     }
+<span class="lineNum">     265 </span>                :<span class="lineCov">      30396 :     return rpc-&gt;status;</span>
+<span class="lineNum">     266 </span>                :            : }
+<span class="lineNum">     267 </span>                :            : 
+<span class="lineNum">     268 </span>                :            : /* Attempts to receive a message from 'rpc'.
+<span class="lineNum">     269 </span>                :            :  *
+<span class="lineNum">     270 </span>                :            :  * If successful, stores the received message in '*msgp' and returns 0.  The
+<span class="lineNum">     271 </span>                :            :  * caller takes ownership of '*msgp' and must eventually destroy it with
+<span class="lineNum">     272 </span>                :            :  * jsonrpc_msg_destroy().
+<span class="lineNum">     273 </span>                :            :  *
+<span class="lineNum">     274 </span>                :            :  * Otherwise, stores NULL in '*msgp' and returns one of the following:
+<span class="lineNum">     275 </span>                :            :  *
+<span class="lineNum">     276 </span>                :            :  *   - EAGAIN: No message has been received.
+<span class="lineNum">     277 </span>                :            :  *
+<span class="lineNum">     278 </span>                :            :  *   - EOF: The remote end closed the connection gracefully.
+<span class="lineNum">     279 </span>                :            :  *
+<span class="lineNum">     280 </span>                :            :  *   - Otherwise an errno value that represents a JSON-RPC protocol violation
+<span class="lineNum">     281 </span>                :            :  *     or another error fatal to the connection.  'rpc' will not send or
+<span class="lineNum">     282 </span>                :            :  *     receive any more messages.
+<a name="283"><span class="lineNum">     283 </span>                :            :  */</a>
+<span class="lineNum">     284 </span>                :            : int
+<span class="lineNum">     285 </span>                :<span class="lineCov">     140438 : jsonrpc_recv(struct jsonrpc *rpc, struct jsonrpc_msg **msgp)</span>
+<span class="lineNum">     286 </span>                :            : {
+<span class="lineNum">     287 </span>                :            :     int i;
+<span class="lineNum">     288 </span>                :            : 
+<span class="lineNum">     289 </span>                :<span class="lineCov">     140438 :     *msgp = NULL;</span>
+<span class="lineNum">     290 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 140438 times"> + </span>]:<span class="lineCov">     140438 :     if (rpc-&gt;status) {</span>
+<span class="lineNum">     291 </span>                :<span class="lineNoCov">          0 :         return rpc-&gt;status;</span>
+<span class="lineNum">     292 </span>                :            :     }
+<span class="lineNum">     293 </span>                :            : 
+<span class="lineNum">     294 </span>        [<span class="branchCov" title="Branch 0 was taken 328252 times"> + </span><span class="branchCov" title="Branch 1 was taken 3054 times"> + </span>]:<span class="lineCov">     331306 :     for (i = 0; i &lt; 50; i++) {</span>
+<span class="lineNum">     295 </span>                :            :         size_t n, used;
+<span class="lineNum">     296 </span>                :            : 
+<span class="lineNum">     297 </span>                :            :         /* Fill our input buffer if it's empty. */
+<span class="lineNum">     298 </span>        [<span class="branchCov" title="Branch 1 was taken 324673 times"> + </span><span class="branchCov" title="Branch 2 was taken 3579 times"> + </span>]:<span class="lineCov">     328252 :         if (byteq_is_empty(&amp;rpc-&gt;input)) {</span>
+<span class="lineNum">     299 </span>                :            :             size_t chunk;
+<span class="lineNum">     300 </span>                :            :             int retval;
+<span class="lineNum">     301 </span>                :            : 
+<span class="lineNum">     302 </span>                :<span class="lineCov">     324673 :             chunk = byteq_headroom(&amp;rpc-&gt;input);</span>
+<span class="lineNum">     303 </span>                :<span class="lineCov">     324673 :             retval = stream_recv(rpc-&gt;stream, byteq_head(&amp;rpc-&gt;input), chunk);</span>
+<span class="lineNum">     304 </span>        [<span class="branchCov" title="Branch 0 was taken 99788 times"> + </span><span class="branchCov" title="Branch 1 was taken 224885 times"> + </span>]:<span class="lineCov">     324673 :             if (retval &lt; 0) {</span>
+<span class="lineNum">     305 </span>        [<span class="branchCov" title="Branch 0 was taken 99788 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      99788 :                 if (retval == -EAGAIN) {</span>
+<span class="lineNum">     306 </span>                :<span class="lineCov">      99788 :                     return EAGAIN;</span>
+<span class="lineNum">     307 </span>                :            :                 } else {
+<span class="lineNum">     308 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                     VLOG_WARN_RL(&amp;rl, &quot;%s: receive error: %s&quot;,</span>
+<span class="lineNum">     309 </span>                :            :                                  rpc-&gt;name, ovs_strerror(-retval));
+<span class="lineNum">     310 </span>                :<span class="lineNoCov">          0 :                     jsonrpc_error(rpc, -retval);</span>
+<span class="lineNum">     311 </span>                :<span class="lineNoCov">          0 :                     return rpc-&gt;status;</span>
+<span class="lineNum">     312 </span>                :            :                 }
+<span class="lineNum">     313 </span>        [<span class="branchCov" title="Branch 0 was taken 7829 times"> + </span><span class="branchCov" title="Branch 1 was taken 217056 times"> + </span>]:<span class="lineCov">     224885 :             } else if (retval == 0) {</span>
+<span class="lineNum">     314 </span>                :<span class="lineCov">       7829 :                 jsonrpc_error(rpc, EOF);</span>
+<span class="lineNum">     315 </span>                :<span class="lineCov">       7829 :                 return EOF;</span>
+<span class="lineNum">     316 </span>                :            :             }
+<span class="lineNum">     317 </span>                :<span class="lineCov">     217056 :             byteq_advance_head(&amp;rpc-&gt;input, retval);</span>
+<span class="lineNum">     318 </span>                :            :         }
+<span class="lineNum">     319 </span>                :            : 
+<span class="lineNum">     320 </span>                :            :         /* We have some input.  Feed it into the JSON parser. */
+<span class="lineNum">     321 </span>        [<span class="branchCov" title="Branch 0 was taken 29767 times"> + </span><span class="branchCov" title="Branch 1 was taken 190868 times"> + </span>]:<span class="lineCov">     220635 :         if (!rpc-&gt;parser) {</span>
+<span class="lineNum">     322 </span>                :<span class="lineCov">      29767 :             rpc-&gt;parser = json_parser_create(0);</span>
+<span class="lineNum">     323 </span>                :            :         }
+<span class="lineNum">     324 </span>                :<span class="lineCov">     220635 :         n = byteq_tailroom(&amp;rpc-&gt;input);</span>
+<span class="lineNum">     325 </span>                :<span class="lineCov">     220635 :         used = json_parser_feed(rpc-&gt;parser,</span>
+<span class="lineNum">     326 </span>                :<span class="lineCov">     220635 :                                 (char *) byteq_tail(&amp;rpc-&gt;input), n);</span>
+<span class="lineNum">     327 </span>                :<span class="lineCov">     220635 :         byteq_advance_tail(&amp;rpc-&gt;input, used);</span>
+<span class="lineNum">     328 </span>                :            : 
+<span class="lineNum">     329 </span>                :            :         /* If we have complete JSON, attempt to parse it as JSON-RPC. */
+<span class="lineNum">     330 </span>        [<span class="branchCov" title="Branch 1 was taken 29767 times"> + </span><span class="branchCov" title="Branch 2 was taken 190868 times"> + </span>]:<span class="lineCov">     220635 :         if (json_parser_is_done(rpc-&gt;parser)) {</span>
+<span class="lineNum">     331 </span>                :<span class="lineCov">      29767 :             *msgp = jsonrpc_parse_received_message(rpc);</span>
+<span class="lineNum">     332 </span>        [<span class="branchCov" title="Branch 0 was taken 29767 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      29767 :             if (*msgp) {</span>
+<span class="lineNum">     333 </span>                :<span class="lineCov">      29767 :                 return 0;</span>
+<span class="lineNum">     334 </span>                :            :             }
+<span class="lineNum">     335 </span>                :            : 
+<span class="lineNum">     336 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (rpc-&gt;status) {</span>
+<span class="lineNum">     337 </span>                :<span class="lineNoCov">          0 :                 const struct byteq *q = &amp;rpc-&gt;input;</span>
+<span class="lineNum">     338 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 if (q-&gt;head &lt;= q-&gt;size) {</span>
+<span class="lineNum">     339 </span>                :<span class="lineNoCov">          0 :                     stream_report_content(q-&gt;buffer, q-&gt;head, STREAM_JSONRPC,</span>
+<span class="lineNum">     340 </span>                :<span class="lineNoCov">          0 :                                           THIS_MODULE, rpc-&gt;name);</span>
+<span class="lineNum">     341 </span>                :            :                 }
+<span class="lineNum">     342 </span>                :<span class="lineNoCov">          0 :                 return rpc-&gt;status;</span>
+<span class="lineNum">     343 </span>                :            :             }
+<span class="lineNum">     344 </span>                :            :         }
+<span class="lineNum">     345 </span>                :            :     }
+<span class="lineNum">     346 </span>                :            : 
+<span class="lineNum">     347 </span>                :<span class="lineCov">     140438 :     return EAGAIN;</span>
+<span class="lineNum">     348 </span>                :            : }
+<span class="lineNum">     349 </span>                :            : 
+<span class="lineNum">     350 </span>                :            : /* Causes the poll loop to wake up when jsonrpc_recv() may return a value other
+<a name="351"><span class="lineNum">     351 </span>                :            :  * than EAGAIN. */</a>
+<span class="lineNum">     352 </span>                :            : void
+<span class="lineNum">     353 </span>                :<span class="lineCov">      76843 : jsonrpc_recv_wait(struct jsonrpc *rpc)</span>
+<span class="lineNum">     354 </span>                :            : {
+<span class="lineNum">     355 </span>[<span class="branchCov" title="Branch 0 was taken 73260 times"> + </span><span class="branchCov" title="Branch 1 was taken 3583 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 448 times"> + </span><span class="branchCov" title="Branch 4 was taken 72812 times"> + </span>]:<span class="lineCov">      76843 :     if (rpc-&gt;status || !byteq_is_empty(&amp;rpc-&gt;input)) {</span>
+<span class="lineNum">     356 </span>                :<span class="lineCov">       4031 :         poll_immediate_wake_at(rpc-&gt;name);</span>
+<span class="lineNum">     357 </span>                :            :     } else {
+<span class="lineNum">     358 </span>                :<span class="lineCov">      72812 :         stream_recv_wait(rpc-&gt;stream);</span>
+<span class="lineNum">     359 </span>                :            :     }
+<span class="lineNum">     360 </span>                :<span class="lineCov">      76843 : }</span>
+<span class="lineNum">     361 </span>                :            : 
+<span class="lineNum">     362 </span>                :            : /* Sends 'msg' on 'rpc' and waits for it to be successfully queued to the
+<span class="lineNum">     363 </span>                :            :  * underlying stream.  Returns 0 if 'msg' was sent successfully, otherwise a
+<span class="lineNum">     364 </span>                :            :  * status value (see jsonrpc_get_status()).
+<span class="lineNum">     365 </span>                :            :  *
+<a name="366"><span class="lineNum">     366 </span>                :            :  * Always takes ownership of 'msg', regardless of success. */</a>
+<span class="lineNum">     367 </span>                :            : int
+<span class="lineNum">     368 </span>                :<span class="lineCov">       6268 : jsonrpc_send_block(struct jsonrpc *rpc, struct jsonrpc_msg *msg)</span>
+<span class="lineNum">     369 </span>                :            : {
+<span class="lineNum">     370 </span>                :            :     int error;
+<span class="lineNum">     371 </span>                :            : 
+<span class="lineNum">     372 </span>                :<span class="lineCov">       6268 :     fatal_signal_run();</span>
+<span class="lineNum">     373 </span>                :            : 
+<span class="lineNum">     374 </span>                :<span class="lineCov">       6268 :     error = jsonrpc_send(rpc, msg);</span>
+<span class="lineNum">     375 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 6268 times"> + </span>]:<span class="lineCov">       6268 :     if (error) {</span>
+<span class="lineNum">     376 </span>                :<span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     377 </span>                :            :     }
+<span class="lineNum">     378 </span>                :            : 
+<span class="lineNum">     379 </span>                :            :     for (;;) {
+<span class="lineNum">     380 </span>                :<span class="lineCov">       6268 :         jsonrpc_run(rpc);</span>
+<span class="lineNum">     381 </span>[<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 6268 times"> + </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineCov">       6268 :         if (list_is_empty(&amp;rpc-&gt;output) || rpc-&gt;status) {</span>
+<span class="lineNum">     382 </span>                :<span class="lineCov">       6268 :             return rpc-&gt;status;</span>
+<span class="lineNum">     383 </span>                :            :         }
+<span class="lineNum">     384 </span>                :<span class="lineNoCov">          0 :         jsonrpc_wait(rpc);</span>
+<span class="lineNum">     385 </span>                :<span class="lineCov">       6268 :         poll_block();</span>
+<span class="lineNum">     386 </span>                :<span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     387 </span>                :            : }
+<span class="lineNum">     388 </span>                :            : 
+<span class="lineNum">     389 </span>                :            : /* Waits for a message to be received on 'rpc'.  Same semantics as
+<a name="390"><span class="lineNum">     390 </span>                :            :  * jsonrpc_recv() except that EAGAIN will never be returned. */</a>
+<span class="lineNum">     391 </span>                :            : int
+<span class="lineNum">     392 </span>                :<span class="lineCov">      19650 : jsonrpc_recv_block(struct jsonrpc *rpc, struct jsonrpc_msg **msgp)</span>
+<span class="lineNum">     393 </span>                :            : {
+<span class="lineNum">     394 </span>                :            :     for (;;) {
+<span class="lineNum">     395 </span>                :<span class="lineCov">      19650 :         int error = jsonrpc_recv(rpc, msgp);</span>
+<span class="lineNum">     396 </span>        [<span class="branchCov" title="Branch 0 was taken 6270 times"> + </span><span class="branchCov" title="Branch 1 was taken 13380 times"> + </span>]:<span class="lineCov">      19650 :         if (error != EAGAIN) {</span>
+<span class="lineNum">     397 </span>                :<span class="lineCov">       6270 :             fatal_signal_run();</span>
+<span class="lineNum">     398 </span>                :<span class="lineCov">       6270 :             return error;</span>
+<span class="lineNum">     399 </span>                :            :         }
+<span class="lineNum">     400 </span>                :            : 
+<span class="lineNum">     401 </span>                :<span class="lineCov">      13380 :         jsonrpc_run(rpc);</span>
+<span class="lineNum">     402 </span>                :<span class="lineCov">      13380 :         jsonrpc_wait(rpc);</span>
+<span class="lineNum">     403 </span>                :<span class="lineCov">      13380 :         jsonrpc_recv_wait(rpc);</span>
+<span class="lineNum">     404 </span>                :<span class="lineCov">      13380 :         poll_block();</span>
+<span class="lineNum">     405 </span>                :<span class="lineCov">      13380 :     }</span>
+<span class="lineNum">     406 </span>                :            : }
+<span class="lineNum">     407 </span>                :            : 
+<span class="lineNum">     408 </span>                :            : /* Sends 'request' to 'rpc' then waits for a reply.  The return value is 0 if
+<span class="lineNum">     409 </span>                :            :  * successful, in which case '*replyp' is set to the reply, which the caller
+<span class="lineNum">     410 </span>                :            :  * must eventually free with jsonrpc_msg_destroy().  Otherwise returns a status
+<span class="lineNum">     411 </span>                :            :  * value (see jsonrpc_get_status()).
+<span class="lineNum">     412 </span>                :            :  *
+<span class="lineNum">     413 </span>                :            :  * Discards any message received on 'rpc' that is not a reply to 'request'
+<span class="lineNum">     414 </span>                :            :  * (based on message id).
+<span class="lineNum">     415 </span>                :            :  *
+<a name="416"><span class="lineNum">     416 </span>                :            :  * Always takes ownership of 'request', regardless of success. */</a>
+<span class="lineNum">     417 </span>                :            : int
+<span class="lineNum">     418 </span>                :<span class="lineCov">       6267 : jsonrpc_transact_block(struct jsonrpc *rpc, struct jsonrpc_msg *request,</span>
+<span class="lineNum">     419 </span>                :            :                        struct jsonrpc_msg **replyp)
+<span class="lineNum">     420 </span>                :            : {
+<span class="lineNum">     421 </span>                :<span class="lineCov">       6267 :     struct jsonrpc_msg *reply = NULL;</span>
+<span class="lineNum">     422 </span>                :            :     struct json *id;
+<span class="lineNum">     423 </span>                :            :     int error;
+<span class="lineNum">     424 </span>                :            : 
+<span class="lineNum">     425 </span>                :<span class="lineCov">       6267 :     id = json_clone(request-&gt;id);</span>
+<span class="lineNum">     426 </span>                :<span class="lineCov">       6267 :     error = jsonrpc_send_block(rpc, request);</span>
+<span class="lineNum">     427 </span>        [<span class="branchCov" title="Branch 0 was taken 6267 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       6267 :     if (!error) {</span>
+<span class="lineNum">     428 </span>                :            :         for (;;) {
+<span class="lineNum">     429 </span>                :<span class="lineCov">       6267 :             error = jsonrpc_recv_block(rpc, &amp;reply);</span>
+<span class="lineNum">     430 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 6267 times"> + </span>]:<span class="lineCov">       6267 :             if (error) {</span>
+<span class="lineNum">     431 </span>                :<span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     432 </span>                :            :             }
+<span class="lineNum">     433 </span>[<span class="branchCov" title="Branch 0 was taken 38 times"> + </span><span class="branchCov" title="Branch 1 was taken 6229 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 38 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">       6267 :             if ((reply-&gt;type == JSONRPC_REPLY || reply-&gt;type == JSONRPC_ERROR)</span>
+<span class="lineNum">     434 </span>        [<span class="branchCov" title="Branch 1 was taken 6267 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">       6267 :                 &amp;&amp; json_equal(id, reply-&gt;id)) {</span>
+<span class="lineNum">     435 </span>                :<span class="lineCov">       6267 :                 break;</span>
+<span class="lineNum">     436 </span>                :            :             }
+<span class="lineNum">     437 </span>                :<span class="lineNoCov">          0 :             jsonrpc_msg_destroy(reply);</span>
+<span class="lineNum">     438 </span>                :<span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     439 </span>                :            :     }
+<span class="lineNum">     440 </span>        [<span class="branchCov" title="Branch 0 was taken 6267 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       6267 :     *replyp = error ? NULL : reply;</span>
+<span class="lineNum">     441 </span>                :<span class="lineCov">       6267 :     json_destroy(id);</span>
+<span class="lineNum">     442 </span>                :<span class="lineCov">       6267 :     return error;</span>
+<span class="lineNum">     443 </span>                :            : }
+<span class="lineNum">     444 </span>                :            : 
+<span class="lineNum">     445 </span>                :            : /* Attempts to parse the content of 'rpc-&gt;parser' (which is complete JSON) as a
+<span class="lineNum">     446 </span>                :            :  * JSON-RPC message.  If successful, returns the JSON-RPC message.  On failure,
+<a name="447"><span class="lineNum">     447 </span>                :            :  * signals an error on 'rpc' with jsonrpc_error() and returns NULL. */</a>
+<span class="lineNum">     448 </span>                :            : static struct jsonrpc_msg *
+<span class="lineNum">     449 </span>                :<span class="lineCov">      29767 : jsonrpc_parse_received_message(struct jsonrpc *rpc)</span>
+<span class="lineNum">     450 </span>                :            : {
+<span class="lineNum">     451 </span>                :            :     struct jsonrpc_msg *msg;
+<span class="lineNum">     452 </span>                :            :     struct json *json;
+<span class="lineNum">     453 </span>                :            :     char *error;
+<span class="lineNum">     454 </span>                :            : 
+<span class="lineNum">     455 </span>                :<span class="lineCov">      29767 :     json = json_parser_finish(rpc-&gt;parser);</span>
+<span class="lineNum">     456 </span>                :<span class="lineCov">      29767 :     rpc-&gt;parser = NULL;</span>
+<span class="lineNum">     457 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 29767 times"> + </span>]:<span class="lineCov">      29767 :     if (json-&gt;type == JSON_STRING) {</span>
+<span class="lineNum">     458 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;%s: error parsing stream: %s&quot;,</span>
+<span class="lineNum">     459 </span>                :            :                      rpc-&gt;name, json_string(json));
+<span class="lineNum">     460 </span>                :<span class="lineNoCov">          0 :         jsonrpc_error(rpc, EPROTO);</span>
+<span class="lineNum">     461 </span>                :<span class="lineNoCov">          0 :         json_destroy(json);</span>
+<span class="lineNum">     462 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     463 </span>                :            :     }
+<span class="lineNum">     464 </span>                :            : 
+<span class="lineNum">     465 </span>                :<span class="lineCov">      29767 :     error = jsonrpc_msg_from_json(json, &amp;msg);</span>
+<span class="lineNum">     466 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 29767 times"> + </span>]:<span class="lineCov">      29767 :     if (error) {</span>
+<span class="lineNum">     467 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;%s: received bad JSON-RPC message: %s&quot;,</span>
+<span class="lineNum">     468 </span>                :            :                      rpc-&gt;name, error);
+<span class="lineNum">     469 </span>                :<span class="lineNoCov">          0 :         free(error);</span>
+<span class="lineNum">     470 </span>                :<span class="lineNoCov">          0 :         jsonrpc_error(rpc, EPROTO);</span>
+<span class="lineNum">     471 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     472 </span>                :            :     }
+<span class="lineNum">     473 </span>                :            : 
+<span class="lineNum">     474 </span>                :<span class="lineCov">      29767 :     jsonrpc_log_msg(rpc, &quot;received&quot;, msg);</span>
+<span class="lineNum">     475 </span>                :<span class="lineCov">      29767 :     return msg;</span>
+<span class="lineNum">     476 </span>                :            : }
+<a name="477"><span class="lineNum">     477 </span>                :            : </a>
+<span class="lineNum">     478 </span>                :            : static void
+<span class="lineNum">     479 </span>                :<span class="lineCov">      11375 : jsonrpc_error(struct jsonrpc *rpc, int error)</span>
+<span class="lineNum">     480 </span>                :            : {
+<span class="lineNum">     481 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 11375 times"> + </span>]:<span class="lineCov">      11375 :     ovs_assert(error);</span>
+<span class="lineNum">     482 </span>        [<span class="branchCov" title="Branch 0 was taken 7830 times"> + </span><span class="branchCov" title="Branch 1 was taken 3545 times"> + </span>]:<span class="lineCov">      11375 :     if (!rpc-&gt;status) {</span>
+<span class="lineNum">     483 </span>                :<span class="lineCov">       7830 :         rpc-&gt;status = error;</span>
+<span class="lineNum">     484 </span>                :<span class="lineCov">       7830 :         jsonrpc_cleanup(rpc);</span>
+<span class="lineNum">     485 </span>                :            :     }
+<span class="lineNum">     486 </span>                :<span class="lineCov">      11375 : }</span>
+<a name="487"><span class="lineNum">     487 </span>                :            : </a>
+<span class="lineNum">     488 </span>                :            : static void
+<span class="lineNum">     489 </span>                :<span class="lineCov">      25817 : jsonrpc_cleanup(struct jsonrpc *rpc)</span>
+<span class="lineNum">     490 </span>                :            : {
+<span class="lineNum">     491 </span>                :<span class="lineCov">      25817 :     stream_close(rpc-&gt;stream);</span>
+<span class="lineNum">     492 </span>                :<span class="lineCov">      25817 :     rpc-&gt;stream = NULL;</span>
+<span class="lineNum">     493 </span>                :            : 
+<span class="lineNum">     494 </span>                :<span class="lineCov">      25817 :     json_parser_abort(rpc-&gt;parser);</span>
+<span class="lineNum">     495 </span>                :<span class="lineCov">      25817 :     rpc-&gt;parser = NULL;</span>
+<span class="lineNum">     496 </span>                :            : 
+<span class="lineNum">     497 </span>                :<span class="lineCov">      25817 :     ofpbuf_list_delete(&amp;rpc-&gt;output);</span>
+<span class="lineNum">     498 </span>                :<span class="lineCov">      25817 :     rpc-&gt;backlog = 0;</span>
+<span class="lineNum">     499 </span>                :<span class="lineCov">      25817 : }</span>
+<a name="500"><span class="lineNum">     500 </span>                :            : </a>
+<span class="lineNum">     501 </span>                :            : static struct jsonrpc_msg *
+<span class="lineNum">     502 </span>                :<span class="lineCov">      30396 : jsonrpc_create(enum jsonrpc_msg_type type, const char *method,</span>
+<span class="lineNum">     503 </span>                :            :                 struct json *params, struct json *result, struct json *error,
+<span class="lineNum">     504 </span>                :            :                 struct json *id)
+<span class="lineNum">     505 </span>                :            : {
+<span class="lineNum">     506 </span>                :<span class="lineCov">      30396 :     struct jsonrpc_msg *msg = xmalloc(sizeof *msg);</span>
+<span class="lineNum">     507 </span>                :<span class="lineCov">      30396 :     msg-&gt;type = type;</span>
+<span class="lineNum">     508 </span>        [<span class="branchCov" title="Branch 0 was taken 17877 times"> + </span><span class="branchCov" title="Branch 1 was taken 12519 times"> + </span>]:<span class="lineCov">      30396 :     msg-&gt;method = method ? xstrdup(method) : NULL;</span>
+<span class="lineNum">     509 </span>                :<span class="lineCov">      30396 :     msg-&gt;params = params;</span>
+<span class="lineNum">     510 </span>                :<span class="lineCov">      30396 :     msg-&gt;result = result;</span>
+<span class="lineNum">     511 </span>                :<span class="lineCov">      30396 :     msg-&gt;error = error;</span>
+<span class="lineNum">     512 </span>                :<span class="lineCov">      30396 :     msg-&gt;id = id;</span>
+<span class="lineNum">     513 </span>                :<span class="lineCov">      30396 :     return msg;</span>
+<span class="lineNum">     514 </span>                :            : }
+<a name="515"><span class="lineNum">     515 </span>                :            : </a>
+<span class="lineNum">     516 </span>                :            : static struct json *
+<span class="lineNum">     517 </span>                :<span class="lineCov">      12687 : jsonrpc_create_id(void)</span>
+<span class="lineNum">     518 </span>                :            : {
+<span class="lineNum">     519 </span>                :            :     static atomic_uint next_id = ATOMIC_VAR_INIT(0);
+<span class="lineNum">     520 </span>                :            :     unsigned int id;
+<span class="lineNum">     521 </span>                :            : 
+<span class="lineNum">     522 </span>                :<span class="lineCov">      12687 :     atomic_add(&amp;next_id, 1, &amp;id);</span>
+<span class="lineNum">     523 </span>                :<span class="lineCov">      12687 :     return json_integer_create(id);</span>
+<span class="lineNum">     524 </span>                :            : }
+<a name="525"><span class="lineNum">     525 </span>                :            : </a>
+<span class="lineNum">     526 </span>                :            : struct jsonrpc_msg *
+<span class="lineNum">     527 </span>                :<span class="lineCov">      12687 : jsonrpc_create_request(const char *method, struct json *params,</span>
+<span class="lineNum">     528 </span>                :            :                        struct json **idp)
+<span class="lineNum">     529 </span>                :            : {
+<span class="lineNum">     530 </span>                :<span class="lineCov">      12687 :     struct json *id = jsonrpc_create_id();</span>
+<span class="lineNum">     531 </span>        [<span class="branchCov" title="Branch 0 was taken 6402 times"> + </span><span class="branchCov" title="Branch 1 was taken 6285 times"> + </span>]:<span class="lineCov">      12687 :     if (idp) {</span>
+<span class="lineNum">     532 </span>                :<span class="lineCov">       6402 :         *idp = json_clone(id);</span>
+<span class="lineNum">     533 </span>                :            :     }
+<span class="lineNum">     534 </span>                :<span class="lineCov">      12687 :     return jsonrpc_create(JSONRPC_REQUEST, method, params, NULL, NULL, id);</span>
+<span class="lineNum">     535 </span>                :            : }
+<a name="536"><span class="lineNum">     536 </span>                :            : </a>
+<span class="lineNum">     537 </span>                :            : struct jsonrpc_msg *
+<span class="lineNum">     538 </span>                :<span class="lineCov">       5190 : jsonrpc_create_notify(const char *method, struct json *params)</span>
+<span class="lineNum">     539 </span>                :            : {
+<span class="lineNum">     540 </span>                :<span class="lineCov">       5190 :     return jsonrpc_create(JSONRPC_NOTIFY, method, params, NULL, NULL, NULL);</span>
+<span class="lineNum">     541 </span>                :            : }
+<a name="542"><span class="lineNum">     542 </span>                :            : </a>
+<span class="lineNum">     543 </span>                :            : struct jsonrpc_msg *
+<span class="lineNum">     544 </span>                :<span class="lineCov">      12484 : jsonrpc_create_reply(struct json *result, const struct json *id)</span>
+<span class="lineNum">     545 </span>                :            : {
+<span class="lineNum">     546 </span>                :<span class="lineCov">      12484 :     return jsonrpc_create(JSONRPC_REPLY, NULL, NULL, result, NULL,</span>
+<span class="lineNum">     547 </span>                :            :                            json_clone(id));
+<span class="lineNum">     548 </span>                :            : }
+<a name="549"><span class="lineNum">     549 </span>                :            : </a>
+<span class="lineNum">     550 </span>                :            : struct jsonrpc_msg *
+<span class="lineNum">     551 </span>                :<span class="lineCov">         35 : jsonrpc_create_error(struct json *error, const struct json *id)</span>
+<span class="lineNum">     552 </span>                :            : {
+<span class="lineNum">     553 </span>                :<span class="lineCov">         35 :     return jsonrpc_create(JSONRPC_REPLY, NULL, NULL, NULL, error,</span>
+<span class="lineNum">     554 </span>                :            :                            json_clone(id));
+<span class="lineNum">     555 </span>                :            : }
+<a name="556"><span class="lineNum">     556 </span>                :            : </a>
+<span class="lineNum">     557 </span>                :            : const char *
+<span class="lineNum">     558 </span>                :<span class="lineCov">      30012 : jsonrpc_msg_type_to_string(enum jsonrpc_msg_type type)</span>
+<span class="lineNum">     559 </span>                :            : {
+<span class="lineNum">     560 </span>  [<span class="branchCov" title="Branch 0 was taken 12622 times"> + </span><span class="branchCov" title="Branch 1 was taken 4603 times"> + </span><span class="branchCov" title="Branch 2 was taken 12748 times"> + </span><span class="branchCov" title="Branch 3 was taken 39 times"> + </span> :<span class="lineCov">      30012 :     switch (type) {</span>
+<span class="lineNum">         </span>            <span class="branchNoCov" title="Branch 4 was not taken"> - </span>]
+<span class="lineNum">     561 </span>                :            :     case JSONRPC_REQUEST:
+<span class="lineNum">     562 </span>                :<span class="lineCov">      12622 :         return &quot;request&quot;;</span>
+<span class="lineNum">     563 </span>                :            : 
+<span class="lineNum">     564 </span>                :            :     case JSONRPC_NOTIFY:
+<span class="lineNum">     565 </span>                :<span class="lineCov">       4603 :         return &quot;notification&quot;;</span>
+<span class="lineNum">     566 </span>                :            : 
+<span class="lineNum">     567 </span>                :            :     case JSONRPC_REPLY:
+<span class="lineNum">     568 </span>                :<span class="lineCov">      12748 :         return &quot;reply&quot;;</span>
+<span class="lineNum">     569 </span>                :            : 
+<span class="lineNum">     570 </span>                :            :     case JSONRPC_ERROR:
+<span class="lineNum">     571 </span>                :<span class="lineCov">         39 :         return &quot;error&quot;;</span>
+<span class="lineNum">     572 </span>                :            :     }
+<span class="lineNum">     573 </span>                :<span class="lineCov">      30012 :     return &quot;(null)&quot;;</span>
+<span class="lineNum">     574 </span>                :            : }
+<a name="575"><span class="lineNum">     575 </span>                :            : </a>
+<span class="lineNum">     576 </span>                :            : char *
+<span class="lineNum">     577 </span>                :<span class="lineCov">      29771 : jsonrpc_msg_is_valid(const struct jsonrpc_msg *m)</span>
+<span class="lineNum">     578 </span>                :            : {
+<span class="lineNum">     579 </span>                :            :     const char *type_name;
+<span class="lineNum">     580 </span>                :            :     unsigned int pattern;
+<span class="lineNum">     581 </span>                :            : 
+<span class="lineNum">     582 </span>[<span class="branchCov" title="Branch 0 was taken 17084 times"> + </span><span class="branchCov" title="Branch 1 was taken 12687 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 17084 times"> + </span>]:<span class="lineCov">      29771 :     if (m-&gt;params &amp;&amp; m-&gt;params-&gt;type != JSON_ARRAY) {</span>
+<span class="lineNum">     583 </span>                :<span class="lineNoCov">          0 :         return xstrdup(&quot;\&quot;params\&quot; must be JSON array&quot;);</span>
+<span class="lineNum">     584 </span>                :            :     }
+<span class="lineNum">     585 </span>                :            : 
+<span class="lineNum">     586 </span>  [<span class="branchCov" title="Branch 0 was taken 12522 times"> + </span><span class="branchCov" title="Branch 1 was taken 4562 times"> + </span><span class="branchCov" title="Branch 2 was taken 12648 times"> + </span><span class="branchCov" title="Branch 3 was taken 39 times"> + </span> :<span class="lineCov">      29771 :     switch (m-&gt;type) {</span>
+<span class="lineNum">         </span>            <span class="branchNoCov" title="Branch 4 was not taken"> - </span>]
+<span class="lineNum">     587 </span>                :            :     case JSONRPC_REQUEST:
+<span class="lineNum">     588 </span>                :<span class="lineCov">      12522 :         pattern = 0x11001;</span>
+<span class="lineNum">     589 </span>                :<span class="lineCov">      12522 :         break;</span>
+<span class="lineNum">     590 </span>                :            : 
+<span class="lineNum">     591 </span>                :            :     case JSONRPC_NOTIFY:
+<span class="lineNum">     592 </span>                :<span class="lineCov">       4562 :         pattern = 0x11000;</span>
+<span class="lineNum">     593 </span>                :<span class="lineCov">       4562 :         break;</span>
+<span class="lineNum">     594 </span>                :            : 
+<span class="lineNum">     595 </span>                :            :     case JSONRPC_REPLY:
+<span class="lineNum">     596 </span>                :<span class="lineCov">      12648 :         pattern = 0x00101;</span>
+<span class="lineNum">     597 </span>                :<span class="lineCov">      12648 :         break;</span>
+<span class="lineNum">     598 </span>                :            : 
+<span class="lineNum">     599 </span>                :            :     case JSONRPC_ERROR:
+<span class="lineNum">     600 </span>                :<span class="lineCov">         39 :         pattern = 0x00011;</span>
+<span class="lineNum">     601 </span>                :<span class="lineCov">         39 :         break;</span>
+<span class="lineNum">     602 </span>                :            : 
+<span class="lineNum">     603 </span>                :            :     default:
+<span class="lineNum">     604 </span>                :<span class="lineNoCov">          0 :         return xasprintf(&quot;invalid JSON-RPC message type %d&quot;, m-&gt;type);</span>
+<span class="lineNum">     605 </span>                :            :     }
+<span class="lineNum">     606 </span>                :            : 
+<span class="lineNum">     607 </span>                :<span class="lineCov">      29771 :     type_name = jsonrpc_msg_type_to_string(m-&gt;type);</span>
+<span class="lineNum">     608 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 29771 times"> + </span>]:<span class="lineCov">      29771 :     if ((m-&gt;method != NULL) != ((pattern &amp; 0x10000) != 0)) {</span>
+<span class="lineNum">     609 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         return xasprintf(&quot;%s must%s have \&quot;method\&quot;&quot;,</span>
+<span class="lineNum">     610 </span>                :<span class="lineNoCov">          0 :                          type_name, (pattern &amp; 0x10000) ? &quot;&quot; : &quot; not&quot;);</span>
+<span class="lineNum">     611 </span>                :            : 
+<span class="lineNum">     612 </span>                :            :     }
+<span class="lineNum">     613 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 29771 times"> + </span>]:<span class="lineCov">      29771 :     if ((m-&gt;params != NULL) != ((pattern &amp; 0x1000) != 0)) {</span>
+<span class="lineNum">     614 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         return xasprintf(&quot;%s must%s have \&quot;params\&quot;&quot;,</span>
+<span class="lineNum">     615 </span>                :<span class="lineNoCov">          0 :                          type_name, (pattern &amp; 0x1000) ? &quot;&quot; : &quot; not&quot;);</span>
+<span class="lineNum">     616 </span>                :            : 
+<span class="lineNum">     617 </span>                :            :     }
+<span class="lineNum">     618 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 29771 times"> + </span>]:<span class="lineCov">      29771 :     if ((m-&gt;result != NULL) != ((pattern &amp; 0x100) != 0)) {</span>
+<span class="lineNum">     619 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         return xasprintf(&quot;%s must%s have \&quot;result\&quot;&quot;,</span>
+<span class="lineNum">     620 </span>                :<span class="lineNoCov">          0 :                          type_name, (pattern &amp; 0x100) ? &quot;&quot; : &quot; not&quot;);</span>
+<span class="lineNum">     621 </span>                :            : 
+<span class="lineNum">     622 </span>                :            :     }
+<span class="lineNum">     623 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 29771 times"> + </span>]:<span class="lineCov">      29771 :     if ((m-&gt;error != NULL) != ((pattern &amp; 0x10) != 0)) {</span>
+<span class="lineNum">     624 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         return xasprintf(&quot;%s must%s have \&quot;error\&quot;&quot;,</span>
+<span class="lineNum">     625 </span>                :<span class="lineNoCov">          0 :                          type_name, (pattern &amp; 0x10) ? &quot;&quot; : &quot; not&quot;);</span>
+<span class="lineNum">     626 </span>                :            : 
+<span class="lineNum">     627 </span>                :            :     }
+<span class="lineNum">     628 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 29771 times"> + </span>]:<span class="lineCov">      29771 :     if ((m-&gt;id != NULL) != ((pattern &amp; 0x1) != 0)) {</span>
+<span class="lineNum">     629 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         return xasprintf(&quot;%s must%s have \&quot;id\&quot;&quot;,</span>
+<span class="lineNum">     630 </span>                :<span class="lineNoCov">          0 :                          type_name, (pattern &amp; 0x1) ? &quot;&quot; : &quot; not&quot;);</span>
+<span class="lineNum">     631 </span>                :            : 
+<span class="lineNum">     632 </span>                :            :     }
+<span class="lineNum">     633 </span>                :<span class="lineCov">      29771 :     return NULL;</span>
+<span class="lineNum">     634 </span>                :            : }
+<a name="635"><span class="lineNum">     635 </span>                :            : </a>
+<span class="lineNum">     636 </span>                :            : void
+<span class="lineNum">     637 </span>                :<span class="lineCov">      29741 : jsonrpc_msg_destroy(struct jsonrpc_msg *m)</span>
+<span class="lineNum">     638 </span>                :            : {
+<span class="lineNum">     639 </span>        [<span class="branchCov" title="Branch 0 was taken 29741 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      29741 :     if (m) {</span>
+<span class="lineNum">     640 </span>                :<span class="lineCov">      29741 :         free(m-&gt;method);</span>
+<span class="lineNum">     641 </span>                :<span class="lineCov">      29741 :         json_destroy(m-&gt;params);</span>
+<span class="lineNum">     642 </span>                :<span class="lineCov">      29741 :         json_destroy(m-&gt;result);</span>
+<span class="lineNum">     643 </span>                :<span class="lineCov">      29741 :         json_destroy(m-&gt;error);</span>
+<span class="lineNum">     644 </span>                :<span class="lineCov">      29741 :         json_destroy(m-&gt;id);</span>
+<span class="lineNum">     645 </span>                :<span class="lineCov">      29741 :         free(m);</span>
+<span class="lineNum">     646 </span>                :            :     }
+<span class="lineNum">     647 </span>                :<span class="lineCov">      29741 : }</span>
+<a name="648"><span class="lineNum">     648 </span>                :            : </a>
+<span class="lineNum">     649 </span>                :            : static struct json *
+<span class="lineNum">     650 </span>                :<span class="lineCov">     119068 : null_from_json_null(struct json *json)</span>
+<span class="lineNum">     651 </span>                :            : {
+<span class="lineNum">     652 </span>[<span class="branchCov" title="Branch 0 was taken 72186 times"> + </span><span class="branchCov" title="Branch 1 was taken 46882 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 17213 times"> + </span><span class="branchCov" title="Branch 3 was taken 54973 times"> + </span>]:<span class="lineCov">     119068 :     if (json &amp;&amp; json-&gt;type == JSON_NULL) {</span>
+<span class="lineNum">     653 </span>                :<span class="lineCov">      17213 :         json_destroy(json);</span>
+<span class="lineNum">     654 </span>                :<span class="lineCov">      17213 :         return NULL;</span>
+<span class="lineNum">     655 </span>                :            :     }
+<span class="lineNum">     656 </span>                :<span class="lineCov">     119068 :     return json;</span>
+<span class="lineNum">     657 </span>                :            : }
+<a name="658"><span class="lineNum">     658 </span>                :            : </a>
+<span class="lineNum">     659 </span>                :            : char *
+<span class="lineNum">     660 </span>                :<span class="lineCov">      29767 : jsonrpc_msg_from_json(struct json *json, struct jsonrpc_msg **msgp)</span>
+<span class="lineNum">     661 </span>                :            : {
+<span class="lineNum">     662 </span>                :<span class="lineCov">      29767 :     struct json *method = NULL;</span>
+<span class="lineNum">     663 </span>                :<span class="lineCov">      29767 :     struct jsonrpc_msg *msg = NULL;</span>
+<span class="lineNum">     664 </span>                :            :     struct shash *object;
+<span class="lineNum">     665 </span>                :            :     char *error;
+<span class="lineNum">     666 </span>                :            : 
+<span class="lineNum">     667 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 29767 times"> + </span>]:<span class="lineCov">      29767 :     if (json-&gt;type != JSON_OBJECT) {</span>
+<span class="lineNum">     668 </span>                :<span class="lineNoCov">          0 :         error = xstrdup(&quot;message is not a JSON object&quot;);</span>
+<span class="lineNum">     669 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     670 </span>                :            :     }
+<span class="lineNum">     671 </span>                :<span class="lineCov">      29767 :     object = json_object(json);</span>
+<span class="lineNum">     672 </span>                :            : 
+<span class="lineNum">     673 </span>                :<span class="lineCov">      29767 :     method = shash_find_and_delete(object, &quot;method&quot;);</span>
+<span class="lineNum">     674 </span>[<span class="branchCov" title="Branch 0 was taken 17080 times"> + </span><span class="branchCov" title="Branch 1 was taken 12687 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 17080 times"> + </span>]:<span class="lineCov">      29767 :     if (method &amp;&amp; method-&gt;type != JSON_STRING) {</span>
+<span class="lineNum">     675 </span>                :<span class="lineNoCov">          0 :         error = xstrdup(&quot;method is not a JSON string&quot;);</span>
+<span class="lineNum">     676 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     677 </span>                :            :     }
+<span class="lineNum">     678 </span>                :            : 
+<span class="lineNum">     679 </span>                :<span class="lineCov">      29767 :     msg = xzalloc(sizeof *msg);</span>
+<span class="lineNum">     680 </span>        [<span class="branchCov" title="Branch 0 was taken 17080 times"> + </span><span class="branchCov" title="Branch 1 was taken 12687 times"> + </span>]:<span class="lineCov">      29767 :     msg-&gt;method = method ? xstrdup(method-&gt;u.string) : NULL;</span>
+<span class="lineNum">     681 </span>                :<span class="lineCov">      29767 :     msg-&gt;params = null_from_json_null(shash_find_and_delete(object, &quot;params&quot;));</span>
+<span class="lineNum">     682 </span>                :<span class="lineCov">      29767 :     msg-&gt;result = null_from_json_null(shash_find_and_delete(object, &quot;result&quot;));</span>
+<span class="lineNum">     683 </span>                :<span class="lineCov">      29767 :     msg-&gt;error = null_from_json_null(shash_find_and_delete(object, &quot;error&quot;));</span>
+<span class="lineNum">     684 </span>                :<span class="lineCov">      29767 :     msg-&gt;id = null_from_json_null(shash_find_and_delete(object, &quot;id&quot;));</span>
+<span class="lineNum">     685 </span>[<span class="branchCov" title="Branch 0 was taken 17119 times"> + </span><span class="branchCov" title="Branch 1 was taken 12648 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 17080 times"> + </span><span class="branchCov" title="Branch 3 was taken 39 times"> + </span>]:<span class="lineCov">      29767 :     msg-&gt;type = (msg-&gt;result ? JSONRPC_REPLY</span>
+<span class="lineNum">     686 </span>                :<span class="lineCov">      17119 :                  : msg-&gt;error ? JSONRPC_ERROR</span>
+<span class="lineNum">     687 </span>                :<span class="lineCov">      17080 :                  : msg-&gt;id ? JSONRPC_REQUEST</span>
+<span class="lineNum">     688 </span>                :<span class="lineCov">      17080 :                  : JSONRPC_NOTIFY);</span>
+<span class="lineNum">     689 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 29767 times"> + </span>]:<span class="lineCov">      29767 :     if (!shash_is_empty(object)) {</span>
+<span class="lineNum">     690 </span>                :<span class="lineNoCov">          0 :         error = xasprintf(&quot;message has unexpected member \&quot;%s\&quot;&quot;,</span>
+<span class="lineNum">     691 </span>                :<span class="lineNoCov">          0 :                           shash_first(object)-&gt;name);</span>
+<span class="lineNum">     692 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     693 </span>                :            :     }
+<span class="lineNum">     694 </span>                :<span class="lineCov">      29767 :     error = jsonrpc_msg_is_valid(msg);</span>
+<span class="lineNum">     695 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 29767 times"> + </span>]:<span class="lineCov">      29767 :     if (error) {</span>
+<span class="lineNum">     696 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     697 </span>                :            :     }
+<span class="lineNum">     698 </span>                :            : 
+<span class="lineNum">     699 </span>                :            : exit:
+<span class="lineNum">     700 </span>                :<span class="lineCov">      29767 :     json_destroy(method);</span>
+<span class="lineNum">     701 </span>                :<span class="lineCov">      29767 :     json_destroy(json);</span>
+<span class="lineNum">     702 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 29767 times"> + </span>]:<span class="lineCov">      29767 :     if (error) {</span>
+<span class="lineNum">     703 </span>                :<span class="lineNoCov">          0 :         jsonrpc_msg_destroy(msg);</span>
+<span class="lineNum">     704 </span>                :<span class="lineNoCov">          0 :         msg = NULL;</span>
+<span class="lineNum">     705 </span>                :            :     }
+<span class="lineNum">     706 </span>                :<span class="lineCov">      29767 :     *msgp = msg;</span>
+<span class="lineNum">     707 </span>                :<span class="lineCov">      29767 :     return error;</span>
+<span class="lineNum">     708 </span>                :            : }
+<a name="709"><span class="lineNum">     709 </span>                :            : </a>
+<span class="lineNum">     710 </span>                :            : struct json *
+<span class="lineNum">     711 </span>                :<span class="lineCov">      30422 : jsonrpc_msg_to_json(struct jsonrpc_msg *m)</span>
+<span class="lineNum">     712 </span>                :            : {
+<span class="lineNum">     713 </span>                :<span class="lineCov">      30422 :     struct json *json = json_object_create();</span>
+<span class="lineNum">     714 </span>                :            : 
+<span class="lineNum">     715 </span>        [<span class="branchCov" title="Branch 0 was taken 17877 times"> + </span><span class="branchCov" title="Branch 1 was taken 12545 times"> + </span>]:<span class="lineCov">      30422 :     if (m-&gt;method) {</span>
+<span class="lineNum">     716 </span>                :<span class="lineCov">      17877 :         json_object_put(json, &quot;method&quot;, json_string_create_nocopy(m-&gt;method));</span>
+<span class="lineNum">     717 </span>                :            :     }
+<span class="lineNum">     718 </span>                :            : 
+<span class="lineNum">     719 </span>        [<span class="branchCov" title="Branch 0 was taken 17877 times"> + </span><span class="branchCov" title="Branch 1 was taken 12545 times"> + </span>]:<span class="lineCov">      30422 :     if (m-&gt;params) {</span>
+<span class="lineNum">     720 </span>                :<span class="lineCov">      17877 :         json_object_put(json, &quot;params&quot;, m-&gt;params);</span>
+<span class="lineNum">     721 </span>                :            :     }
+<span class="lineNum">     722 </span>                :            : 
+<span class="lineNum">     723 </span>        [<span class="branchCov" title="Branch 0 was taken 12509 times"> + </span><span class="branchCov" title="Branch 1 was taken 17913 times"> + </span>]:<span class="lineCov">      30422 :     if (m-&gt;result) {</span>
+<span class="lineNum">     724 </span>                :<span class="lineCov">      12509 :         json_object_put(json, &quot;result&quot;, m-&gt;result);</span>
+<span class="lineNum">     725 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 17912 times"> + </span>]:<span class="lineCov">      17913 :     } else if (m-&gt;type == JSONRPC_ERROR) {</span>
+<span class="lineNum">     726 </span>                :<span class="lineCov">          1 :         json_object_put(json, &quot;result&quot;, json_null_create());</span>
+<span class="lineNum">     727 </span>                :            :     }
+<span class="lineNum">     728 </span>                :            : 
+<span class="lineNum">     729 </span>        [<span class="branchCov" title="Branch 0 was taken 36 times"> + </span><span class="branchCov" title="Branch 1 was taken 30386 times"> + </span>]:<span class="lineCov">      30422 :     if (m-&gt;error) {</span>
+<span class="lineNum">     730 </span>                :<span class="lineCov">         36 :         json_object_put(json, &quot;error&quot;, m-&gt;error);</span>
+<span class="lineNum">     731 </span>        [<span class="branchCov" title="Branch 0 was taken 12509 times"> + </span><span class="branchCov" title="Branch 1 was taken 17877 times"> + </span>]:<span class="lineCov">      30386 :     } else if (m-&gt;type == JSONRPC_REPLY) {</span>
+<span class="lineNum">     732 </span>                :<span class="lineCov">      12509 :         json_object_put(json, &quot;error&quot;, json_null_create());</span>
+<span class="lineNum">     733 </span>                :            :     }
+<span class="lineNum">     734 </span>                :            : 
+<span class="lineNum">     735 </span>        [<span class="branchCov" title="Branch 0 was taken 25209 times"> + </span><span class="branchCov" title="Branch 1 was taken 5213 times"> + </span>]:<span class="lineCov">      30422 :     if (m-&gt;id) {</span>
+<span class="lineNum">     736 </span>                :<span class="lineCov">      25209 :         json_object_put(json, &quot;id&quot;, m-&gt;id);</span>
+<span class="lineNum">     737 </span>        [<span class="branchCov" title="Branch 0 was taken 5190 times"> + </span><span class="branchCov" title="Branch 1 was taken 23 times"> + </span>]:<span class="lineCov">       5213 :     } else if (m-&gt;type == JSONRPC_NOTIFY) {</span>
+<span class="lineNum">     738 </span>                :<span class="lineCov">       5190 :         json_object_put(json, &quot;id&quot;, json_null_create());</span>
+<span class="lineNum">     739 </span>                :            :     }
+<span class="lineNum">     740 </span>                :            : 
+<span class="lineNum">     741 </span>                :<span class="lineCov">      30422 :     free(m);</span>
+<span class="lineNum">     742 </span>                :            : 
+<span class="lineNum">     743 </span>                :<span class="lineCov">      30422 :     return json;</span>
+<span class="lineNum">     744 </span>                :            : }
+<span class="lineNum">     745 </span>                :            : 
+<span class="lineNum">     746 </span>                :            : /* A JSON-RPC session with reconnection. */
+<span class="lineNum">     747 </span>                :            : 
+<span class="lineNum">     748 </span>                :            : struct jsonrpc_session {
+<span class="lineNum">     749 </span>                :            :     struct reconnect *reconnect;
+<span class="lineNum">     750 </span>                :            :     struct jsonrpc *rpc;
+<span class="lineNum">     751 </span>                :            :     struct stream *stream;
+<span class="lineNum">     752 </span>                :            :     struct pstream *pstream;
+<span class="lineNum">     753 </span>                :            :     int last_error;
+<span class="lineNum">     754 </span>                :            :     unsigned int seqno;
+<span class="lineNum">     755 </span>                :            :     uint8_t dscp;
+<span class="lineNum">     756 </span>                :            : };
+<span class="lineNum">     757 </span>                :            : 
+<span class="lineNum">     758 </span>                :            : /* Creates and returns a jsonrpc_session to 'name', which should be a string
+<span class="lineNum">     759 </span>                :            :  * acceptable to stream_open() or pstream_open().
+<span class="lineNum">     760 </span>                :            :  *
+<span class="lineNum">     761 </span>                :            :  * If 'name' is an active connection method, e.g. &quot;tcp:127.1.2.3&quot;, the new
+<span class="lineNum">     762 </span>                :            :  * jsonrpc_session connects to 'name'.  If 'retry' is true, then the new
+<span class="lineNum">     763 </span>                :            :  * session connects and reconnects to 'name', with backoff.  If 'retry' is
+<span class="lineNum">     764 </span>                :            :  * false, the new session will only try to connect once and after a connection
+<span class="lineNum">     765 </span>                :            :  * failure or a disconnection jsonrpc_session_is_alive() will return false for
+<span class="lineNum">     766 </span>                :            :  * the new session.
+<span class="lineNum">     767 </span>                :            :  *
+<span class="lineNum">     768 </span>                :            :  * If 'name' is a passive connection method, e.g. &quot;ptcp:&quot;, the new
+<span class="lineNum">     769 </span>                :            :  * jsonrpc_session listens for connections to 'name'.  It maintains at most one
+<span class="lineNum">     770 </span>                :            :  * connection at any given time.  Any new connection causes the previous one
+<a name="771"><span class="lineNum">     771 </span>                :            :  * (if any) to be dropped. */</a>
+<span class="lineNum">     772 </span>                :            : struct jsonrpc_session *
+<span class="lineNum">     773 </span>                :<span class="lineCov">       3098 : jsonrpc_session_open(const char *name, bool retry)</span>
+<span class="lineNum">     774 </span>                :            : {
+<span class="lineNum">     775 </span>                :            :     struct jsonrpc_session *s;
+<span class="lineNum">     776 </span>                :            : 
+<span class="lineNum">     777 </span>                :<span class="lineCov">       3098 :     s = xmalloc(sizeof *s);</span>
+<span class="lineNum">     778 </span>                :<span class="lineCov">       3098 :     s-&gt;reconnect = reconnect_create(time_msec());</span>
+<span class="lineNum">     779 </span>                :<span class="lineCov">       3098 :     reconnect_set_name(s-&gt;reconnect, name);</span>
+<span class="lineNum">     780 </span>                :<span class="lineCov">       3098 :     reconnect_enable(s-&gt;reconnect, time_msec());</span>
+<span class="lineNum">     781 </span>                :<span class="lineCov">       3098 :     s-&gt;rpc = NULL;</span>
+<span class="lineNum">     782 </span>                :<span class="lineCov">       3098 :     s-&gt;stream = NULL;</span>
+<span class="lineNum">     783 </span>                :<span class="lineCov">       3098 :     s-&gt;pstream = NULL;</span>
+<span class="lineNum">     784 </span>                :<span class="lineCov">       3098 :     s-&gt;seqno = 0;</span>
+<span class="lineNum">     785 </span>                :<span class="lineCov">       3098 :     s-&gt;dscp = 0;</span>
+<span class="lineNum">     786 </span>                :<span class="lineCov">       3098 :     s-&gt;last_error = 0;</span>
+<span class="lineNum">     787 </span>                :            : 
+<span class="lineNum">     788 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 3098 times"> + </span>]:<span class="lineCov">       3098 :     if (!pstream_verify_name(name)) {</span>
+<span class="lineNum">     789 </span>                :<span class="lineNoCov">          0 :         reconnect_set_passive(s-&gt;reconnect, true, time_msec());</span>
+<span class="lineNum">     790 </span>        [<span class="branchCov" title="Branch 0 was taken 2829 times"> + </span><span class="branchCov" title="Branch 1 was taken 269 times"> + </span>]:<span class="lineCov">       3098 :     } else if (!retry) {</span>
+<span class="lineNum">     791 </span>                :<span class="lineCov">       2829 :         reconnect_set_max_tries(s-&gt;reconnect, 1);</span>
+<span class="lineNum">     792 </span>                :<span class="lineCov">       2829 :         reconnect_set_backoff(s-&gt;reconnect, INT_MAX, INT_MAX);</span>
+<span class="lineNum">     793 </span>                :            :     }
+<span class="lineNum">     794 </span>                :            : 
+<span class="lineNum">     795 </span>        [<span class="branchCov" title="Branch 1 was taken 3098 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">       3098 :     if (!stream_or_pstream_needs_probes(name)) {</span>
+<span class="lineNum">     796 </span>                :<span class="lineCov">       3098 :         reconnect_set_probe_interval(s-&gt;reconnect, 0);</span>
+<span class="lineNum">     797 </span>                :            :     }
+<span class="lineNum">     798 </span>                :            : 
+<span class="lineNum">     799 </span>                :<span class="lineCov">       3098 :     return s;</span>
+<span class="lineNum">     800 </span>                :            : }
+<span class="lineNum">     801 </span>                :            : 
+<span class="lineNum">     802 </span>                :            : /* Creates and returns a jsonrpc_session that is initially connected to
+<span class="lineNum">     803 </span>                :            :  * 'jsonrpc'.  If the connection is dropped, it will not be reconnected.
+<span class="lineNum">     804 </span>                :            :  *
+<span class="lineNum">     805 </span>                :            :  * On the assumption that such connections are likely to be short-lived
+<a name="806"><span class="lineNum">     806 </span>                :            :  * (e.g. from ovs-vsctl), informational logging for them is suppressed. */</a>
+<span class="lineNum">     807 </span>                :            : struct jsonrpc_session *
+<span class="lineNum">     808 </span>                :<span class="lineCov">       3636 : jsonrpc_session_open_unreliably(struct jsonrpc *jsonrpc, uint8_t dscp)</span>
+<span class="lineNum">     809 </span>                :            : {
+<span class="lineNum">     810 </span>                :            :     struct jsonrpc_session *s;
+<span class="lineNum">     811 </span>                :            : 
+<span class="lineNum">     812 </span>                :<span class="lineCov">       3636 :     s = xmalloc(sizeof *s);</span>
+<span class="lineNum">     813 </span>                :<span class="lineCov">       3636 :     s-&gt;reconnect = reconnect_create(time_msec());</span>
+<span class="lineNum">     814 </span>                :<span class="lineCov">       3636 :     reconnect_set_quiet(s-&gt;reconnect, true);</span>
+<span class="lineNum">     815 </span>                :<span class="lineCov">       3636 :     reconnect_set_name(s-&gt;reconnect, jsonrpc_get_name(jsonrpc));</span>
+<span class="lineNum">     816 </span>                :<span class="lineCov">       3636 :     reconnect_set_max_tries(s-&gt;reconnect, 0);</span>
+<span class="lineNum">     817 </span>                :<span class="lineCov">       3636 :     reconnect_connected(s-&gt;reconnect, time_msec());</span>
+<span class="lineNum">     818 </span>                :<span class="lineCov">       3636 :     s-&gt;dscp = dscp;</span>
+<span class="lineNum">     819 </span>                :<span class="lineCov">       3636 :     s-&gt;rpc = jsonrpc;</span>
+<span class="lineNum">     820 </span>                :<span class="lineCov">       3636 :     s-&gt;stream = NULL;</span>
+<span class="lineNum">     821 </span>                :<span class="lineCov">       3636 :     s-&gt;pstream = NULL;</span>
+<span class="lineNum">     822 </span>                :<span class="lineCov">       3636 :     s-&gt;seqno = 0;</span>
+<span class="lineNum">     823 </span>                :            : 
+<span class="lineNum">     824 </span>                :<span class="lineCov">       3636 :     return s;</span>
+<span class="lineNum">     825 </span>                :            : }
+<a name="826"><span class="lineNum">     826 </span>                :            : </a>
+<span class="lineNum">     827 </span>                :            : void
+<span class="lineNum">     828 </span>                :<span class="lineCov">       6734 : jsonrpc_session_close(struct jsonrpc_session *s)</span>
+<span class="lineNum">     829 </span>                :            : {
+<span class="lineNum">     830 </span>        [<span class="branchCov" title="Branch 0 was taken 6734 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       6734 :     if (s) {</span>
+<span class="lineNum">     831 </span>                :<span class="lineCov">       6734 :         jsonrpc_close(s-&gt;rpc);</span>
+<span class="lineNum">     832 </span>                :<span class="lineCov">       6734 :         reconnect_destroy(s-&gt;reconnect);</span>
+<span class="lineNum">     833 </span>                :<span class="lineCov">       6734 :         stream_close(s-&gt;stream);</span>
+<span class="lineNum">     834 </span>                :<span class="lineCov">       6734 :         pstream_close(s-&gt;pstream);</span>
+<span class="lineNum">     835 </span>                :<span class="lineCov">       6734 :         free(s);</span>
+<span class="lineNum">     836 </span>                :            :     }
+<span class="lineNum">     837 </span>                :<span class="lineCov">       6734 : }</span>
+<a name="838"><span class="lineNum">     838 </span>                :            : </a>
+<span class="lineNum">     839 </span>                :            : static void
+<span class="lineNum">     840 </span>                :<span class="lineCov">       6637 : jsonrpc_session_disconnect(struct jsonrpc_session *s)</span>
+<span class="lineNum">     841 </span>                :            : {
+<span class="lineNum">     842 </span>        [<span class="branchCov" title="Branch 0 was taken 3546 times"> + </span><span class="branchCov" title="Branch 1 was taken 3091 times"> + </span>]:<span class="lineCov">       6637 :     if (s-&gt;rpc) {</span>
+<span class="lineNum">     843 </span>                :<span class="lineCov">       3546 :         jsonrpc_error(s-&gt;rpc, EOF);</span>
+<span class="lineNum">     844 </span>                :<span class="lineCov">       3546 :         jsonrpc_close(s-&gt;rpc);</span>
+<span class="lineNum">     845 </span>                :<span class="lineCov">       3546 :         s-&gt;rpc = NULL;</span>
+<span class="lineNum">     846 </span>                :<span class="lineCov">       3546 :         s-&gt;seqno++;</span>
+<span class="lineNum">     847 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3091 times"> + </span>]:<span class="lineCov">       3091 :     } else if (s-&gt;stream) {</span>
+<span class="lineNum">     848 </span>                :<span class="lineNoCov">          0 :         stream_close(s-&gt;stream);</span>
+<span class="lineNum">     849 </span>                :<span class="lineNoCov">          0 :         s-&gt;stream = NULL;</span>
+<span class="lineNum">     850 </span>                :<span class="lineNoCov">          0 :         s-&gt;seqno++;</span>
+<span class="lineNum">     851 </span>                :            :     }
+<span class="lineNum">     852 </span>                :<span class="lineCov">       6637 : }</span>
+<a name="853"><span class="lineNum">     853 </span>                :            : </a>
+<span class="lineNum">     854 </span>                :            : static void
+<span class="lineNum">     855 </span>                :<span class="lineCov">       3091 : jsonrpc_session_connect(struct jsonrpc_session *s)</span>
+<span class="lineNum">     856 </span>                :            : {
+<span class="lineNum">     857 </span>                :<span class="lineCov">       3091 :     const char *name = reconnect_get_name(s-&gt;reconnect);</span>
+<span class="lineNum">     858 </span>                :            :     int error;
+<span class="lineNum">     859 </span>                :            : 
+<span class="lineNum">     860 </span>                :<span class="lineCov">       3091 :     jsonrpc_session_disconnect(s);</span>
+<span class="lineNum">     861 </span>        [<span class="branchCov" title="Branch 1 was taken 3091 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">       3091 :     if (!reconnect_is_passive(s-&gt;reconnect)) {</span>
+<span class="lineNum">     862 </span>                :<span class="lineCov">       3091 :         error = jsonrpc_stream_open(name, &amp;s-&gt;stream, s-&gt;dscp);</span>
+<span class="lineNum">     863 </span>        [<span class="branchCov" title="Branch 0 was taken 3090 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">       3091 :         if (!error) {</span>
+<span class="lineNum">     864 </span>                :<span class="lineCov">       3090 :             reconnect_connecting(s-&gt;reconnect, time_msec());</span>
+<span class="lineNum">     865 </span>                :            :         } else {
+<span class="lineNum">     866 </span>                :<span class="lineCov">          1 :             s-&gt;last_error = error;</span>
+<span class="lineNum">     867 </span>                :            :         }
+<span class="lineNum">     868 </span>                :            :     } else {
+<span class="lineNum">     869 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         error = s-&gt;pstream ? 0 : jsonrpc_pstream_open(name, &amp;s-&gt;pstream,</span>
+<span class="lineNum">     870 </span>                :<span class="lineNoCov">          0 :                                                       s-&gt;dscp);</span>
+<span class="lineNum">     871 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!error) {</span>
+<span class="lineNum">     872 </span>                :<span class="lineNoCov">          0 :             reconnect_listening(s-&gt;reconnect, time_msec());</span>
+<span class="lineNum">     873 </span>                :            :         }
+<span class="lineNum">     874 </span>                :            :     }
+<span class="lineNum">     875 </span>                :            : 
+<span class="lineNum">     876 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 3090 times"> + </span>]:<span class="lineCov">       3091 :     if (error) {</span>
+<span class="lineNum">     877 </span>                :<span class="lineCov">          1 :         reconnect_connect_failed(s-&gt;reconnect, time_msec(), error);</span>
+<span class="lineNum">     878 </span>                :            :     }
+<span class="lineNum">     879 </span>                :<span class="lineCov">       3091 :     s-&gt;seqno++;</span>
+<span class="lineNum">     880 </span>                :<span class="lineCov">       3091 : }</span>
+<a name="881"><span class="lineNum">     881 </span>                :            : </a>
+<span class="lineNum">     882 </span>                :            : void
+<span class="lineNum">     883 </span>                :<span class="lineCov">      68559 : jsonrpc_session_run(struct jsonrpc_session *s)</span>
+<span class="lineNum">     884 </span>                :            : {
+<span class="lineNum">     885 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 68559 times"> + </span>]:<span class="lineCov">      68559 :     if (s-&gt;pstream) {</span>
+<span class="lineNum">     886 </span>                :            :         struct stream *stream;
+<span class="lineNum">     887 </span>                :            :         int error;
+<span class="lineNum">     888 </span>                :            : 
+<span class="lineNum">     889 </span>                :<span class="lineNoCov">          0 :         error = pstream_accept(s-&gt;pstream, &amp;stream);</span>
+<span class="lineNum">     890 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!error) {</span>
+<span class="lineNum">     891 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (s-&gt;rpc || s-&gt;stream) {</span>
+<span class="lineNum">     892 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_INFO_RL(&amp;rl,</span>
+<span class="lineNum">     893 </span>                :            :                              &quot;%s: new connection replacing active connection&quot;,
+<span class="lineNum">     894 </span>                :            :                              reconnect_get_name(s-&gt;reconnect));
+<span class="lineNum">     895 </span>                :<span class="lineNoCov">          0 :                 jsonrpc_session_disconnect(s);</span>
+<span class="lineNum">     896 </span>                :            :             }
+<span class="lineNum">     897 </span>                :<span class="lineNoCov">          0 :             reconnect_connected(s-&gt;reconnect, time_msec());</span>
+<span class="lineNum">     898 </span>                :<span class="lineNoCov">          0 :             s-&gt;rpc = jsonrpc_open(stream);</span>
+<span class="lineNum">     899 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         } else if (error != EAGAIN) {</span>
+<span class="lineNum">     900 </span>                :<span class="lineNoCov">          0 :             reconnect_listen_error(s-&gt;reconnect, time_msec(), error);</span>
+<span class="lineNum">     901 </span>                :<span class="lineNoCov">          0 :             pstream_close(s-&gt;pstream);</span>
+<span class="lineNum">     902 </span>                :<span class="lineNoCov">          0 :             s-&gt;pstream = NULL;</span>
+<span class="lineNum">     903 </span>                :            :         }
+<span class="lineNum">     904 </span>                :            :     }
+<span class="lineNum">     905 </span>                :            : 
+<span class="lineNum">     906 </span>        [<span class="branchCov" title="Branch 0 was taken 62378 times"> + </span><span class="branchCov" title="Branch 1 was taken 6181 times"> + </span>]:<span class="lineCov">      68559 :     if (s-&gt;rpc) {</span>
+<span class="lineNum">     907 </span>                :            :         size_t backlog;
+<span class="lineNum">     908 </span>                :            :         int error;
+<span class="lineNum">     909 </span>                :            : 
+<span class="lineNum">     910 </span>                :<span class="lineCov">      62378 :         backlog = jsonrpc_get_backlog(s-&gt;rpc);</span>
+<span class="lineNum">     911 </span>                :<span class="lineCov">      62378 :         jsonrpc_run(s-&gt;rpc);</span>
+<span class="lineNum">     912 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 62378 times"> + </span>]:<span class="lineCov">      62378 :         if (jsonrpc_get_backlog(s-&gt;rpc) &lt; backlog) {</span>
+<span class="lineNum">     913 </span>                :            :             /* Data previously caught in a queue was successfully sent (or
+<span class="lineNum">     914 </span>                :            :              * there's an error, which we'll catch below.)
+<span class="lineNum">     915 </span>                :            :              *
+<span class="lineNum">     916 </span>                :            :              * We don't count data that is successfully sent immediately as
+<span class="lineNum">     917 </span>                :            :              * activity, because there's a lot of queuing downstream from us,
+<span class="lineNum">     918 </span>                :            :              * which means that we can push a lot of data into a connection
+<span class="lineNum">     919 </span>                :            :              * that has stalled and won't ever recover.
+<span class="lineNum">     920 </span>                :            :              */
+<span class="lineNum">     921 </span>                :<span class="lineNoCov">          0 :             reconnect_activity(s-&gt;reconnect, time_msec());</span>
+<span class="lineNum">     922 </span>                :            :         }
+<span class="lineNum">     923 </span>                :            : 
+<span class="lineNum">     924 </span>                :<span class="lineCov">      62378 :         error = jsonrpc_get_status(s-&gt;rpc);</span>
+<span class="lineNum">     925 </span>        [<span class="branchCov" title="Branch 0 was taken 3545 times"> + </span><span class="branchCov" title="Branch 1 was taken 58833 times"> + </span>]:<span class="lineCov">      62378 :         if (error) {</span>
+<span class="lineNum">     926 </span>                :<span class="lineCov">       3545 :             reconnect_disconnected(s-&gt;reconnect, time_msec(), error);</span>
+<span class="lineNum">     927 </span>                :<span class="lineCov">       3545 :             jsonrpc_session_disconnect(s);</span>
+<span class="lineNum">     928 </span>                :<span class="lineCov">       3545 :             s-&gt;last_error = error;</span>
+<span class="lineNum">     929 </span>                :            :         }
+<span class="lineNum">     930 </span>        [<span class="branchCov" title="Branch 0 was taken 3090 times"> + </span><span class="branchCov" title="Branch 1 was taken 3091 times"> + </span>]:<span class="lineCov">       6181 :     } else if (s-&gt;stream) {</span>
+<span class="lineNum">     931 </span>                :            :         int error;
+<span class="lineNum">     932 </span>                :            : 
+<span class="lineNum">     933 </span>                :<span class="lineCov">       3090 :         stream_run(s-&gt;stream);</span>
+<span class="lineNum">     934 </span>                :<span class="lineCov">       3090 :         error = stream_connect(s-&gt;stream);</span>
+<span class="lineNum">     935 </span>        [<span class="branchCov" title="Branch 0 was taken 3090 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       3090 :         if (!error) {</span>
+<span class="lineNum">     936 </span>                :<span class="lineCov">       3090 :             reconnect_connected(s-&gt;reconnect, time_msec());</span>
+<span class="lineNum">     937 </span>                :<span class="lineCov">       3090 :             s-&gt;rpc = jsonrpc_open(s-&gt;stream);</span>
+<span class="lineNum">     938 </span>                :<span class="lineCov">       3090 :             s-&gt;stream = NULL;</span>
+<span class="lineNum">     939 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         } else if (error != EAGAIN) {</span>
+<span class="lineNum">     940 </span>                :<span class="lineNoCov">          0 :             reconnect_connect_failed(s-&gt;reconnect, time_msec(), error);</span>
+<span class="lineNum">     941 </span>                :<span class="lineNoCov">          0 :             stream_close(s-&gt;stream);</span>
+<span class="lineNum">     942 </span>                :<span class="lineNoCov">          0 :             s-&gt;stream = NULL;</span>
+<span class="lineNum">     943 </span>                :            :         }
+<span class="lineNum">     944 </span>                :            :     }
+<span class="lineNum">     945 </span>                :            : 
+<span class="lineNum">     946 </span>  [<span class="branchCov" title="Branch 2 was taken 3091 times"> + </span><span class="branchCov" title="Branch 3 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 65467 times"> + </span>]:<span class="lineCov">      68559 :     switch (reconnect_run(s-&gt;reconnect, time_msec())) {</span>
+<span class="lineNum">     947 </span>                :            :     case RECONNECT_CONNECT:
+<span class="lineNum">     948 </span>                :<span class="lineCov">       3091 :         jsonrpc_session_connect(s);</span>
+<span class="lineNum">     949 </span>                :<span class="lineCov">       3091 :         break;</span>
+<span class="lineNum">     950 </span>                :            : 
+<span class="lineNum">     951 </span>                :            :     case RECONNECT_DISCONNECT:
+<span class="lineNum">     952 </span>                :<span class="lineCov">          1 :         reconnect_disconnected(s-&gt;reconnect, time_msec(), 0);</span>
+<span class="lineNum">     953 </span>                :<span class="lineCov">          1 :         jsonrpc_session_disconnect(s);</span>
+<span class="lineNum">     954 </span>                :<span class="lineCov">          1 :         break;</span>
+<span class="lineNum">     955 </span>                :            : 
+<span class="lineNum">     956 </span>                :            :     case RECONNECT_PROBE:
+<span class="lineNum">     957 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (s-&gt;rpc) {</span>
+<span class="lineNum">     958 </span>                :            :             struct json *params;
+<span class="lineNum">     959 </span>                :            :             struct jsonrpc_msg *request;
+<span class="lineNum">     960 </span>                :            : 
+<span class="lineNum">     961 </span>                :<span class="lineNoCov">          0 :             params = json_array_create_empty();</span>
+<span class="lineNum">     962 </span>                :<span class="lineNoCov">          0 :             request = jsonrpc_create_request(&quot;echo&quot;, params, NULL);</span>
+<span class="lineNum">     963 </span>                :<span class="lineNoCov">          0 :             json_destroy(request-&gt;id);</span>
+<span class="lineNum">     964 </span>                :<span class="lineNoCov">          0 :             request-&gt;id = json_string_create(&quot;echo&quot;);</span>
+<span class="lineNum">     965 </span>                :<span class="lineNoCov">          0 :             jsonrpc_send(s-&gt;rpc, request);</span>
+<span class="lineNum">     966 </span>                :            :         }
+<span class="lineNum">     967 </span>                :<span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">     968 </span>                :            :     }
+<span class="lineNum">     969 </span>                :<span class="lineCov">      68559 : }</span>
+<a name="970"><span class="lineNum">     970 </span>                :            : </a>
+<span class="lineNum">     971 </span>                :            : void
+<span class="lineNum">     972 </span>                :<span class="lineCov">      61191 : jsonrpc_session_wait(struct jsonrpc_session *s)</span>
+<span class="lineNum">     973 </span>                :            : {
+<span class="lineNum">     974 </span>        [<span class="branchCov" title="Branch 0 was taken 58100 times"> + </span><span class="branchCov" title="Branch 1 was taken 3091 times"> + </span>]:<span class="lineCov">      61191 :     if (s-&gt;rpc) {</span>
+<span class="lineNum">     975 </span>                :<span class="lineCov">      58100 :         jsonrpc_wait(s-&gt;rpc);</span>
+<span class="lineNum">     976 </span>        [<span class="branchCov" title="Branch 0 was taken 3090 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">       3091 :     } else if (s-&gt;stream) {</span>
+<span class="lineNum">     977 </span>                :<span class="lineCov">       3090 :         stream_run_wait(s-&gt;stream);</span>
+<span class="lineNum">     978 </span>                :<span class="lineCov">       3090 :         stream_connect_wait(s-&gt;stream);</span>
+<span class="lineNum">     979 </span>                :            :     }
+<span class="lineNum">     980 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 61191 times"> + </span>]:<span class="lineCov">      61191 :     if (s-&gt;pstream) {</span>
+<span class="lineNum">     981 </span>                :<span class="lineNoCov">          0 :         pstream_wait(s-&gt;pstream);</span>
+<span class="lineNum">     982 </span>                :            :     }
+<span class="lineNum">     983 </span>                :<span class="lineCov">      61191 :     reconnect_wait(s-&gt;reconnect, time_msec());</span>
+<span class="lineNum">     984 </span>                :<span class="lineCov">      61191 : }</span>
+<a name="985"><span class="lineNum">     985 </span>                :            : </a>
+<span class="lineNum">     986 </span>                :            : size_t
+<span class="lineNum">     987 </span>                :<span class="lineCov">      48252 : jsonrpc_session_get_backlog(const struct jsonrpc_session *s)</span>
+<span class="lineNum">     988 </span>                :            : {
+<span class="lineNum">     989 </span>        [<span class="branchCov" title="Branch 0 was taken 44707 times"> + </span><span class="branchCov" title="Branch 1 was taken 3545 times"> + </span>]:<span class="lineCov">      48252 :     return s-&gt;rpc ? jsonrpc_get_backlog(s-&gt;rpc) : 0;</span>
+<span class="lineNum">     990 </span>                :            : }
+<span class="lineNum">     991 </span>                :            : 
+<span class="lineNum">     992 </span>                :            : /* Always returns a pointer to a valid C string, assuming 's' was initialized
+<a name="993"><span class="lineNum">     993 </span>                :            :  * correctly. */</a>
+<span class="lineNum">     994 </span>                :            : const char *
+<span class="lineNum">     995 </span>                :<span class="lineNoCov">          0 : jsonrpc_session_get_name(const struct jsonrpc_session *s)</span>
+<span class="lineNum">     996 </span>                :            : {
+<span class="lineNum">     997 </span>                :<span class="lineNoCov">          0 :     return reconnect_get_name(s-&gt;reconnect);</span>
+<span class="lineNum">     998 </span>                :            : }
+<span class="lineNum">     999 </span>                :            : 
+<a name="1000"><span class="lineNum">    1000 </span>                :            : /* Always takes ownership of 'msg', regardless of success. */</a>
+<span class="lineNum">    1001 </span>                :            : int
+<span class="lineNum">    1002 </span>                :<span class="lineCov">      19033 : jsonrpc_session_send(struct jsonrpc_session *s, struct jsonrpc_msg *msg)</span>
+<span class="lineNum">    1003 </span>                :            : {
+<span class="lineNum">    1004 </span>        [<span class="branchCov" title="Branch 0 was taken 19033 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      19033 :     if (s-&gt;rpc) {</span>
+<span class="lineNum">    1005 </span>                :<span class="lineCov">      19033 :         return jsonrpc_send(s-&gt;rpc, msg);</span>
+<span class="lineNum">    1006 </span>                :            :     } else {
+<span class="lineNum">    1007 </span>                :<span class="lineNoCov">          0 :         jsonrpc_msg_destroy(msg);</span>
+<span class="lineNum">    1008 </span>                :<span class="lineCov">      19033 :         return ENOTCONN;</span>
+<span class="lineNum">    1009 </span>                :            :     }
+<span class="lineNum">    1010 </span>                :            : }
+<a name="1011"><span class="lineNum">    1011 </span>                :            : </a>
+<span class="lineNum">    1012 </span>                :            : struct jsonrpc_msg *
+<span class="lineNum">    1013 </span>                :<span class="lineCov">      73320 : jsonrpc_session_recv(struct jsonrpc_session *s)</span>
+<span class="lineNum">    1014 </span>                :            : {
+<span class="lineNum">    1015 </span>        [<span class="branchCov" title="Branch 0 was taken 69775 times"> + </span><span class="branchCov" title="Branch 1 was taken 3545 times"> + </span>]:<span class="lineCov">      73320 :     if (s-&gt;rpc) {</span>
+<span class="lineNum">    1016 </span>                :            :         unsigned int received_bytes;
+<span class="lineNum">    1017 </span>                :            :         struct jsonrpc_msg *msg;
+<span class="lineNum">    1018 </span>                :            : 
+<span class="lineNum">    1019 </span>                :<span class="lineCov">      69775 :         received_bytes = jsonrpc_get_received_bytes(s-&gt;rpc);</span>
+<span class="lineNum">    1020 </span>                :<span class="lineCov">      69775 :         jsonrpc_recv(s-&gt;rpc, &amp;msg);</span>
+<span class="lineNum">    1021 </span>        [<span class="branchCov" title="Branch 1 was taken 16418 times"> + </span><span class="branchCov" title="Branch 2 was taken 53357 times"> + </span>]:<span class="lineCov">      69775 :         if (received_bytes != jsonrpc_get_received_bytes(s-&gt;rpc)) {</span>
+<span class="lineNum">    1022 </span>                :            :             /* Data was successfully received.
+<span class="lineNum">    1023 </span>                :            :              *
+<span class="lineNum">    1024 </span>                :            :              * Previously we only counted receiving a full message as activity,
+<span class="lineNum">    1025 </span>                :            :              * but with large messages or a slow connection that policy could
+<span class="lineNum">    1026 </span>                :            :              * time out the session mid-message. */
+<span class="lineNum">    1027 </span>                :<span class="lineCov">      16418 :             reconnect_activity(s-&gt;reconnect, time_msec());</span>
+<span class="lineNum">    1028 </span>                :            :         }
+<span class="lineNum">    1029 </span>                :            : 
+<span class="lineNum">    1030 </span>        [<span class="branchCov" title="Branch 0 was taken 18385 times"> + </span><span class="branchCov" title="Branch 1 was taken 51390 times"> + </span>]:<span class="lineCov">      69775 :         if (msg) {</span>
+<span class="lineNum">    1031 </span>[<span class="branchCov" title="Branch 0 was taken 7442 times"> + </span><span class="branchCov" title="Branch 1 was taken 10943 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 7442 times"> + </span>]:<span class="lineCov">      18385 :             if (msg-&gt;type == JSONRPC_REQUEST &amp;&amp; !strcmp(msg-&gt;method, &quot;echo&quot;)) {</span>
+<span class="lineNum">    1032 </span>                :            :                 /* Echo request.  Send reply. */
+<span class="lineNum">    1033 </span>                :            :                 struct jsonrpc_msg *reply;
+<span class="lineNum">    1034 </span>                :            : 
+<span class="lineNum">    1035 </span>                :<span class="lineNoCov">          0 :                 reply = jsonrpc_create_reply(json_clone(msg-&gt;params), msg-&gt;id);</span>
+<span class="lineNum">    1036 </span>                :<span class="lineNoCov">          0 :                 jsonrpc_session_send(s, reply);</span>
+<span class="lineNum">    1037 </span>        [<span class="branchCov" title="Branch 0 was taken 6402 times"> + </span><span class="branchCov" title="Branch 1 was taken 11983 times"> + </span>]:<span class="lineCov">      18385 :             } else if (msg-&gt;type == JSONRPC_REPLY</span>
+<span class="lineNum">    1038 </span>[<span class="branchCov" title="Branch 0 was taken 6402 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 6402 times"> + </span>]:<span class="lineCov">       6402 :                        &amp;&amp; msg-&gt;id &amp;&amp; msg-&gt;id-&gt;type == JSON_STRING</span>
+<span class="lineNum">    1039 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                        &amp;&amp; !strcmp(msg-&gt;id-&gt;u.string, &quot;echo&quot;)) {</span>
+<span class="lineNum">    1040 </span>                :            :                 /* It's a reply to our echo request.  Suppress it. */
+<span class="lineNum">    1041 </span>                :            :             } else {
+<span class="lineNum">    1042 </span>                :<span class="lineCov">      18385 :                 return msg;</span>
+<span class="lineNum">    1043 </span>                :            :             }
+<span class="lineNum">    1044 </span>                :<span class="lineCov">      51390 :             jsonrpc_msg_destroy(msg);</span>
+<span class="lineNum">    1045 </span>                :            :         }
+<span class="lineNum">    1046 </span>                :            :     }
+<span class="lineNum">    1047 </span>                :<span class="lineCov">      73320 :     return NULL;</span>
+<span class="lineNum">    1048 </span>                :            : }
+<a name="1049"><span class="lineNum">    1049 </span>                :            : </a>
+<span class="lineNum">    1050 </span>                :            : void
+<span class="lineNum">    1051 </span>                :<span class="lineCov">      60216 : jsonrpc_session_recv_wait(struct jsonrpc_session *s)</span>
+<span class="lineNum">    1052 </span>                :            : {
+<span class="lineNum">    1053 </span>        [<span class="branchCov" title="Branch 0 was taken 57125 times"> + </span><span class="branchCov" title="Branch 1 was taken 3091 times"> + </span>]:<span class="lineCov">      60216 :     if (s-&gt;rpc) {</span>
+<span class="lineNum">    1054 </span>                :<span class="lineCov">      57125 :         jsonrpc_recv_wait(s-&gt;rpc);</span>
+<span class="lineNum">    1055 </span>                :            :     }
+<span class="lineNum">    1056 </span>                :<span class="lineCov">      60216 : }</span>
+<a name="1057"><span class="lineNum">    1057 </span>                :            : </a>
+<span class="lineNum">    1058 </span>                :            : bool
+<span class="lineNum">    1059 </span>                :<span class="lineCov">      33624 : jsonrpc_session_is_alive(const struct jsonrpc_session *s)</span>
+<span class="lineNum">    1060 </span>                :            : {
+<span class="lineNum">    1061 </span>[<span class="branchCov" title="Branch 0 was taken 6040 times"> + </span><span class="branchCov" title="Branch 1 was taken 27584 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 3546 times"> + </span><span class="branchCov" title="Branch 3 was taken 2494 times"> + </span>]:<span class="lineCov">      33624 :     return s-&gt;rpc || s-&gt;stream || reconnect_get_max_tries(s-&gt;reconnect);</span>
+<span class="lineNum">         </span>        [<span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchCov" title="Branch 6 was taken 3546 times"> + </span>]
+<span class="lineNum">    1062 </span>                :            : }
+<a name="1063"><span class="lineNum">    1063 </span>                :            : </a>
+<span class="lineNum">    1064 </span>                :            : bool
+<span class="lineNum">    1065 </span>                :<span class="lineCov">      58167 : jsonrpc_session_is_connected(const struct jsonrpc_session *s)</span>
+<span class="lineNum">    1066 </span>                :            : {
+<span class="lineNum">    1067 </span>                :<span class="lineCov">      58167 :     return s-&gt;rpc != NULL;</span>
+<span class="lineNum">    1068 </span>                :            : }
+<a name="1069"><span class="lineNum">    1069 </span>                :            : </a>
+<span class="lineNum">    1070 </span>                :            : unsigned int
+<span class="lineNum">    1071 </span>                :<span class="lineCov">      83591 : jsonrpc_session_get_seqno(const struct jsonrpc_session *s)</span>
+<span class="lineNum">    1072 </span>                :            : {
+<span class="lineNum">    1073 </span>                :<span class="lineCov">      83591 :     return s-&gt;seqno;</span>
+<span class="lineNum">    1074 </span>                :            : }
+<a name="1075"><span class="lineNum">    1075 </span>                :            : </a>
+<span class="lineNum">    1076 </span>                :            : int
+<span class="lineNum">    1077 </span>                :<span class="lineNoCov">          0 : jsonrpc_session_get_status(const struct jsonrpc_session *s)</span>
+<span class="lineNum">    1078 </span>                :            : {
+<span class="lineNum">    1079 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     return s &amp;&amp; s-&gt;rpc ? jsonrpc_get_status(s-&gt;rpc) : 0;</span>
+<span class="lineNum">    1080 </span>                :            : }
+<a name="1081"><span class="lineNum">    1081 </span>                :            : </a>
+<span class="lineNum">    1082 </span>                :            : int
+<span class="lineNum">    1083 </span>                :<span class="lineCov">          1 : jsonrpc_session_get_last_error(const struct jsonrpc_session *s)</span>
+<span class="lineNum">    1084 </span>                :            : {
+<span class="lineNum">    1085 </span>                :<span class="lineCov">          1 :     return s-&gt;last_error;</span>
+<span class="lineNum">    1086 </span>                :            : }
+<a name="1087"><span class="lineNum">    1087 </span>                :            : </a>
+<span class="lineNum">    1088 </span>                :            : void
+<span class="lineNum">    1089 </span>                :<span class="lineNoCov">          0 : jsonrpc_session_get_reconnect_stats(const struct jsonrpc_session *s,</span>
+<span class="lineNum">    1090 </span>                :            :                                     struct reconnect_stats *stats)
+<span class="lineNum">    1091 </span>                :            : {
+<span class="lineNum">    1092 </span>                :<span class="lineNoCov">          0 :     reconnect_get_stats(s-&gt;reconnect, time_msec(), stats);</span>
+<span class="lineNum">    1093 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="1094"><span class="lineNum">    1094 </span>                :            : </a>
+<span class="lineNum">    1095 </span>                :            : void
+<span class="lineNum">    1096 </span>                :<span class="lineCov">        964 : jsonrpc_session_enable_reconnect(struct jsonrpc_session *s)</span>
+<span class="lineNum">    1097 </span>                :            : {
+<span class="lineNum">    1098 </span>                :<span class="lineCov">        964 :     reconnect_set_max_tries(s-&gt;reconnect, UINT_MAX);</span>
+<span class="lineNum">    1099 </span>                :<span class="lineCov">        964 :     reconnect_set_backoff(s-&gt;reconnect, RECONNECT_DEFAULT_MIN_BACKOFF,</span>
+<span class="lineNum">    1100 </span>                :            :                           RECONNECT_DEFAULT_MAX_BACKOFF);
+<span class="lineNum">    1101 </span>                :<span class="lineCov">        964 : }</span>
+<a name="1102"><span class="lineNum">    1102 </span>                :            : </a>
+<span class="lineNum">    1103 </span>                :            : void
+<span class="lineNum">    1104 </span>                :<span class="lineCov">          1 : jsonrpc_session_force_reconnect(struct jsonrpc_session *s)</span>
+<span class="lineNum">    1105 </span>                :            : {
+<span class="lineNum">    1106 </span>                :<span class="lineCov">          1 :     reconnect_force_reconnect(s-&gt;reconnect, time_msec());</span>
+<span class="lineNum">    1107 </span>                :<span class="lineCov">          1 : }</span>
+<a name="1108"><span class="lineNum">    1108 </span>                :            : </a>
+<span class="lineNum">    1109 </span>                :            : void
+<span class="lineNum">    1110 </span>                :<span class="lineCov">      22259 : jsonrpc_session_set_max_backoff(struct jsonrpc_session *s, int max_backoff)</span>
+<span class="lineNum">    1111 </span>                :            : {
+<span class="lineNum">    1112 </span>                :<span class="lineCov">      22259 :     reconnect_set_backoff(s-&gt;reconnect, 0, max_backoff);</span>
+<span class="lineNum">    1113 </span>                :<span class="lineCov">      22259 : }</span>
+<a name="1114"><span class="lineNum">    1114 </span>                :            : </a>
+<span class="lineNum">    1115 </span>                :            : void
+<span class="lineNum">    1116 </span>                :<span class="lineCov">      22259 : jsonrpc_session_set_probe_interval(struct jsonrpc_session *s,</span>
+<span class="lineNum">    1117 </span>                :            :                                    int probe_interval)
+<span class="lineNum">    1118 </span>                :            : {
+<span class="lineNum">    1119 </span>                :<span class="lineCov">      22259 :     reconnect_set_probe_interval(s-&gt;reconnect, probe_interval);</span>
+<span class="lineNum">    1120 </span>                :<span class="lineCov">      22259 : }</span>
+<a name="1121"><span class="lineNum">    1121 </span>                :            : </a>
+<span class="lineNum">    1122 </span>                :            : void
+<span class="lineNum">    1123 </span>                :<span class="lineCov">      22259 : jsonrpc_session_set_dscp(struct jsonrpc_session *s,</span>
+<span class="lineNum">    1124 </span>                :            :                          uint8_t dscp)
+<span class="lineNum">    1125 </span>                :            : {
+<span class="lineNum">    1126 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 22259 times"> + </span>]:<span class="lineCov">      22259 :     if (s-&gt;dscp != dscp) {</span>
+<span class="lineNum">    1127 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (s-&gt;pstream) {</span>
+<span class="lineNum">    1128 </span>                :            :             int error;
+<span class="lineNum">    1129 </span>                :            : 
+<span class="lineNum">    1130 </span>                :<span class="lineNoCov">          0 :             error = pstream_set_dscp(s-&gt;pstream, dscp);</span>
+<span class="lineNum">    1131 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (error) {</span>
+<span class="lineNum">    1132 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_ERR(&quot;%s: failed set_dscp %s&quot;,</span>
+<span class="lineNum">    1133 </span>                :            :                          reconnect_get_name(s-&gt;reconnect),
+<span class="lineNum">    1134 </span>                :            :                          ovs_strerror(error));
+<span class="lineNum">    1135 </span>                :            :             }
+<span class="lineNum">    1136 </span>                :            :             /*
+<span class="lineNum">    1137 </span>                :            :              * XXX race window between setting dscp to listening socket
+<span class="lineNum">    1138 </span>                :            :              * and accepting socket. accepted socket may have old dscp value.
+<span class="lineNum">    1139 </span>                :            :              * Ignore this race window for now.
+<span class="lineNum">    1140 </span>                :            :              */
+<span class="lineNum">    1141 </span>                :            :         }
+<span class="lineNum">    1142 </span>                :<span class="lineNoCov">          0 :         s-&gt;dscp = dscp;</span>
+<span class="lineNum">    1143 </span>                :<span class="lineNoCov">          0 :         jsonrpc_session_force_reconnect(s);</span>
+<span class="lineNum">    1144 </span>                :            :     }
+<span class="lineNum">    1145 </span>                :<span class="lineCov">      22259 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

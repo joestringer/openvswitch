@@ -1,0 +1,295 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/pvector.h</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - pvector.h<span style="font-size: 80%;"> (source / <a href="pvector.h.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">22</td>
+            <td class="headerCovTableEntry">22</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">10</td>
+            <td class="headerCovTableEntry">10</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #ifndef PVECTOR_H
+<span class="lineNum">      18 </span>                :            : #define PVECTOR_H 1
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &lt;stdbool.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;stdint.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &quot;ovs-rcu.h&quot;
+<span class="lineNum">      23 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      24 </span>                :            : 
+<span class="lineNum">      25 </span>                :            : /* Concurrent Priority Vector
+<span class="lineNum">      26 </span>                :            :  * ==========================
+<span class="lineNum">      27 </span>                :            :  *
+<span class="lineNum">      28 </span>                :            :  * Concurrent priority vector holds non-NULL pointers to objects in an
+<span class="lineNum">      29 </span>                :            :  * increasing priority order and allows readers to traverse the vector without
+<span class="lineNum">      30 </span>                :            :  * being concerned about writers modifying the vector as they are traversing
+<span class="lineNum">      31 </span>                :            :  * it.
+<span class="lineNum">      32 </span>                :            :  *
+<span class="lineNum">      33 </span>                :            :  * The priority order is maintained as a linear vector of elements to allow
+<span class="lineNum">      34 </span>                :            :  * for efficient memory prefetching.
+<span class="lineNum">      35 </span>                :            :  *
+<span class="lineNum">      36 </span>                :            :  * Concurrency is implemented with OVS RCU so that the readers can assume
+<span class="lineNum">      37 </span>                :            :  * that once they have taken a pointer to the vector with
+<span class="lineNum">      38 </span>                :            :  * pvector_cursor_init(), the 'size' member will not decrease, so that
+<span class="lineNum">      39 </span>                :            :  * they can safely read 'size' entries from 'vector', and find that each
+<span class="lineNum">      40 </span>                :            :  * entry has a valid, non-NULL 'ptr', and the vector is in order from highest
+<span class="lineNum">      41 </span>                :            :  * to lowest 'priority'.  The 'priority' values can change any time, but only
+<span class="lineNum">      42 </span>                :            :  * so that the order of the entries does not change, so readers can use
+<span class="lineNum">      43 </span>                :            :  * 'priority' values read at any time after acquisition of the vector pointer.
+<span class="lineNum">      44 </span>                :            :  *
+<span class="lineNum">      45 </span>                :            :  * Writers can concurrently add entries to the end of the vector, incrementing
+<span class="lineNum">      46 </span>                :            :  * 'size', or update the 'priority' value of an entry, but only if that does
+<span class="lineNum">      47 </span>                :            :  * not change the ordering of the entries.  Writers will never change the 'ptr'
+<span class="lineNum">      48 </span>                :            :  * values, or decrement the 'size' on a copy that readers have access to.
+<span class="lineNum">      49 </span>                :            :  */
+<span class="lineNum">      50 </span>                :            : 
+<span class="lineNum">      51 </span>                :            : struct pvector_entry {
+<span class="lineNum">      52 </span>                :            :     unsigned int priority;
+<span class="lineNum">      53 </span>                :            :     void *ptr;
+<span class="lineNum">      54 </span>                :            : };
+<span class="lineNum">      55 </span>                :            : 
+<span class="lineNum">      56 </span>                :            : /* Writers will preallocate space for some entries at the end to avoid future
+<span class="lineNum">      57 </span>                :            :  * reallocations. */
+<span class="lineNum">      58 </span>                :            : enum { PVECTOR_EXTRA_ALLOC = 4 };
+<span class="lineNum">      59 </span>                :            : 
+<span class="lineNum">      60 </span>                :            : struct pvector_impl {
+<span class="lineNum">      61 </span>                :            :     size_t size;       /* Number of entries in the vector. */
+<span class="lineNum">      62 </span>                :            :     size_t allocated;  /* Number of allocated entries. */
+<span class="lineNum">      63 </span>                :            :     struct pvector_entry vector[];
+<span class="lineNum">      64 </span>                :            : };
+<span class="lineNum">      65 </span>                :            : 
+<span class="lineNum">      66 </span>                :            : /* Concurrent priority vector. */
+<span class="lineNum">      67 </span>                :            : struct pvector {
+<span class="lineNum">      68 </span>                :            :     OVSRCU_TYPE(struct pvector_impl *) impl;
+<span class="lineNum">      69 </span>                :            : };
+<span class="lineNum">      70 </span>                :            : 
+<span class="lineNum">      71 </span>                :            : /* Initialization. */
+<span class="lineNum">      72 </span>                :            : void pvector_init(struct pvector *);
+<span class="lineNum">      73 </span>                :            : void pvector_destroy(struct pvector *);
+<span class="lineNum">      74 </span>                :            : 
+<span class="lineNum">      75 </span>                :            : /* Count. */
+<span class="lineNum">      76 </span>                :            : static inline size_t pvector_count(const struct pvector *);
+<span class="lineNum">      77 </span>                :            : static inline bool pvector_is_empty(const struct pvector *);
+<span class="lineNum">      78 </span>                :            : 
+<span class="lineNum">      79 </span>                :            : /* Insertion and deletion. */
+<span class="lineNum">      80 </span>                :            : void pvector_insert(struct pvector *, void *, unsigned int);
+<span class="lineNum">      81 </span>                :            : void pvector_change_priority(struct pvector *, void *, unsigned int);
+<span class="lineNum">      82 </span>                :            : void pvector_remove(struct pvector *, void *);
+<span class="lineNum">      83 </span>                :            : 
+<span class="lineNum">      84 </span>                :            : /* Iteration.
+<span class="lineNum">      85 </span>                :            :  *
+<span class="lineNum">      86 </span>                :            :  *
+<span class="lineNum">      87 </span>                :            :  * Thread-safety
+<span class="lineNum">      88 </span>                :            :  * =============
+<span class="lineNum">      89 </span>                :            :  *
+<span class="lineNum">      90 </span>                :            :  * Iteration is safe even in a pvector that is changing concurrently.
+<span class="lineNum">      91 </span>                :            :  * Multiple writers must exclude each other via e.g., a mutex.
+<span class="lineNum">      92 </span>                :            :  *
+<span class="lineNum">      93 </span>                :            :  * Example
+<span class="lineNum">      94 </span>                :            :  * =======
+<span class="lineNum">      95 </span>                :            :  *
+<span class="lineNum">      96 </span>                :            :  *     struct my_node {
+<span class="lineNum">      97 </span>                :            :  *         int data;
+<span class="lineNum">      98 </span>                :            :  *     };
+<span class="lineNum">      99 </span>                :            :  *
+<span class="lineNum">     100 </span>                :            :  *     struct my_node elem1, elem2, *iter;
+<span class="lineNum">     101 </span>                :            :  *     struct pvector my_pvector;
+<span class="lineNum">     102 </span>                :            :  *
+<span class="lineNum">     103 </span>                :            :  *     pvector_init(&amp;my_pvector);
+<span class="lineNum">     104 </span>                :            :  *     ...add data...
+<span class="lineNum">     105 </span>                :            :  *     pvector_insert(&amp;my_pvector, &amp;elem1, 1);
+<span class="lineNum">     106 </span>                :            :  *     pvector_insert(&amp;my_pvector, &amp;elem2, 2);
+<span class="lineNum">     107 </span>                :            :  *     ...
+<span class="lineNum">     108 </span>                :            :  *     PVECTOR_FOR_EACH (iter, &amp;my_pvector) {
+<span class="lineNum">     109 </span>                :            :  *         ...operate on '*iter'...
+<span class="lineNum">     110 </span>                :            :  *         ...elem2 to be seen before elem1...
+<span class="lineNum">     111 </span>                :            :  *     }
+<span class="lineNum">     112 </span>                :            :  *     ...
+<span class="lineNum">     113 </span>                :            :  *     pvector_destroy(&amp;my_pvector);
+<span class="lineNum">     114 </span>                :            :  *
+<span class="lineNum">     115 </span>                :            :  * There is no PVECTOR_FOR_EACH_SAFE variant as iteration is performed on RCU
+<span class="lineNum">     116 </span>                :            :  * protected instance of the priority vector.  Any concurrent modifications
+<span class="lineNum">     117 </span>                :            :  * that would be disruptive for readers (such as deletions), will be performed
+<span class="lineNum">     118 </span>                :            :  * on a new instance.  To see any of the modifications, a new iteration loop
+<span class="lineNum">     119 </span>                :            :  * has to be started.
+<span class="lineNum">     120 </span>                :            :  *
+<span class="lineNum">     121 </span>                :            :  * The PVECTOR_FOR_EACH_PRIORITY limits the iteration to entries with higher
+<span class="lineNum">     122 </span>                :            :  * than given priority and allows for object lookahead.
+<span class="lineNum">     123 </span>                :            :  *
+<span class="lineNum">     124 </span>                :            :  * The iteration loop must be completed without entering the OVS RCU quiescent
+<span class="lineNum">     125 </span>                :            :  * period.  That is, an old iteration loop must not be continued after any
+<span class="lineNum">     126 </span>                :            :  * blocking IO (VLOG is non-blocking, so that is OK).
+<span class="lineNum">     127 </span>                :            :  */
+<span class="lineNum">     128 </span>                :            : struct pvector_cursor {
+<span class="lineNum">     129 </span>                :            :     size_t size;        /* Number of entries in the vector. */
+<span class="lineNum">     130 </span>                :            :     size_t entry_idx;   /* Current index. */
+<span class="lineNum">     131 </span>                :            :     const struct pvector_entry *vector;
+<span class="lineNum">     132 </span>                :            : };
+<span class="lineNum">     133 </span>                :            : 
+<span class="lineNum">     134 </span>                :            : static inline struct pvector_cursor pvector_cursor_init(const struct pvector *,
+<span class="lineNum">     135 </span>                :            :                                                         size_t n_ahead,
+<span class="lineNum">     136 </span>                :            :                                                         size_t obj_size);
+<span class="lineNum">     137 </span>                :            : static inline void *pvector_cursor_next(struct pvector_cursor *,
+<span class="lineNum">     138 </span>                :            :                                         int64_t stop_at_priority,
+<span class="lineNum">     139 </span>                :            :                                         size_t n_ahead, size_t obj_size);
+<span class="lineNum">     140 </span>                :            : static inline void pvector_cursor_lookahead(const struct pvector_cursor *,
+<span class="lineNum">     141 </span>                :            :                                             int n, size_t size);
+<span class="lineNum">     142 </span>                :            : 
+<span class="lineNum">     143 </span>                :            : #define PVECTOR_FOR_EACH(PTR, PVECTOR)                                  \
+<span class="lineNum">     144 </span>                :            :     for (struct pvector_cursor cursor__ = pvector_cursor_init(PVECTOR, 0, 0); \
+<span class="lineNum">     145 </span>                :            :          ((PTR) = pvector_cursor_next(&amp;cursor__, -1, 0, 0)) != NULL; )
+<span class="lineNum">     146 </span>                :            : 
+<span class="lineNum">     147 </span>                :            : /* Loop while priority is higher than 'PRIORITY' and prefetch objects
+<span class="lineNum">     148 </span>                :            :  * of size 'SZ' 'N' objects ahead from the current object. */
+<span class="lineNum">     149 </span>                :            : #define PVECTOR_FOR_EACH_PRIORITY(PTR, PRIORITY, N, SZ, PVECTOR)        \
+<span class="lineNum">     150 </span>                :            :     for (struct pvector_cursor cursor__ = pvector_cursor_init(PVECTOR, N, SZ); \
+<span class="lineNum">     151 </span>                :            :          ((PTR) = pvector_cursor_next(&amp;cursor__, PRIORITY, N, SZ)) != NULL; )
+<span class="lineNum">     152 </span>                :            : 
+<span class="lineNum">     153 </span>                :            : 
+<span class="lineNum">     154 </span>                :            : /* Inline implementations. */
+<a name="155"><span class="lineNum">     155 </span>                :            : </a>
+<span class="lineNum">     156 </span>                :            : static inline struct pvector_cursor
+<span class="lineNum">     157 </span>                :<span class="lineCov">   42468770 : pvector_cursor_init(const struct pvector *pvec,</span>
+<span class="lineNum">     158 </span>                :            :                     size_t n_ahead, size_t obj_size)
+<span class="lineNum">     159 </span>                :            : {
+<span class="lineNum">     160 </span>                :            :     const struct pvector_impl *impl;
+<span class="lineNum">     161 </span>                :            :     struct pvector_cursor cursor;
+<span class="lineNum">     162 </span>                :            : 
+<span class="lineNum">     163 </span>                :<span class="lineCov">   42468770 :     impl = ovsrcu_get(struct pvector_impl *, &amp;pvec-&gt;impl);</span>
+<span class="lineNum">     164 </span>                :            : 
+<span class="lineNum">     165 </span>                :<span class="lineCov">   42468770 :     ovs_prefetch_range(impl-&gt;vector, impl-&gt;size * sizeof impl-&gt;vector[0]);</span>
+<span class="lineNum">     166 </span>                :            : 
+<span class="lineNum">     167 </span>                :<span class="lineCov">   42468770 :     cursor.size = impl-&gt;size;</span>
+<span class="lineNum">     168 </span>                :<span class="lineCov">   42468770 :     cursor.vector = impl-&gt;vector;</span>
+<span class="lineNum">     169 </span>                :<span class="lineCov">   42468770 :     cursor.entry_idx = -1;</span>
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>        [<span class="branchCov" title="Branch 0 was taken 84794496 times"> + </span><span class="branchCov" title="Branch 1 was taken 42468770 times"> + </span>]:<span class="lineCov">  127263266 :     for (size_t i = 0; i &lt; n_ahead; i++) {</span>
+<span class="lineNum">     172 </span>                :            :         /* Prefetch the first objects. */
+<span class="lineNum">     173 </span>                :<span class="lineCov">   84794496 :         pvector_cursor_lookahead(&amp;cursor, i, obj_size);</span>
+<span class="lineNum">     174 </span>                :            :     }
+<span class="lineNum">     175 </span>                :<span class="lineCov">   42468770 :     return cursor;</span>
+<a name="176"><span class="lineNum">     176 </span>                :            : }</a>
+<span class="lineNum">     177 </span>                :            : 
+<span class="lineNum">     178 </span>                :<span class="lineCov">   76325548 : static inline void *pvector_cursor_next(struct pvector_cursor *cursor,</span>
+<span class="lineNum">     179 </span>                :            :                                         int64_t stop_at_priority,
+<span class="lineNum">     180 </span>                :            :                                         size_t n_ahead, size_t obj_size)
+<span class="lineNum">     181 </span>                :            : {
+<span class="lineNum">     182 </span>[<span class="branchCov" title="Branch 0 was taken 33859018 times"> + </span><span class="branchCov" title="Branch 1 was taken 42466530 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 33857268 times"> + </span><span class="branchCov" title="Branch 3 was taken 1750 times"> + </span>]:<span class="lineCov">   76325548 :     if (++cursor-&gt;entry_idx &lt; cursor-&gt;size &amp;&amp;</span>
+<span class="lineNum">     183 </span>                :<span class="lineCov">   33859018 :         cursor-&gt;vector[cursor-&gt;entry_idx].priority &gt; stop_at_priority) {</span>
+<span class="lineNum">     184 </span>        [<span class="branchCov" title="Branch 0 was taken 33787344 times"> + </span><span class="branchCov" title="Branch 1 was taken 69924 times"> + </span>]:<span class="lineCov">   33857268 :         if (n_ahead) {</span>
+<span class="lineNum">     185 </span>                :<span class="lineCov">   33787344 :             pvector_cursor_lookahead(cursor, n_ahead, obj_size);</span>
+<span class="lineNum">     186 </span>                :            :         }
+<span class="lineNum">     187 </span>                :<span class="lineCov">   33857268 :         return cursor-&gt;vector[cursor-&gt;entry_idx].ptr;</span>
+<span class="lineNum">     188 </span>                :            :     }
+<span class="lineNum">     189 </span>                :<span class="lineCov">   76325548 :     return NULL;</span>
+<a name="190"><span class="lineNum">     190 </span>                :            : }</a>
+<span class="lineNum">     191 </span>                :            : 
+<span class="lineNum">     192 </span>                :<span class="lineCov">  118581840 : static inline void pvector_cursor_lookahead(const struct pvector_cursor *cursor,</span>
+<span class="lineNum">     193 </span>                :            :                                             int n, size_t size)
+<span class="lineNum">     194 </span>                :            : {
+<span class="lineNum">     195 </span>        [<span class="branchCov" title="Branch 0 was taken 33788492 times"> + </span><span class="branchCov" title="Branch 1 was taken 84793348 times"> + </span>]:<span class="lineCov">  118581840 :     if (cursor-&gt;entry_idx + n &lt; cursor-&gt;size) {</span>
+<span class="lineNum">     196 </span>                :<span class="lineCov">   33788492 :         ovs_prefetch_range(cursor-&gt;vector[cursor-&gt;entry_idx + n].ptr, size);</span>
+<span class="lineNum">     197 </span>                :            :     }
+<a name="198"><span class="lineNum">     198 </span>                :<span class="lineCov">  118581840 : }</span></a>
+<span class="lineNum">     199 </span>                :            : 
+<span class="lineNum">     200 </span>                :<span class="lineCov">      34190 : static inline size_t pvector_count(const struct pvector *pvec)</span>
+<span class="lineNum">     201 </span>                :            : {
+<span class="lineNum">     202 </span>                :<span class="lineCov">      34190 :     return ovsrcu_get(struct pvector_impl *, &amp;pvec-&gt;impl)-&gt;size;</span>
+<span class="lineNum">     203 </span>                :            : }
+<span class="lineNum">     204 </span>                :            : 
+<span class="lineNum">     205 </span>                :            : static inline bool pvector_is_empty(const struct pvector *pvec)
+<span class="lineNum">     206 </span>                :            : {
+<span class="lineNum">     207 </span>                :            :     return pvector_count(pvec) == 0;
+<span class="lineNum">     208 </span>                :            : }
+<span class="lineNum">     209 </span>                :            : 
+<span class="lineNum">     210 </span>                :            : #endif /* pvector.h */
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

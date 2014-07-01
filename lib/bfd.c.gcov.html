@@ -1,0 +1,1428 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/bfd.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - bfd.c<span style="font-size: 80%;"> (source / <a href="bfd.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">493</td>
+            <td class="headerCovTableEntry">562</td>
+            <td class="headerCovTableEntryMed">87.7 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">38</td>
+            <td class="headerCovTableEntry">39</td>
+            <td class="headerCovTableEntryHi">97.4 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">230</td>
+            <td class="headerCovTableEntry">327</td>
+            <td class="headerCovTableEntryLo">70.3 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (c) 2013, 2014 Nicira, Inc.</a>
+<span class="lineNum">       2 </span>                :            :  *
+<span class="lineNum">       3 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       4 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       5 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       6 </span>                :            :  *
+<span class="lineNum">       7 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       8 </span>                :            :  *
+<span class="lineNum">       9 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      10 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      11 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      12 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      13 </span>                :            :  * limitations under the License. */
+<span class="lineNum">      14 </span>                :            : 
+<span class="lineNum">      15 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      16 </span>                :            : #include &quot;bfd.h&quot;
+<span class="lineNum">      17 </span>                :            : 
+<span class="lineNum">      18 </span>                :            : #include &lt;sys/types.h&gt;
+<span class="lineNum">      19 </span>                :            : #include &lt;arpa/inet.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &lt;netinet/in_systm.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;netinet/ip.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      23 </span>                :            : 
+<span class="lineNum">      24 </span>                :            : #include &quot;byte-order.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;connectivity.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;csum.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;dpif.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;dynamic-string.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;flow.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;hmap.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;list.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;netdev.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;odp-util.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      36 </span>                :            : #include &quot;ovs-thread.h&quot;
+<span class="lineNum">      37 </span>                :            : #include &quot;openvswitch/types.h&quot;
+<span class="lineNum">      38 </span>                :            : #include &quot;packets.h&quot;
+<span class="lineNum">      39 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      40 </span>                :            : #include &quot;random.h&quot;
+<span class="lineNum">      41 </span>                :            : #include &quot;seq.h&quot;
+<span class="lineNum">      42 </span>                :            : #include &quot;smap.h&quot;
+<span class="lineNum">      43 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      44 </span>                :            : #include &quot;unaligned.h&quot;
+<span class="lineNum">      45 </span>                :            : #include &quot;unixctl.h&quot;
+<span class="lineNum">      46 </span>                :            : #include &quot;util.h&quot;
+<a name="47"><span class="lineNum">      47 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      48 </span>                :            : 
+<span class="lineNum">      49 </span>                :<span class="lineCov">        525 : VLOG_DEFINE_THIS_MODULE(bfd);</span>
+<span class="lineNum">      50 </span>                :            : 
+<span class="lineNum">      51 </span>                :            : /* XXX Finish BFD.
+<span class="lineNum">      52 </span>                :            :  *
+<span class="lineNum">      53 </span>                :            :  * The goal of this module is to replace CFM with something both more flexible
+<span class="lineNum">      54 </span>                :            :  * and standards compliant.  In service of this goal, the following needs to be
+<span class="lineNum">      55 </span>                :            :  * done.
+<span class="lineNum">      56 </span>                :            :  *
+<span class="lineNum">      57 </span>                :            :  * - Compliance
+<span class="lineNum">      58 </span>                :            :  *   * Implement Demand mode.
+<span class="lineNum">      59 </span>                :            :  *   * Go through the RFC line by line and verify we comply.
+<span class="lineNum">      60 </span>                :            :  *   * Test against a hardware implementation.  Preferably a popular one.
+<span class="lineNum">      61 </span>                :            :  *   * Delete BFD packets with nw_ttl != 255 in the datapath to prevent DOS
+<span class="lineNum">      62 </span>                :            :  *     attacks.
+<span class="lineNum">      63 </span>                :            :  *
+<span class="lineNum">      64 </span>                :            :  * - Unit tests.
+<span class="lineNum">      65 </span>                :            :  *
+<span class="lineNum">      66 </span>                :            :  * - Set TOS/PCP on the outer tunnel header when encapped.
+<span class="lineNum">      67 </span>                :            :  *
+<span class="lineNum">      68 </span>                :            :  * - Sending BFD messages should be in its own thread/process.
+<span class="lineNum">      69 </span>                :            :  *
+<span class="lineNum">      70 </span>                :            :  * - Scale testing.  How does it operate when there are large number of bfd
+<span class="lineNum">      71 </span>                :            :  *   sessions?  Do we ever have random flaps?  What's the CPU utilization?
+<span class="lineNum">      72 </span>                :            :  *
+<span class="lineNum">      73 </span>                :            :  * - Rely on data traffic for liveness by using BFD demand mode.
+<span class="lineNum">      74 </span>                :            :  *   If we're receiving traffic on a port, we can safely assume it's up (modulo
+<span class="lineNum">      75 </span>                :            :  *   unidrectional failures).  BFD has a demand mode in which it can stay quiet
+<span class="lineNum">      76 </span>                :            :  *   unless it feels the need to check the status of the port.  Using this, we
+<span class="lineNum">      77 </span>                :            :  *   can implement a strategy in which BFD only sends control messages on dark
+<span class="lineNum">      78 </span>                :            :  *   interfaces.
+<span class="lineNum">      79 </span>                :            :  *
+<span class="lineNum">      80 </span>                :            :  * - Depending on how one interprets the spec, it appears that a BFD session
+<span class="lineNum">      81 </span>                :            :  *   can never change bfd.LocalDiag to &quot;No Diagnostic&quot;.  We should verify that
+<span class="lineNum">      82 </span>                :            :  *   this is what hardware implementations actually do.  Seems like &quot;No
+<span class="lineNum">      83 </span>                :            :  *   Diagnostic&quot; should be set once a BFD session state goes UP. */
+<span class="lineNum">      84 </span>                :            : 
+<span class="lineNum">      85 </span>                :            : #define BFD_VERSION 1
+<span class="lineNum">      86 </span>                :            : 
+<span class="lineNum">      87 </span>                :            : enum flags {
+<span class="lineNum">      88 </span>                :            :     FLAG_MULTIPOINT = 1 &lt;&lt; 0,
+<span class="lineNum">      89 </span>                :            :     FLAG_DEMAND = 1 &lt;&lt; 1,
+<span class="lineNum">      90 </span>                :            :     FLAG_AUTH = 1 &lt;&lt; 2,
+<span class="lineNum">      91 </span>                :            :     FLAG_CTL = 1 &lt;&lt; 3,
+<span class="lineNum">      92 </span>                :            :     FLAG_FINAL = 1 &lt;&lt; 4,
+<span class="lineNum">      93 </span>                :            :     FLAG_POLL = 1 &lt;&lt; 5
+<span class="lineNum">      94 </span>                :            : };
+<span class="lineNum">      95 </span>                :            : 
+<span class="lineNum">      96 </span>                :            : enum state {
+<span class="lineNum">      97 </span>                :            :     STATE_ADMIN_DOWN = 0 &lt;&lt; 6,
+<span class="lineNum">      98 </span>                :            :     STATE_DOWN = 1 &lt;&lt; 6,
+<span class="lineNum">      99 </span>                :            :     STATE_INIT = 2 &lt;&lt; 6,
+<span class="lineNum">     100 </span>                :            :     STATE_UP = 3 &lt;&lt; 6
+<span class="lineNum">     101 </span>                :            : };
+<span class="lineNum">     102 </span>                :            : 
+<span class="lineNum">     103 </span>                :            : enum diag {
+<span class="lineNum">     104 </span>                :            :     DIAG_NONE = 0,                /* No Diagnostic. */
+<span class="lineNum">     105 </span>                :            :     DIAG_EXPIRED = 1,             /* Control Detection Time Expired. */
+<span class="lineNum">     106 </span>                :            :     DIAG_ECHO_FAILED = 2,         /* Echo Function Failed. */
+<span class="lineNum">     107 </span>                :            :     DIAG_RMT_DOWN = 3,            /* Neighbor Signaled Session Down. */
+<span class="lineNum">     108 </span>                :            :     DIAG_FWD_RESET = 4,           /* Forwarding Plane Reset. */
+<span class="lineNum">     109 </span>                :            :     DIAG_PATH_DOWN = 5,           /* Path Down. */
+<span class="lineNum">     110 </span>                :            :     DIAG_CPATH_DOWN = 6,          /* Concatenated Path Down. */
+<span class="lineNum">     111 </span>                :            :     DIAG_ADMIN_DOWN = 7,          /* Administratively Down. */
+<span class="lineNum">     112 </span>                :            :     DIAG_RCPATH_DOWN = 8          /* Reverse Concatenated Path Down. */
+<span class="lineNum">     113 </span>                :            : };
+<span class="lineNum">     114 </span>                :            : 
+<span class="lineNum">     115 </span>                :            : /* RFC 5880 Section 4.1
+<span class="lineNum">     116 </span>                :            :  *  0                   1                   2                   3
+<span class="lineNum">     117 </span>                :            :  *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+<span class="lineNum">     118 </span>                :            :  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+<span class="lineNum">     119 </span>                :            :  * |Vers |  Diag   |Sta|P|F|C|A|D|M|  Detect Mult  |    Length     |
+<span class="lineNum">     120 </span>                :            :  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+<span class="lineNum">     121 </span>                :            :  * |                       My Discriminator                        |
+<span class="lineNum">     122 </span>                :            :  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+<span class="lineNum">     123 </span>                :            :  * |                      Your Discriminator                       |
+<span class="lineNum">     124 </span>                :            :  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+<span class="lineNum">     125 </span>                :            :  * |                    Desired Min TX Interval                    |
+<span class="lineNum">     126 </span>                :            :  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+<span class="lineNum">     127 </span>                :            :  * |                   Required Min RX Interval                    |
+<span class="lineNum">     128 </span>                :            :  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+<span class="lineNum">     129 </span>                :            :  * |                 Required Min Echo RX Interval                 |
+<span class="lineNum">     130 </span>                :            :  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
+<span class="lineNum">     131 </span>                :            : struct msg {
+<span class="lineNum">     132 </span>                :            :     uint8_t vers_diag;    /* Version and diagnostic. */
+<span class="lineNum">     133 </span>                :            :     uint8_t flags;        /* 2bit State field followed by flags. */
+<span class="lineNum">     134 </span>                :            :     uint8_t mult;         /* Fault detection multiplier. */
+<span class="lineNum">     135 </span>                :            :     uint8_t length;       /* Length of this BFD message. */
+<span class="lineNum">     136 </span>                :            :     ovs_be32 my_disc;     /* My discriminator. */
+<span class="lineNum">     137 </span>                :            :     ovs_be32 your_disc;   /* Your discriminator. */
+<span class="lineNum">     138 </span>                :            :     ovs_be32 min_tx;      /* Desired minimum tx interval. */
+<span class="lineNum">     139 </span>                :            :     ovs_be32 min_rx;      /* Required minimum rx interval. */
+<span class="lineNum">     140 </span>                :            :     ovs_be32 min_rx_echo; /* Required minimum echo rx interval. */
+<span class="lineNum">     141 </span>                :            : };
+<span class="lineNum">     142 </span>                :            : BUILD_ASSERT_DECL(BFD_PACKET_LEN == sizeof(struct msg));
+<span class="lineNum">     143 </span>                :            : 
+<span class="lineNum">     144 </span>                :            : #define DIAG_MASK 0x1f
+<span class="lineNum">     145 </span>                :            : #define VERS_SHIFT 5
+<span class="lineNum">     146 </span>                :            : #define STATE_MASK 0xC0
+<span class="lineNum">     147 </span>                :            : #define FLAGS_MASK 0x3f
+<span class="lineNum">     148 </span>                :            : 
+<span class="lineNum">     149 </span>                :            : struct bfd {
+<span class="lineNum">     150 </span>                :            :     struct hmap_node node;        /* In 'all_bfds'. */
+<span class="lineNum">     151 </span>                :            :     uint32_t disc;                /* bfd.LocalDiscr. Key in 'all_bfds' hmap. */
+<span class="lineNum">     152 </span>                :            : 
+<span class="lineNum">     153 </span>                :            :     char *name;                   /* Name used for logging. */
+<span class="lineNum">     154 </span>                :            : 
+<span class="lineNum">     155 </span>                :            :     bool cpath_down;              /* Concatenated Path Down. */
+<span class="lineNum">     156 </span>                :            :     uint8_t mult;                 /* bfd.DetectMult. */
+<span class="lineNum">     157 </span>                :            : 
+<span class="lineNum">     158 </span>                :            :     struct netdev *netdev;
+<span class="lineNum">     159 </span>                :            :     uint64_t rx_packets;          /* Packets received by 'netdev'. */
+<span class="lineNum">     160 </span>                :            : 
+<span class="lineNum">     161 </span>                :            :     enum state state;             /* bfd.SessionState. */
+<span class="lineNum">     162 </span>                :            :     enum state rmt_state;         /* bfd.RemoteSessionState. */
+<span class="lineNum">     163 </span>                :            : 
+<span class="lineNum">     164 </span>                :            :     enum diag diag;               /* bfd.LocalDiag. */
+<span class="lineNum">     165 </span>                :            :     enum diag rmt_diag;           /* Remote diagnostic. */
+<span class="lineNum">     166 </span>                :            : 
+<span class="lineNum">     167 </span>                :            :     enum flags flags;             /* Flags sent on messages. */
+<span class="lineNum">     168 </span>                :            :     enum flags rmt_flags;         /* Flags last received. */
+<span class="lineNum">     169 </span>                :            : 
+<span class="lineNum">     170 </span>                :            :     uint32_t rmt_disc;            /* bfd.RemoteDiscr. */
+<span class="lineNum">     171 </span>                :            : 
+<span class="lineNum">     172 </span>                :            :     uint8_t eth_dst[ETH_ADDR_LEN];/* Ethernet destination address. */
+<span class="lineNum">     173 </span>                :            :     bool eth_dst_set;             /* 'eth_dst' set through database. */
+<span class="lineNum">     174 </span>                :            : 
+<span class="lineNum">     175 </span>                :            :     ovs_be32 ip_src;              /* IPv4 source address. */
+<span class="lineNum">     176 </span>                :            :     ovs_be32 ip_dst;              /* IPv4 destination address. */
+<span class="lineNum">     177 </span>                :            : 
+<span class="lineNum">     178 </span>                :            :     uint16_t udp_src;             /* UDP source port. */
+<span class="lineNum">     179 </span>                :            : 
+<span class="lineNum">     180 </span>                :            :     /* All timers in milliseconds. */
+<span class="lineNum">     181 </span>                :            :     long long int rmt_min_rx;     /* bfd.RemoteMinRxInterval. */
+<span class="lineNum">     182 </span>                :            :     long long int rmt_min_tx;     /* Remote minimum TX interval. */
+<span class="lineNum">     183 </span>                :            : 
+<span class="lineNum">     184 </span>                :            :     long long int cfg_min_tx;     /* Configured minimum TX rate. */
+<span class="lineNum">     185 </span>                :            :     long long int cfg_min_rx;     /* Configured required minimum RX rate. */
+<span class="lineNum">     186 </span>                :            :     long long int poll_min_tx;    /* Min TX negotating in a poll sequence. */
+<span class="lineNum">     187 </span>                :            :     long long int poll_min_rx;    /* Min RX negotating in a poll sequence. */
+<span class="lineNum">     188 </span>                :            :     long long int min_tx;         /* bfd.DesiredMinTxInterval. */
+<span class="lineNum">     189 </span>                :            :     long long int min_rx;         /* bfd.RequiredMinRxInterval. */
+<span class="lineNum">     190 </span>                :            : 
+<span class="lineNum">     191 </span>                :            :     long long int last_tx;        /* Last TX time. */
+<span class="lineNum">     192 </span>                :            :     long long int next_tx;        /* Next TX time. */
+<span class="lineNum">     193 </span>                :            :     long long int detect_time;    /* RFC 5880 6.8.4 Detection time. */
+<span class="lineNum">     194 </span>                :            : 
+<span class="lineNum">     195 </span>                :            :     bool last_forwarding;         /* Last calculation of forwarding flag. */
+<span class="lineNum">     196 </span>                :            :     int forwarding_override;      /* Manual override of 'forwarding' status. */
+<span class="lineNum">     197 </span>                :            : 
+<span class="lineNum">     198 </span>                :            :     atomic_bool check_tnl_key;    /* Verify tunnel key of inbound packets? */
+<span class="lineNum">     199 </span>                :            :     struct ovs_refcount ref_cnt;
+<span class="lineNum">     200 </span>                :            : 
+<span class="lineNum">     201 </span>                :            :     /* When forward_if_rx is true, bfd_forwarding() will return
+<span class="lineNum">     202 </span>                :            :      * true as long as there are incoming packets received.
+<span class="lineNum">     203 </span>                :            :      * Note, forwarding_override still has higher priority. */
+<span class="lineNum">     204 </span>                :            :     bool forwarding_if_rx;
+<span class="lineNum">     205 </span>                :            :     long long int forwarding_if_rx_detect_time;
+<span class="lineNum">     206 </span>                :            : 
+<span class="lineNum">     207 </span>                :            :     /* When 'bfd-&gt;forwarding_if_rx' is set, at least one bfd control packet
+<span class="lineNum">     208 </span>                :            :      * is required to be received every 100 * bfd-&gt;cfg_min_rx.  If bfd
+<span class="lineNum">     209 </span>                :            :      * control packet is not received within this interval, even if data
+<span class="lineNum">     210 </span>                :            :      * packets are received, the bfd-&gt;forwarding will still be false. */
+<span class="lineNum">     211 </span>                :            :     long long int demand_rx_bfd_time;
+<span class="lineNum">     212 </span>                :            : 
+<span class="lineNum">     213 </span>                :            :     /* BFD decay related variables. */
+<span class="lineNum">     214 </span>                :            :     bool in_decay;                /* True when bfd is in decay. */
+<span class="lineNum">     215 </span>                :            :     int decay_min_rx;             /* min_rx is set to decay_min_rx when */
+<span class="lineNum">     216 </span>                :            :                                   /* in decay. */
+<span class="lineNum">     217 </span>                :            :     int decay_rx_ctl;             /* Count bfd packets received within decay */
+<span class="lineNum">     218 </span>                :            :                                   /* detect interval. */
+<span class="lineNum">     219 </span>                :            :     uint64_t decay_rx_packets;    /* Packets received by 'netdev'. */
+<span class="lineNum">     220 </span>                :            :     long long int decay_detect_time; /* Decay detection time. */
+<span class="lineNum">     221 </span>                :            : 
+<span class="lineNum">     222 </span>                :            :     uint64_t flap_count;          /* Counts bfd forwarding flaps. */
+<span class="lineNum">     223 </span>                :            : 
+<span class="lineNum">     224 </span>                :            :     /* True when the variables returned by bfd_get_status() are changed
+<span class="lineNum">     225 </span>                :            :      * since last check. */
+<span class="lineNum">     226 </span>                :            :     bool status_changed;
+<span class="lineNum">     227 </span>                :            : };
+<span class="lineNum">     228 </span>                :            : 
+<span class="lineNum">     229 </span>                :            : static struct ovs_mutex mutex = OVS_MUTEX_INITIALIZER;
+<span class="lineNum">     230 </span>                :            : static struct hmap all_bfds__ = HMAP_INITIALIZER(&amp;all_bfds__);
+<span class="lineNum">     231 </span>                :            : static struct hmap *const all_bfds OVS_GUARDED_BY(mutex) = &amp;all_bfds__;
+<span class="lineNum">     232 </span>                :            : 
+<span class="lineNum">     233 </span>                :            : static bool bfd_lookup_ip(const char *host_name, struct in_addr *)
+<span class="lineNum">     234 </span>                :            :     OVS_REQUIRES(mutex);
+<span class="lineNum">     235 </span>                :            : static bool bfd_forwarding__(struct bfd *) OVS_REQUIRES(mutex);
+<span class="lineNum">     236 </span>                :            : static bool bfd_in_poll(const struct bfd *) OVS_REQUIRES(mutex);
+<span class="lineNum">     237 </span>                :            : static void bfd_poll(struct bfd *bfd) OVS_REQUIRES(mutex);
+<span class="lineNum">     238 </span>                :            : static const char *bfd_diag_str(enum diag) OVS_REQUIRES(mutex);
+<span class="lineNum">     239 </span>                :            : static const char *bfd_state_str(enum state) OVS_REQUIRES(mutex);
+<span class="lineNum">     240 </span>                :            : static long long int bfd_min_tx(const struct bfd *) OVS_REQUIRES(mutex);
+<span class="lineNum">     241 </span>                :            : static long long int bfd_tx_interval(const struct bfd *)
+<span class="lineNum">     242 </span>                :            :     OVS_REQUIRES(mutex);
+<span class="lineNum">     243 </span>                :            : static long long int bfd_rx_interval(const struct bfd *)
+<span class="lineNum">     244 </span>                :            :     OVS_REQUIRES(mutex);
+<span class="lineNum">     245 </span>                :            : static void bfd_set_next_tx(struct bfd *) OVS_REQUIRES(mutex);
+<span class="lineNum">     246 </span>                :            : static void bfd_set_state(struct bfd *, enum state, enum diag)
+<span class="lineNum">     247 </span>                :            :     OVS_REQUIRES(mutex);
+<span class="lineNum">     248 </span>                :            : static uint32_t generate_discriminator(void) OVS_REQUIRES(mutex);
+<span class="lineNum">     249 </span>                :            : static void bfd_put_details(struct ds *, const struct bfd *)
+<span class="lineNum">     250 </span>                :            :     OVS_REQUIRES(mutex);
+<span class="lineNum">     251 </span>                :            : static uint64_t bfd_rx_packets(const struct bfd *) OVS_REQUIRES(mutex);
+<span class="lineNum">     252 </span>                :            : static void bfd_try_decay(struct bfd *) OVS_REQUIRES(mutex);
+<span class="lineNum">     253 </span>                :            : static void bfd_decay_update(struct bfd *) OVS_REQUIRES(mutex);
+<span class="lineNum">     254 </span>                :            : static void bfd_status_changed(struct bfd *) OVS_REQUIRES(mutex);
+<span class="lineNum">     255 </span>                :            : 
+<span class="lineNum">     256 </span>                :            : static void bfd_forwarding_if_rx_update(struct bfd *) OVS_REQUIRES(mutex);
+<span class="lineNum">     257 </span>                :            : static void bfd_unixctl_show(struct unixctl_conn *, int argc,
+<span class="lineNum">     258 </span>                :            :                              const char *argv[], void *aux OVS_UNUSED);
+<span class="lineNum">     259 </span>                :            : static void bfd_unixctl_set_forwarding_override(struct unixctl_conn *,
+<span class="lineNum">     260 </span>                :            :                                                 int argc, const char *argv[],
+<span class="lineNum">     261 </span>                :            :                                                 void *aux OVS_UNUSED);
+<span class="lineNum">     262 </span>                :            : static void log_msg(enum vlog_level, const struct msg *, const char *message,
+<span class="lineNum">     263 </span>                :            :                     const struct bfd *) OVS_REQUIRES(mutex);
+<span class="lineNum">     264 </span>                :            : 
+<span class="lineNum">     265 </span>                :            : static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(20, 20);
+<span class="lineNum">     266 </span>                :            : 
+<span class="lineNum">     267 </span>                :            : /* Returns true if the interface on which 'bfd' is running may be used to
+<a name="268"><span class="lineNum">     268 </span>                :            :  * forward traffic according to the BFD session state. */</a>
+<span class="lineNum">     269 </span>                :            : bool
+<span class="lineNum">     270 </span>                :<span class="lineCov">        175 : bfd_forwarding(struct bfd *bfd) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     271 </span>                :            : {
+<span class="lineNum">     272 </span>                :            :     bool ret;
+<span class="lineNum">     273 </span>                :            : 
+<span class="lineNum">     274 </span>                :<span class="lineCov">        175 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     275 </span>                :<span class="lineCov">        175 :     ret = bfd_forwarding__(bfd);</span>
+<span class="lineNum">     276 </span>                :<span class="lineCov">        175 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     277 </span>                :<span class="lineCov">        175 :     return ret;</span>
+<span class="lineNum">     278 </span>                :            : }
+<span class="lineNum">     279 </span>                :            : 
+<span class="lineNum">     280 </span>                :            : /* When forwarding_if_rx is enabled, if there are packets received,
+<a name="281"><span class="lineNum">     281 </span>                :            :  * updates forwarding_if_rx_detect_time. */</a>
+<span class="lineNum">     282 </span>                :            : void
+<span class="lineNum">     283 </span>                :<span class="lineCov">       1037 : bfd_account_rx(struct bfd *bfd, const struct dpif_flow_stats *stats)</span>
+<span class="lineNum">     284 </span>                :            : {
+<span class="lineNum">     285 </span>[<span class="branchCov" title="Branch 0 was taken 1037 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 133 times"> + </span><span class="branchCov" title="Branch 3 was taken 904 times"> + </span>]:<span class="lineCov">       1037 :     if (stats-&gt;n_packets &amp;&amp; bfd-&gt;forwarding_if_rx) {</span>
+<span class="lineNum">     286 </span>                :<span class="lineCov">        133 :         ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     287 </span>                :<span class="lineCov">        133 :         bfd_forwarding__(bfd);</span>
+<span class="lineNum">     288 </span>                :<span class="lineCov">        133 :         bfd_forwarding_if_rx_update(bfd);</span>
+<span class="lineNum">     289 </span>                :<span class="lineCov">        133 :         bfd_forwarding__(bfd);</span>
+<span class="lineNum">     290 </span>                :<span class="lineCov">        133 :         ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     291 </span>                :            :     }
+<span class="lineNum">     292 </span>                :<span class="lineCov">       1037 : }</span>
+<span class="lineNum">     293 </span>                :            : 
+<a name="294"><span class="lineNum">     294 </span>                :            : /* Returns and resets the 'bfd-&gt;status_changed'. */</a>
+<span class="lineNum">     295 </span>                :            : bool
+<span class="lineNum">     296 </span>                :<span class="lineCov">        172 : bfd_check_status_change(struct bfd *bfd) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     297 </span>                :            : {
+<span class="lineNum">     298 </span>                :            :     bool ret;
+<span class="lineNum">     299 </span>                :            : 
+<span class="lineNum">     300 </span>                :<span class="lineCov">        172 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     301 </span>                :<span class="lineCov">        172 :     ret = bfd-&gt;status_changed;</span>
+<span class="lineNum">     302 </span>                :<span class="lineCov">        172 :     bfd-&gt;status_changed = false;</span>
+<span class="lineNum">     303 </span>                :<span class="lineCov">        172 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     304 </span>                :            : 
+<span class="lineNum">     305 </span>                :<span class="lineCov">        172 :     return ret;</span>
+<span class="lineNum">     306 </span>                :            : }
+<span class="lineNum">     307 </span>                :            : 
+<span class="lineNum">     308 </span>                :            : /* Returns a 'smap' of key value pairs representing the status of 'bfd'
+<a name="309"><span class="lineNum">     309 </span>                :            :  * intended for the OVS database. */</a>
+<span class="lineNum">     310 </span>                :            : void
+<span class="lineNum">     311 </span>                :<span class="lineCov">        121 : bfd_get_status(const struct bfd *bfd, struct smap *smap)</span>
+<span class="lineNum">     312 </span>                :            :     OVS_EXCLUDED(mutex)
+<span class="lineNum">     313 </span>                :            : {
+<span class="lineNum">     314 </span>                :<span class="lineCov">        121 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     315 </span>        [<span class="branchCov" title="Branch 0 was taken 69 times"> + </span><span class="branchCov" title="Branch 1 was taken 52 times"> + </span>]:<span class="lineCov">        121 :     smap_add(smap, &quot;forwarding&quot;,</span>
+<span class="lineNum">     316 </span>                :<span class="lineCov">        121 :              bfd_forwarding__(CONST_CAST(struct bfd *, bfd))</span>
+<span class="lineNum">     317 </span>                :            :              ? &quot;true&quot; : &quot;false&quot;);
+<span class="lineNum">     318 </span>                :<span class="lineCov">        121 :     smap_add(smap, &quot;state&quot;, bfd_state_str(bfd-&gt;state));</span>
+<span class="lineNum">     319 </span>                :<span class="lineCov">        121 :     smap_add(smap, &quot;diagnostic&quot;, bfd_diag_str(bfd-&gt;diag));</span>
+<span class="lineNum">     320 </span>                :<span class="lineCov">        121 :     smap_add_format(smap, &quot;flap_count&quot;, &quot;%&quot;PRIu64, bfd-&gt;flap_count);</span>
+<span class="lineNum">     321 </span>                :            : 
+<span class="lineNum">     322 </span>        [<span class="branchCov" title="Branch 0 was taken 78 times"> + </span><span class="branchCov" title="Branch 1 was taken 43 times"> + </span>]:<span class="lineCov">        121 :     if (bfd-&gt;state != STATE_DOWN) {</span>
+<span class="lineNum">     323 </span>                :<span class="lineCov">         78 :         smap_add(smap, &quot;remote_state&quot;, bfd_state_str(bfd-&gt;rmt_state));</span>
+<span class="lineNum">     324 </span>                :<span class="lineCov">         78 :         smap_add(smap, &quot;remote_diagnostic&quot;, bfd_diag_str(bfd-&gt;rmt_diag));</span>
+<span class="lineNum">     325 </span>                :            :     }
+<span class="lineNum">     326 </span>                :<span class="lineCov">        121 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     327 </span>                :<span class="lineCov">        121 : }</span>
+<span class="lineNum">     328 </span>                :            : 
+<span class="lineNum">     329 </span>                :            : /* Initializes, destroys, or reconfigures the BFD session 'bfd' (named 'name'),
+<span class="lineNum">     330 </span>                :            :  * according to the database configuration contained in 'cfg'.  Takes ownership
+<span class="lineNum">     331 </span>                :            :  * of 'bfd', which may be NULL.  Returns a BFD object which may be used as a
+<span class="lineNum">     332 </span>                :            :  * handle for the session, or NULL if BFD is not enabled according to 'cfg'.
+<a name="333"><span class="lineNum">     333 </span>                :            :  * Also returns NULL if cfg is NULL. */</a>
+<span class="lineNum">     334 </span>                :            : struct bfd *
+<span class="lineNum">     335 </span>                :<span class="lineCov">       2912 : bfd_configure(struct bfd *bfd, const char *name, const struct smap *cfg,</span>
+<span class="lineNum">     336 </span>                :            :               struct netdev *netdev) OVS_EXCLUDED(mutex)
+<span class="lineNum">     337 </span>                :            : {
+<span class="lineNum">     338 </span>                :            :     static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
+<span class="lineNum">     339 </span>                :            :     static atomic_uint16_t udp_src = ATOMIC_VAR_INIT(0);
+<span class="lineNum">     340 </span>                :            : 
+<span class="lineNum">     341 </span>                :            :     int decay_min_rx;
+<span class="lineNum">     342 </span>                :            :     long long int min_tx, min_rx;
+<span class="lineNum">     343 </span>                :<span class="lineCov">       2912 :     bool need_poll = false;</span>
+<span class="lineNum">     344 </span>                :<span class="lineCov">       2912 :     bool cfg_min_rx_changed = false;</span>
+<span class="lineNum">     345 </span>                :            :     bool cpath_down, forwarding_if_rx;
+<span class="lineNum">     346 </span>                :            :     const char *hwaddr, *ip_src, *ip_dst;
+<span class="lineNum">     347 </span>                :            :     struct in_addr in_addr;
+<span class="lineNum">     348 </span>                :            :     uint8_t ea[ETH_ADDR_LEN];
+<span class="lineNum">     349 </span>                :            : 
+<span class="lineNum">     350 </span>        [<span class="branchCov" title="Branch 1 was taken 257 times"> + </span><span class="branchCov" title="Branch 2 was taken 2655 times"> + </span>]:<span class="lineCov">       2912 :     if (ovsthread_once_start(&amp;once)) {</span>
+<span class="lineNum">     351 </span>                :<span class="lineCov">        257 :         unixctl_command_register(&quot;bfd/show&quot;, &quot;[interface]&quot;, 0, 1,</span>
+<span class="lineNum">     352 </span>                :            :                                  bfd_unixctl_show, NULL);
+<span class="lineNum">     353 </span>                :<span class="lineCov">        257 :         unixctl_command_register(&quot;bfd/set-forwarding&quot;,</span>
+<span class="lineNum">     354 </span>                :            :                                  &quot;[interface] normal|false|true&quot;, 1, 2,
+<span class="lineNum">     355 </span>                :            :                                  bfd_unixctl_set_forwarding_override, NULL);
+<span class="lineNum">     356 </span>                :<span class="lineCov">        257 :         ovsthread_once_done(&amp;once);</span>
+<span class="lineNum">     357 </span>                :            :     }
+<span class="lineNum">     358 </span>                :            : 
+<span class="lineNum">     359 </span>[<span class="branchCov" title="Branch 0 was taken 1972 times"> + </span><span class="branchCov" title="Branch 1 was taken 940 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 1911 times"> + </span><span class="branchCov" title="Branch 4 was taken 61 times"> + </span>]:<span class="lineCov">       2912 :     if (!cfg || !smap_get_bool(cfg, &quot;enable&quot;, false)) {</span>
+<span class="lineNum">     360 </span>                :<span class="lineCov">       2851 :         bfd_unref(bfd);</span>
+<span class="lineNum">     361 </span>                :<span class="lineCov">       2851 :         return NULL;</span>
+<span class="lineNum">     362 </span>                :            :     }
+<span class="lineNum">     363 </span>                :            : 
+<span class="lineNum">     364 </span>                :<span class="lineCov">         61 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     365 </span>        [<span class="branchCov" title="Branch 0 was taken 23 times"> + </span><span class="branchCov" title="Branch 1 was taken 38 times"> + </span>]:<span class="lineCov">         61 :     if (!bfd) {</span>
+<span class="lineNum">     366 </span>                :<span class="lineCov">         23 :         bfd = xzalloc(sizeof *bfd);</span>
+<span class="lineNum">     367 </span>                :<span class="lineCov">         23 :         bfd-&gt;name = xstrdup(name);</span>
+<span class="lineNum">     368 </span>                :<span class="lineCov">         23 :         bfd-&gt;forwarding_override = -1;</span>
+<span class="lineNum">     369 </span>                :<span class="lineCov">         23 :         bfd-&gt;disc = generate_discriminator();</span>
+<span class="lineNum">     370 </span>                :<span class="lineCov">         23 :         hmap_insert(all_bfds, &amp;bfd-&gt;node, bfd-&gt;disc);</span>
+<span class="lineNum">     371 </span>                :            : 
+<span class="lineNum">     372 </span>                :<span class="lineCov">         23 :         bfd-&gt;diag = DIAG_NONE;</span>
+<span class="lineNum">     373 </span>                :<span class="lineCov">         23 :         bfd-&gt;min_tx = 1000;</span>
+<span class="lineNum">     374 </span>                :<span class="lineCov">         23 :         bfd-&gt;mult = 3;</span>
+<span class="lineNum">     375 </span>                :<span class="lineCov">         23 :         ovs_refcount_init(&amp;bfd-&gt;ref_cnt);</span>
+<span class="lineNum">     376 </span>                :<span class="lineCov">         23 :         bfd-&gt;netdev = netdev_ref(netdev);</span>
+<span class="lineNum">     377 </span>                :<span class="lineCov">         23 :         bfd-&gt;rx_packets = bfd_rx_packets(bfd);</span>
+<span class="lineNum">     378 </span>                :<span class="lineCov">         23 :         bfd-&gt;in_decay = false;</span>
+<span class="lineNum">     379 </span>                :<span class="lineCov">         23 :         bfd-&gt;flap_count = 0;</span>
+<span class="lineNum">     380 </span>                :            : 
+<span class="lineNum">     381 </span>                :            :         /* RFC 5881 section 4
+<span class="lineNum">     382 </span>                :            :          * The source port MUST be in the range 49152 through 65535.  The same
+<span class="lineNum">     383 </span>                :            :          * UDP source port number MUST be used for all BFD Control packets
+<span class="lineNum">     384 </span>                :            :          * associated with a particular session.  The source port number SHOULD
+<span class="lineNum">     385 </span>                :            :          * be unique among all BFD sessions on the system. */
+<span class="lineNum">     386 </span>                :<span class="lineCov">         23 :         atomic_add(&amp;udp_src, 1, &amp;bfd-&gt;udp_src);</span>
+<span class="lineNum">     387 </span>                :<span class="lineCov">         23 :         bfd-&gt;udp_src = (bfd-&gt;udp_src % 16384) + 49152;</span>
+<span class="lineNum">     388 </span>                :            : 
+<span class="lineNum">     389 </span>                :<span class="lineCov">         23 :         bfd_set_state(bfd, STATE_DOWN, DIAG_NONE);</span>
+<span class="lineNum">     390 </span>                :            : 
+<span class="lineNum">     391 </span>                :<span class="lineCov">         23 :         memcpy(bfd-&gt;eth_dst, eth_addr_bfd, ETH_ADDR_LEN);</span>
+<span class="lineNum">     392 </span>                :            : 
+<span class="lineNum">     393 </span>                :<span class="lineCov">         23 :         bfd_status_changed(bfd);</span>
+<span class="lineNum">     394 </span>                :            :     }
+<span class="lineNum">     395 </span>                :            : 
+<span class="lineNum">     396 </span>                :<span class="lineCov">         61 :     atomic_store(&amp;bfd-&gt;check_tnl_key,</span>
+<span class="lineNum">     397 </span>                :            :                  smap_get_bool(cfg, &quot;check_tnl_key&quot;, false));
+<span class="lineNum">     398 </span>                :<span class="lineCov">         61 :     min_tx = smap_get_int(cfg, &quot;min_tx&quot;, 100);</span>
+<span class="lineNum">     399 </span>                :<span class="lineCov">         61 :     min_tx = MAX(min_tx, 100);</span>
+<span class="lineNum">     400 </span>        [<span class="branchCov" title="Branch 0 was taken 26 times"> + </span><span class="branchCov" title="Branch 1 was taken 35 times"> + </span>]:<span class="lineCov">         61 :     if (bfd-&gt;cfg_min_tx != min_tx) {</span>
+<span class="lineNum">     401 </span>                :<span class="lineCov">         26 :         bfd-&gt;cfg_min_tx = min_tx;</span>
+<span class="lineNum">     402 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 23 times"> + </span>]:<span class="lineCov">         26 :         if (bfd-&gt;state != STATE_UP</span>
+<span class="lineNum">     403 </span>[<span class="branchCov" title="Branch 1 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>][<span class="branchCov" title="Branch 3 was taken 1 time"> + </span><span class="branchCov" title="Branch 4 was taken 2 times"> + </span>]:<span class="lineCov">          3 :             || (!bfd_in_poll(bfd) &amp;&amp; bfd-&gt;cfg_min_tx &lt; bfd-&gt;min_tx)) {</span>
+<span class="lineNum">     404 </span>                :<span class="lineCov">         24 :             bfd-&gt;min_tx = bfd-&gt;cfg_min_tx;</span>
+<span class="lineNum">     405 </span>                :            :         }
+<span class="lineNum">     406 </span>                :<span class="lineCov">         26 :         need_poll = true;</span>
+<span class="lineNum">     407 </span>                :            :     }
+<span class="lineNum">     408 </span>                :            : 
+<span class="lineNum">     409 </span>                :<span class="lineCov">         61 :     min_rx = smap_get_int(cfg, &quot;min_rx&quot;, 1000);</span>
+<span class="lineNum">     410 </span>                :<span class="lineCov">         61 :     min_rx = MAX(min_rx, 100);</span>
+<span class="lineNum">     411 </span>        [<span class="branchCov" title="Branch 0 was taken 24 times"> + </span><span class="branchCov" title="Branch 1 was taken 37 times"> + </span>]:<span class="lineCov">         61 :     if (bfd-&gt;cfg_min_rx != min_rx) {</span>
+<span class="lineNum">     412 </span>                :<span class="lineCov">         24 :         bfd-&gt;cfg_min_rx = min_rx;</span>
+<span class="lineNum">     413 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 23 times"> + </span>]:<span class="lineCov">         24 :         if (bfd-&gt;state != STATE_UP</span>
+<span class="lineNum">     414 </span>[<span class="branchCov" title="Branch 1 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 1 time"> + </span>]:<span class="lineCov">          1 :             || (!bfd_in_poll(bfd) &amp;&amp; bfd-&gt;cfg_min_rx &gt; bfd-&gt;min_rx)) {</span>
+<span class="lineNum">     415 </span>                :<span class="lineCov">         23 :             bfd-&gt;min_rx = bfd-&gt;cfg_min_rx;</span>
+<span class="lineNum">     416 </span>                :            :         }
+<span class="lineNum">     417 </span>                :<span class="lineCov">         24 :         cfg_min_rx_changed = true;</span>
+<span class="lineNum">     418 </span>                :<span class="lineCov">         24 :         need_poll = true;</span>
+<span class="lineNum">     419 </span>                :            :     }
+<span class="lineNum">     420 </span>                :            : 
+<span class="lineNum">     421 </span>                :<span class="lineCov">         61 :     decay_min_rx = smap_get_int(cfg, &quot;decay_min_rx&quot;, 0);</span>
+<span class="lineNum">     422 </span>[<span class="branchCov" title="Branch 0 was taken 57 times"> + </span><span class="branchCov" title="Branch 1 was taken 4 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 24 times"> + </span><span class="branchCov" title="Branch 3 was taken 33 times"> + </span>]:<span class="lineCov">         61 :     if (bfd-&gt;decay_min_rx != decay_min_rx || cfg_min_rx_changed) {</span>
+<span class="lineNum">     423 </span>[<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 25 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 3 times"> + </span>]:<span class="lineCov">         28 :         if (decay_min_rx &gt; 0 &amp;&amp; decay_min_rx &lt; bfd-&gt;cfg_min_rx) {</span>
+<span class="lineNum">     424 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN(&quot;%s: decay_min_rx cannot be less than %lld ms&quot;,</span>
+<span class="lineNum">     425 </span>                :            :                       bfd-&gt;name, bfd-&gt;cfg_min_rx);
+<span class="lineNum">     426 </span>                :<span class="lineNoCov">          0 :             bfd-&gt;decay_min_rx = 0;</span>
+<span class="lineNum">     427 </span>                :            :         } else {
+<span class="lineNum">     428 </span>                :<span class="lineCov">         28 :             bfd-&gt;decay_min_rx = decay_min_rx;</span>
+<span class="lineNum">     429 </span>                :            :         }
+<span class="lineNum">     430 </span>                :            :         /* Resets decay. */
+<span class="lineNum">     431 </span>                :<span class="lineCov">         28 :         bfd-&gt;in_decay = false;</span>
+<span class="lineNum">     432 </span>                :<span class="lineCov">         28 :         bfd_decay_update(bfd);</span>
+<span class="lineNum">     433 </span>                :<span class="lineCov">         28 :         need_poll = true;</span>
+<span class="lineNum">     434 </span>                :            :     }
+<span class="lineNum">     435 </span>                :            : 
+<span class="lineNum">     436 </span>                :<span class="lineCov">         61 :     cpath_down = smap_get_bool(cfg, &quot;cpath_down&quot;, false);</span>
+<span class="lineNum">     437 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 60 times"> + </span>]:<span class="lineCov">         61 :     if (bfd-&gt;cpath_down != cpath_down) {</span>
+<span class="lineNum">     438 </span>                :<span class="lineCov">          1 :         bfd-&gt;cpath_down = cpath_down;</span>
+<span class="lineNum">     439 </span>                :<span class="lineCov">          1 :         bfd_set_state(bfd, bfd-&gt;state, DIAG_NONE);</span>
+<span class="lineNum">     440 </span>                :<span class="lineCov">          1 :         need_poll = true;</span>
+<span class="lineNum">     441 </span>                :            :     }
+<span class="lineNum">     442 </span>                :            : 
+<span class="lineNum">     443 </span>                :<span class="lineCov">         61 :     hwaddr = smap_get(cfg, &quot;bfd_dst_mac&quot;);</span>
+<span class="lineNum">     444 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 61 times"> + </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineCov">         61 :     if (hwaddr &amp;&amp; eth_addr_from_string(hwaddr, ea) &amp;&amp; !eth_addr_is_zero(ea)) {</span>
+<span class="lineNum">         </span>        [<span class="branchNoExec" title="Branch 6 was not executed"> # </span><span class="branchNoExec" title="Branch 7 was not executed"> # </span>]
+<span class="lineNum">     445 </span>                :<span class="lineNoCov">          0 :         memcpy(bfd-&gt;eth_dst, ea, ETH_ADDR_LEN);</span>
+<span class="lineNum">     446 </span>                :<span class="lineNoCov">          0 :         bfd-&gt;eth_dst_set = true;</span>
+<span class="lineNum">     447 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 61 times"> + </span>]:<span class="lineCov">         61 :     } else if (bfd-&gt;eth_dst_set) {</span>
+<span class="lineNum">     448 </span>                :<span class="lineNoCov">          0 :         memcpy(bfd-&gt;eth_dst, eth_addr_bfd, ETH_ADDR_LEN);</span>
+<span class="lineNum">     449 </span>                :<span class="lineNoCov">          0 :         bfd-&gt;eth_dst_set = false;</span>
+<span class="lineNum">     450 </span>                :            :     }
+<span class="lineNum">     451 </span>                :            : 
+<span class="lineNum">     452 </span>                :<span class="lineCov">         61 :     ip_src = smap_get(cfg, &quot;bfd_src_ip&quot;);</span>
+<span class="lineNum">     453 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 61 times"> + </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineCov">         61 :     if (ip_src &amp;&amp; bfd_lookup_ip(ip_src, &amp;in_addr)) {</span>
+<span class="lineNum">     454 </span>                :<span class="lineNoCov">          0 :         memcpy(&amp;bfd-&gt;ip_src, &amp;in_addr, sizeof in_addr);</span>
+<span class="lineNum">     455 </span>                :            :     } else {
+<span class="lineNum">     456 </span>                :<span class="lineCov">         61 :         bfd-&gt;ip_src = htonl(0xA9FE0100); /* 169.254.1.0. */</span>
+<span class="lineNum">     457 </span>                :            :     }
+<span class="lineNum">     458 </span>                :            : 
+<span class="lineNum">     459 </span>                :<span class="lineCov">         61 :     ip_dst = smap_get(cfg, &quot;bfd_dst_ip&quot;);</span>
+<span class="lineNum">     460 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 61 times"> + </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineCov">         61 :     if (ip_dst &amp;&amp; bfd_lookup_ip(ip_dst, &amp;in_addr)) {</span>
+<span class="lineNum">     461 </span>                :<span class="lineNoCov">          0 :         memcpy(&amp;bfd-&gt;ip_dst, &amp;in_addr, sizeof in_addr);</span>
+<span class="lineNum">     462 </span>                :            :     } else {
+<span class="lineNum">     463 </span>                :<span class="lineCov">         61 :         bfd-&gt;ip_dst = htonl(0xA9FE0101); /* 169.254.1.1. */</span>
+<span class="lineNum">     464 </span>                :            :     }
+<span class="lineNum">     465 </span>                :            : 
+<span class="lineNum">     466 </span>                :<span class="lineCov">         61 :     forwarding_if_rx = smap_get_bool(cfg, &quot;forwarding_if_rx&quot;, false);</span>
+<span class="lineNum">     467 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 60 times"> + </span>]:<span class="lineCov">         61 :     if (bfd-&gt;forwarding_if_rx != forwarding_if_rx) {</span>
+<span class="lineNum">     468 </span>                :<span class="lineCov">          1 :         bfd-&gt;forwarding_if_rx = forwarding_if_rx;</span>
+<span class="lineNum">     469 </span>[<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">          1 :         if (bfd-&gt;state == STATE_UP &amp;&amp; bfd-&gt;forwarding_if_rx) {</span>
+<span class="lineNum">     470 </span>                :<span class="lineCov">          1 :             bfd_forwarding_if_rx_update(bfd);</span>
+<span class="lineNum">     471 </span>                :            :         } else {
+<span class="lineNum">     472 </span>                :<span class="lineNoCov">          0 :             bfd-&gt;forwarding_if_rx_detect_time = 0;</span>
+<span class="lineNum">     473 </span>                :            :         }
+<span class="lineNum">     474 </span>                :            :     }
+<span class="lineNum">     475 </span>                :            : 
+<span class="lineNum">     476 </span>        [<span class="branchCov" title="Branch 0 was taken 32 times"> + </span><span class="branchCov" title="Branch 1 was taken 29 times"> + </span>]:<span class="lineCov">         61 :     if (need_poll) {</span>
+<span class="lineNum">     477 </span>                :<span class="lineCov">         32 :         bfd_poll(bfd);</span>
+<span class="lineNum">     478 </span>                :            :     }
+<span class="lineNum">     479 </span>                :<span class="lineCov">         61 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     480 </span>                :<span class="lineCov">       2912 :     return bfd;</span>
+<span class="lineNum">     481 </span>                :            : }
+<a name="482"><span class="lineNum">     482 </span>                :            : </a>
+<span class="lineNum">     483 </span>                :            : struct bfd *
+<span class="lineNum">     484 </span>                :<span class="lineCov">        435 : bfd_ref(const struct bfd *bfd_)</span>
+<span class="lineNum">     485 </span>                :            : {
+<span class="lineNum">     486 </span>                :<span class="lineCov">        435 :     struct bfd *bfd = CONST_CAST(struct bfd *, bfd_);</span>
+<span class="lineNum">     487 </span>        [<span class="branchCov" title="Branch 0 was taken 395 times"> + </span><span class="branchCov" title="Branch 1 was taken 40 times"> + </span>]:<span class="lineCov">        435 :     if (bfd) {</span>
+<span class="lineNum">     488 </span>                :<span class="lineCov">        395 :         ovs_refcount_ref(&amp;bfd-&gt;ref_cnt);</span>
+<span class="lineNum">     489 </span>                :            :     }
+<span class="lineNum">     490 </span>                :<span class="lineCov">        435 :     return bfd;</span>
+<span class="lineNum">     491 </span>                :            : }
+<a name="492"><span class="lineNum">     492 </span>                :            : </a>
+<span class="lineNum">     493 </span>                :            : void
+<span class="lineNum">     494 </span>                :<span class="lineCov">      17388 : bfd_unref(struct bfd *bfd) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     495 </span>                :            : {
+<span class="lineNum">     496 </span>[<span class="branchCov" title="Branch 0 was taken 418 times"> + </span><span class="branchCov" title="Branch 1 was taken 16970 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 23 times"> + </span><span class="branchCov" title="Branch 4 was taken 395 times"> + </span>]:<span class="lineCov">      17388 :     if (bfd &amp;&amp; ovs_refcount_unref(&amp;bfd-&gt;ref_cnt) == 1) {</span>
+<span class="lineNum">     497 </span>                :<span class="lineCov">         23 :         ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     498 </span>                :<span class="lineCov">         23 :         bfd_status_changed(bfd);</span>
+<span class="lineNum">     499 </span>                :<span class="lineCov">         23 :         hmap_remove(all_bfds, &amp;bfd-&gt;node);</span>
+<span class="lineNum">     500 </span>                :<span class="lineCov">         23 :         netdev_close(bfd-&gt;netdev);</span>
+<span class="lineNum">     501 </span>                :<span class="lineCov">         23 :         free(bfd-&gt;name);</span>
+<span class="lineNum">     502 </span>                :<span class="lineCov">         23 :         free(bfd);</span>
+<span class="lineNum">     503 </span>                :<span class="lineCov">         23 :         ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     504 </span>                :            :     }
+<span class="lineNum">     505 </span>                :<span class="lineCov">      17388 : }</span>
+<a name="506"><span class="lineNum">     506 </span>                :            : </a>
+<span class="lineNum">     507 </span>                :            : void
+<span class="lineNum">     508 </span>                :<span class="lineCov">       1378 : bfd_wait(const struct bfd *bfd) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     509 </span>                :            : {
+<span class="lineNum">     510 </span>                :<span class="lineCov">       1378 :     poll_timer_wait_until(bfd_wake_time(bfd));</span>
+<span class="lineNum">     511 </span>                :<span class="lineCov">       1378 : }</span>
+<span class="lineNum">     512 </span>                :            : 
+<a name="513"><span class="lineNum">     513 </span>                :            : /* Returns the next wake up time. */</a>
+<span class="lineNum">     514 </span>                :            : long long int
+<span class="lineNum">     515 </span>                :<span class="lineCov">       5419 : bfd_wake_time(const struct bfd *bfd) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     516 </span>                :            : {
+<span class="lineNum">     517 </span>                :            :     long long int retval;
+<span class="lineNum">     518 </span>                :            : 
+<span class="lineNum">     519 </span>        [<span class="branchCov" title="Branch 0 was taken 1293 times"> + </span><span class="branchCov" title="Branch 1 was taken 4126 times"> + </span>]:<span class="lineCov">       5419 :     if (!bfd) {</span>
+<span class="lineNum">     520 </span>                :<span class="lineCov">       1293 :         return LLONG_MAX;</span>
+<span class="lineNum">     521 </span>                :            :     }
+<span class="lineNum">     522 </span>                :            : 
+<span class="lineNum">     523 </span>                :<span class="lineCov">       4126 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     524 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 4126 times"> + </span>]:<span class="lineCov">       4126 :     if (bfd-&gt;flags &amp; FLAG_FINAL) {</span>
+<span class="lineNum">     525 </span>                :<span class="lineNoCov">          0 :         retval = 0;</span>
+<span class="lineNum">     526 </span>                :            :     } else {
+<span class="lineNum">     527 </span>                :<span class="lineCov">       4126 :         retval = bfd-&gt;next_tx;</span>
+<span class="lineNum">     528 </span>        [<span class="branchCov" title="Branch 0 was taken 3827 times"> + </span><span class="branchCov" title="Branch 1 was taken 299 times"> + </span>]:<span class="lineCov">       4126 :         if (bfd-&gt;state &gt; STATE_DOWN) {</span>
+<span class="lineNum">     529 </span>                :<span class="lineCov">       3827 :             retval = MIN(bfd-&gt;detect_time, retval);</span>
+<span class="lineNum">     530 </span>                :            :         }
+<span class="lineNum">     531 </span>                :            :     }
+<span class="lineNum">     532 </span>                :<span class="lineCov">       4126 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     533 </span>                :<span class="lineCov">       5419 :     return retval;</span>
+<span class="lineNum">     534 </span>                :            : }
+<a name="535"><span class="lineNum">     535 </span>                :            : </a>
+<span class="lineNum">     536 </span>                :            : void
+<span class="lineNum">     537 </span>                :<span class="lineCov">       1378 : bfd_run(struct bfd *bfd) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     538 </span>                :            : {
+<span class="lineNum">     539 </span>                :            :     long long int now;
+<span class="lineNum">     540 </span>                :            :     bool old_in_decay;
+<span class="lineNum">     541 </span>                :            : 
+<span class="lineNum">     542 </span>                :<span class="lineCov">       1378 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     543 </span>                :<span class="lineCov">       1378 :     now = time_msec();</span>
+<span class="lineNum">     544 </span>                :<span class="lineCov">       1378 :     old_in_decay = bfd-&gt;in_decay;</span>
+<span class="lineNum">     545 </span>                :            : 
+<span class="lineNum">     546 </span>[<span class="branchCov" title="Branch 0 was taken 1284 times"> + </span><span class="branchCov" title="Branch 1 was taken 94 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 7 times"> + </span><span class="branchCov" title="Branch 3 was taken 1277 times"> + </span>]:<span class="lineCov">       1378 :     if (bfd-&gt;state &gt; STATE_DOWN &amp;&amp; now &gt;= bfd-&gt;detect_time) {</span>
+<span class="lineNum">     547 </span>                :<span class="lineCov">          7 :         bfd_set_state(bfd, STATE_DOWN, DIAG_EXPIRED);</span>
+<span class="lineNum">     548 </span>                :            :     }
+<span class="lineNum">     549 </span>                :<span class="lineCov">       1378 :     bfd_forwarding__(bfd);</span>
+<span class="lineNum">     550 </span>                :            : 
+<span class="lineNum">     551 </span>                :            :     /* Decay may only happen when state is STATE_UP, bfd-&gt;decay_min_rx is
+<span class="lineNum">     552 </span>                :            :      * configured, and decay_detect_time is reached. */
+<span class="lineNum">     553 </span>[<span class="branchCov" title="Branch 0 was taken 1260 times"> + </span><span class="branchCov" title="Branch 1 was taken 118 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 182 times"> + </span><span class="branchCov" title="Branch 3 was taken 1078 times"> + </span>]:<span class="lineCov">       1378 :     if (bfd-&gt;state == STATE_UP &amp;&amp; bfd-&gt;decay_min_rx &gt; 0</span>
+<span class="lineNum">     554 </span>        [<span class="branchCov" title="Branch 0 was taken 27 times"> + </span><span class="branchCov" title="Branch 1 was taken 155 times"> + </span>]:<span class="lineCov">        182 :         &amp;&amp; now &gt;= bfd-&gt;decay_detect_time) {</span>
+<span class="lineNum">     555 </span>                :<span class="lineCov">         27 :         bfd_try_decay(bfd);</span>
+<span class="lineNum">     556 </span>                :            :     }
+<span class="lineNum">     557 </span>                :            : 
+<span class="lineNum">     558 </span>        [<span class="branchCov" title="Branch 0 was taken 1374 times"> + </span><span class="branchCov" title="Branch 1 was taken 4 times"> + </span>]:<span class="lineCov">       1378 :     if (bfd-&gt;min_tx != bfd-&gt;cfg_min_tx</span>
+<span class="lineNum">     559 </span>[<span class="branchCov" title="Branch 0 was taken 145 times"> + </span><span class="branchCov" title="Branch 1 was taken 1229 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 143 times"> + </span><span class="branchCov" title="Branch 3 was taken 2 times"> + </span>]:<span class="lineCov">       1374 :         || (bfd-&gt;min_rx != bfd-&gt;cfg_min_rx &amp;&amp; bfd-&gt;min_rx != bfd-&gt;decay_min_rx)</span>
+<span class="lineNum">     560 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 1366 times"> + </span>]:<span class="lineCov">       1372 :         || bfd-&gt;in_decay != old_in_decay) {</span>
+<span class="lineNum">     561 </span>                :<span class="lineCov">         12 :         bfd_poll(bfd);</span>
+<span class="lineNum">     562 </span>                :            :     }
+<span class="lineNum">     563 </span>                :<span class="lineCov">       1378 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     564 </span>                :<span class="lineCov">       1378 : }</span>
+<a name="565"><span class="lineNum">     565 </span>                :            : </a>
+<span class="lineNum">     566 </span>                :            : bool
+<span class="lineNum">     567 </span>                :<span class="lineCov">       2277 : bfd_should_send_packet(const struct bfd *bfd) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     568 </span>                :            : {
+<span class="lineNum">     569 </span>                :            :     bool ret;
+<span class="lineNum">     570 </span>                :<span class="lineCov">       2277 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     571 </span>[<span class="branchCov" title="Branch 0 was taken 2249 times"> + </span><span class="branchCov" title="Branch 1 was taken 28 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 1307 times"> + </span><span class="branchCov" title="Branch 4 was taken 942 times"> + </span>]:<span class="lineCov">       2277 :     ret = bfd-&gt;flags &amp; FLAG_FINAL || time_msec() &gt;= bfd-&gt;next_tx;</span>
+<span class="lineNum">     572 </span>                :<span class="lineCov">       2277 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     573 </span>                :<span class="lineCov">       2277 :     return ret;</span>
+<span class="lineNum">     574 </span>                :            : }
+<a name="575"><span class="lineNum">     575 </span>                :            : </a>
+<span class="lineNum">     576 </span>                :            : void
+<span class="lineNum">     577 </span>                :<span class="lineCov">        990 : bfd_put_packet(struct bfd *bfd, struct ofpbuf *p,</span>
+<span class="lineNum">     578 </span>                :            :                uint8_t eth_src[ETH_ADDR_LEN]) OVS_EXCLUDED(mutex)
+<span class="lineNum">     579 </span>                :            : {
+<span class="lineNum">     580 </span>                :            :     long long int min_tx, min_rx;
+<span class="lineNum">     581 </span>                :            :     struct udp_header *udp;
+<span class="lineNum">     582 </span>                :            :     struct eth_header *eth;
+<span class="lineNum">     583 </span>                :            :     struct ip_header *ip;
+<span class="lineNum">     584 </span>                :            :     struct msg *msg;
+<span class="lineNum">     585 </span>                :            : 
+<span class="lineNum">     586 </span>                :<span class="lineCov">        990 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     587 </span>        [<span class="branchCov" title="Branch 0 was taken 953 times"> + </span><span class="branchCov" title="Branch 1 was taken 37 times"> + </span>]:<span class="lineCov">        990 :     if (bfd-&gt;next_tx) {</span>
+<span class="lineNum">     588 </span>                :<span class="lineCov">        953 :         long long int delay = time_msec() - bfd-&gt;next_tx;</span>
+<span class="lineNum">     589 </span>                :<span class="lineCov">        953 :         long long int interval = bfd_tx_interval(bfd);</span>
+<span class="lineNum">     590 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 953 times"> + </span>]:<span class="lineCov">        953 :         if (delay &gt; interval * 3 / 2) {</span>
+<span class="lineNum">     591 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_INFO(&quot;%s: long delay of %lldms (expected %lldms) sending BFD&quot;</span>
+<span class="lineNum">     592 </span>                :            :                       &quot; control message&quot;, bfd-&gt;name, delay, interval);
+<span class="lineNum">     593 </span>                :            :         }
+<span class="lineNum">     594 </span>                :            :     }
+<span class="lineNum">     595 </span>                :            : 
+<span class="lineNum">     596 </span>                :            :     /* RFC 5880 Section 6.5
+<span class="lineNum">     597 </span>                :            :      * A BFD Control packet MUST NOT have both the Poll (P) and Final (F) bits
+<span class="lineNum">     598 </span>                :            :      * set. */
+<span class="lineNum">     599 </span>[<span class="branchCov" title="Branch 0 was taken 14 times"> + </span><span class="branchCov" title="Branch 1 was taken 976 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 14 times"> + </span>]:<span class="lineCov">        990 :     ovs_assert(!(bfd-&gt;flags &amp; FLAG_POLL) || !(bfd-&gt;flags &amp; FLAG_FINAL));</span>
+<span class="lineNum">     600 </span>                :            : 
+<span class="lineNum">     601 </span>                :<span class="lineCov">        990 :     ofpbuf_reserve(p, 2); /* Properly align after the ethernet header. */</span>
+<span class="lineNum">     602 </span>                :<span class="lineCov">        990 :     eth = ofpbuf_put_uninit(p, sizeof *eth);</span>
+<span class="lineNum">     603 </span>                :<span class="lineCov">        990 :     memcpy(eth-&gt;eth_src, eth_src, ETH_ADDR_LEN);</span>
+<span class="lineNum">     604 </span>                :<span class="lineCov">        990 :     memcpy(eth-&gt;eth_dst, bfd-&gt;eth_dst, ETH_ADDR_LEN);</span>
+<span class="lineNum">     605 </span>                :<span class="lineCov">        990 :     eth-&gt;eth_type = htons(ETH_TYPE_IP);</span>
+<span class="lineNum">     606 </span>                :            : 
+<span class="lineNum">     607 </span>                :<span class="lineCov">        990 :     ip = ofpbuf_put_zeros(p, sizeof *ip);</span>
+<span class="lineNum">     608 </span>                :<span class="lineCov">        990 :     ip-&gt;ip_ihl_ver = IP_IHL_VER(5, 4);</span>
+<span class="lineNum">     609 </span>                :<span class="lineCov">        990 :     ip-&gt;ip_tot_len = htons(sizeof *ip + sizeof *udp + sizeof *msg);</span>
+<span class="lineNum">     610 </span>                :<span class="lineCov">        990 :     ip-&gt;ip_ttl = MAXTTL;</span>
+<span class="lineNum">     611 </span>                :<span class="lineCov">        990 :     ip-&gt;ip_tos = IPTOS_LOWDELAY | IPTOS_THROUGHPUT;</span>
+<span class="lineNum">     612 </span>                :<span class="lineCov">        990 :     ip-&gt;ip_proto = IPPROTO_UDP;</span>
+<span class="lineNum">     613 </span>                :<span class="lineCov">        990 :     put_16aligned_be32(&amp;ip-&gt;ip_src, bfd-&gt;ip_src);</span>
+<span class="lineNum">     614 </span>                :<span class="lineCov">        990 :     put_16aligned_be32(&amp;ip-&gt;ip_dst, bfd-&gt;ip_dst);</span>
+<span class="lineNum">     615 </span>                :<span class="lineCov">        990 :     ip-&gt;ip_csum = csum(ip, sizeof *ip);</span>
+<span class="lineNum">     616 </span>                :            : 
+<span class="lineNum">     617 </span>                :<span class="lineCov">        990 :     udp = ofpbuf_put_zeros(p, sizeof *udp);</span>
+<span class="lineNum">     618 </span>                :<span class="lineCov">        990 :     udp-&gt;udp_src = htons(bfd-&gt;udp_src);</span>
+<span class="lineNum">     619 </span>                :<span class="lineCov">        990 :     udp-&gt;udp_dst = htons(BFD_DEST_PORT);</span>
+<span class="lineNum">     620 </span>                :<span class="lineCov">        990 :     udp-&gt;udp_len = htons(sizeof *udp + sizeof *msg);</span>
+<span class="lineNum">     621 </span>                :            : 
+<span class="lineNum">     622 </span>                :<span class="lineCov">        990 :     msg = ofpbuf_put_uninit(p, sizeof *msg);</span>
+<span class="lineNum">     623 </span>                :<span class="lineCov">        990 :     msg-&gt;vers_diag = (BFD_VERSION &lt;&lt; 5) | bfd-&gt;diag;</span>
+<span class="lineNum">     624 </span>                :<span class="lineCov">        990 :     msg-&gt;flags = (bfd-&gt;state &amp; STATE_MASK) | bfd-&gt;flags;</span>
+<span class="lineNum">     625 </span>                :            : 
+<span class="lineNum">     626 </span>                :<span class="lineCov">        990 :     msg-&gt;mult = bfd-&gt;mult;</span>
+<span class="lineNum">     627 </span>                :<span class="lineCov">        990 :     msg-&gt;length = BFD_PACKET_LEN;</span>
+<span class="lineNum">     628 </span>                :<span class="lineCov">        990 :     msg-&gt;my_disc = htonl(bfd-&gt;disc);</span>
+<span class="lineNum">     629 </span>                :<span class="lineCov">        990 :     msg-&gt;your_disc = htonl(bfd-&gt;rmt_disc);</span>
+<span class="lineNum">     630 </span>                :<span class="lineCov">        990 :     msg-&gt;min_rx_echo = htonl(0);</span>
+<span class="lineNum">     631 </span>                :            : 
+<span class="lineNum">     632 </span>        [<span class="branchCov" title="Branch 1 was taken 14 times"> + </span><span class="branchCov" title="Branch 2 was taken 976 times"> + </span>]:<span class="lineCov">        990 :     if (bfd_in_poll(bfd)) {</span>
+<span class="lineNum">     633 </span>                :<span class="lineCov">         14 :         min_tx = bfd-&gt;poll_min_tx;</span>
+<span class="lineNum">     634 </span>                :<span class="lineCov">         14 :         min_rx = bfd-&gt;poll_min_rx;</span>
+<span class="lineNum">     635 </span>                :            :     } else {
+<span class="lineNum">     636 </span>                :<span class="lineCov">        976 :         min_tx = bfd_min_tx(bfd);</span>
+<span class="lineNum">     637 </span>                :<span class="lineCov">        976 :         min_rx = bfd-&gt;min_rx;</span>
+<span class="lineNum">     638 </span>                :            :     }
+<span class="lineNum">     639 </span>                :            : 
+<span class="lineNum">     640 </span>                :<span class="lineCov">        990 :     msg-&gt;min_tx = htonl(min_tx * 1000);</span>
+<span class="lineNum">     641 </span>                :<span class="lineCov">        990 :     msg-&gt;min_rx = htonl(min_rx * 1000);</span>
+<span class="lineNum">     642 </span>                :            : 
+<span class="lineNum">     643 </span>                :<span class="lineCov">        990 :     bfd-&gt;flags &amp;= ~FLAG_FINAL;</span>
+<span class="lineNum">     644 </span>                :            : 
+<span class="lineNum">     645 </span>                :<span class="lineCov">        990 :     log_msg(VLL_DBG, msg, &quot;Sending BFD Message&quot;, bfd);</span>
+<span class="lineNum">     646 </span>                :            : 
+<span class="lineNum">     647 </span>                :<span class="lineCov">        990 :     bfd-&gt;last_tx = time_msec();</span>
+<span class="lineNum">     648 </span>                :<span class="lineCov">        990 :     bfd_set_next_tx(bfd);</span>
+<span class="lineNum">     649 </span>                :<span class="lineCov">        990 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     650 </span>                :<span class="lineCov">        990 : }</span>
+<a name="651"><span class="lineNum">     651 </span>                :            : </a>
+<span class="lineNum">     652 </span>                :            : bool
+<span class="lineNum">     653 </span>                :<span class="lineCov">       1040 : bfd_should_process_flow(const struct bfd *bfd_, const struct flow *flow,</span>
+<span class="lineNum">     654 </span>                :            :                         struct flow_wildcards *wc)
+<span class="lineNum">     655 </span>                :            : {
+<span class="lineNum">     656 </span>                :<span class="lineCov">       1040 :     struct bfd *bfd = CONST_CAST(struct bfd *, bfd_);</span>
+<span class="lineNum">     657 </span>                :            :     bool check_tnl_key;
+<span class="lineNum">     658 </span>                :            : 
+<span class="lineNum">     659 </span>                :<span class="lineCov">       1040 :     memset(&amp;wc-&gt;masks.dl_dst, 0xff, sizeof wc-&gt;masks.dl_dst);</span>
+<span class="lineNum">     660 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1040 times"> + </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">       1040 :     if (bfd-&gt;eth_dst_set &amp;&amp; memcmp(bfd-&gt;eth_dst, flow-&gt;dl_dst, ETH_ADDR_LEN)) {</span>
+<span class="lineNum">     661 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     662 </span>                :            :     }
+<span class="lineNum">     663 </span>                :            : 
+<span class="lineNum">     664 </span>                :<span class="lineCov">       1040 :     memset(&amp;wc-&gt;masks.nw_proto, 0xff, sizeof wc-&gt;masks.nw_proto);</span>
+<span class="lineNum">     665 </span>                :<span class="lineCov">       1040 :     memset(&amp;wc-&gt;masks.tp_dst, 0xff, sizeof wc-&gt;masks.tp_dst);</span>
+<span class="lineNum">     666 </span>                :            : 
+<span class="lineNum">     667 </span>                :<span class="lineCov">       1040 :     atomic_read(&amp;bfd-&gt;check_tnl_key, &amp;check_tnl_key);</span>
+<span class="lineNum">     668 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 1038 times"> + </span>]:<span class="lineCov">       1040 :     if (check_tnl_key) {</span>
+<span class="lineNum">     669 </span>                :<span class="lineCov">          2 :         memset(&amp;wc-&gt;masks.tunnel.tun_id, 0xff, sizeof wc-&gt;masks.tunnel.tun_id);</span>
+<span class="lineNum">     670 </span>                :            :     }
+<span class="lineNum">     671 </span>                :<span class="lineCov">       2080 :     return (flow-&gt;dl_type == htons(ETH_TYPE_IP)</span>
+<span class="lineNum">     672 </span>        [<span class="branchCov" title="Branch 0 was taken 900 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        900 :             &amp;&amp; flow-&gt;nw_proto == IPPROTO_UDP</span>
+<span class="lineNum">     673 </span>        [<span class="branchCov" title="Branch 1 was taken 900 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        900 :             &amp;&amp; flow-&gt;tp_dst == htons(BFD_DEST_PORT)</span>
+<span class="lineNum">     674 </span>[<span class="branchCov" title="Branch 0 was taken 900 times"> + </span><span class="branchCov" title="Branch 1 was taken 140 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 2 times"> + </span><span class="branchCov" title="Branch 3 was taken 898 times"> + </span>]:<span class="lineCov">       1940 :             &amp;&amp; (!check_tnl_key || flow-&gt;tunnel.tun_id == htonll(0)));</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 5 was taken 1 time"> + </span><span class="branchCov" title="Branch 6 was taken 1 time"> + </span>]
+<span class="lineNum">     675 </span>                :            : }
+<a name="676"><span class="lineNum">     676 </span>                :            : </a>
+<span class="lineNum">     677 </span>                :            : void
+<span class="lineNum">     678 </span>                :<span class="lineCov">        899 : bfd_process_packet(struct bfd *bfd, const struct flow *flow,</span>
+<span class="lineNum">     679 </span>                :            :                    const struct ofpbuf *p) OVS_EXCLUDED(mutex)
+<span class="lineNum">     680 </span>                :            : {
+<span class="lineNum">     681 </span>                :            :     uint32_t rmt_min_rx, pkt_your_disc;
+<span class="lineNum">     682 </span>                :            :     enum state rmt_state;
+<span class="lineNum">     683 </span>                :            :     enum flags flags;
+<span class="lineNum">     684 </span>                :            :     uint8_t version;
+<span class="lineNum">     685 </span>                :            :     struct msg *msg;
+<span class="lineNum">     686 </span>                :<span class="lineCov">        899 :     const uint8_t *l7 = ofpbuf_get_udp_payload(p);</span>
+<span class="lineNum">     687 </span>                :            : 
+<span class="lineNum">     688 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 899 times"> + </span>]:<span class="lineCov">        899 :     if (!l7) {</span>
+<span class="lineNum">     689 </span>                :<span class="lineCov">        899 :         return; /* No UDP payload. */</span>
+<span class="lineNum">     690 </span>                :            :     }
+<span class="lineNum">     691 </span>                :            : 
+<span class="lineNum">     692 </span>                :            :     /* This function is designed to follow section RFC 5880 6.8.6 closely. */
+<span class="lineNum">     693 </span>                :            : 
+<span class="lineNum">     694 </span>                :<span class="lineCov">        899 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     695 </span>                :            :     /* Increments the decay rx counter. */
+<span class="lineNum">     696 </span>                :<span class="lineCov">        899 :     bfd-&gt;decay_rx_ctl++;</span>
+<span class="lineNum">     697 </span>                :            : 
+<span class="lineNum">     698 </span>                :<span class="lineCov">        899 :     bfd_forwarding__(bfd);</span>
+<span class="lineNum">     699 </span>                :            : 
+<span class="lineNum">     700 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 899 times"> + </span>]:<span class="lineCov">        899 :     if (flow-&gt;nw_ttl != 255) {</span>
+<span class="lineNum">     701 </span>                :            :         /* XXX Should drop in the kernel to prevent DOS. */
+<span class="lineNum">     702 </span>                :<span class="lineNoCov">          0 :         goto out;</span>
+<span class="lineNum">     703 </span>                :            :     }
+<span class="lineNum">     704 </span>                :            : 
+<span class="lineNum">     705 </span>                :<span class="lineCov">        899 :     msg = ofpbuf_at(p, l7 - (uint8_t *)ofpbuf_data(p), BFD_PACKET_LEN);</span>
+<span class="lineNum">     706 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 897 times"> + </span>]:<span class="lineCov">        899 :     if (!msg) {</span>
+<span class="lineNum">     707 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :         VLOG_INFO_RL(&amp;rl, &quot;%s: Received too-short BFD control message (only &quot;</span>
+<span class="lineNum">     708 </span>                :            :                      &quot;%&quot;PRIdPTR&quot; bytes long, at least %d required).&quot;,
+<span class="lineNum">     709 </span>                :            :                      bfd-&gt;name, (uint8_t *) ofpbuf_tail(p) - l7,
+<span class="lineNum">     710 </span>                :            :                      BFD_PACKET_LEN);
+<span class="lineNum">     711 </span>                :<span class="lineCov">          2 :         goto out;</span>
+<span class="lineNum">     712 </span>                :            :     }
+<span class="lineNum">     713 </span>                :            : 
+<span class="lineNum">     714 </span>                :            :     /* RFC 5880 Section 6.8.6
+<span class="lineNum">     715 </span>                :            :      * If the Length field is greater than the payload of the encapsulating
+<span class="lineNum">     716 </span>                :            :      * protocol, the packet MUST be discarded.
+<span class="lineNum">     717 </span>                :            :      *
+<span class="lineNum">     718 </span>                :            :      * Note that we make this check implicity.  Above we use ofpbuf_at() to
+<span class="lineNum">     719 </span>                :            :      * ensure that there are at least BFD_PACKET_LEN bytes in the payload of
+<span class="lineNum">     720 </span>                :            :      * the encapsulating protocol.  Below we require msg-&gt;length to be exactly
+<span class="lineNum">     721 </span>                :            :      * BFD_PACKET_LEN bytes. */
+<span class="lineNum">     722 </span>                :            : 
+<span class="lineNum">     723 </span>                :<span class="lineCov">        897 :     flags = msg-&gt;flags &amp; FLAGS_MASK;</span>
+<span class="lineNum">     724 </span>                :<span class="lineCov">        897 :     rmt_state = msg-&gt;flags &amp; STATE_MASK;</span>
+<span class="lineNum">     725 </span>                :<span class="lineCov">        897 :     version = msg-&gt;vers_diag &gt;&gt; VERS_SHIFT;</span>
+<span class="lineNum">     726 </span>                :            : 
+<span class="lineNum">     727 </span>                :<span class="lineCov">        897 :     log_msg(VLL_DBG, msg, &quot;Received BFD control message&quot;, bfd);</span>
+<span class="lineNum">     728 </span>                :            : 
+<span class="lineNum">     729 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 897 times"> + </span>]:<span class="lineCov">        897 :     if (version != BFD_VERSION) {</span>
+<span class="lineNum">     730 </span>                :<span class="lineNoCov">          0 :         log_msg(VLL_WARN, msg, &quot;Incorrect version&quot;, bfd);</span>
+<span class="lineNum">     731 </span>                :<span class="lineNoCov">          0 :         goto out;</span>
+<span class="lineNum">     732 </span>                :            :     }
+<span class="lineNum">     733 </span>                :            : 
+<span class="lineNum">     734 </span>                :            :     /* Technically this should happen after the length check. We don't support
+<span class="lineNum">     735 </span>                :            :      * authentication however, so it's simpler to do the check first. */
+<span class="lineNum">     736 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 897 times"> + </span>]:<span class="lineCov">        897 :     if (flags &amp; FLAG_AUTH) {</span>
+<span class="lineNum">     737 </span>                :<span class="lineNoCov">          0 :         log_msg(VLL_WARN, msg, &quot;Authenticated control message with&quot;</span>
+<span class="lineNum">     738 </span>                :            :                    &quot; authentication disabled&quot;, bfd);
+<span class="lineNum">     739 </span>                :<span class="lineNoCov">          0 :         goto out;</span>
+<span class="lineNum">     740 </span>                :            :     }
+<span class="lineNum">     741 </span>                :            : 
+<span class="lineNum">     742 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 897 times"> + </span>]:<span class="lineCov">        897 :     if (msg-&gt;length != BFD_PACKET_LEN) {</span>
+<span class="lineNum">     743 </span>                :<span class="lineNoCov">          0 :         log_msg(VLL_WARN, msg, &quot;Unexpected length&quot;, bfd);</span>
+<span class="lineNum">     744 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (msg-&gt;length &lt; BFD_PACKET_LEN) {</span>
+<span class="lineNum">     745 </span>                :<span class="lineNoCov">          0 :             goto out;</span>
+<span class="lineNum">     746 </span>                :            :         }
+<span class="lineNum">     747 </span>                :            :     }
+<span class="lineNum">     748 </span>                :            : 
+<span class="lineNum">     749 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 897 times"> + </span>]:<span class="lineCov">        897 :     if (!msg-&gt;mult) {</span>
+<span class="lineNum">     750 </span>                :<span class="lineNoCov">          0 :         log_msg(VLL_WARN, msg, &quot;Zero multiplier&quot;, bfd);</span>
+<span class="lineNum">     751 </span>                :<span class="lineNoCov">          0 :         goto out;</span>
+<span class="lineNum">     752 </span>                :            :     }
+<span class="lineNum">     753 </span>                :            : 
+<span class="lineNum">     754 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 897 times"> + </span>]:<span class="lineCov">        897 :     if (flags &amp; FLAG_MULTIPOINT) {</span>
+<span class="lineNum">     755 </span>                :<span class="lineNoCov">          0 :         log_msg(VLL_WARN, msg, &quot;Unsupported multipoint flag&quot;, bfd);</span>
+<span class="lineNum">     756 </span>                :<span class="lineNoCov">          0 :         goto out;</span>
+<span class="lineNum">     757 </span>                :            :     }
+<span class="lineNum">     758 </span>                :            : 
+<span class="lineNum">     759 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 897 times"> + </span>]:<span class="lineCov">        897 :     if (!msg-&gt;my_disc) {</span>
+<span class="lineNum">     760 </span>                :<span class="lineNoCov">          0 :         log_msg(VLL_WARN, msg, &quot;NULL my_disc&quot;, bfd);</span>
+<span class="lineNum">     761 </span>                :<span class="lineNoCov">          0 :         goto out;</span>
+<span class="lineNum">     762 </span>                :            :     }
+<span class="lineNum">     763 </span>                :            : 
+<span class="lineNum">     764 </span>                :<span class="lineCov">        897 :     pkt_your_disc = ntohl(msg-&gt;your_disc);</span>
+<span class="lineNum">     765 </span>        [<span class="branchCov" title="Branch 0 was taken 883 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>]:<span class="lineCov">        897 :     if (pkt_your_disc) {</span>
+<span class="lineNum">     766 </span>                :            :         /* Technically, we should use the your discriminator field to figure
+<span class="lineNum">     767 </span>                :            :          * out which 'struct bfd' this packet is destined towards.  That way a
+<span class="lineNum">     768 </span>                :            :          * bfd session could migrate from one interface to another
+<span class="lineNum">     769 </span>                :            :          * transparently.  This doesn't fit in with the OVS structure very
+<span class="lineNum">     770 </span>                :            :          * well, so in this respect, we are not compliant. */
+<span class="lineNum">     771 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 883 times"> + </span>]:<span class="lineCov">        883 :        if (pkt_your_disc != bfd-&gt;disc) {</span>
+<span class="lineNum">     772 </span>                :<span class="lineNoCov">          0 :            log_msg(VLL_WARN, msg, &quot;Incorrect your_disc&quot;, bfd);</span>
+<span class="lineNum">     773 </span>                :<span class="lineNoCov">          0 :            goto out;</span>
+<span class="lineNum">     774 </span>                :            :        }
+<span class="lineNum">     775 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>]:<span class="lineCov">         14 :     } else if (rmt_state &gt; STATE_DOWN) {</span>
+<span class="lineNum">     776 </span>                :<span class="lineNoCov">          0 :         log_msg(VLL_WARN, msg, &quot;Null your_disc&quot;, bfd);</span>
+<span class="lineNum">     777 </span>                :<span class="lineNoCov">          0 :         goto out;</span>
+<span class="lineNum">     778 </span>                :            :     }
+<span class="lineNum">     779 </span>                :            : 
+<span class="lineNum">     780 </span>        [<span class="branchCov" title="Branch 0 was taken 36 times"> + </span><span class="branchCov" title="Branch 1 was taken 861 times"> + </span>]:<span class="lineCov">        897 :     if (bfd-&gt;rmt_state != rmt_state) {</span>
+<span class="lineNum">     781 </span>                :<span class="lineCov">         36 :         bfd_status_changed(bfd);</span>
+<span class="lineNum">     782 </span>                :            :     }
+<span class="lineNum">     783 </span>                :            : 
+<span class="lineNum">     784 </span>                :<span class="lineCov">        897 :     bfd-&gt;rmt_disc = ntohl(msg-&gt;my_disc);</span>
+<span class="lineNum">     785 </span>                :<span class="lineCov">        897 :     bfd-&gt;rmt_state = rmt_state;</span>
+<span class="lineNum">     786 </span>                :<span class="lineCov">        897 :     bfd-&gt;rmt_flags = flags;</span>
+<span class="lineNum">     787 </span>                :<span class="lineCov">        897 :     bfd-&gt;rmt_diag = msg-&gt;vers_diag &amp; DIAG_MASK;</span>
+<span class="lineNum">     788 </span>                :            : 
+<span class="lineNum">     789 </span>[<span class="branchCov" title="Branch 0 was taken 14 times"> + </span><span class="branchCov" title="Branch 1 was taken 883 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 14 times"> + </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span>]:<span class="lineCov">        897 :     if (flags &amp; FLAG_FINAL &amp;&amp; bfd_in_poll(bfd)) {</span>
+<span class="lineNum">     790 </span>                :<span class="lineCov">         14 :         bfd-&gt;min_tx = bfd-&gt;poll_min_tx;</span>
+<span class="lineNum">     791 </span>                :<span class="lineCov">         14 :         bfd-&gt;min_rx = bfd-&gt;poll_min_rx;</span>
+<span class="lineNum">     792 </span>                :<span class="lineCov">         14 :         bfd-&gt;flags &amp;= ~FLAG_POLL;</span>
+<span class="lineNum">     793 </span>                :<span class="lineCov">         14 :         log_msg(VLL_INFO, msg, &quot;Poll sequence terminated&quot;, bfd);</span>
+<span class="lineNum">     794 </span>                :            :     }
+<span class="lineNum">     795 </span>                :            : 
+<span class="lineNum">     796 </span>        [<span class="branchCov" title="Branch 0 was taken 14 times"> + </span><span class="branchCov" title="Branch 1 was taken 883 times"> + </span>]:<span class="lineCov">        897 :     if (flags &amp; FLAG_POLL) {</span>
+<span class="lineNum">     797 </span>                :            :         /* RFC 5880 Section 6.5
+<span class="lineNum">     798 </span>                :            :          * When the other system receives a Poll, it immediately transmits a
+<span class="lineNum">     799 </span>                :            :          * BFD Control packet with the Final (F) bit set, independent of any
+<span class="lineNum">     800 </span>                :            :          * periodic BFD Control packets it may be sending
+<span class="lineNum">     801 </span>                :            :          * (see section 6.8.7). */
+<span class="lineNum">     802 </span>                :<span class="lineCov">         14 :         bfd-&gt;flags &amp;= ~FLAG_POLL;</span>
+<span class="lineNum">     803 </span>                :<span class="lineCov">         14 :         bfd-&gt;flags |= FLAG_FINAL;</span>
+<span class="lineNum">     804 </span>                :            :     }
+<span class="lineNum">     805 </span>                :            : 
+<span class="lineNum">     806 </span>        [<span class="branchCov" title="Branch 1 was taken 897 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        897 :     rmt_min_rx = MAX(ntohl(msg-&gt;min_rx) / 1000, 1);</span>
+<span class="lineNum">     807 </span>        [<span class="branchCov" title="Branch 0 was taken 32 times"> + </span><span class="branchCov" title="Branch 1 was taken 865 times"> + </span>]:<span class="lineCov">        897 :     if (bfd-&gt;rmt_min_rx != rmt_min_rx) {</span>
+<span class="lineNum">     808 </span>                :<span class="lineCov">         32 :         bfd-&gt;rmt_min_rx = rmt_min_rx;</span>
+<span class="lineNum">     809 </span>        [<span class="branchCov" title="Branch 0 was taken 31 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">         32 :         if (bfd-&gt;next_tx) {</span>
+<span class="lineNum">     810 </span>                :<span class="lineCov">         31 :             bfd_set_next_tx(bfd);</span>
+<span class="lineNum">     811 </span>                :            :         }
+<span class="lineNum">     812 </span>                :<span class="lineCov">         32 :         log_msg(VLL_INFO, msg, &quot;New remote min_rx&quot;, bfd);</span>
+<span class="lineNum">     813 </span>                :            :     }
+<span class="lineNum">     814 </span>                :            : 
+<span class="lineNum">     815 </span>        [<span class="branchCov" title="Branch 1 was taken 897 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        897 :     bfd-&gt;rmt_min_tx = MAX(ntohl(msg-&gt;min_tx) / 1000, 1);</span>
+<span class="lineNum">     816 </span>                :<span class="lineCov">        897 :     bfd-&gt;detect_time = bfd_rx_interval(bfd) * bfd-&gt;mult + time_msec();</span>
+<span class="lineNum">     817 </span>                :            : 
+<span class="lineNum">     818 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 897 times"> + </span>]:<span class="lineCov">        897 :     if (bfd-&gt;state == STATE_ADMIN_DOWN) {</span>
+<span class="lineNum">     819 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_DBG_RL(&amp;rl, &quot;Administratively down, dropping control message.&quot;);</span>
+<span class="lineNum">     820 </span>                :<span class="lineNoCov">          0 :         goto out;</span>
+<span class="lineNum">     821 </span>                :            :     }
+<span class="lineNum">     822 </span>                :            : 
+<span class="lineNum">     823 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 897 times"> + </span>]:<span class="lineCov">        897 :     if (rmt_state == STATE_ADMIN_DOWN) {</span>
+<span class="lineNum">     824 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (bfd-&gt;state != STATE_DOWN) {</span>
+<span class="lineNum">     825 </span>                :<span class="lineNoCov">          0 :             bfd_set_state(bfd, STATE_DOWN, DIAG_RMT_DOWN);</span>
+<span class="lineNum">     826 </span>                :            :         }
+<span class="lineNum">     827 </span>                :            :     } else {
+<span class="lineNum">     828 </span>  [<span class="branchCov" title="Branch 0 was taken 25 times"> + </span><span class="branchCov" title="Branch 1 was taken 13 times"> + </span><span class="branchCov" title="Branch 2 was taken 859 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        897 :         switch (bfd-&gt;state) {</span>
+<span class="lineNum">     829 </span>                :            :         case STATE_DOWN:
+<span class="lineNum">     830 </span>        [<span class="branchCov" title="Branch 0 was taken 13 times"> + </span><span class="branchCov" title="Branch 1 was taken 12 times"> + </span>]:<span class="lineCov">         25 :             if (rmt_state == STATE_DOWN) {</span>
+<span class="lineNum">     831 </span>                :<span class="lineCov">         13 :                 bfd_set_state(bfd, STATE_INIT, bfd-&gt;diag);</span>
+<span class="lineNum">     832 </span>        [<span class="branchCov" title="Branch 0 was taken 12 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         12 :             } else if (rmt_state == STATE_INIT) {</span>
+<span class="lineNum">     833 </span>                :<span class="lineCov">         12 :                 bfd_set_state(bfd, STATE_UP, bfd-&gt;diag);</span>
+<span class="lineNum">     834 </span>                :            :             }
+<span class="lineNum">     835 </span>                :<span class="lineCov">         25 :             break;</span>
+<span class="lineNum">     836 </span>                :            :         case STATE_INIT:
+<span class="lineNum">     837 </span>        [<span class="branchCov" title="Branch 0 was taken 12 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">         13 :             if (rmt_state &gt; STATE_DOWN) {</span>
+<span class="lineNum">     838 </span>                :<span class="lineCov">         12 :                 bfd_set_state(bfd, STATE_UP, bfd-&gt;diag);</span>
+<span class="lineNum">     839 </span>                :            :             }
+<span class="lineNum">     840 </span>                :<span class="lineCov">         13 :             break;</span>
+<span class="lineNum">     841 </span>                :            :         case STATE_UP:
+<span class="lineNum">     842 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 859 times"> + </span>]:<span class="lineCov">        859 :             if (rmt_state &lt;= STATE_DOWN) {</span>
+<span class="lineNum">     843 </span>                :<span class="lineNoCov">          0 :                 bfd_set_state(bfd, STATE_DOWN, DIAG_RMT_DOWN);</span>
+<span class="lineNum">     844 </span>                :<span class="lineNoCov">          0 :                 log_msg(VLL_INFO, msg, &quot;Remote signaled STATE_DOWN&quot;, bfd);</span>
+<span class="lineNum">     845 </span>                :            :             }
+<span class="lineNum">     846 </span>                :<span class="lineCov">        859 :             break;</span>
+<span class="lineNum">     847 </span>                :            :         case STATE_ADMIN_DOWN:
+<span class="lineNum">     848 </span>                :            :         default:
+<span class="lineNum">     849 </span>                :<span class="lineNoCov">          0 :             OVS_NOT_REACHED();</span>
+<span class="lineNum">     850 </span>                :            :         }
+<span class="lineNum">     851 </span>                :            :     }
+<span class="lineNum">     852 </span>                :            :     /* XXX: RFC 5880 Section 6.8.6 Demand mode related calculations here. */
+<span class="lineNum">     853 </span>                :            : 
+<span class="lineNum">     854 </span>        [<span class="branchCov" title="Branch 0 was taken 53 times"> + </span><span class="branchCov" title="Branch 1 was taken 844 times"> + </span>]:<span class="lineCov">        897 :     if (bfd-&gt;forwarding_if_rx) {</span>
+<span class="lineNum">     855 </span>                :<span class="lineCov">         53 :         bfd-&gt;demand_rx_bfd_time = time_msec() + 100 * bfd-&gt;cfg_min_rx;</span>
+<span class="lineNum">     856 </span>                :            :     }
+<span class="lineNum">     857 </span>                :            : 
+<span class="lineNum">     858 </span>                :            : out:
+<span class="lineNum">     859 </span>                :<span class="lineCov">        899 :     bfd_forwarding__(bfd);</span>
+<span class="lineNum">     860 </span>                :<span class="lineCov">        899 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     861 </span>                :            : }
+<span class="lineNum">     862 </span>                :            : 
+<a name="863"><span class="lineNum">     863 </span>                :            : /* Must be called when the netdev owned by 'bfd' should change. */</a>
+<span class="lineNum">     864 </span>                :            : void
+<span class="lineNum">     865 </span>                :<span class="lineCov">         52 : bfd_set_netdev(struct bfd *bfd, const struct netdev *netdev)</span>
+<span class="lineNum">     866 </span>                :            :     OVS_EXCLUDED(mutex)
+<span class="lineNum">     867 </span>                :            : {
+<span class="lineNum">     868 </span>                :<span class="lineCov">         52 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     869 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 52 times"> + </span>]:<span class="lineCov">         52 :     if (bfd-&gt;netdev != netdev) {</span>
+<span class="lineNum">     870 </span>                :<span class="lineNoCov">          0 :         netdev_close(bfd-&gt;netdev);</span>
+<span class="lineNum">     871 </span>                :<span class="lineNoCov">          0 :         bfd-&gt;netdev = netdev_ref(netdev);</span>
+<span class="lineNum">     872 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (bfd-&gt;decay_min_rx &amp;&amp; bfd-&gt;state == STATE_UP) {</span>
+<span class="lineNum">     873 </span>                :<span class="lineNoCov">          0 :             bfd_decay_update(bfd);</span>
+<span class="lineNum">     874 </span>                :            :         }
+<span class="lineNum">     875 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (bfd-&gt;forwarding_if_rx &amp;&amp; bfd-&gt;state == STATE_UP) {</span>
+<span class="lineNum">     876 </span>                :<span class="lineNoCov">          0 :             bfd_forwarding_if_rx_update(bfd);</span>
+<span class="lineNum">     877 </span>                :            :         }
+<span class="lineNum">     878 </span>                :<span class="lineNoCov">          0 :         bfd-&gt;rx_packets = bfd_rx_packets(bfd);</span>
+<span class="lineNum">     879 </span>                :            :     }
+<span class="lineNum">     880 </span>                :<span class="lineCov">         52 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     881 </span>                :<span class="lineCov">         52 : }</span>
+<span class="lineNum">     882 </span>                :            : 
+<span class="lineNum">     883 </span>                :            : 
+<span class="lineNum">     884 </span>                :            : /* Updates the forwarding flag.  If override is not configured and
+<span class="lineNum">     885 </span>                :            :  * the forwarding flag value changes, increments the flap count.
+<span class="lineNum">     886 </span>                :            :  *
+<span class="lineNum">     887 </span>                :            :  * Note this function may be called multiple times in a function
+<span class="lineNum">     888 </span>                :            :  * (e.g. bfd_account_rx) before and after the bfd state or status
+<a name="889"><span class="lineNum">     889 </span>                :            :  * change.  This is to capture any forwarding flag flap. */</a>
+<span class="lineNum">     890 </span>                :            : static bool
+<span class="lineNum">     891 </span>                :<span class="lineCov">       4076 : bfd_forwarding__(struct bfd *bfd) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     892 </span>                :            : {
+<span class="lineNum">     893 </span>                :<span class="lineCov">       4076 :     long long int now = time_msec();</span>
+<span class="lineNum">     894 </span>                :            :     bool forwarding_if_rx;
+<span class="lineNum">     895 </span>                :<span class="lineCov">       4076 :     bool last_forwarding = bfd-&gt;last_forwarding;</span>
+<span class="lineNum">     896 </span>                :            : 
+<span class="lineNum">     897 </span>        [<span class="branchCov" title="Branch 0 was taken 165 times"> + </span><span class="branchCov" title="Branch 1 was taken 3911 times"> + </span>]:<span class="lineCov">       4076 :     if (bfd-&gt;forwarding_override != -1) {</span>
+<span class="lineNum">     898 </span>                :<span class="lineCov">        165 :         return bfd-&gt;forwarding_override == 1;</span>
+<span class="lineNum">     899 </span>                :            :     }
+<span class="lineNum">     900 </span>                :            : 
+<span class="lineNum">     901 </span>                :<span class="lineCov">       7822 :     forwarding_if_rx = bfd-&gt;forwarding_if_rx</span>
+<span class="lineNum">     902 </span>        [<span class="branchCov" title="Branch 0 was taken 469 times"> + </span><span class="branchCov" title="Branch 1 was taken 15 times"> + </span>]:<span class="lineCov">        484 :                        &amp;&amp; bfd-&gt;forwarding_if_rx_detect_time &gt; now</span>
+<span class="lineNum">     903 </span>[<span class="branchCov" title="Branch 0 was taken 484 times"> + </span><span class="branchCov" title="Branch 1 was taken 3427 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 374 times"> + </span><span class="branchCov" title="Branch 3 was taken 95 times"> + </span>]:<span class="lineCov">       4395 :                        &amp;&amp; bfd-&gt;demand_rx_bfd_time &gt; now;</span>
+<span class="lineNum">     904 </span>                :            : 
+<span class="lineNum">     905 </span>        [<span class="branchCov" title="Branch 0 was taken 95 times"> + </span><span class="branchCov" title="Branch 1 was taken 442 times"> + </span>]:<span class="lineCov">        537 :     bfd-&gt;last_forwarding = (bfd-&gt;state == STATE_UP || forwarding_if_rx)</span>
+<span class="lineNum">     906 </span>        [<span class="branchCov" title="Branch 0 was taken 3469 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       3469 :                            &amp;&amp; bfd-&gt;rmt_diag != DIAG_PATH_DOWN</span>
+<span class="lineNum">     907 </span>        [<span class="branchCov" title="Branch 0 was taken 3451 times"> + </span><span class="branchCov" title="Branch 1 was taken 18 times"> + </span>]:<span class="lineCov">       3469 :                            &amp;&amp; bfd-&gt;rmt_diag != DIAG_CPATH_DOWN</span>
+<span class="lineNum">     908 </span>[<span class="branchCov" title="Branch 0 was taken 537 times"> + </span><span class="branchCov" title="Branch 1 was taken 3374 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 3451 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">       7822 :                            &amp;&amp; bfd-&gt;rmt_diag != DIAG_RCPATH_DOWN;</span>
+<span class="lineNum">     909 </span>        [<span class="branchCov" title="Branch 0 was taken 30 times"> + </span><span class="branchCov" title="Branch 1 was taken 3881 times"> + </span>]:<span class="lineCov">       3911 :     if (bfd-&gt;last_forwarding != last_forwarding) {</span>
+<span class="lineNum">     910 </span>                :<span class="lineCov">         30 :         bfd-&gt;flap_count++;</span>
+<span class="lineNum">     911 </span>                :<span class="lineCov">         30 :         bfd_status_changed(bfd);</span>
+<span class="lineNum">     912 </span>                :            :     }
+<span class="lineNum">     913 </span>                :<span class="lineCov">       4076 :     return bfd-&gt;last_forwarding;</span>
+<span class="lineNum">     914 </span>                :            : }
+<span class="lineNum">     915 </span>                :            : 
+<a name="916"><span class="lineNum">     916 </span>                :            : /* Helpers. */</a>
+<span class="lineNum">     917 </span>                :            : static bool
+<span class="lineNum">     918 </span>                :<span class="lineNoCov">          0 : bfd_lookup_ip(const char *host_name, struct in_addr *addr)</span>
+<span class="lineNum">     919 </span>                :            : {
+<span class="lineNum">     920 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!inet_pton(AF_INET, host_name, addr)) {</span>
+<span class="lineNum">     921 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;\&quot;%s\&quot; is not a valid IP address&quot;, host_name);</span>
+<span class="lineNum">     922 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     923 </span>                :            :     }
+<span class="lineNum">     924 </span>                :<span class="lineNoCov">          0 :     return true;</span>
+<span class="lineNum">     925 </span>                :            : }
+<a name="926"><span class="lineNum">     926 </span>                :            : </a>
+<span class="lineNum">     927 </span>                :            : static bool
+<span class="lineNum">     928 </span>                :<span class="lineCov">       1028 : bfd_in_poll(const struct bfd *bfd) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     929 </span>                :            : {
+<span class="lineNum">     930 </span>                :<span class="lineCov">       1028 :     return (bfd-&gt;flags &amp; FLAG_POLL) != 0;</span>
+<span class="lineNum">     931 </span>                :            : }
+<a name="932"><span class="lineNum">     932 </span>                :            : </a>
+<span class="lineNum">     933 </span>                :            : static void
+<span class="lineNum">     934 </span>                :<span class="lineCov">         44 : bfd_poll(struct bfd *bfd) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     935 </span>                :            : {
+<span class="lineNum">     936 </span>[<span class="branchCov" title="Branch 0 was taken 20 times"> + </span><span class="branchCov" title="Branch 1 was taken 24 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 15 times"> + </span><span class="branchCov" title="Branch 4 was taken 5 times"> + </span>]:<span class="lineCov">         44 :     if (bfd-&gt;state &gt; STATE_DOWN &amp;&amp; !bfd_in_poll(bfd)</span>
+<span class="lineNum">     937 </span>        [<span class="branchCov" title="Branch 0 was taken 15 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         15 :         &amp;&amp; !(bfd-&gt;flags &amp; FLAG_FINAL)) {</span>
+<span class="lineNum">     938 </span>                :<span class="lineCov">         15 :         bfd-&gt;poll_min_tx = bfd-&gt;cfg_min_tx;</span>
+<span class="lineNum">     939 </span>        [<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchCov" title="Branch 1 was taken 11 times"> + </span>]:<span class="lineCov">         15 :         bfd-&gt;poll_min_rx = bfd-&gt;in_decay ? bfd-&gt;decay_min_rx : bfd-&gt;cfg_min_rx;</span>
+<span class="lineNum">     940 </span>                :<span class="lineCov">         15 :         bfd-&gt;flags |= FLAG_POLL;</span>
+<span class="lineNum">     941 </span>                :<span class="lineCov">         15 :         bfd-&gt;next_tx = 0;</span>
+<span class="lineNum">     942 </span>        [<span class="branchCov" title="Branch 0 was taken 15 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         15 :         VLOG_INFO_RL(&amp;rl, &quot;%s: Initiating poll sequence&quot;, bfd-&gt;name);</span>
+<span class="lineNum">     943 </span>                :            :     }
+<span class="lineNum">     944 </span>                :<span class="lineCov">         44 : }</span>
+<a name="945"><span class="lineNum">     945 </span>                :            : </a>
+<span class="lineNum">     946 </span>                :            : static long long int
+<span class="lineNum">     947 </span>                :<span class="lineCov">       3626 : bfd_min_tx(const struct bfd *bfd) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     948 </span>                :            : {
+<span class="lineNum">     949 </span>                :            :     /* RFC 5880 Section 6.8.3
+<span class="lineNum">     950 </span>                :            :      * When bfd.SessionState is not Up, the system MUST set
+<span class="lineNum">     951 </span>                :            :      * bfd.DesiredMinTxInterval to a value of not less than one second
+<span class="lineNum">     952 </span>                :            :      * (1,000,000 microseconds).  This is intended to ensure that the
+<span class="lineNum">     953 </span>                :            :      * bandwidth consumed by BFD sessions that are not Up is negligible,
+<span class="lineNum">     954 </span>                :            :      * particularly in the case where a neighbor may not be running BFD. */
+<span class="lineNum">     955 </span>        [<span class="branchCov" title="Branch 0 was taken 3147 times"> + </span><span class="branchCov" title="Branch 1 was taken 479 times"> + </span>]:<span class="lineCov">       3626 :     return (bfd-&gt;state == STATE_UP ? bfd-&gt;min_tx : MAX(bfd-&gt;min_tx, 1000));</span>
+<span class="lineNum">     956 </span>                :            : }
+<a name="957"><span class="lineNum">     957 </span>                :            : </a>
+<span class="lineNum">     958 </span>                :            : static long long int
+<span class="lineNum">     959 </span>                :<span class="lineCov">       2312 : bfd_tx_interval(const struct bfd *bfd) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     960 </span>                :            : {
+<span class="lineNum">     961 </span>                :<span class="lineCov">       2312 :     long long int interval = bfd_min_tx(bfd);</span>
+<span class="lineNum">     962 </span>                :<span class="lineCov">       2312 :     return MAX(interval, bfd-&gt;rmt_min_rx);</span>
+<span class="lineNum">     963 </span>                :            : }
+<a name="964"><span class="lineNum">     964 </span>                :            : </a>
+<span class="lineNum">     965 </span>                :            : static long long int
+<span class="lineNum">     966 </span>                :<span class="lineCov">       1369 : bfd_rx_interval(const struct bfd *bfd) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     967 </span>                :            : {
+<span class="lineNum">     968 </span>                :<span class="lineCov">       1369 :     return MAX(bfd-&gt;min_rx, bfd-&gt;rmt_min_tx);</span>
+<span class="lineNum">     969 </span>                :            : }
+<a name="970"><span class="lineNum">     970 </span>                :            : </a>
+<span class="lineNum">     971 </span>                :            : static void
+<span class="lineNum">     972 </span>                :<span class="lineCov">       1021 : bfd_set_next_tx(struct bfd *bfd) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     973 </span>                :            : {
+<span class="lineNum">     974 </span>                :<span class="lineCov">       1021 :     long long int interval = bfd_tx_interval(bfd);</span>
+<span class="lineNum">     975 </span>                :<span class="lineCov">       1021 :     interval -= interval * random_range(26) / 100;</span>
+<span class="lineNum">     976 </span>                :<span class="lineCov">       1021 :     bfd-&gt;next_tx = bfd-&gt;last_tx + interval;</span>
+<span class="lineNum">     977 </span>                :<span class="lineCov">       1021 : }</span>
+<a name="978"><span class="lineNum">     978 </span>                :            : </a>
+<span class="lineNum">     979 </span>                :            : static const char *
+<span class="lineNum">     980 </span>                :<span class="lineCov">        722 : bfd_flag_str(enum flags flags)</span>
+<span class="lineNum">     981 </span>                :            : {
+<span class="lineNum">     982 </span>                :<span class="lineCov">        722 :     struct ds ds = DS_EMPTY_INITIALIZER;</span>
+<span class="lineNum">     983 </span>                :            :     static char flag_str[128];
+<span class="lineNum">     984 </span>                :            : 
+<span class="lineNum">     985 </span>        [<span class="branchCov" title="Branch 0 was taken 671 times"> + </span><span class="branchCov" title="Branch 1 was taken 51 times"> + </span>]:<span class="lineCov">        722 :     if (!flags) {</span>
+<span class="lineNum">     986 </span>                :<span class="lineCov">        671 :         return &quot;none&quot;;</span>
+<span class="lineNum">     987 </span>                :            :     }
+<span class="lineNum">     988 </span>                :            : 
+<span class="lineNum">     989 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 51 times"> + </span>]:<span class="lineCov">         51 :     if (flags &amp; FLAG_MULTIPOINT) {</span>
+<span class="lineNum">     990 </span>                :<span class="lineNoCov">          0 :         ds_put_cstr(&amp;ds, &quot;multipoint &quot;);</span>
+<span class="lineNum">     991 </span>                :            :     }
+<span class="lineNum">     992 </span>                :            : 
+<span class="lineNum">     993 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 51 times"> + </span>]:<span class="lineCov">         51 :     if (flags &amp; FLAG_DEMAND) {</span>
+<span class="lineNum">     994 </span>                :<span class="lineNoCov">          0 :         ds_put_cstr(&amp;ds, &quot;demand &quot;);</span>
+<span class="lineNum">     995 </span>                :            :     }
+<span class="lineNum">     996 </span>                :            : 
+<span class="lineNum">     997 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 51 times"> + </span>]:<span class="lineCov">         51 :     if (flags &amp; FLAG_AUTH) {</span>
+<span class="lineNum">     998 </span>                :<span class="lineNoCov">          0 :         ds_put_cstr(&amp;ds, &quot;auth &quot;);</span>
+<span class="lineNum">     999 </span>                :            :     }
+<span class="lineNum">    1000 </span>                :            : 
+<span class="lineNum">    1001 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 51 times"> + </span>]:<span class="lineCov">         51 :     if (flags &amp; FLAG_CTL) {</span>
+<span class="lineNum">    1002 </span>                :<span class="lineNoCov">          0 :         ds_put_cstr(&amp;ds, &quot;ctl &quot;);</span>
+<span class="lineNum">    1003 </span>                :            :     }
+<span class="lineNum">    1004 </span>                :            : 
+<span class="lineNum">    1005 </span>        [<span class="branchCov" title="Branch 0 was taken 37 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>]:<span class="lineCov">         51 :     if (flags &amp; FLAG_FINAL) {</span>
+<span class="lineNum">    1006 </span>                :<span class="lineCov">         37 :         ds_put_cstr(&amp;ds, &quot;final &quot;);</span>
+<span class="lineNum">    1007 </span>                :            :     }
+<span class="lineNum">    1008 </span>                :            : 
+<span class="lineNum">    1009 </span>        [<span class="branchCov" title="Branch 0 was taken 14 times"> + </span><span class="branchCov" title="Branch 1 was taken 37 times"> + </span>]:<span class="lineCov">         51 :     if (flags &amp; FLAG_POLL) {</span>
+<span class="lineNum">    1010 </span>                :<span class="lineCov">         14 :         ds_put_cstr(&amp;ds, &quot;poll &quot;);</span>
+<span class="lineNum">    1011 </span>                :            :     }
+<span class="lineNum">    1012 </span>                :            : 
+<span class="lineNum">    1013 </span>                :            :     /* Do not copy the trailing whitespace. */
+<span class="lineNum">    1014 </span>                :<span class="lineCov">         51 :     ds_chomp(&amp;ds, ' ');</span>
+<span class="lineNum">    1015 </span>                :<span class="lineCov">         51 :     ovs_strlcpy(flag_str, ds_cstr(&amp;ds), sizeof flag_str);</span>
+<span class="lineNum">    1016 </span>                :<span class="lineCov">         51 :     ds_destroy(&amp;ds);</span>
+<span class="lineNum">    1017 </span>                :<span class="lineCov">        722 :     return flag_str;</span>
+<span class="lineNum">    1018 </span>                :            : }
+<a name="1019"><span class="lineNum">    1019 </span>                :            : </a>
+<span class="lineNum">    1020 </span>                :            : static const char *
+<span class="lineNum">    1021 </span>                :<span class="lineCov">       1057 : bfd_state_str(enum state state)</span>
+<span class="lineNum">    1022 </span>                :            : {
+<span class="lineNum">    1023 </span>  [<span class="branchCov" title="Branch 0 was taken 69 times"> + </span><span class="branchCov" title="Branch 1 was taken 222 times"> + </span><span class="branchCov" title="Branch 2 was taken 98 times"> + </span><span class="branchCov" title="Branch 3 was taken 668 times"> + </span> :<span class="lineCov">       1057 :     switch (state) {</span>
+<span class="lineNum">         </span>            <span class="branchNoCov" title="Branch 4 was not taken"> - </span>]
+<span class="lineNum">    1024 </span>                :<span class="lineCov">         69 :     case STATE_ADMIN_DOWN: return &quot;admin_down&quot;;</span>
+<span class="lineNum">    1025 </span>                :<span class="lineCov">        222 :     case STATE_DOWN: return &quot;down&quot;;</span>
+<span class="lineNum">    1026 </span>                :<span class="lineCov">         98 :     case STATE_INIT: return &quot;init&quot;;</span>
+<span class="lineNum">    1027 </span>                :<span class="lineCov">        668 :     case STATE_UP: return &quot;up&quot;;</span>
+<span class="lineNum">    1028 </span>                :<span class="lineCov">       1057 :     default: return &quot;invalid&quot;;</span>
+<span class="lineNum">    1029 </span>                :            :     }
+<span class="lineNum">    1030 </span>                :            : }
+<a name="1031"><span class="lineNum">    1031 </span>                :            : </a>
+<span class="lineNum">    1032 </span>                :            : static const char *
+<span class="lineNum">    1033 </span>                :<span class="lineCov">       1057 : bfd_diag_str(enum diag diag) {</span>
+<span class="lineNum">    1034 </span>  [<span class="branchCov" title="Branch 0 was taken 908 times"> + </span><span class="branchCov" title="Branch 1 was taken 144 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span> :<span class="lineCov">       1057 :     switch (diag) {</span>
+<span class="lineNum">         </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchCov" title="Branch 6 was taken 5 times"> + </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span><span class="branchNoCov" title="Branch 8 was not taken"> - </span> 
+<span class="lineNum">         </span>            <span class="branchNoCov" title="Branch 9 was not taken"> - </span>]
+<span class="lineNum">    1035 </span>                :<span class="lineCov">        908 :     case DIAG_NONE: return &quot;No Diagnostic&quot;;</span>
+<span class="lineNum">    1036 </span>                :<span class="lineCov">        144 :     case DIAG_EXPIRED: return &quot;Control Detection Time Expired&quot;;</span>
+<span class="lineNum">    1037 </span>                :<span class="lineNoCov">          0 :     case DIAG_ECHO_FAILED: return &quot;Echo Function Failed&quot;;</span>
+<span class="lineNum">    1038 </span>                :<span class="lineNoCov">          0 :     case DIAG_RMT_DOWN: return &quot;Neighbor Signaled Session Down&quot;;</span>
+<span class="lineNum">    1039 </span>                :<span class="lineNoCov">          0 :     case DIAG_FWD_RESET: return &quot;Forwarding Plane Reset&quot;;</span>
+<span class="lineNum">    1040 </span>                :<span class="lineNoCov">          0 :     case DIAG_PATH_DOWN: return &quot;Path Down&quot;;</span>
+<span class="lineNum">    1041 </span>                :<span class="lineCov">          5 :     case DIAG_CPATH_DOWN: return &quot;Concatenated Path Down&quot;;</span>
+<span class="lineNum">    1042 </span>                :<span class="lineNoCov">          0 :     case DIAG_ADMIN_DOWN: return &quot;Administratively Down&quot;;</span>
+<span class="lineNum">    1043 </span>                :<span class="lineNoCov">          0 :     case DIAG_RCPATH_DOWN: return &quot;Reverse Concatenated Path Down&quot;;</span>
+<span class="lineNum">    1044 </span>                :<span class="lineCov">       1057 :     default: return &quot;Invalid Diagnostic&quot;;</span>
+<span class="lineNum">    1045 </span>                :            :     }
+<span class="lineNum">    1046 </span>                :            : };
+<a name="1047"><span class="lineNum">    1047 </span>                :            : </a>
+<span class="lineNum">    1048 </span>                :            : static void
+<span class="lineNum">    1049 </span>                :<span class="lineCov">       1933 : log_msg(enum vlog_level level, const struct msg *p, const char *message,</span>
+<span class="lineNum">    1050 </span>                :            :         const struct bfd *bfd) OVS_REQUIRES(mutex)
+<span class="lineNum">    1051 </span>                :            : {
+<span class="lineNum">    1052 </span>                :<span class="lineCov">       1933 :     struct ds ds = DS_EMPTY_INITIALIZER;</span>
+<span class="lineNum">    1053 </span>                :            : 
+<span class="lineNum">    1054 </span>        [<span class="branchCov" title="Branch 1 was taken 46 times"> + </span><span class="branchCov" title="Branch 2 was taken 1887 times"> + </span>]:<span class="lineCov">       1933 :     if (vlog_should_drop(THIS_MODULE, level, &amp;rl)) {</span>
+<span class="lineNum">    1055 </span>                :<span class="lineCov">       1933 :         return;</span>
+<span class="lineNum">    1056 </span>                :            :     }
+<span class="lineNum">    1057 </span>                :            : 
+<span class="lineNum">    1058 </span>                :<span class="lineCov">        138 :     ds_put_format(&amp;ds,</span>
+<span class="lineNum">    1059 </span>                :            :                   &quot;%s: %s.&quot;
+<span class="lineNum">    1060 </span>                :            :                   &quot;\n\tvers:%&quot;PRIu8&quot; diag:\&quot;%s\&quot; state:%s mult:%&quot;PRIu8
+<span class="lineNum">    1061 </span>                :            :                   &quot; length:%&quot;PRIu8
+<span class="lineNum">    1062 </span>                :            :                   &quot;\n\tflags: %s&quot;
+<span class="lineNum">    1063 </span>                :            :                   &quot;\n\tmy_disc:0x%&quot;PRIx32&quot; your_disc:0x%&quot;PRIx32
+<span class="lineNum">    1064 </span>                :            :                   &quot;\n\tmin_tx:%&quot;PRIu32&quot;us (%&quot;PRIu32&quot;ms)&quot;
+<span class="lineNum">    1065 </span>                :            :                   &quot;\n\tmin_rx:%&quot;PRIu32&quot;us (%&quot;PRIu32&quot;ms)&quot;
+<span class="lineNum">    1066 </span>                :            :                   &quot;\n\tmin_rx_echo:%&quot;PRIu32&quot;us (%&quot;PRIu32&quot;ms)&quot;,
+<span class="lineNum">    1067 </span>                :<span class="lineCov">         46 :                   bfd-&gt;name, message, p-&gt;vers_diag &gt;&gt; VERS_SHIFT,</span>
+<span class="lineNum">    1068 </span>                :<span class="lineCov">         46 :                   bfd_diag_str(p-&gt;vers_diag &amp; DIAG_MASK),</span>
+<span class="lineNum">    1069 </span>                :<span class="lineCov">         46 :                   bfd_state_str(p-&gt;flags &amp; STATE_MASK),</span>
+<span class="lineNum">    1070 </span>                :<span class="lineCov">        138 :                   p-&gt;mult, p-&gt;length, bfd_flag_str(p-&gt;flags &amp; FLAGS_MASK),</span>
+<span class="lineNum">    1071 </span>                :            :                   ntohl(p-&gt;my_disc), ntohl(p-&gt;your_disc),
+<span class="lineNum">    1072 </span>                :<span class="lineCov">         46 :                   ntohl(p-&gt;min_tx), ntohl(p-&gt;min_tx) / 1000,</span>
+<span class="lineNum">    1073 </span>                :<span class="lineCov">         46 :                   ntohl(p-&gt;min_rx), ntohl(p-&gt;min_rx) / 1000,</span>
+<span class="lineNum">    1074 </span>                :<span class="lineCov">         46 :                   ntohl(p-&gt;min_rx_echo), ntohl(p-&gt;min_rx_echo) / 1000);</span>
+<span class="lineNum">    1075 </span>                :<span class="lineCov">         46 :     bfd_put_details(&amp;ds, bfd);</span>
+<span class="lineNum">    1076 </span>        [<span class="branchCov" title="Branch 0 was taken 46 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         46 :     VLOG(level, &quot;%s&quot;, ds_cstr(&amp;ds));</span>
+<span class="lineNum">    1077 </span>                :<span class="lineCov">       1933 :     ds_destroy(&amp;ds);</span>
+<span class="lineNum">    1078 </span>                :            : }
+<a name="1079"><span class="lineNum">    1079 </span>                :            : </a>
+<span class="lineNum">    1080 </span>                :            : static void
+<span class="lineNum">    1081 </span>                :<span class="lineCov">         68 : bfd_set_state(struct bfd *bfd, enum state state, enum diag diag)</span>
+<span class="lineNum">    1082 </span>                :            :     OVS_REQUIRES(mutex)
+<span class="lineNum">    1083 </span>                :            : {
+<span class="lineNum">    1084 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 67 times"> + </span>]:<span class="lineCov">         68 :     if (bfd-&gt;cpath_down) {</span>
+<span class="lineNum">    1085 </span>                :<span class="lineCov">          1 :         diag = DIAG_CPATH_DOWN;</span>
+<span class="lineNum">    1086 </span>                :            :     }
+<span class="lineNum">    1087 </span>                :            : 
+<span class="lineNum">    1088 </span>[<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 67 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         68 :     if (bfd-&gt;state != state || bfd-&gt;diag != diag) {</span>
+<span class="lineNum">    1089 </span>        [<span class="branchCov" title="Branch 1 was taken 68 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">         68 :         if (!VLOG_DROP_INFO(&amp;rl)) {</span>
+<span class="lineNum">    1090 </span>                :<span class="lineCov">         68 :             struct ds ds = DS_EMPTY_INITIALIZER;</span>
+<span class="lineNum">    1091 </span>                :            : 
+<span class="lineNum">    1092 </span>                :<span class="lineCov">         68 :             ds_put_format(&amp;ds, &quot;%s: BFD state change: %s-&gt;%s&quot;</span>
+<span class="lineNum">    1093 </span>                :            :                           &quot; \&quot;%s\&quot;-&gt;\&quot;%s\&quot;.\n&quot;,
+<span class="lineNum">    1094 </span>                :            :                           bfd-&gt;name, bfd_state_str(bfd-&gt;state),
+<span class="lineNum">    1095 </span>                :            :                           bfd_state_str(state), bfd_diag_str(bfd-&gt;diag),
+<span class="lineNum">    1096 </span>                :            :                           bfd_diag_str(diag));
+<span class="lineNum">    1097 </span>                :<span class="lineCov">         68 :             bfd_put_details(&amp;ds, bfd);</span>
+<span class="lineNum">    1098 </span>        [<span class="branchCov" title="Branch 0 was taken 68 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         68 :             VLOG_INFO(&quot;%s&quot;, ds_cstr(&amp;ds));</span>
+<span class="lineNum">    1099 </span>                :<span class="lineCov">         68 :             ds_destroy(&amp;ds);</span>
+<span class="lineNum">    1100 </span>                :            :         }
+<span class="lineNum">    1101 </span>                :            : 
+<span class="lineNum">    1102 </span>                :<span class="lineCov">         68 :         bfd-&gt;state = state;</span>
+<span class="lineNum">    1103 </span>                :<span class="lineCov">         68 :         bfd-&gt;diag = diag;</span>
+<span class="lineNum">    1104 </span>                :            : 
+<span class="lineNum">    1105 </span>        [<span class="branchCov" title="Branch 0 was taken 30 times"> + </span><span class="branchCov" title="Branch 1 was taken 38 times"> + </span>]:<span class="lineCov">         68 :         if (bfd-&gt;state &lt;= STATE_DOWN) {</span>
+<span class="lineNum">    1106 </span>                :<span class="lineCov">         30 :             bfd-&gt;rmt_state = STATE_DOWN;</span>
+<span class="lineNum">    1107 </span>                :<span class="lineCov">         30 :             bfd-&gt;rmt_diag = DIAG_NONE;</span>
+<span class="lineNum">    1108 </span>                :<span class="lineCov">         30 :             bfd-&gt;rmt_min_rx = 1;</span>
+<span class="lineNum">    1109 </span>                :<span class="lineCov">         30 :             bfd-&gt;rmt_flags = 0;</span>
+<span class="lineNum">    1110 </span>                :<span class="lineCov">         30 :             bfd-&gt;rmt_disc = 0;</span>
+<span class="lineNum">    1111 </span>                :<span class="lineCov">         30 :             bfd-&gt;rmt_min_tx = 0;</span>
+<span class="lineNum">    1112 </span>                :            :             /* Resets the min_rx if in_decay. */
+<span class="lineNum">    1113 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 29 times"> + </span>]:<span class="lineCov">         30 :             if (bfd-&gt;in_decay) {</span>
+<span class="lineNum">    1114 </span>                :<span class="lineCov">          1 :                 bfd-&gt;min_rx = bfd-&gt;cfg_min_rx;</span>
+<span class="lineNum">    1115 </span>                :<span class="lineCov">          1 :                 bfd-&gt;in_decay = false;</span>
+<span class="lineNum">    1116 </span>                :            :             }
+<span class="lineNum">    1117 </span>                :            :         }
+<span class="lineNum">    1118 </span>                :            :         /* Resets the decay when state changes to STATE_UP
+<span class="lineNum">    1119 </span>                :            :          * and decay_min_rx is configured. */
+<span class="lineNum">    1120 </span>[<span class="branchCov" title="Branch 0 was taken 25 times"> + </span><span class="branchCov" title="Branch 1 was taken 43 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchCov" title="Branch 3 was taken 24 times"> + </span>]:<span class="lineCov">         68 :         if (bfd-&gt;state == STATE_UP &amp;&amp; bfd-&gt;decay_min_rx) {</span>
+<span class="lineNum">    1121 </span>                :<span class="lineCov">          1 :             bfd_decay_update(bfd);</span>
+<span class="lineNum">    1122 </span>                :            :         }
+<span class="lineNum">    1123 </span>                :            : 
+<span class="lineNum">    1124 </span>                :<span class="lineCov">         68 :         bfd_status_changed(bfd);</span>
+<span class="lineNum">    1125 </span>                :            :     }
+<span class="lineNum">    1126 </span>                :<span class="lineCov">         68 : }</span>
+<a name="1127"><span class="lineNum">    1127 </span>                :            : </a>
+<span class="lineNum">    1128 </span>                :            : static uint64_t
+<span class="lineNum">    1129 </span>                :<span class="lineCov">        106 : bfd_rx_packets(const struct bfd *bfd) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">    1130 </span>                :            : {
+<span class="lineNum">    1131 </span>                :            :     struct netdev_stats stats;
+<span class="lineNum">    1132 </span>                :            : 
+<span class="lineNum">    1133 </span>        [<span class="branchCov" title="Branch 1 was taken 106 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        106 :     if (!netdev_get_stats(bfd-&gt;netdev, &amp;stats)) {</span>
+<span class="lineNum">    1134 </span>                :<span class="lineCov">        106 :         return stats.rx_packets;</span>
+<span class="lineNum">    1135 </span>                :            :     } else {
+<span class="lineNum">    1136 </span>                :<span class="lineCov">        106 :         return 0;</span>
+<span class="lineNum">    1137 </span>                :            :     }
+<span class="lineNum">    1138 </span>                :            : }
+<span class="lineNum">    1139 </span>                :            : 
+<span class="lineNum">    1140 </span>                :            : /* Decays the bfd-&gt;min_rx to bfd-&gt;decay_min_rx when 'diff' is less than
+<a name="1141"><span class="lineNum">    1141 </span>                :            :  * the 'expect' value. */</a>
+<span class="lineNum">    1142 </span>                :            : static void
+<span class="lineNum">    1143 </span>                :<span class="lineCov">         27 : bfd_try_decay(struct bfd *bfd) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">    1144 </span>                :            : {
+<span class="lineNum">    1145 </span>                :            :     int64_t diff, expect;
+<span class="lineNum">    1146 </span>                :            : 
+<span class="lineNum">    1147 </span>                :            :     /* The 'diff' is the difference between current interface rx_packets
+<span class="lineNum">    1148 </span>                :            :      * stats and last-time check.  The 'expect' is the recorded number of
+<span class="lineNum">    1149 </span>                :            :      * bfd control packets received within an approximately decay_min_rx
+<span class="lineNum">    1150 </span>                :            :      * (2000 ms if decay_min_rx is less than 2000 ms) interval.
+<span class="lineNum">    1151 </span>                :            :      *
+<span class="lineNum">    1152 </span>                :            :      * Since the update of rx_packets stats at interface happens
+<span class="lineNum">    1153 </span>                :            :      * asynchronously to the bfd_rx_packets() function, the 'diff' value
+<span class="lineNum">    1154 </span>                :            :      * can be jittered.  Thusly, we double the decay_rx_ctl to provide
+<span class="lineNum">    1155 </span>                :            :      * more wiggle room. */
+<span class="lineNum">    1156 </span>                :<span class="lineCov">         27 :     diff = bfd_rx_packets(bfd) - bfd-&gt;decay_rx_packets;</span>
+<span class="lineNum">    1157 </span>                :<span class="lineCov">         27 :     expect = 2 * MAX(bfd-&gt;decay_rx_ctl, 1);</span>
+<span class="lineNum">    1158 </span>                :<span class="lineCov">         27 :     bfd-&gt;in_decay = diff &lt;= expect ? true : false;</span>
+<span class="lineNum">    1159 </span>                :<span class="lineCov">         27 :     bfd_decay_update(bfd);</span>
+<span class="lineNum">    1160 </span>                :<span class="lineCov">         27 : }</span>
+<span class="lineNum">    1161 </span>                :            : 
+<a name="1162"><span class="lineNum">    1162 </span>                :            : /* Updates the rx_packets, decay_rx_ctl and decay_detect_time. */</a>
+<span class="lineNum">    1163 </span>                :            : static void
+<span class="lineNum">    1164 </span>                :<span class="lineCov">         56 : bfd_decay_update(struct bfd * bfd) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">    1165 </span>                :            : {
+<span class="lineNum">    1166 </span>                :<span class="lineCov">         56 :     bfd-&gt;decay_rx_packets = bfd_rx_packets(bfd);</span>
+<span class="lineNum">    1167 </span>                :<span class="lineCov">         56 :     bfd-&gt;decay_rx_ctl = 0;</span>
+<span class="lineNum">    1168 </span>                :<span class="lineCov">         56 :     bfd-&gt;decay_detect_time = MAX(bfd-&gt;decay_min_rx, 2000) + time_msec();</span>
+<span class="lineNum">    1169 </span>                :<span class="lineCov">         56 : }</span>
+<span class="lineNum">    1170 </span>                :            : 
+<a name="1171"><span class="lineNum">    1171 </span>                :            : /* Records the status change and changes the global connectivity seq. */</a>
+<span class="lineNum">    1172 </span>                :            : static void
+<span class="lineNum">    1173 </span>                :<span class="lineCov">        182 : bfd_status_changed(struct bfd *bfd) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">    1174 </span>                :            : {
+<span class="lineNum">    1175 </span>                :<span class="lineCov">        182 :     seq_change(connectivity_seq_get());</span>
+<span class="lineNum">    1176 </span>                :<span class="lineCov">        182 :     bfd-&gt;status_changed = true;</span>
+<span class="lineNum">    1177 </span>                :<span class="lineCov">        182 : }</span>
+<a name="1178"><span class="lineNum">    1178 </span>                :            : </a>
+<span class="lineNum">    1179 </span>                :            : static void
+<span class="lineNum">    1180 </span>                :<span class="lineCov">        134 : bfd_forwarding_if_rx_update(struct bfd *bfd) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">    1181 </span>                :            : {
+<span class="lineNum">    1182 </span>                :<span class="lineCov">        134 :     int64_t incr = bfd_rx_interval(bfd) * bfd-&gt;mult;</span>
+<span class="lineNum">    1183 </span>                :<span class="lineCov">        134 :     bfd-&gt;forwarding_if_rx_detect_time = MAX(incr, 2000) + time_msec();</span>
+<span class="lineNum">    1184 </span>                :<span class="lineCov">        134 : }</span>
+<a name="1185"><span class="lineNum">    1185 </span>                :            : </a>
+<span class="lineNum">    1186 </span>                :            : static uint32_t
+<span class="lineNum">    1187 </span>                :<span class="lineCov">         23 : generate_discriminator(void)</span>
+<span class="lineNum">    1188 </span>                :            : {
+<span class="lineNum">    1189 </span>                :<span class="lineCov">         23 :     uint32_t disc = 0;</span>
+<span class="lineNum">    1190 </span>                :            : 
+<span class="lineNum">    1191 </span>                :            :     /* RFC 5880 Section 6.8.1
+<span class="lineNum">    1192 </span>                :            :      * It SHOULD be set to a random (but still unique) value to improve
+<span class="lineNum">    1193 </span>                :            :      * security.  The value is otherwise outside the scope of this
+<span class="lineNum">    1194 </span>                :            :      * specification. */
+<span class="lineNum">    1195 </span>                :            : 
+<span class="lineNum">    1196 </span>        [<span class="branchCov" title="Branch 0 was taken 23 times"> + </span><span class="branchCov" title="Branch 1 was taken 23 times"> + </span>]:<span class="lineCov">         46 :     while (!disc) {</span>
+<span class="lineNum">    1197 </span>                :            :         struct bfd *bfd;
+<span class="lineNum">    1198 </span>                :            : 
+<span class="lineNum">    1199 </span>                :            :         /* 'disc' is by definition random, so there's no reason to waste time
+<span class="lineNum">    1200 </span>                :            :          * hashing it. */
+<span class="lineNum">    1201 </span>                :<span class="lineCov">         23 :         disc = random_uint32();</span>
+<span class="lineNum">    1202 </span>        [<span class="branchCov" title="Branch 2 was taken 8 times"> + </span><span class="branchCov" title="Branch 3 was taken 23 times"> + </span>]:<span class="lineCov">         31 :         HMAP_FOR_EACH_IN_BUCKET (bfd, node, disc, all_bfds) {</span>
+<span class="lineNum">    1203 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>]:<span class="lineCov">          8 :             if (bfd-&gt;disc == disc) {</span>
+<span class="lineNum">    1204 </span>                :<span class="lineNoCov">          0 :                 disc = 0;</span>
+<span class="lineNum">    1205 </span>                :<span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1206 </span>                :            :             }
+<span class="lineNum">    1207 </span>                :            :         }
+<span class="lineNum">    1208 </span>                :            :     }
+<span class="lineNum">    1209 </span>                :            : 
+<span class="lineNum">    1210 </span>                :<span class="lineCov">         23 :     return disc;</span>
+<span class="lineNum">    1211 </span>                :            : }
+<a name="1212"><span class="lineNum">    1212 </span>                :            : </a>
+<span class="lineNum">    1213 </span>                :            : static struct bfd *
+<span class="lineNum">    1214 </span>                :<span class="lineCov">        224 : bfd_find_by_name(const char *name) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">    1215 </span>                :            : {
+<span class="lineNum">    1216 </span>                :            :     struct bfd *bfd;
+<span class="lineNum">    1217 </span>                :            : 
+<span class="lineNum">    1218 </span>        [<span class="branchCov" title="Branch 2 was taken 278 times"> + </span><span class="branchCov" title="Branch 3 was taken 2 times"> + </span>]:<span class="lineCov">        280 :     HMAP_FOR_EACH (bfd, node, all_bfds) {</span>
+<span class="lineNum">    1219 </span>        [<span class="branchCov" title="Branch 0 was taken 222 times"> + </span><span class="branchCov" title="Branch 1 was taken 56 times"> + </span>]:<span class="lineCov">        278 :         if (!strcmp(bfd-&gt;name, name)) {</span>
+<span class="lineNum">    1220 </span>                :<span class="lineCov">        222 :             return bfd;</span>
+<span class="lineNum">    1221 </span>                :            :         }
+<span class="lineNum">    1222 </span>                :            :     }
+<span class="lineNum">    1223 </span>                :<span class="lineCov">        224 :     return NULL;</span>
+<span class="lineNum">    1224 </span>                :            : }
+<a name="1225"><span class="lineNum">    1225 </span>                :            : </a>
+<span class="lineNum">    1226 </span>                :            : static void
+<span class="lineNum">    1227 </span>                :<span class="lineCov">        338 : bfd_put_details(struct ds *ds, const struct bfd *bfd) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">    1228 </span>                :            : {
+<span class="lineNum">    1229 </span>        [<span class="branchCov" title="Branch 0 was taken 247 times"> + </span><span class="branchCov" title="Branch 1 was taken 91 times"> + </span>]:<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tForwarding: %s\n&quot;,</span>
+<span class="lineNum">    1230 </span>                :<span class="lineCov">        338 :                   bfd_forwarding__(CONST_CAST(struct bfd *, bfd))</span>
+<span class="lineNum">    1231 </span>                :            :                   ? &quot;true&quot; : &quot;false&quot;);
+<span class="lineNum">    1232 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tDetect Multiplier: %d\n&quot;, bfd-&gt;mult);</span>
+<span class="lineNum">    1233 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 336 times"> + </span>]:<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tConcatenated Path Down: %s\n&quot;,</span>
+<span class="lineNum">    1234 </span>                :<span class="lineCov">        338 :                   bfd-&gt;cpath_down ? &quot;true&quot; : &quot;false&quot;);</span>
+<span class="lineNum">    1235 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tTX Interval: Approx %lldms\n&quot;, bfd_tx_interval(bfd));</span>
+<span class="lineNum">    1236 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tRX Interval: Approx %lldms\n&quot;, bfd_rx_interval(bfd));</span>
+<span class="lineNum">    1237 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tDetect Time: now %+lldms\n&quot;,</span>
+<span class="lineNum">    1238 </span>                :<span class="lineCov">        338 :                   time_msec() - bfd-&gt;detect_time);</span>
+<span class="lineNum">    1239 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tNext TX Time: now %+lldms\n&quot;,</span>
+<span class="lineNum">    1240 </span>                :<span class="lineCov">        338 :                   time_msec() - bfd-&gt;next_tx);</span>
+<span class="lineNum">    1241 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tLast TX Time: now %+lldms\n&quot;,</span>
+<span class="lineNum">    1242 </span>                :<span class="lineCov">        338 :                   time_msec() - bfd-&gt;last_tx);</span>
+<span class="lineNum">    1243 </span>                :            : 
+<span class="lineNum">    1244 </span>                :<span class="lineCov">        338 :     ds_put_cstr(ds, &quot;\n&quot;);</span>
+<span class="lineNum">    1245 </span>                :            : 
+<span class="lineNum">    1246 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tLocal Flags: %s\n&quot;, bfd_flag_str(bfd-&gt;flags));</span>
+<span class="lineNum">    1247 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tLocal Session State: %s\n&quot;,</span>
+<span class="lineNum">    1248 </span>                :            :                   bfd_state_str(bfd-&gt;state));
+<span class="lineNum">    1249 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tLocal Diagnostic: %s\n&quot;, bfd_diag_str(bfd-&gt;diag));</span>
+<span class="lineNum">    1250 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tLocal Discriminator: 0x%&quot;PRIx32&quot;\n&quot;, bfd-&gt;disc);</span>
+<span class="lineNum">    1251 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tLocal Minimum TX Interval: %lldms\n&quot;,</span>
+<span class="lineNum">    1252 </span>                :            :                   bfd_min_tx(bfd));
+<span class="lineNum">    1253 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tLocal Minimum RX Interval: %lldms\n&quot;, bfd-&gt;min_rx);</span>
+<span class="lineNum">    1254 </span>                :            : 
+<span class="lineNum">    1255 </span>                :<span class="lineCov">        338 :     ds_put_cstr(ds, &quot;\n&quot;);</span>
+<span class="lineNum">    1256 </span>                :            : 
+<span class="lineNum">    1257 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tRemote Flags: %s\n&quot;, bfd_flag_str(bfd-&gt;rmt_flags));</span>
+<span class="lineNum">    1258 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tRemote Session State: %s\n&quot;,</span>
+<span class="lineNum">    1259 </span>                :            :                   bfd_state_str(bfd-&gt;rmt_state));
+<span class="lineNum">    1260 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tRemote Diagnostic: %s\n&quot;,</span>
+<span class="lineNum">    1261 </span>                :            :                   bfd_diag_str(bfd-&gt;rmt_diag));
+<span class="lineNum">    1262 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tRemote Discriminator: 0x%&quot;PRIx32&quot;\n&quot;, bfd-&gt;rmt_disc);</span>
+<span class="lineNum">    1263 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tRemote Minimum TX Interval: %lldms\n&quot;,</span>
+<span class="lineNum">    1264 </span>                :            :                   bfd-&gt;rmt_min_tx);
+<span class="lineNum">    1265 </span>                :<span class="lineCov">        338 :     ds_put_format(ds, &quot;\tRemote Minimum RX Interval: %lldms\n&quot;,</span>
+<span class="lineNum">    1266 </span>                :            :                   bfd-&gt;rmt_min_rx);
+<span class="lineNum">    1267 </span>                :<span class="lineCov">        338 : }</span>
+<a name="1268"><span class="lineNum">    1268 </span>                :            : </a>
+<span class="lineNum">    1269 </span>                :            : static void
+<span class="lineNum">    1270 </span>                :<span class="lineCov">        225 : bfd_unixctl_show(struct unixctl_conn *conn, int argc, const char *argv[],</span>
+<span class="lineNum">    1271 </span>                :            :                  void *aux OVS_UNUSED) OVS_EXCLUDED(mutex)
+<span class="lineNum">    1272 </span>                :            : {
+<span class="lineNum">    1273 </span>                :<span class="lineCov">        225 :     struct ds ds = DS_EMPTY_INITIALIZER;</span>
+<span class="lineNum">    1274 </span>                :            :     struct bfd *bfd;
+<span class="lineNum">    1275 </span>                :            : 
+<span class="lineNum">    1276 </span>                :<span class="lineCov">        225 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">    1277 </span>        [<span class="branchCov" title="Branch 0 was taken 222 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">        225 :     if (argc &gt; 1) {</span>
+<span class="lineNum">    1278 </span>                :<span class="lineCov">        222 :         bfd = bfd_find_by_name(argv[1]);</span>
+<span class="lineNum">    1279 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 220 times"> + </span>]:<span class="lineCov">        222 :         if (!bfd) {</span>
+<span class="lineNum">    1280 </span>                :<span class="lineCov">          2 :             unixctl_command_reply_error(conn, &quot;no such bfd object&quot;);</span>
+<span class="lineNum">    1281 </span>                :<span class="lineCov">          2 :             goto out;</span>
+<span class="lineNum">    1282 </span>                :            :         }
+<span class="lineNum">    1283 </span>                :<span class="lineCov">        220 :         bfd_put_details(&amp;ds, bfd);</span>
+<span class="lineNum">    1284 </span>                :            :     } else {
+<span class="lineNum">    1285 </span>        [<span class="branchCov" title="Branch 2 was taken 4 times"> + </span><span class="branchCov" title="Branch 3 was taken 3 times"> + </span>]:<span class="lineCov">          7 :         HMAP_FOR_EACH (bfd, node, all_bfds) {</span>
+<span class="lineNum">    1286 </span>                :<span class="lineCov">          4 :             ds_put_format(&amp;ds, &quot;---- %s ----\n&quot;, bfd-&gt;name);</span>
+<span class="lineNum">    1287 </span>                :<span class="lineCov">          4 :             bfd_put_details(&amp;ds, bfd);</span>
+<span class="lineNum">    1288 </span>                :            :         }
+<span class="lineNum">    1289 </span>                :            :     }
+<span class="lineNum">    1290 </span>                :<span class="lineCov">        223 :     unixctl_command_reply(conn, ds_cstr(&amp;ds));</span>
+<span class="lineNum">    1291 </span>                :<span class="lineCov">        223 :     ds_destroy(&amp;ds);</span>
+<span class="lineNum">    1292 </span>                :            : 
+<span class="lineNum">    1293 </span>                :            : out:
+<span class="lineNum">    1294 </span>                :<span class="lineCov">        225 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">    1295 </span>                :<span class="lineCov">        225 : }</span>
+<span class="lineNum">    1296 </span>                :            : 
+<a name="1297"><span class="lineNum">    1297 </span>                :            : </a>
+<span class="lineNum">    1298 </span>                :            : static void
+<span class="lineNum">    1299 </span>                :<span class="lineCov">          2 : bfd_unixctl_set_forwarding_override(struct unixctl_conn *conn, int argc,</span>
+<span class="lineNum">    1300 </span>                :            :                                     const char *argv[], void *aux OVS_UNUSED)
+<span class="lineNum">    1301 </span>                :            :     OVS_EXCLUDED(mutex)
+<span class="lineNum">    1302 </span>                :            : {
+<span class="lineNum">    1303 </span>                :<span class="lineCov">          2 :     const char *forward_str = argv[argc - 1];</span>
+<span class="lineNum">    1304 </span>                :            :     int forwarding_override;
+<span class="lineNum">    1305 </span>                :            :     struct bfd *bfd;
+<span class="lineNum">    1306 </span>                :            : 
+<span class="lineNum">    1307 </span>                :<span class="lineCov">          2 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">    1308 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          2 :     if (!strcasecmp(&quot;true&quot;, forward_str)) {</span>
+<span class="lineNum">    1309 </span>                :<span class="lineCov">          1 :         forwarding_override = 1;</span>
+<span class="lineNum">    1310 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     } else if (!strcasecmp(&quot;false&quot;, forward_str)) {</span>
+<span class="lineNum">    1311 </span>                :<span class="lineNoCov">          0 :         forwarding_override = 0;</span>
+<span class="lineNum">    1312 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          1 :     } else if (!strcasecmp(&quot;normal&quot;, forward_str)) {</span>
+<span class="lineNum">    1313 </span>                :<span class="lineCov">          1 :         forwarding_override = -1;</span>
+<span class="lineNum">    1314 </span>                :            :     } else {
+<span class="lineNum">    1315 </span>                :<span class="lineNoCov">          0 :         unixctl_command_reply_error(conn, &quot;unknown fault string&quot;);</span>
+<span class="lineNum">    1316 </span>                :<span class="lineNoCov">          0 :         goto out;</span>
+<span class="lineNum">    1317 </span>                :            :     }
+<span class="lineNum">    1318 </span>                :            : 
+<span class="lineNum">    1319 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :     if (argc &gt; 2) {</span>
+<span class="lineNum">    1320 </span>                :<span class="lineCov">          2 :         bfd = bfd_find_by_name(argv[1]);</span>
+<span class="lineNum">    1321 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :         if (!bfd) {</span>
+<span class="lineNum">    1322 </span>                :<span class="lineNoCov">          0 :             unixctl_command_reply_error(conn, &quot;no such BFD object&quot;);</span>
+<span class="lineNum">    1323 </span>                :<span class="lineNoCov">          0 :             goto out;</span>
+<span class="lineNum">    1324 </span>                :            :         }
+<span class="lineNum">    1325 </span>                :<span class="lineCov">          2 :         bfd-&gt;forwarding_override = forwarding_override;</span>
+<span class="lineNum">    1326 </span>                :<span class="lineCov">          2 :         bfd_status_changed(bfd);</span>
+<span class="lineNum">    1327 </span>                :            :     } else {
+<span class="lineNum">    1328 </span>        [<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         HMAP_FOR_EACH (bfd, node, all_bfds) {</span>
+<span class="lineNum">    1329 </span>                :<span class="lineNoCov">          0 :             bfd-&gt;forwarding_override = forwarding_override;</span>
+<span class="lineNum">    1330 </span>                :<span class="lineNoCov">          0 :             bfd_status_changed(bfd);</span>
+<span class="lineNum">    1331 </span>                :            :         }
+<span class="lineNum">    1332 </span>                :            :     }
+<span class="lineNum">    1333 </span>                :            : 
+<span class="lineNum">    1334 </span>                :<span class="lineCov">          2 :     unixctl_command_reply(conn, &quot;OK&quot;);</span>
+<span class="lineNum">    1335 </span>                :            : 
+<span class="lineNum">    1336 </span>                :            : out:
+<span class="lineNum">    1337 </span>                :<span class="lineCov">          2 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">    1338 </span>                :<span class="lineCov">          2 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,1558 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/stream-ssl.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - stream-ssl.c<span style="font-size: 80%;"> (source / <a href="stream-ssl.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">358</td>
+            <td class="headerCovTableEntry">559</td>
+            <td class="headerCovTableEntryLo">64.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">41</td>
+            <td class="headerCovTableEntry">45</td>
+            <td class="headerCovTableEntryHi">91.1 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">144</td>
+            <td class="headerCovTableEntry">417</td>
+            <td class="headerCovTableEntryLo">34.5 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2008, 2009, 2010, 2011, 2012, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;stream-ssl.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &quot;dhparams.h&quot;
+<span class="lineNum">      20 </span>                :            : #include &lt;ctype.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;inttypes.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &lt;sys/types.h&gt;
+<span class="lineNum">      25 </span>                :            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      26 </span>                :            : #include &lt;netinet/tcp.h&gt;
+<span class="lineNum">      27 </span>                :            : #include &lt;openssl/err.h&gt;
+<span class="lineNum">      28 </span>                :            : #include &lt;openssl/rand.h&gt;
+<span class="lineNum">      29 </span>                :            : #include &lt;openssl/ssl.h&gt;
+<span class="lineNum">      30 </span>                :            : #include &lt;openssl/x509v3.h&gt;
+<span class="lineNum">      31 </span>                :            : #include &lt;poll.h&gt;
+<span class="lineNum">      32 </span>                :            : #include &lt;fcntl.h&gt;
+<span class="lineNum">      33 </span>                :            : #include &lt;sys/stat.h&gt;
+<span class="lineNum">      34 </span>                :            : #include &lt;unistd.h&gt;
+<span class="lineNum">      35 </span>                :            : #include &quot;coverage.h&quot;
+<span class="lineNum">      36 </span>                :            : #include &quot;dynamic-string.h&quot;
+<span class="lineNum">      37 </span>                :            : #include &quot;entropy.h&quot;
+<span class="lineNum">      38 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      39 </span>                :            : #include &quot;openflow/openflow.h&quot;
+<span class="lineNum">      40 </span>                :            : #include &quot;packets.h&quot;
+<span class="lineNum">      41 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      42 </span>                :            : #include &quot;shash.h&quot;
+<span class="lineNum">      43 </span>                :            : #include &quot;socket-util.h&quot;
+<span class="lineNum">      44 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      45 </span>                :            : #include &quot;stream-provider.h&quot;
+<span class="lineNum">      46 </span>                :            : #include &quot;stream.h&quot;
+<span class="lineNum">      47 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      48 </span>                :            : #include &quot;vlog.h&quot;
+<span class="lineNum">      49 </span>                :            : 
+<span class="lineNum">      50 </span>                :            : #ifdef _WIN32
+<span class="lineNum">      51 </span>                :            : /* Ref: https://www.openssl.org/support/faq.html#PROG2
+<span class="lineNum">      52 </span>                :            :  * Your application must link against the same version of the Win32 C-Runtime
+<span class="lineNum">      53 </span>                :            :  * against which your openssl libraries were linked.  The default version for
+<span class="lineNum">      54 </span>                :            :  * OpenSSL is /MD - &quot;Multithreaded DLL&quot;. If we compile Open vSwitch with
+<span class="lineNum">      55 </span>                :            :  * something other than /MD, instead of re-compiling OpenSSL
+<span class="lineNum">      56 </span>                :            :  * toolkit, openssl/applink.c can be #included. Also, it is important
+<span class="lineNum">      57 </span>                :            :  * to add CRYPTO_malloc_init prior first call to OpenSSL.
+<span class="lineNum">      58 </span>                :            :  *
+<span class="lineNum">      59 </span>                :            :  * XXX: The behavior of the following #include when Open vSwitch is
+<span class="lineNum">      60 </span>                :            :  * compiled with /MD is not tested. */
+<span class="lineNum">      61 </span>                :            : #include &lt;openssl/applink.c&gt;
+<span class="lineNum">      62 </span>                :            : #define SHUT_RDWR SD_BOTH
+<a name="63"><span class="lineNum">      63 </span>                :            : #endif</a>
+<span class="lineNum">      64 </span>                :            : 
+<span class="lineNum">      65 </span>                :<span class="lineCov">      15103 : VLOG_DEFINE_THIS_MODULE(stream_ssl);</span>
+<span class="lineNum">      66 </span>                :            : 
+<span class="lineNum">      67 </span>                :            : /* Active SSL. */
+<span class="lineNum">      68 </span>                :            : 
+<span class="lineNum">      69 </span>                :            : enum ssl_state {
+<span class="lineNum">      70 </span>                :            :     STATE_TCP_CONNECTING,
+<span class="lineNum">      71 </span>                :            :     STATE_SSL_CONNECTING
+<span class="lineNum">      72 </span>                :            : };
+<span class="lineNum">      73 </span>                :            : 
+<span class="lineNum">      74 </span>                :            : enum session_type {
+<span class="lineNum">      75 </span>                :            :     CLIENT,
+<span class="lineNum">      76 </span>                :            :     SERVER
+<span class="lineNum">      77 </span>                :            : };
+<span class="lineNum">      78 </span>                :            : 
+<span class="lineNum">      79 </span>                :            : struct ssl_stream
+<span class="lineNum">      80 </span>                :            : {
+<span class="lineNum">      81 </span>                :            :     struct stream stream;
+<span class="lineNum">      82 </span>                :            :     enum ssl_state state;
+<span class="lineNum">      83 </span>                :            :     enum session_type type;
+<span class="lineNum">      84 </span>                :            :     int fd;
+<span class="lineNum">      85 </span>                :            :     HANDLE wevent;
+<span class="lineNum">      86 </span>                :            :     SSL *ssl;
+<span class="lineNum">      87 </span>                :            :     struct ofpbuf *txbuf;
+<span class="lineNum">      88 </span>                :            :     unsigned int session_nr;
+<span class="lineNum">      89 </span>                :            : 
+<span class="lineNum">      90 </span>                :            :     /* rx_want and tx_want record the result of the last call to SSL_read()
+<span class="lineNum">      91 </span>                :            :      * and SSL_write(), respectively:
+<span class="lineNum">      92 </span>                :            :      *
+<span class="lineNum">      93 </span>                :            :      *    - If the call reported that data needed to be read from the file
+<span class="lineNum">      94 </span>                :            :      *      descriptor, the corresponding member is set to SSL_READING.
+<span class="lineNum">      95 </span>                :            :      *
+<span class="lineNum">      96 </span>                :            :      *    - If the call reported that data needed to be written to the file
+<span class="lineNum">      97 </span>                :            :      *      descriptor, the corresponding member is set to SSL_WRITING.
+<span class="lineNum">      98 </span>                :            :      *
+<span class="lineNum">      99 </span>                :            :      *    - Otherwise, the member is set to SSL_NOTHING, indicating that the
+<span class="lineNum">     100 </span>                :            :      *      call completed successfully (or with an error) and that there is no
+<span class="lineNum">     101 </span>                :            :      *      need to block.
+<span class="lineNum">     102 </span>                :            :      *
+<span class="lineNum">     103 </span>                :            :      * These are needed because there is no way to ask OpenSSL what a data read
+<span class="lineNum">     104 </span>                :            :      * or write would require without giving it a buffer to receive into or
+<span class="lineNum">     105 </span>                :            :      * data to send, respectively.  (Note that the SSL_want() status is
+<span class="lineNum">     106 </span>                :            :      * overwritten by each SSL_read() or SSL_write() call, so we can't rely on
+<span class="lineNum">     107 </span>                :            :      * its value.)
+<span class="lineNum">     108 </span>                :            :      *
+<span class="lineNum">     109 </span>                :            :      * A single call to SSL_read() or SSL_write() can perform both reading
+<span class="lineNum">     110 </span>                :            :      * and writing and thus invalidate not one of these values but actually
+<span class="lineNum">     111 </span>                :            :      * both.  Consider this situation, for example:
+<span class="lineNum">     112 </span>                :            :      *
+<span class="lineNum">     113 </span>                :            :      *    - SSL_write() blocks on a read, so tx_want gets SSL_READING.
+<span class="lineNum">     114 </span>                :            :      *
+<span class="lineNum">     115 </span>                :            :      *    - SSL_read() laters succeeds reading from 'fd' and clears out the
+<span class="lineNum">     116 </span>                :            :      *      whole receive buffer, so rx_want gets SSL_READING.
+<span class="lineNum">     117 </span>                :            :      *
+<span class="lineNum">     118 </span>                :            :      *    - Client calls stream_wait(STREAM_RECV) and stream_wait(STREAM_SEND)
+<span class="lineNum">     119 </span>                :            :      *      and blocks.
+<span class="lineNum">     120 </span>                :            :      *
+<span class="lineNum">     121 </span>                :            :      *    - Now we're stuck blocking until the peer sends us data, even though
+<span class="lineNum">     122 </span>                :            :      *      SSL_write() could now succeed, which could easily be a deadlock
+<span class="lineNum">     123 </span>                :            :      *      condition.
+<span class="lineNum">     124 </span>                :            :      *
+<span class="lineNum">     125 </span>                :            :      * On the other hand, we can't reset both tx_want and rx_want on every call
+<span class="lineNum">     126 </span>                :            :      * to SSL_read() or SSL_write(), because that would produce livelock,
+<span class="lineNum">     127 </span>                :            :      * e.g. in this situation:
+<span class="lineNum">     128 </span>                :            :      *
+<span class="lineNum">     129 </span>                :            :      *    - SSL_write() blocks, so tx_want gets SSL_READING or SSL_WRITING.
+<span class="lineNum">     130 </span>                :            :      *
+<span class="lineNum">     131 </span>                :            :      *    - SSL_read() blocks, so rx_want gets SSL_READING or SSL_WRITING,
+<span class="lineNum">     132 </span>                :            :      *      but tx_want gets reset to SSL_NOTHING.
+<span class="lineNum">     133 </span>                :            :      *
+<span class="lineNum">     134 </span>                :            :      *    - Client calls stream_wait(STREAM_RECV) and stream_wait(STREAM_SEND)
+<span class="lineNum">     135 </span>                :            :      *      and blocks.
+<span class="lineNum">     136 </span>                :            :      *
+<span class="lineNum">     137 </span>                :            :      *    - Client wakes up immediately since SSL_NOTHING in tx_want indicates
+<span class="lineNum">     138 </span>                :            :      *      that no blocking is necessary.
+<span class="lineNum">     139 </span>                :            :      *
+<span class="lineNum">     140 </span>                :            :      * The solution we adopt here is to set tx_want to SSL_NOTHING after
+<span class="lineNum">     141 </span>                :            :      * calling SSL_read() only if the SSL state of the connection changed,
+<span class="lineNum">     142 </span>                :            :      * which indicates that an SSL-level renegotiation made some progress, and
+<span class="lineNum">     143 </span>                :            :      * similarly for rx_want and SSL_write().  This prevents both the
+<span class="lineNum">     144 </span>                :            :      * deadlock and livelock situations above.
+<span class="lineNum">     145 </span>                :            :      */
+<span class="lineNum">     146 </span>                :            :     int rx_want, tx_want;
+<span class="lineNum">     147 </span>                :            : 
+<span class="lineNum">     148 </span>                :            :     /* A few bytes of header data in case SSL negotiation fails. */
+<span class="lineNum">     149 </span>                :            :     uint8_t head[2];
+<span class="lineNum">     150 </span>                :            :     short int n_head;
+<span class="lineNum">     151 </span>                :            : };
+<span class="lineNum">     152 </span>                :            : 
+<span class="lineNum">     153 </span>                :            : /* SSL context created by ssl_init(). */
+<span class="lineNum">     154 </span>                :            : static SSL_CTX *ctx;
+<span class="lineNum">     155 </span>                :            : 
+<span class="lineNum">     156 </span>                :            : struct ssl_config_file {
+<span class="lineNum">     157 </span>                :            :     bool read;                  /* Whether the file was successfully read. */
+<span class="lineNum">     158 </span>                :            :     char *file_name;            /* Configured file name, if any. */
+<span class="lineNum">     159 </span>                :            :     struct timespec mtime;      /* File mtime as of last time we read it. */
+<span class="lineNum">     160 </span>                :            : };
+<span class="lineNum">     161 </span>                :            : 
+<span class="lineNum">     162 </span>                :            : /* SSL configuration files. */
+<span class="lineNum">     163 </span>                :            : static struct ssl_config_file private_key;
+<span class="lineNum">     164 </span>                :            : static struct ssl_config_file certificate;
+<span class="lineNum">     165 </span>                :            : static struct ssl_config_file ca_cert;
+<span class="lineNum">     166 </span>                :            : 
+<span class="lineNum">     167 </span>                :            : /* Ordinarily, the SSL client and server verify each other's certificates using
+<span class="lineNum">     168 </span>                :            :  * a CA certificate.  Setting this to false disables this behavior.  (This is a
+<span class="lineNum">     169 </span>                :            :  * security risk.) */
+<span class="lineNum">     170 </span>                :            : static bool verify_peer_cert = true;
+<span class="lineNum">     171 </span>                :            : 
+<span class="lineNum">     172 </span>                :            : /* Ordinarily, we require a CA certificate for the peer to be locally
+<span class="lineNum">     173 </span>                :            :  * available.  We can, however, bootstrap the CA certificate from the peer at
+<span class="lineNum">     174 </span>                :            :  * the beginning of our first connection then use that certificate on all
+<span class="lineNum">     175 </span>                :            :  * subsequent connections, saving it to a file for use in future runs also.  In
+<span class="lineNum">     176 </span>                :            :  * this case, 'bootstrap_ca_cert' is true. */
+<span class="lineNum">     177 </span>                :            : static bool bootstrap_ca_cert;
+<span class="lineNum">     178 </span>                :            : 
+<span class="lineNum">     179 </span>                :            : /* Session number.  Used in debug logging messages to uniquely identify a
+<span class="lineNum">     180 </span>                :            :  * session. */
+<span class="lineNum">     181 </span>                :            : static unsigned int next_session_nr;
+<span class="lineNum">     182 </span>                :            : 
+<span class="lineNum">     183 </span>                :            : /* Who knows what can trigger various SSL errors, so let's throttle them down
+<span class="lineNum">     184 </span>                :            :  * quite a bit. */
+<span class="lineNum">     185 </span>                :            : static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(10, 25);
+<span class="lineNum">     186 </span>                :            : 
+<span class="lineNum">     187 </span>                :            : static int ssl_init(void);
+<span class="lineNum">     188 </span>                :            : static int do_ssl_init(void);
+<span class="lineNum">     189 </span>                :            : static bool ssl_wants_io(int ssl_error);
+<span class="lineNum">     190 </span>                :            : static void ssl_close(struct stream *);
+<span class="lineNum">     191 </span>                :            : static void ssl_clear_txbuf(struct ssl_stream *);
+<span class="lineNum">     192 </span>                :            : static void interpret_queued_ssl_error(const char *function);
+<span class="lineNum">     193 </span>                :            : static int interpret_ssl_error(const char *function, int ret, int error,
+<span class="lineNum">     194 </span>                :            :                                int *want);
+<span class="lineNum">     195 </span>                :            : static DH *tmp_dh_callback(SSL *ssl, int is_export OVS_UNUSED, int keylength);
+<span class="lineNum">     196 </span>                :            : static void log_ca_cert(const char *file_name, X509 *cert);
+<span class="lineNum">     197 </span>                :            : static void stream_ssl_set_ca_cert_file__(const char *file_name,
+<span class="lineNum">     198 </span>                :            :                                           bool bootstrap, bool force);
+<span class="lineNum">     199 </span>                :            : static void ssl_protocol_cb(int write_p, int version, int content_type,
+<span class="lineNum">     200 </span>                :            :                             const void *, size_t, SSL *, void *sslv_);
+<span class="lineNum">     201 </span>                :            : static bool update_ssl_config(struct ssl_config_file *, const char *file_name);
+<span class="lineNum">     202 </span>                :            : static int sock_errno(void);
+<span class="lineNum">     203 </span>                :            : static void clear_handle(int fd, HANDLE wevent);
+<a name="204"><span class="lineNum">     204 </span>                :            : </a>
+<span class="lineNum">     205 </span>                :            : static short int
+<span class="lineNum">     206 </span>                :<span class="lineCov">        615 : want_to_poll_events(int want)</span>
+<span class="lineNum">     207 </span>                :            : {
+<span class="lineNum">     208 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 615 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        615 :     switch (want) {</span>
+<span class="lineNum">     209 </span>                :            :     case SSL_NOTHING:
+<span class="lineNum">     210 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     211 </span>                :            : 
+<span class="lineNum">     212 </span>                :            :     case SSL_READING:
+<span class="lineNum">     213 </span>                :<span class="lineCov">        615 :         return POLLIN;</span>
+<span class="lineNum">     214 </span>                :            : 
+<span class="lineNum">     215 </span>                :            :     case SSL_WRITING:
+<span class="lineNum">     216 </span>                :<span class="lineNoCov">          0 :         return POLLOUT;</span>
+<span class="lineNum">     217 </span>                :            : 
+<span class="lineNum">     218 </span>                :            :     default:
+<span class="lineNum">     219 </span>                :<span class="lineCov">        615 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     220 </span>                :            :     }
+<span class="lineNum">     221 </span>                :            : }
+<a name="222"><span class="lineNum">     222 </span>                :            : </a>
+<span class="lineNum">     223 </span>                :            : static int
+<span class="lineNum">     224 </span>                :<span class="lineCov">        221 : setsockopt_tcp_nodelay(int fd)</span>
+<span class="lineNum">     225 </span>                :            : {
+<span class="lineNum">     226 </span>                :<span class="lineCov">        221 :     int on = 1;</span>
+<span class="lineNum">     227 </span>                :            :     int retval;
+<span class="lineNum">     228 </span>                :            : 
+<span class="lineNum">     229 </span>                :<span class="lineCov">        221 :     retval = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &amp;on, sizeof on);</span>
+<span class="lineNum">     230 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 221 times"> + </span>]:<span class="lineCov">        221 :     if (retval) {</span>
+<span class="lineNum">     231 </span>                :<span class="lineNoCov">          0 :         retval = sock_errno();</span>
+<span class="lineNum">     232 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;setsockopt(TCP_NODELAY): %s&quot;, sock_strerror(retval));</span>
+<span class="lineNum">     233 </span>                :            :     }
+<span class="lineNum">     234 </span>                :<span class="lineCov">        221 :     return retval;</span>
+<span class="lineNum">     235 </span>                :            : }
+<a name="236"><span class="lineNum">     236 </span>                :            : </a>
+<span class="lineNum">     237 </span>                :            : static int
+<span class="lineNum">     238 </span>                :<span class="lineCov">        221 : new_ssl_stream(const char *name, int fd, enum session_type type,</span>
+<span class="lineNum">     239 </span>                :            :                enum ssl_state state, struct stream **streamp)
+<span class="lineNum">     240 </span>                :            : {
+<span class="lineNum">     241 </span>                :            :     struct sockaddr_storage local;
+<span class="lineNum">     242 </span>                :<span class="lineCov">        221 :     socklen_t local_len = sizeof local;</span>
+<span class="lineNum">     243 </span>                :            :     struct ssl_stream *sslv;
+<span class="lineNum">     244 </span>                :<span class="lineCov">        221 :     SSL *ssl = NULL;</span>
+<span class="lineNum">     245 </span>                :            :     int retval;
+<span class="lineNum">     246 </span>                :            : 
+<span class="lineNum">     247 </span>                :            :     /* Check for all the needful configuration. */
+<span class="lineNum">     248 </span>                :<span class="lineCov">        221 :     retval = 0;</span>
+<span class="lineNum">     249 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 221 times"> + </span>]:<span class="lineCov">        221 :     if (!private_key.read) {</span>
+<span class="lineNum">     250 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;Private key must be configured to use SSL&quot;);</span>
+<span class="lineNum">     251 </span>                :<span class="lineNoCov">          0 :         retval = ENOPROTOOPT;</span>
+<span class="lineNum">     252 </span>                :            :     }
+<span class="lineNum">     253 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 221 times"> + </span>]:<span class="lineCov">        221 :     if (!certificate.read) {</span>
+<span class="lineNum">     254 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;Certificate must be configured to use SSL&quot;);</span>
+<span class="lineNum">     255 </span>                :<span class="lineNoCov">          0 :         retval = ENOPROTOOPT;</span>
+<span class="lineNum">     256 </span>                :            :     }
+<span class="lineNum">     257 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 221 times"> + </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">        221 :     if (!ca_cert.read &amp;&amp; verify_peer_cert &amp;&amp; !bootstrap_ca_cert) {</span>
+<span class="lineNum">         </span>        [<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]
+<span class="lineNum">     258 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;CA certificate must be configured to use SSL&quot;);</span>
+<span class="lineNum">     259 </span>                :<span class="lineNoCov">          0 :         retval = ENOPROTOOPT;</span>
+<span class="lineNum">     260 </span>                :            :     }
+<span class="lineNum">     261 </span>[<span class="branchCov" title="Branch 0 was taken 221 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 221 times"> + </span>]:<span class="lineCov">        221 :     if (!retval &amp;&amp; !SSL_CTX_check_private_key(ctx)) {</span>
+<span class="lineNum">     262 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;Private key does not match certificate public key: %s&quot;,</span>
+<span class="lineNum">     263 </span>                :            :                  ERR_error_string(ERR_get_error(), NULL));
+<span class="lineNum">     264 </span>                :<span class="lineNoCov">          0 :         retval = ENOPROTOOPT;</span>
+<span class="lineNum">     265 </span>                :            :     }
+<span class="lineNum">     266 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 221 times"> + </span>]:<span class="lineCov">        221 :     if (retval) {</span>
+<span class="lineNum">     267 </span>                :<span class="lineNoCov">          0 :         goto error;</span>
+<span class="lineNum">     268 </span>                :            :     }
+<span class="lineNum">     269 </span>                :            : 
+<span class="lineNum">     270 </span>                :            :     /* Get the local IP and port information */
+<span class="lineNum">     271 </span>                :<span class="lineCov">        221 :     retval = getsockname(fd, (struct sockaddr *) &amp;local, &amp;local_len);</span>
+<span class="lineNum">     272 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 221 times"> + </span>]:<span class="lineCov">        221 :     if (retval) {</span>
+<span class="lineNum">     273 </span>                :<span class="lineNoCov">          0 :         memset(&amp;local, 0, sizeof local);</span>
+<span class="lineNum">     274 </span>                :            :     }
+<span class="lineNum">     275 </span>                :            : 
+<span class="lineNum">     276 </span>                :            :     /* Disable Nagle.
+<span class="lineNum">     277 </span>                :            :      * On windows platforms, this can only be called upon TCP connected.
+<span class="lineNum">     278 </span>                :            :      */
+<span class="lineNum">     279 </span>        [<span class="branchCov" title="Branch 0 was taken 110 times"> + </span><span class="branchCov" title="Branch 1 was taken 111 times"> + </span>]:<span class="lineCov">        221 :     if (state == STATE_SSL_CONNECTING) {</span>
+<span class="lineNum">     280 </span>                :<span class="lineCov">        110 :         retval = setsockopt_tcp_nodelay(fd);</span>
+<span class="lineNum">     281 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 110 times"> + </span>]:<span class="lineCov">        110 :         if (retval) {</span>
+<span class="lineNum">     282 </span>                :<span class="lineNoCov">          0 :             goto error;</span>
+<span class="lineNum">     283 </span>                :            :         }
+<span class="lineNum">     284 </span>                :            :     }
+<span class="lineNum">     285 </span>                :            : 
+<span class="lineNum">     286 </span>                :            :     /* Create and configure OpenSSL stream. */
+<span class="lineNum">     287 </span>                :<span class="lineCov">        221 :     ssl = SSL_new(ctx);</span>
+<span class="lineNum">     288 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 221 times"> + </span>]:<span class="lineCov">        221 :     if (ssl == NULL) {</span>
+<span class="lineNum">     289 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;SSL_new: %s&quot;, ERR_error_string(ERR_get_error(), NULL));</span>
+<span class="lineNum">     290 </span>                :<span class="lineNoCov">          0 :         retval = ENOPROTOOPT;</span>
+<span class="lineNum">     291 </span>                :<span class="lineNoCov">          0 :         goto error;</span>
+<span class="lineNum">     292 </span>                :            :     }
+<span class="lineNum">     293 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 221 times"> + </span>]:<span class="lineCov">        221 :     if (SSL_set_fd(ssl, fd) == 0) {</span>
+<span class="lineNum">     294 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;SSL_set_fd: %s&quot;, ERR_error_string(ERR_get_error(), NULL));</span>
+<span class="lineNum">     295 </span>                :<span class="lineNoCov">          0 :         retval = ENOPROTOOPT;</span>
+<span class="lineNum">     296 </span>                :<span class="lineNoCov">          0 :         goto error;</span>
+<span class="lineNum">     297 </span>                :            :     }
+<span class="lineNum">     298 </span>[<span class="branchCov" title="Branch 0 was taken 221 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 221 times"> + </span>]:<span class="lineCov">        221 :     if (!verify_peer_cert || (bootstrap_ca_cert &amp;&amp; type == CLIENT)) {</span>
+<span class="lineNum">         </span>        [<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]
+<span class="lineNum">     299 </span>                :<span class="lineNoCov">          0 :         SSL_set_verify(ssl, SSL_VERIFY_NONE, NULL);</span>
+<span class="lineNum">     300 </span>                :            :     }
+<span class="lineNum">     301 </span>                :            : 
+<span class="lineNum">     302 </span>                :            :     /* Create and return the ssl_stream. */
+<span class="lineNum">     303 </span>                :<span class="lineCov">        221 :     sslv = xmalloc(sizeof *sslv);</span>
+<span class="lineNum">     304 </span>                :<span class="lineCov">        221 :     stream_init(&amp;sslv-&gt;stream, &amp;ssl_stream_class, EAGAIN, name);</span>
+<span class="lineNum">     305 </span>                :<span class="lineCov">        221 :     sslv-&gt;state = state;</span>
+<span class="lineNum">     306 </span>                :<span class="lineCov">        221 :     sslv-&gt;type = type;</span>
+<span class="lineNum">     307 </span>                :<span class="lineCov">        221 :     sslv-&gt;fd = fd;</span>
+<span class="lineNum">     308 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     309 </span>                :            :     sslv-&gt;wevent = CreateEvent(NULL, FALSE, FALSE, NULL);
+<span class="lineNum">     310 </span>                :            : #else
+<span class="lineNum">     311 </span>                :<span class="lineCov">        221 :     sslv-&gt;wevent = 0;</span>
+<span class="lineNum">     312 </span>                :            : #endif
+<span class="lineNum">     313 </span>                :<span class="lineCov">        221 :     sslv-&gt;ssl = ssl;</span>
+<span class="lineNum">     314 </span>                :<span class="lineCov">        221 :     sslv-&gt;txbuf = NULL;</span>
+<span class="lineNum">     315 </span>                :<span class="lineCov">        221 :     sslv-&gt;rx_want = sslv-&gt;tx_want = SSL_NOTHING;</span>
+<span class="lineNum">     316 </span>                :<span class="lineCov">        221 :     sslv-&gt;session_nr = next_session_nr++;</span>
+<span class="lineNum">     317 </span>                :<span class="lineCov">        221 :     sslv-&gt;n_head = 0;</span>
+<span class="lineNum">     318 </span>                :            : 
+<span class="lineNum">     319 </span>        [<span class="branchCov" title="Branch 1 was taken 15 times"> + </span><span class="branchCov" title="Branch 2 was taken 206 times"> + </span>]:<span class="lineCov">        221 :     if (VLOG_IS_DBG_ENABLED()) {</span>
+<span class="lineNum">     320 </span>                :<span class="lineCov">         15 :         SSL_set_msg_callback(ssl, ssl_protocol_cb);</span>
+<span class="lineNum">     321 </span>                :<span class="lineCov">         15 :         SSL_set_msg_callback_arg(ssl, sslv);</span>
+<span class="lineNum">     322 </span>                :            :     }
+<span class="lineNum">     323 </span>                :            : 
+<span class="lineNum">     324 </span>                :<span class="lineCov">        221 :     *streamp = &amp;sslv-&gt;stream;</span>
+<span class="lineNum">     325 </span>                :<span class="lineCov">        221 :     return 0;</span>
+<span class="lineNum">     326 </span>                :            : 
+<span class="lineNum">     327 </span>                :            : error:
+<span class="lineNum">     328 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (ssl) {</span>
+<span class="lineNum">     329 </span>                :<span class="lineNoCov">          0 :         SSL_free(ssl);</span>
+<span class="lineNum">     330 </span>                :            :     }
+<span class="lineNum">     331 </span>                :<span class="lineNoCov">          0 :     closesocket(fd);</span>
+<span class="lineNum">     332 </span>                :<span class="lineCov">        221 :     return retval;</span>
+<span class="lineNum">     333 </span>                :            : }
+<a name="334"><span class="lineNum">     334 </span>                :            : </a>
+<span class="lineNum">     335 </span>                :            : static struct ssl_stream *
+<span class="lineNum">     336 </span>                :<span class="lineCov">       4814 : ssl_stream_cast(struct stream *stream)</span>
+<span class="lineNum">     337 </span>                :            : {
+<span class="lineNum">     338 </span>                :<span class="lineCov">       4814 :     stream_assert_class(stream, &amp;ssl_stream_class);</span>
+<span class="lineNum">     339 </span>                :<span class="lineCov">       4814 :     return CONTAINER_OF(stream, struct ssl_stream, stream);</span>
+<span class="lineNum">     340 </span>                :            : }
+<a name="341"><span class="lineNum">     341 </span>                :            : </a>
+<span class="lineNum">     342 </span>                :            : static int
+<span class="lineNum">     343 </span>                :<span class="lineCov">        111 : ssl_open(const char *name, char *suffix, struct stream **streamp, uint8_t dscp)</span>
+<span class="lineNum">     344 </span>                :            : {
+<span class="lineNum">     345 </span>                :            :     int error, fd;
+<span class="lineNum">     346 </span>                :            : 
+<span class="lineNum">     347 </span>                :<span class="lineCov">        111 :     error = ssl_init();</span>
+<span class="lineNum">     348 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 111 times"> + </span>]:<span class="lineCov">        111 :     if (error) {</span>
+<span class="lineNum">     349 </span>                :<span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     350 </span>                :            :     }
+<span class="lineNum">     351 </span>                :            : 
+<span class="lineNum">     352 </span>                :<span class="lineCov">        111 :     error = inet_open_active(SOCK_STREAM, suffix, OFP_OLD_PORT, NULL, &amp;fd,</span>
+<span class="lineNum">     353 </span>                :            :                              dscp);
+<span class="lineNum">     354 </span>        [<span class="branchCov" title="Branch 0 was taken 111 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        111 :     if (fd &gt;= 0) {</span>
+<span class="lineNum">     355 </span>                :<span class="lineCov">        111 :         int state = error ? STATE_TCP_CONNECTING : STATE_SSL_CONNECTING;</span>
+<span class="lineNum">     356 </span>                :<span class="lineCov">        111 :         return new_ssl_stream(name, fd, CLIENT, state, streamp);</span>
+<span class="lineNum">     357 </span>                :            :     } else {
+<span class="lineNum">     358 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;%s: connect: %s&quot;, name, ovs_strerror(error));</span>
+<span class="lineNum">     359 </span>                :<span class="lineCov">        111 :         return error;</span>
+<span class="lineNum">     360 </span>                :            :     }
+<span class="lineNum">     361 </span>                :            : }
+<a name="362"><span class="lineNum">     362 </span>                :            : </a>
+<span class="lineNum">     363 </span>                :            : static int
+<span class="lineNum">     364 </span>                :<span class="lineNoCov">          0 : do_ca_cert_bootstrap(struct stream *stream)</span>
+<span class="lineNum">     365 </span>                :            : {
+<span class="lineNum">     366 </span>                :<span class="lineNoCov">          0 :     struct ssl_stream *sslv = ssl_stream_cast(stream);</span>
+<span class="lineNum">     367 </span>                :            :     STACK_OF(X509) *chain;
+<span class="lineNum">     368 </span>                :            :     X509 *cert;
+<span class="lineNum">     369 </span>                :            :     FILE *file;
+<span class="lineNum">     370 </span>                :            :     int error;
+<span class="lineNum">     371 </span>                :            :     int fd;
+<span class="lineNum">     372 </span>                :            : 
+<span class="lineNum">     373 </span>                :<span class="lineNoCov">          0 :     chain = SSL_get_peer_cert_chain(sslv-&gt;ssl);</span>
+<span class="lineNum">     374 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!chain || !sk_X509_num(chain)) {</span>
+<span class="lineNum">     375 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;could not bootstrap CA cert: no certificate presented by &quot;</span>
+<span class="lineNum">     376 </span>                :            :                  &quot;peer&quot;);
+<span class="lineNum">     377 </span>                :<span class="lineNoCov">          0 :         return EPROTO;</span>
+<span class="lineNum">     378 </span>                :            :     }
+<span class="lineNum">     379 </span>                :<span class="lineNoCov">          0 :     cert = sk_X509_value(chain, sk_X509_num(chain) - 1);</span>
+<span class="lineNum">     380 </span>                :            : 
+<span class="lineNum">     381 </span>                :            :     /* Check that 'cert' is self-signed.  Otherwise it is not a CA
+<span class="lineNum">     382 </span>                :            :      * certificate and we should not attempt to use it as one. */
+<span class="lineNum">     383 </span>                :<span class="lineNoCov">          0 :     error = X509_check_issued(cert, cert);</span>
+<span class="lineNum">     384 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (error) {</span>
+<span class="lineNum">     385 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;could not bootstrap CA cert: obtained certificate is &quot;</span>
+<span class="lineNum">     386 </span>                :            :                  &quot;not self-signed (%s)&quot;,
+<span class="lineNum">     387 </span>                :            :                  X509_verify_cert_error_string(error));
+<span class="lineNum">     388 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (sk_X509_num(chain) &lt; 2) {</span>
+<span class="lineNum">     389 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_ERR(&quot;only one certificate was received, so probably the peer &quot;</span>
+<span class="lineNum">     390 </span>                :            :                      &quot;is not configured to send its CA certificate&quot;);
+<span class="lineNum">     391 </span>                :            :         }
+<span class="lineNum">     392 </span>                :<span class="lineNoCov">          0 :         return EPROTO;</span>
+<span class="lineNum">     393 </span>                :            :     }
+<span class="lineNum">     394 </span>                :            : 
+<span class="lineNum">     395 </span>                :<span class="lineNoCov">          0 :     fd = open(ca_cert.file_name, O_CREAT | O_EXCL | O_WRONLY, 0444);</span>
+<span class="lineNum">     396 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (fd &lt; 0) {</span>
+<span class="lineNum">     397 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (errno == EEXIST) {</span>
+<span class="lineNum">     398 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_INFO_RL(&amp;rl, &quot;reading CA cert %s created by another process&quot;,</span>
+<span class="lineNum">     399 </span>                :            :                          ca_cert.file_name);
+<span class="lineNum">     400 </span>                :<span class="lineNoCov">          0 :             stream_ssl_set_ca_cert_file__(ca_cert.file_name, true, true);</span>
+<span class="lineNum">     401 </span>                :<span class="lineNoCov">          0 :             return EPROTO;</span>
+<span class="lineNum">     402 </span>                :            :         } else {
+<span class="lineNum">     403 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_ERR(&quot;could not bootstrap CA cert: creating %s failed: %s&quot;,</span>
+<span class="lineNum">     404 </span>                :            :                      ca_cert.file_name, ovs_strerror(errno));
+<span class="lineNum">     405 </span>                :<span class="lineNoCov">          0 :             return errno;</span>
+<span class="lineNum">     406 </span>                :            :         }
+<span class="lineNum">     407 </span>                :            :     }
+<span class="lineNum">     408 </span>                :            : 
+<span class="lineNum">     409 </span>                :<span class="lineNoCov">          0 :     file = fdopen(fd, &quot;w&quot;);</span>
+<span class="lineNum">     410 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!file) {</span>
+<span class="lineNum">     411 </span>                :<span class="lineNoCov">          0 :         error = errno;</span>
+<span class="lineNum">     412 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;could not bootstrap CA cert: fdopen failed: %s&quot;,</span>
+<span class="lineNum">     413 </span>                :            :                  ovs_strerror(error));
+<span class="lineNum">     414 </span>                :<span class="lineNoCov">          0 :         unlink(ca_cert.file_name);</span>
+<span class="lineNum">     415 </span>                :<span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     416 </span>                :            :     }
+<span class="lineNum">     417 </span>                :            : 
+<span class="lineNum">     418 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!PEM_write_X509(file, cert)) {</span>
+<span class="lineNum">     419 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;could not bootstrap CA cert: PEM_write_X509 to %s failed: &quot;</span>
+<span class="lineNum">     420 </span>                :            :                  &quot;%s&quot;, ca_cert.file_name,
+<span class="lineNum">     421 </span>                :            :                  ERR_error_string(ERR_get_error(), NULL));
+<span class="lineNum">     422 </span>                :<span class="lineNoCov">          0 :         fclose(file);</span>
+<span class="lineNum">     423 </span>                :<span class="lineNoCov">          0 :         unlink(ca_cert.file_name);</span>
+<span class="lineNum">     424 </span>                :<span class="lineNoCov">          0 :         return EIO;</span>
+<span class="lineNum">     425 </span>                :            :     }
+<span class="lineNum">     426 </span>                :            : 
+<span class="lineNum">     427 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (fclose(file)) {</span>
+<span class="lineNum">     428 </span>                :<span class="lineNoCov">          0 :         error = errno;</span>
+<span class="lineNum">     429 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;could not bootstrap CA cert: writing %s failed: %s&quot;,</span>
+<span class="lineNum">     430 </span>                :            :                  ca_cert.file_name, ovs_strerror(error));
+<span class="lineNum">     431 </span>                :<span class="lineNoCov">          0 :         unlink(ca_cert.file_name);</span>
+<span class="lineNum">     432 </span>                :<span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     433 </span>                :            :     }
+<span class="lineNum">     434 </span>                :            : 
+<span class="lineNum">     435 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     VLOG_INFO(&quot;successfully bootstrapped CA cert to %s&quot;, ca_cert.file_name);</span>
+<span class="lineNum">     436 </span>                :<span class="lineNoCov">          0 :     log_ca_cert(ca_cert.file_name, cert);</span>
+<span class="lineNum">     437 </span>                :<span class="lineNoCov">          0 :     bootstrap_ca_cert = false;</span>
+<span class="lineNum">     438 </span>                :<span class="lineNoCov">          0 :     ca_cert.read = true;</span>
+<span class="lineNum">     439 </span>                :            : 
+<span class="lineNum">     440 </span>                :            :     /* SSL_CTX_add_client_CA makes a copy of cert's relevant data. */
+<span class="lineNum">     441 </span>                :<span class="lineNoCov">          0 :     SSL_CTX_add_client_CA(ctx, cert);</span>
+<span class="lineNum">     442 </span>                :            : 
+<span class="lineNum">     443 </span>                :            :     /* SSL_CTX_use_certificate() takes ownership of the certificate passed in.
+<span class="lineNum">     444 </span>                :            :      * 'cert' is owned by sslv-&gt;ssl, so we need to duplicate it. */
+<span class="lineNum">     445 </span>                :<span class="lineNoCov">          0 :     cert = X509_dup(cert);</span>
+<span class="lineNum">     446 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!cert) {</span>
+<span class="lineNum">     447 </span>                :<span class="lineNoCov">          0 :         out_of_memory();</span>
+<span class="lineNum">     448 </span>                :            :     }
+<span class="lineNum">     449 </span>                :<span class="lineNoCov">          0 :     SSL_CTX_set_cert_store(ctx, X509_STORE_new());</span>
+<span class="lineNum">     450 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (SSL_CTX_load_verify_locations(ctx, ca_cert.file_name, NULL) != 1) {</span>
+<span class="lineNum">     451 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;SSL_CTX_load_verify_locations: %s&quot;,</span>
+<span class="lineNum">     452 </span>                :            :                  ERR_error_string(ERR_get_error(), NULL));
+<span class="lineNum">     453 </span>                :<span class="lineNoCov">          0 :         return EPROTO;</span>
+<span class="lineNum">     454 </span>                :            :     }
+<span class="lineNum">     455 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     VLOG_INFO(&quot;killing successful connection to retry using CA cert&quot;);</span>
+<span class="lineNum">     456 </span>                :<span class="lineNoCov">          0 :     return EPROTO;</span>
+<span class="lineNum">     457 </span>                :            : }
+<a name="458"><span class="lineNum">     458 </span>                :            : </a>
+<span class="lineNum">     459 </span>                :            : static int
+<span class="lineNum">     460 </span>                :<span class="lineCov">        980 : ssl_connect(struct stream *stream)</span>
+<span class="lineNum">     461 </span>                :            : {
+<span class="lineNum">     462 </span>                :<span class="lineCov">        980 :     struct ssl_stream *sslv = ssl_stream_cast(stream);</span>
+<span class="lineNum">     463 </span>                :            :     int retval;
+<span class="lineNum">     464 </span>                :            : 
+<span class="lineNum">     465 </span>     [<span class="branchCov" title="Branch 0 was taken 111 times"> + </span><span class="branchCov" title="Branch 1 was taken 869 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        980 :     switch (sslv-&gt;state) {</span>
+<span class="lineNum">     466 </span>                :            :     case STATE_TCP_CONNECTING:
+<span class="lineNum">     467 </span>                :<span class="lineCov">        111 :         retval = check_connection_completion(sslv-&gt;fd);</span>
+<span class="lineNum">     468 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 111 times"> + </span>]:<span class="lineCov">        111 :         if (retval) {</span>
+<span class="lineNum">     469 </span>                :<span class="lineNoCov">          0 :             return retval;</span>
+<span class="lineNum">     470 </span>                :            :         }
+<span class="lineNum">     471 </span>                :<span class="lineCov">        111 :         sslv-&gt;state = STATE_SSL_CONNECTING;</span>
+<span class="lineNum">     472 </span>                :<span class="lineCov">        111 :         retval = setsockopt_tcp_nodelay(sslv-&gt;fd);</span>
+<span class="lineNum">     473 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 111 times"> + </span>]:<span class="lineCov">        111 :         if (retval) {</span>
+<span class="lineNum">     474 </span>                :<span class="lineNoCov">          0 :             return retval;</span>
+<span class="lineNum">     475 </span>                :            :         }
+<span class="lineNum">     476 </span>                :            :         /* Fall through. */
+<span class="lineNum">     477 </span>                :            : 
+<span class="lineNum">     478 </span>                :            :     case STATE_SSL_CONNECTING:
+<span class="lineNum">     479 </span>                :            :         /* Capture the first few bytes of received data so that we can guess
+<span class="lineNum">     480 </span>                :            :          * what kind of funny data we've been sent if SSL negotiation fails. */
+<span class="lineNum">     481 </span>        [<span class="branchCov" title="Branch 0 was taken 687 times"> + </span><span class="branchCov" title="Branch 1 was taken 293 times"> + </span>]:<span class="lineCov">        980 :         if (sslv-&gt;n_head &lt;= 0) {</span>
+<span class="lineNum">     482 </span>                :<span class="lineCov">        687 :             sslv-&gt;n_head = recv(sslv-&gt;fd, sslv-&gt;head, sizeof sslv-&gt;head,</span>
+<span class="lineNum">     483 </span>                :            :                                 MSG_PEEK);
+<span class="lineNum">     484 </span>                :            :         }
+<span class="lineNum">     485 </span>                :            : 
+<span class="lineNum">     486 </span>                :<span class="lineCov">       1960 :         retval = (sslv-&gt;type == CLIENT</span>
+<span class="lineNum">     487 </span>        [<span class="branchCov" title="Branch 0 was taken 579 times"> + </span><span class="branchCov" title="Branch 1 was taken 401 times"> + </span>]:<span class="lineCov">        980 :                    ? SSL_connect(sslv-&gt;ssl) : SSL_accept(sslv-&gt;ssl));</span>
+<span class="lineNum">     488 </span>        [<span class="branchCov" title="Branch 0 was taken 762 times"> + </span><span class="branchCov" title="Branch 1 was taken 218 times"> + </span>]:<span class="lineCov">        980 :         if (retval != 1) {</span>
+<span class="lineNum">     489 </span>                :<span class="lineCov">        762 :             int error = SSL_get_error(sslv-&gt;ssl, retval);</span>
+<span class="lineNum">     490 </span>[<span class="branchCov" title="Branch 0 was taken 760 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 760 times"> + </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span>]:<span class="lineCov">        762 :             if (retval &lt; 0 &amp;&amp; ssl_wants_io(error)) {</span>
+<span class="lineNum">     491 </span>                :<span class="lineCov">        760 :                 return EAGAIN;</span>
+<span class="lineNum">     492 </span>                :            :             } else {
+<span class="lineNum">     493 </span>                :            :                 int unused;
+<span class="lineNum">     494 </span>                :            : 
+<span class="lineNum">     495 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :                 interpret_ssl_error((sslv-&gt;type == CLIENT ? &quot;SSL_connect&quot;</span>
+<span class="lineNum">     496 </span>                :            :                                      : &quot;SSL_accept&quot;), retval, error, &amp;unused);
+<span class="lineNum">     497 </span>                :<span class="lineCov">          2 :                 shutdown(sslv-&gt;fd, SHUT_RDWR);</span>
+<span class="lineNum">     498 </span>                :<span class="lineCov">          2 :                 stream_report_content(sslv-&gt;head, sslv-&gt;n_head, STREAM_SSL,</span>
+<span class="lineNum">     499 </span>                :            :                                       THIS_MODULE, stream_get_name(stream));
+<span class="lineNum">     500 </span>                :<span class="lineCov">          2 :                 return EPROTO;</span>
+<span class="lineNum">     501 </span>                :            :             }
+<span class="lineNum">     502 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 218 times"> + </span>]:<span class="lineCov">        218 :         } else if (bootstrap_ca_cert) {</span>
+<span class="lineNum">     503 </span>                :<span class="lineNoCov">          0 :             return do_ca_cert_bootstrap(stream);</span>
+<span class="lineNum">     504 </span>        [<span class="branchCov" title="Branch 0 was taken 218 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        218 :         } else if (verify_peer_cert</span>
+<span class="lineNum">     505 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 218 times"> + </span>]:<span class="lineCov">        218 :                    &amp;&amp; ((SSL_get_verify_mode(sslv-&gt;ssl)</span>
+<span class="lineNum">     506 </span>                :<span class="lineCov">        218 :                        &amp; (SSL_VERIFY_NONE | SSL_VERIFY_PEER))</span>
+<span class="lineNum">     507 </span>                :            :                        != SSL_VERIFY_PEER)) {
+<span class="lineNum">     508 </span>                :            :             /* Two or more SSL connections completed at the same time while we
+<span class="lineNum">     509 </span>                :            :              * were in bootstrap mode.  Only one of these can finish the
+<span class="lineNum">     510 </span>                :            :              * bootstrap successfully.  The other one(s) must be rejected
+<span class="lineNum">     511 </span>                :            :              * because they were not verified against the bootstrapped CA
+<span class="lineNum">     512 </span>                :            :              * certificate.  (Alternatively we could verify them against the CA
+<span class="lineNum">     513 </span>                :            :              * certificate, but that's more trouble than it's worth.  These
+<span class="lineNum">     514 </span>                :            :              * connections will succeed the next time they retry, assuming that
+<span class="lineNum">     515 </span>                :            :              * they have a certificate against the correct CA.) */
+<span class="lineNum">     516 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_INFO(&quot;rejecting SSL connection during bootstrap race window&quot;);</span>
+<span class="lineNum">     517 </span>                :<span class="lineNoCov">          0 :             return EPROTO;</span>
+<span class="lineNum">     518 </span>                :            :         } else {
+<span class="lineNum">     519 </span>                :<span class="lineCov">        218 :             return 0;</span>
+<span class="lineNum">     520 </span>                :            :         }
+<span class="lineNum">     521 </span>                :            :     }
+<span class="lineNum">     522 </span>                :            : 
+<span class="lineNum">     523 </span>                :<span class="lineCov">        980 :     OVS_NOT_REACHED();</span>
+<span class="lineNum">     524 </span>                :            : }
+<a name="525"><span class="lineNum">     525 </span>                :            : </a>
+<span class="lineNum">     526 </span>                :            : static void
+<span class="lineNum">     527 </span>                :<span class="lineCov">        221 : ssl_close(struct stream *stream)</span>
+<span class="lineNum">     528 </span>                :            : {
+<span class="lineNum">     529 </span>                :<span class="lineCov">        221 :     struct ssl_stream *sslv = ssl_stream_cast(stream);</span>
+<span class="lineNum">     530 </span>                :<span class="lineCov">        221 :     ssl_clear_txbuf(sslv);</span>
+<span class="lineNum">     531 </span>                :            : 
+<span class="lineNum">     532 </span>                :            :     /* Attempt clean shutdown of the SSL connection.  This will work most of
+<span class="lineNum">     533 </span>                :            :      * the time, as long as the kernel send buffer has some free space and the
+<span class="lineNum">     534 </span>                :            :      * SSL connection isn't renegotiating, etc.  That has to be good enough,
+<span class="lineNum">     535 </span>                :            :      * since we don't have any way to continue the close operation in the
+<span class="lineNum">     536 </span>                :            :      * background. */
+<span class="lineNum">     537 </span>                :<span class="lineCov">        221 :     SSL_shutdown(sslv-&gt;ssl);</span>
+<span class="lineNum">     538 </span>                :            : 
+<span class="lineNum">     539 </span>                :            :     /* SSL_shutdown() might have signaled an error, in which case we need to
+<span class="lineNum">     540 </span>                :            :      * flush it out of the OpenSSL error queue or the next OpenSSL operation
+<span class="lineNum">     541 </span>                :            :      * will falsely signal an error. */
+<span class="lineNum">     542 </span>                :<span class="lineCov">        221 :     ERR_clear_error();</span>
+<span class="lineNum">     543 </span>                :            : 
+<span class="lineNum">     544 </span>                :<span class="lineCov">        221 :     SSL_free(sslv-&gt;ssl);</span>
+<span class="lineNum">     545 </span>                :<span class="lineCov">        221 :     clear_handle(sslv-&gt;fd, sslv-&gt;wevent);</span>
+<span class="lineNum">     546 </span>                :<span class="lineCov">        221 :     closesocket(sslv-&gt;fd);</span>
+<span class="lineNum">     547 </span>                :<span class="lineCov">        221 :     free(sslv);</span>
+<span class="lineNum">     548 </span>                :<span class="lineCov">        221 : }</span>
+<a name="549"><span class="lineNum">     549 </span>                :            : </a>
+<span class="lineNum">     550 </span>                :            : static void
+<span class="lineNum">     551 </span>                :<span class="lineNoCov">          0 : interpret_queued_ssl_error(const char *function)</span>
+<span class="lineNum">     552 </span>                :            : {
+<span class="lineNum">     553 </span>                :<span class="lineNoCov">          0 :     int queued_error = ERR_get_error();</span>
+<span class="lineNum">     554 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (queued_error != 0) {</span>
+<span class="lineNum">     555 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;%s: %s&quot;,</span>
+<span class="lineNum">     556 </span>                :            :                      function, ERR_error_string(queued_error, NULL));
+<span class="lineNum">     557 </span>                :            :     } else {
+<span class="lineNum">     558 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;%s: SSL_ERROR_SSL without queued error&quot;, function);</span>
+<span class="lineNum">     559 </span>                :            :     }
+<span class="lineNum">     560 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="561"><span class="lineNum">     561 </span>                :            : </a>
+<span class="lineNum">     562 </span>                :            : static int
+<span class="lineNum">     563 </span>                :<span class="lineCov">        253 : interpret_ssl_error(const char *function, int ret, int error,</span>
+<span class="lineNum">     564 </span>                :            :                     int *want)
+<span class="lineNum">     565 </span>                :            : {
+<span class="lineNum">     566 </span>                :<span class="lineCov">        253 :     *want = SSL_NOTHING;</span>
+<span class="lineNum">     567 </span>                :            : 
+<span class="lineNum">     568 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 251 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span> :<span class="lineCov">        253 :     switch (error) {</span>
+<span class="lineNum">         </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchNoCov" title="Branch 6 was not taken"> - </span><span class="branchCov" title="Branch 7 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 8 was not taken"> - </span> 
+<span class="lineNum">         </span>            <span class="branchNoCov" title="Branch 9 was not taken"> - </span>]
+<span class="lineNum">     569 </span>                :            :     case SSL_ERROR_NONE:
+<span class="lineNum">     570 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;%s: unexpected SSL_ERROR_NONE&quot;, function);</span>
+<span class="lineNum">     571 </span>                :<span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">     572 </span>                :            : 
+<span class="lineNum">     573 </span>                :            :     case SSL_ERROR_ZERO_RETURN:
+<span class="lineNum">     574 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;%s: unexpected SSL_ERROR_ZERO_RETURN&quot;, function);</span>
+<span class="lineNum">     575 </span>                :<span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">     576 </span>                :            : 
+<span class="lineNum">     577 </span>                :            :     case SSL_ERROR_WANT_READ:
+<span class="lineNum">     578 </span>                :<span class="lineCov">        251 :         *want = SSL_READING;</span>
+<span class="lineNum">     579 </span>                :<span class="lineCov">        251 :         return EAGAIN;</span>
+<span class="lineNum">     580 </span>                :            : 
+<span class="lineNum">     581 </span>                :            :     case SSL_ERROR_WANT_WRITE:
+<span class="lineNum">     582 </span>                :<span class="lineNoCov">          0 :         *want = SSL_WRITING;</span>
+<span class="lineNum">     583 </span>                :<span class="lineNoCov">          0 :         return EAGAIN;</span>
+<span class="lineNum">     584 </span>                :            : 
+<span class="lineNum">     585 </span>                :            :     case SSL_ERROR_WANT_CONNECT:
+<span class="lineNum">     586 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;%s: unexpected SSL_ERROR_WANT_CONNECT&quot;, function);</span>
+<span class="lineNum">     587 </span>                :<span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">     588 </span>                :            : 
+<span class="lineNum">     589 </span>                :            :     case SSL_ERROR_WANT_ACCEPT:
+<span class="lineNum">     590 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;%s: unexpected SSL_ERROR_WANT_ACCEPT&quot;, function);</span>
+<span class="lineNum">     591 </span>                :<span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">     592 </span>                :            : 
+<span class="lineNum">     593 </span>                :            :     case SSL_ERROR_WANT_X509_LOOKUP:
+<span class="lineNum">     594 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;%s: unexpected SSL_ERROR_WANT_X509_LOOKUP&quot;,</span>
+<span class="lineNum">     595 </span>                :            :                     function);
+<span class="lineNum">     596 </span>                :<span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">     597 </span>                :            : 
+<span class="lineNum">     598 </span>                :            :     case SSL_ERROR_SYSCALL: {
+<span class="lineNum">     599 </span>                :<span class="lineCov">          2 :         int queued_error = ERR_get_error();</span>
+<span class="lineNum">     600 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :         if (queued_error == 0) {</span>
+<span class="lineNum">     601 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :             if (ret &lt; 0) {</span>
+<span class="lineNum">     602 </span>                :<span class="lineNoCov">          0 :                 int status = errno;</span>
+<span class="lineNum">     603 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_WARN_RL(&amp;rl, &quot;%s: system error (%s)&quot;,</span>
+<span class="lineNum">     604 </span>                :            :                              function, ovs_strerror(status));
+<span class="lineNum">     605 </span>                :<span class="lineNoCov">          0 :                 return status;</span>
+<span class="lineNum">     606 </span>                :            :             } else {
+<span class="lineNum">     607 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :                 VLOG_WARN_RL(&amp;rl, &quot;%s: unexpected SSL connection close&quot;,</span>
+<span class="lineNum">     608 </span>                :            :                              function);
+<span class="lineNum">     609 </span>                :<span class="lineCov">          2 :                 return EPROTO;</span>
+<span class="lineNum">     610 </span>                :            :             }
+<span class="lineNum">     611 </span>                :            :         } else {
+<span class="lineNum">     612 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN_RL(&amp;rl, &quot;%s: %s&quot;,</span>
+<span class="lineNum">     613 </span>                :            :                          function, ERR_error_string(queued_error, NULL));
+<span class="lineNum">     614 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     615 </span>                :            :         }
+<span class="lineNum">     616 </span>                :            :     }
+<span class="lineNum">     617 </span>                :            : 
+<span class="lineNum">     618 </span>                :            :     case SSL_ERROR_SSL:
+<span class="lineNum">     619 </span>                :<span class="lineNoCov">          0 :         interpret_queued_ssl_error(function);</span>
+<span class="lineNum">     620 </span>                :<span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">     621 </span>                :            : 
+<span class="lineNum">     622 </span>                :            :     default:
+<span class="lineNum">     623 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;%s: bad SSL error code %d&quot;, function, error);</span>
+<span class="lineNum">     624 </span>                :<span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">     625 </span>                :            :     }
+<span class="lineNum">     626 </span>                :<span class="lineCov">        253 :     return EIO;</span>
+<span class="lineNum">     627 </span>                :            : }
+<a name="628"><span class="lineNum">     628 </span>                :            : </a>
+<span class="lineNum">     629 </span>                :            : static ssize_t
+<span class="lineNum">     630 </span>                :<span class="lineCov">        575 : ssl_recv(struct stream *stream, void *buffer, size_t n)</span>
+<span class="lineNum">     631 </span>                :            : {
+<span class="lineNum">     632 </span>                :<span class="lineCov">        575 :     struct ssl_stream *sslv = ssl_stream_cast(stream);</span>
+<span class="lineNum">     633 </span>                :            :     int old_state;
+<span class="lineNum">     634 </span>                :            :     ssize_t ret;
+<span class="lineNum">     635 </span>                :            : 
+<span class="lineNum">     636 </span>                :            :     /* Behavior of zero-byte SSL_read is poorly defined. */
+<span class="lineNum">     637 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 575 times"> + </span>]:<span class="lineCov">        575 :     ovs_assert(n &gt; 0);</span>
+<span class="lineNum">     638 </span>                :            : 
+<span class="lineNum">     639 </span>                :<span class="lineCov">        575 :     old_state = SSL_get_state(sslv-&gt;ssl);</span>
+<span class="lineNum">     640 </span>                :<span class="lineCov">        575 :     ret = SSL_read(sslv-&gt;ssl, buffer, n);</span>
+<span class="lineNum">     641 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 575 times"> + </span>]:<span class="lineCov">        575 :     if (old_state != SSL_get_state(sslv-&gt;ssl)) {</span>
+<span class="lineNum">     642 </span>                :<span class="lineNoCov">          0 :         sslv-&gt;tx_want = SSL_NOTHING;</span>
+<span class="lineNum">     643 </span>                :            :     }
+<span class="lineNum">     644 </span>                :<span class="lineCov">        575 :     sslv-&gt;rx_want = SSL_NOTHING;</span>
+<span class="lineNum">     645 </span>                :            : 
+<span class="lineNum">     646 </span>        [<span class="branchCov" title="Branch 0 was taken 218 times"> + </span><span class="branchCov" title="Branch 1 was taken 357 times"> + </span>]:<span class="lineCov">        575 :     if (ret &gt; 0) {</span>
+<span class="lineNum">     647 </span>                :<span class="lineCov">        218 :         return ret;</span>
+<span class="lineNum">     648 </span>                :            :     } else {
+<span class="lineNum">     649 </span>                :<span class="lineCov">        357 :         int error = SSL_get_error(sslv-&gt;ssl, ret);</span>
+<span class="lineNum">     650 </span>        [<span class="branchCov" title="Branch 0 was taken 106 times"> + </span><span class="branchCov" title="Branch 1 was taken 251 times"> + </span>]:<span class="lineCov">        357 :         if (error == SSL_ERROR_ZERO_RETURN) {</span>
+<span class="lineNum">     651 </span>                :<span class="lineCov">        106 :             return 0;</span>
+<span class="lineNum">     652 </span>                :            :         } else {
+<span class="lineNum">     653 </span>                :<span class="lineCov">        575 :             return -interpret_ssl_error(&quot;SSL_read&quot;, ret, error,</span>
+<span class="lineNum">     654 </span>                :            :                                         &amp;sslv-&gt;rx_want);
+<span class="lineNum">     655 </span>                :            :         }
+<span class="lineNum">     656 </span>                :            :     }
+<span class="lineNum">     657 </span>                :            : }
+<a name="658"><span class="lineNum">     658 </span>                :            : </a>
+<span class="lineNum">     659 </span>                :            : static void
+<span class="lineNum">     660 </span>                :<span class="lineCov">        438 : ssl_clear_txbuf(struct ssl_stream *sslv)</span>
+<span class="lineNum">     661 </span>                :            : {
+<span class="lineNum">     662 </span>                :<span class="lineCov">        438 :     ofpbuf_delete(sslv-&gt;txbuf);</span>
+<span class="lineNum">     663 </span>                :<span class="lineCov">        438 :     sslv-&gt;txbuf = NULL;</span>
+<span class="lineNum">     664 </span>                :<span class="lineCov">        438 : }</span>
+<a name="665"><span class="lineNum">     665 </span>                :            : </a>
+<span class="lineNum">     666 </span>                :            : static int
+<span class="lineNum">     667 </span>                :<span class="lineCov">        217 : ssl_do_tx(struct stream *stream)</span>
+<span class="lineNum">     668 </span>                :            : {
+<span class="lineNum">     669 </span>                :<span class="lineCov">        217 :     struct ssl_stream *sslv = ssl_stream_cast(stream);</span>
+<span class="lineNum">     670 </span>                :            : 
+<span class="lineNum">     671 </span>                :            :     for (;;) {
+<span class="lineNum">     672 </span>                :<span class="lineCov">        217 :         int old_state = SSL_get_state(sslv-&gt;ssl);</span>
+<span class="lineNum">     673 </span>                :<span class="lineCov">        217 :         int ret = SSL_write(sslv-&gt;ssl,</span>
+<span class="lineNum">     674 </span>                :<span class="lineCov">        217 :                             ofpbuf_data(sslv-&gt;txbuf), ofpbuf_size(sslv-&gt;txbuf));</span>
+<span class="lineNum">     675 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 217 times"> + </span>]:<span class="lineCov">        217 :         if (old_state != SSL_get_state(sslv-&gt;ssl)) {</span>
+<span class="lineNum">     676 </span>                :<span class="lineNoCov">          0 :             sslv-&gt;rx_want = SSL_NOTHING;</span>
+<span class="lineNum">     677 </span>                :            :         }
+<span class="lineNum">     678 </span>                :<span class="lineCov">        217 :         sslv-&gt;tx_want = SSL_NOTHING;</span>
+<span class="lineNum">     679 </span>        [<span class="branchCov" title="Branch 0 was taken 217 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        217 :         if (ret &gt; 0) {</span>
+<span class="lineNum">     680 </span>                :<span class="lineCov">        217 :             ofpbuf_pull(sslv-&gt;txbuf, ret);</span>
+<span class="lineNum">     681 </span>        [<span class="branchCov" title="Branch 1 was taken 217 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        217 :             if (ofpbuf_size(sslv-&gt;txbuf) == 0) {</span>
+<span class="lineNum">     682 </span>                :<span class="lineCov">        217 :                 return 0;</span>
+<span class="lineNum">     683 </span>                :            :             }
+<span class="lineNum">     684 </span>                :            :         } else {
+<span class="lineNum">     685 </span>                :<span class="lineNoCov">          0 :             int ssl_error = SSL_get_error(sslv-&gt;ssl, ret);</span>
+<span class="lineNum">     686 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (ssl_error == SSL_ERROR_ZERO_RETURN) {</span>
+<span class="lineNum">     687 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_WARN_RL(&amp;rl, &quot;SSL_write: connection closed&quot;);</span>
+<span class="lineNum">     688 </span>                :<span class="lineNoCov">          0 :                 return EPIPE;</span>
+<span class="lineNum">     689 </span>                :            :             } else {
+<span class="lineNum">     690 </span>                :<span class="lineNoCov">          0 :                 return interpret_ssl_error(&quot;SSL_write&quot;, ret, ssl_error,</span>
+<span class="lineNum">     691 </span>                :            :                                            &amp;sslv-&gt;tx_want);
+<span class="lineNum">     692 </span>                :            :             }
+<span class="lineNum">     693 </span>                :            :         }
+<span class="lineNum">     694 </span>                :<span class="lineCov">        217 :     }</span>
+<span class="lineNum">     695 </span>                :            : }
+<a name="696"><span class="lineNum">     696 </span>                :            : </a>
+<span class="lineNum">     697 </span>                :            : static ssize_t
+<span class="lineNum">     698 </span>                :<span class="lineCov">        217 : ssl_send(struct stream *stream, const void *buffer, size_t n)</span>
+<span class="lineNum">     699 </span>                :            : {
+<span class="lineNum">     700 </span>                :<span class="lineCov">        217 :     struct ssl_stream *sslv = ssl_stream_cast(stream);</span>
+<span class="lineNum">     701 </span>                :            : 
+<span class="lineNum">     702 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 217 times"> + </span>]:<span class="lineCov">        217 :     if (sslv-&gt;txbuf) {</span>
+<span class="lineNum">     703 </span>                :<span class="lineNoCov">          0 :         return -EAGAIN;</span>
+<span class="lineNum">     704 </span>                :            :     } else {
+<span class="lineNum">     705 </span>                :            :         int error;
+<span class="lineNum">     706 </span>                :            : 
+<span class="lineNum">     707 </span>                :<span class="lineCov">        217 :         sslv-&gt;txbuf = ofpbuf_clone_data(buffer, n);</span>
+<span class="lineNum">     708 </span>                :<span class="lineCov">        217 :         error = ssl_do_tx(stream);</span>
+<span class="lineNum">     709 </span>     [<span class="branchCov" title="Branch 0 was taken 217 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        217 :         switch (error) {</span>
+<span class="lineNum">     710 </span>                :            :         case 0:
+<span class="lineNum">     711 </span>                :<span class="lineCov">        217 :             ssl_clear_txbuf(sslv);</span>
+<span class="lineNum">     712 </span>                :<span class="lineCov">        217 :             return n;</span>
+<span class="lineNum">     713 </span>                :            :         case EAGAIN:
+<span class="lineNum">     714 </span>                :<span class="lineNoCov">          0 :             return n;</span>
+<span class="lineNum">     715 </span>                :            :         default:
+<span class="lineNum">     716 </span>                :<span class="lineNoCov">          0 :             sslv-&gt;txbuf = NULL;</span>
+<span class="lineNum">     717 </span>                :<span class="lineCov">        217 :             return -error;</span>
+<span class="lineNum">     718 </span>                :            :         }
+<span class="lineNum">     719 </span>                :            :     }
+<span class="lineNum">     720 </span>                :            : }
+<a name="721"><span class="lineNum">     721 </span>                :            : </a>
+<span class="lineNum">     722 </span>                :            : static void
+<span class="lineNum">     723 </span>                :<span class="lineCov">       1150 : ssl_run(struct stream *stream)</span>
+<span class="lineNum">     724 </span>                :            : {
+<span class="lineNum">     725 </span>                :<span class="lineCov">       1150 :     struct ssl_stream *sslv = ssl_stream_cast(stream);</span>
+<span class="lineNum">     726 </span>                :            : 
+<span class="lineNum">     727 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1150 times"> + </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineCov">       1150 :     if (sslv-&gt;txbuf &amp;&amp; ssl_do_tx(stream) != EAGAIN) {</span>
+<span class="lineNum">     728 </span>                :<span class="lineNoCov">          0 :         ssl_clear_txbuf(sslv);</span>
+<span class="lineNum">     729 </span>                :            :     }
+<span class="lineNum">     730 </span>                :<span class="lineCov">       1150 : }</span>
+<a name="731"><span class="lineNum">     731 </span>                :            : </a>
+<span class="lineNum">     732 </span>                :            : static void
+<span class="lineNum">     733 </span>                :<span class="lineCov">        720 : ssl_run_wait(struct stream *stream)</span>
+<span class="lineNum">     734 </span>                :            : {
+<span class="lineNum">     735 </span>                :<span class="lineCov">        720 :     struct ssl_stream *sslv = ssl_stream_cast(stream);</span>
+<span class="lineNum">     736 </span>                :            : 
+<span class="lineNum">     737 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 720 times"> + </span>]:<span class="lineCov">        720 :     if (sslv-&gt;tx_want != SSL_NOTHING) {</span>
+<span class="lineNum">     738 </span>                :<span class="lineNoCov">          0 :         poll_fd_wait_event(sslv-&gt;fd, sslv-&gt;wevent,</span>
+<span class="lineNum">     739 </span>                :            :                            want_to_poll_events(sslv-&gt;tx_want));
+<span class="lineNum">     740 </span>                :            :     }
+<span class="lineNum">     741 </span>                :<span class="lineCov">        720 : }</span>
+<a name="742"><span class="lineNum">     742 </span>                :            : </a>
+<span class="lineNum">     743 </span>                :            : static void
+<span class="lineNum">     744 </span>                :<span class="lineCov">        734 : ssl_wait(struct stream *stream, enum stream_wait_type wait)</span>
+<span class="lineNum">     745 </span>                :            : {
+<span class="lineNum">     746 </span>                :<span class="lineCov">        734 :     struct ssl_stream *sslv = ssl_stream_cast(stream);</span>
+<span class="lineNum">     747 </span>                :            : 
+<span class="lineNum">     748 </span>  [<span class="branchCov" title="Branch 0 was taken 383 times"> + </span><span class="branchCov" title="Branch 1 was taken 351 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        734 :     switch (wait) {</span>
+<span class="lineNum">     749 </span>                :            :     case STREAM_CONNECT:
+<span class="lineNum">     750 </span>        [<span class="branchCov" title="Branch 1 was taken 16 times"> + </span><span class="branchCov" title="Branch 2 was taken 367 times"> + </span>]:<span class="lineCov">        383 :         if (stream_connect(stream) != EAGAIN) {</span>
+<span class="lineNum">     751 </span>                :<span class="lineCov">         16 :             poll_immediate_wake();</span>
+<span class="lineNum">     752 </span>                :            :         } else {
+<span class="lineNum">     753 </span>     [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 367 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        367 :             switch (sslv-&gt;state) {</span>
+<span class="lineNum">     754 </span>                :            :             case STATE_TCP_CONNECTING:
+<span class="lineNum">     755 </span>                :<span class="lineNoCov">          0 :                 poll_fd_wait_event(sslv-&gt;fd, sslv-&gt;wevent, POLLOUT);</span>
+<span class="lineNum">     756 </span>                :<span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     757 </span>                :            : 
+<span class="lineNum">     758 </span>                :            :             case STATE_SSL_CONNECTING:
+<span class="lineNum">     759 </span>                :            :                 /* ssl_connect() called SSL_accept() or SSL_connect(), which
+<span class="lineNum">     760 </span>                :            :                  * set up the status that we test here. */
+<span class="lineNum">     761 </span>                :<span class="lineCov">        367 :                 poll_fd_wait_event(sslv-&gt;fd, sslv-&gt;wevent,</span>
+<span class="lineNum">     762 </span>                :            :                                    want_to_poll_events(SSL_want(sslv-&gt;ssl)));
+<span class="lineNum">     763 </span>                :<span class="lineCov">        367 :                 break;</span>
+<span class="lineNum">     764 </span>                :            : 
+<span class="lineNum">     765 </span>                :            :             default:
+<span class="lineNum">     766 </span>                :<span class="lineNoCov">          0 :                 OVS_NOT_REACHED();</span>
+<span class="lineNum">     767 </span>                :            :             }
+<span class="lineNum">     768 </span>                :            :         }
+<span class="lineNum">     769 </span>                :<span class="lineCov">        383 :         break;</span>
+<span class="lineNum">     770 </span>                :            : 
+<span class="lineNum">     771 </span>                :            :     case STREAM_RECV:
+<span class="lineNum">     772 </span>        [<span class="branchCov" title="Branch 0 was taken 248 times"> + </span><span class="branchCov" title="Branch 1 was taken 103 times"> + </span>]:<span class="lineCov">        351 :         if (sslv-&gt;rx_want != SSL_NOTHING) {</span>
+<span class="lineNum">     773 </span>                :<span class="lineCov">        248 :             poll_fd_wait_event(sslv-&gt;fd, sslv-&gt;wevent,</span>
+<span class="lineNum">     774 </span>                :            :                                want_to_poll_events(sslv-&gt;rx_want));
+<span class="lineNum">     775 </span>                :            :         } else {
+<span class="lineNum">     776 </span>                :<span class="lineCov">        103 :             poll_immediate_wake();</span>
+<span class="lineNum">     777 </span>                :            :         }
+<span class="lineNum">     778 </span>                :<span class="lineCov">        351 :         break;</span>
+<span class="lineNum">     779 </span>                :            : 
+<span class="lineNum">     780 </span>                :            :     case STREAM_SEND:
+<span class="lineNum">     781 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!sslv-&gt;txbuf) {</span>
+<span class="lineNum">     782 </span>                :            :             /* We have room in our tx queue. */
+<span class="lineNum">     783 </span>                :<span class="lineNoCov">          0 :             poll_immediate_wake();</span>
+<span class="lineNum">     784 </span>                :            :         } else {
+<span class="lineNum">     785 </span>                :            :             /* stream_run_wait() will do the right thing; don't bother with
+<span class="lineNum">     786 </span>                :            :              * redundancy. */
+<span class="lineNum">     787 </span>                :            :         }
+<span class="lineNum">     788 </span>                :<span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">     789 </span>                :            : 
+<span class="lineNum">     790 </span>                :            :     default:
+<span class="lineNum">     791 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     792 </span>                :            :     }
+<span class="lineNum">     793 </span>                :<span class="lineCov">        734 : }</span>
+<span class="lineNum">     794 </span>                :            : 
+<span class="lineNum">     795 </span>                :            : const struct stream_class ssl_stream_class = {
+<span class="lineNum">     796 </span>                :            :     &quot;ssl&quot;,                      /* name */
+<span class="lineNum">     797 </span>                :            :     true,                       /* needs_probes */
+<span class="lineNum">     798 </span>                :            :     ssl_open,                   /* open */
+<span class="lineNum">     799 </span>                :            :     ssl_close,                  /* close */
+<span class="lineNum">     800 </span>                :            :     ssl_connect,                /* connect */
+<span class="lineNum">     801 </span>                :            :     ssl_recv,                   /* recv */
+<span class="lineNum">     802 </span>                :            :     ssl_send,                   /* send */
+<span class="lineNum">     803 </span>                :            :     ssl_run,                    /* run */
+<span class="lineNum">     804 </span>                :            :     ssl_run_wait,               /* run_wait */
+<span class="lineNum">     805 </span>                :            :     ssl_wait,                   /* wait */
+<span class="lineNum">     806 </span>                :            : };
+<span class="lineNum">     807 </span>                :            : 
+<span class="lineNum">     808 </span>                :            : /* Passive SSL. */
+<span class="lineNum">     809 </span>                :            : 
+<span class="lineNum">     810 </span>                :            : struct pssl_pstream
+<span class="lineNum">     811 </span>                :            : {
+<span class="lineNum">     812 </span>                :            :     struct pstream pstream;
+<span class="lineNum">     813 </span>                :            :     int fd;
+<span class="lineNum">     814 </span>                :            :     HANDLE wevent;
+<span class="lineNum">     815 </span>                :            : };
+<span class="lineNum">     816 </span>                :            : 
+<span class="lineNum">     817 </span>                :            : const struct pstream_class pssl_pstream_class;
+<a name="818"><span class="lineNum">     818 </span>                :            : </a>
+<span class="lineNum">     819 </span>                :            : static struct pssl_pstream *
+<span class="lineNum">     820 </span>                :<span class="lineCov">       2226 : pssl_pstream_cast(struct pstream *pstream)</span>
+<span class="lineNum">     821 </span>                :            : {
+<span class="lineNum">     822 </span>                :<span class="lineCov">       2226 :     pstream_assert_class(pstream, &amp;pssl_pstream_class);</span>
+<span class="lineNum">     823 </span>                :<span class="lineCov">       2226 :     return CONTAINER_OF(pstream, struct pssl_pstream, pstream);</span>
+<span class="lineNum">     824 </span>                :            : }
+<a name="825"><span class="lineNum">     825 </span>                :            : </a>
+<span class="lineNum">     826 </span>                :            : static int
+<span class="lineNum">     827 </span>                :<span class="lineCov">         35 : pssl_open(const char *name OVS_UNUSED, char *suffix, struct pstream **pstreamp,</span>
+<span class="lineNum">     828 </span>                :            :           uint8_t dscp)
+<span class="lineNum">     829 </span>                :            : {
+<span class="lineNum">     830 </span>                :            :     char bound_name[SS_NTOP_BUFSIZE + 16];
+<span class="lineNum">     831 </span>                :            :     char addrbuf[SS_NTOP_BUFSIZE];
+<span class="lineNum">     832 </span>                :            :     struct sockaddr_storage ss;
+<span class="lineNum">     833 </span>                :            :     struct pssl_pstream *pssl;
+<span class="lineNum">     834 </span>                :            :     uint16_t port;
+<span class="lineNum">     835 </span>                :            :     int retval;
+<span class="lineNum">     836 </span>                :            :     int fd;
+<span class="lineNum">     837 </span>                :            : 
+<span class="lineNum">     838 </span>                :<span class="lineCov">         35 :     retval = ssl_init();</span>
+<span class="lineNum">     839 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 35 times"> + </span>]:<span class="lineCov">         35 :     if (retval) {</span>
+<span class="lineNum">     840 </span>                :<span class="lineNoCov">          0 :         return retval;</span>
+<span class="lineNum">     841 </span>                :            :     }
+<span class="lineNum">     842 </span>                :            : 
+<span class="lineNum">     843 </span>                :<span class="lineCov">         35 :     fd = inet_open_passive(SOCK_STREAM, suffix, OFP_OLD_PORT, &amp;ss, dscp, true);</span>
+<span class="lineNum">     844 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 35 times"> + </span>]:<span class="lineCov">         35 :     if (fd &lt; 0) {</span>
+<span class="lineNum">     845 </span>                :<span class="lineNoCov">          0 :         return -fd;</span>
+<span class="lineNum">     846 </span>                :            :     }
+<span class="lineNum">     847 </span>                :            : 
+<span class="lineNum">     848 </span>                :<span class="lineCov">         35 :     port = ss_get_port(&amp;ss);</span>
+<span class="lineNum">     849 </span>                :<span class="lineCov">         35 :     snprintf(bound_name, sizeof bound_name, &quot;ptcp:%&quot;PRIu16&quot;:%s&quot;,</span>
+<span class="lineNum">     850 </span>                :            :              port, ss_format_address(&amp;ss, addrbuf, sizeof addrbuf));
+<span class="lineNum">     851 </span>                :            : 
+<span class="lineNum">     852 </span>                :<span class="lineCov">         35 :     pssl = xmalloc(sizeof *pssl);</span>
+<span class="lineNum">     853 </span>                :<span class="lineCov">         35 :     pstream_init(&amp;pssl-&gt;pstream, &amp;pssl_pstream_class, bound_name);</span>
+<span class="lineNum">     854 </span>                :<span class="lineCov">         35 :     pstream_set_bound_port(&amp;pssl-&gt;pstream, htons(port));</span>
+<span class="lineNum">     855 </span>                :<span class="lineCov">         35 :     pssl-&gt;fd = fd;</span>
+<span class="lineNum">     856 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     857 </span>                :            :     pssl-&gt;wevent = CreateEvent(NULL, FALSE, FALSE, NULL);
+<span class="lineNum">     858 </span>                :            : #else
+<span class="lineNum">     859 </span>                :<span class="lineCov">         35 :     pssl-&gt;wevent = 0;</span>
+<span class="lineNum">     860 </span>                :            : #endif
+<span class="lineNum">     861 </span>                :<span class="lineCov">         35 :     *pstreamp = &amp;pssl-&gt;pstream;</span>
+<span class="lineNum">     862 </span>                :<span class="lineCov">         35 :     return 0;</span>
+<span class="lineNum">     863 </span>                :            : }
+<a name="864"><span class="lineNum">     864 </span>                :            : </a>
+<span class="lineNum">     865 </span>                :            : static void
+<span class="lineNum">     866 </span>                :<span class="lineCov">         35 : pssl_close(struct pstream *pstream)</span>
+<span class="lineNum">     867 </span>                :            : {
+<span class="lineNum">     868 </span>                :<span class="lineCov">         35 :     struct pssl_pstream *pssl = pssl_pstream_cast(pstream);</span>
+<span class="lineNum">     869 </span>                :<span class="lineCov">         35 :     clear_handle(pssl-&gt;fd, pssl-&gt;wevent);</span>
+<span class="lineNum">     870 </span>                :<span class="lineCov">         35 :     closesocket(pssl-&gt;fd);</span>
+<span class="lineNum">     871 </span>                :<span class="lineCov">         35 :     free(pssl);</span>
+<span class="lineNum">     872 </span>                :<span class="lineCov">         35 : }</span>
+<a name="873"><span class="lineNum">     873 </span>                :            : </a>
+<span class="lineNum">     874 </span>                :            : static int
+<span class="lineNum">     875 </span>                :<span class="lineCov">        726 : pssl_accept(struct pstream *pstream, struct stream **new_streamp)</span>
+<span class="lineNum">     876 </span>                :            : {
+<span class="lineNum">     877 </span>                :<span class="lineCov">        726 :     struct pssl_pstream *pssl = pssl_pstream_cast(pstream);</span>
+<span class="lineNum">     878 </span>                :            :     char name[SS_NTOP_BUFSIZE + 16];
+<span class="lineNum">     879 </span>                :            :     char addrbuf[SS_NTOP_BUFSIZE];
+<span class="lineNum">     880 </span>                :            :     struct sockaddr_storage ss;
+<span class="lineNum">     881 </span>                :<span class="lineCov">        726 :     socklen_t ss_len = sizeof ss;</span>
+<span class="lineNum">     882 </span>                :            :     int new_fd;
+<span class="lineNum">     883 </span>                :            :     int error;
+<span class="lineNum">     884 </span>                :            : 
+<span class="lineNum">     885 </span>                :<span class="lineCov">        726 :     new_fd = accept(pssl-&gt;fd, (struct sockaddr *) &amp;ss, &amp;ss_len);</span>
+<span class="lineNum">     886 </span>        [<span class="branchCov" title="Branch 0 was taken 616 times"> + </span><span class="branchCov" title="Branch 1 was taken 110 times"> + </span>]:<span class="lineCov">        726 :     if (new_fd &lt; 0) {</span>
+<span class="lineNum">     887 </span>                :<span class="lineCov">        616 :         error = sock_errno();</span>
+<span class="lineNum">     888 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     889 </span>                :            :         if (error == WSAEWOULDBLOCK) {
+<span class="lineNum">     890 </span>                :            :             error = EAGAIN;
+<span class="lineNum">     891 </span>                :            :         }
+<span class="lineNum">     892 </span>                :            : #endif
+<span class="lineNum">     893 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 616 times"> + </span>]:<span class="lineCov">        616 :         if (error != EAGAIN) {</span>
+<span class="lineNum">     894 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_DBG_RL(&amp;rl, &quot;accept: %s&quot;, sock_strerror(error));</span>
+<span class="lineNum">     895 </span>                :            :         }
+<span class="lineNum">     896 </span>                :<span class="lineCov">        616 :         return error;</span>
+<span class="lineNum">     897 </span>                :            :     }
+<span class="lineNum">     898 </span>                :            : 
+<span class="lineNum">     899 </span>                :<span class="lineCov">        110 :     error = set_nonblocking(new_fd);</span>
+<span class="lineNum">     900 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 110 times"> + </span>]:<span class="lineCov">        110 :     if (error) {</span>
+<span class="lineNum">     901 </span>                :<span class="lineNoCov">          0 :         closesocket(new_fd);</span>
+<span class="lineNum">     902 </span>                :<span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     903 </span>                :            :     }
+<span class="lineNum">     904 </span>                :            : 
+<span class="lineNum">     905 </span>                :<span class="lineCov">        110 :     snprintf(name, sizeof name, &quot;tcp:%s:%&quot;PRIu16,</span>
+<span class="lineNum">     906 </span>                :            :              ss_format_address(&amp;ss, addrbuf, sizeof addrbuf),
+<span class="lineNum">     907 </span>                :<span class="lineCov">        110 :              ss_get_port(&amp;ss));</span>
+<span class="lineNum">     908 </span>                :<span class="lineCov">        726 :     return new_ssl_stream(name, new_fd, SERVER, STATE_SSL_CONNECTING,</span>
+<span class="lineNum">     909 </span>                :            :                           new_streamp);
+<span class="lineNum">     910 </span>                :            : }
+<a name="911"><span class="lineNum">     911 </span>                :            : </a>
+<span class="lineNum">     912 </span>                :            : static void
+<span class="lineNum">     913 </span>                :<span class="lineCov">        719 : pssl_wait(struct pstream *pstream)</span>
+<span class="lineNum">     914 </span>                :            : {
+<span class="lineNum">     915 </span>                :<span class="lineCov">        719 :     struct pssl_pstream *pssl = pssl_pstream_cast(pstream);</span>
+<span class="lineNum">     916 </span>                :<span class="lineCov">        719 :     poll_fd_wait_event(pssl-&gt;fd, pssl-&gt;wevent, POLLIN);</span>
+<span class="lineNum">     917 </span>                :<span class="lineCov">        719 : }</span>
+<a name="918"><span class="lineNum">     918 </span>                :            : </a>
+<span class="lineNum">     919 </span>                :            : static int
+<span class="lineNum">     920 </span>                :<span class="lineCov">        746 : pssl_set_dscp(struct pstream *pstream, uint8_t dscp)</span>
+<span class="lineNum">     921 </span>                :            : {
+<span class="lineNum">     922 </span>                :<span class="lineCov">        746 :     struct pssl_pstream *pssl = pssl_pstream_cast(pstream);</span>
+<span class="lineNum">     923 </span>                :<span class="lineCov">        746 :     return set_dscp(pssl-&gt;fd, dscp);</span>
+<span class="lineNum">     924 </span>                :            : }
+<span class="lineNum">     925 </span>                :            : 
+<span class="lineNum">     926 </span>                :            : const struct pstream_class pssl_pstream_class = {
+<span class="lineNum">     927 </span>                :            :     &quot;pssl&quot;,
+<span class="lineNum">     928 </span>                :            :     true,
+<span class="lineNum">     929 </span>                :            :     pssl_open,
+<span class="lineNum">     930 </span>                :            :     pssl_close,
+<span class="lineNum">     931 </span>                :            :     pssl_accept,
+<span class="lineNum">     932 </span>                :            :     pssl_wait,
+<span class="lineNum">     933 </span>                :            :     pssl_set_dscp,
+<span class="lineNum">     934 </span>                :            : };
+<span class="lineNum">     935 </span>                :            : 
+<span class="lineNum">     936 </span>                :            : /*
+<span class="lineNum">     937 </span>                :            :  * Returns true if OpenSSL error is WANT_READ or WANT_WRITE, indicating that
+<span class="lineNum">     938 </span>                :            :  * OpenSSL is requesting that we call it back when the socket is ready for read
+<span class="lineNum">     939 </span>                :            :  * or writing, respectively.
+<a name="940"><span class="lineNum">     940 </span>                :            :  */</a>
+<span class="lineNum">     941 </span>                :            : static bool
+<span class="lineNum">     942 </span>                :<span class="lineCov">        760 : ssl_wants_io(int ssl_error)</span>
+<span class="lineNum">     943 </span>                :            : {
+<span class="lineNum">     944 </span>                :<span class="lineCov">        760 :     return (ssl_error == SSL_ERROR_WANT_WRITE</span>
+<span class="lineNum">     945 </span>[<span class="branchCov" title="Branch 0 was taken 760 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 760 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        760 :             || ssl_error == SSL_ERROR_WANT_READ);</span>
+<span class="lineNum">     946 </span>                :            : }
+<a name="947"><span class="lineNum">     947 </span>                :            : </a>
+<span class="lineNum">     948 </span>                :            : static int
+<span class="lineNum">     949 </span>                :<span class="lineCov">      59393 : ssl_init(void)</span>
+<span class="lineNum">     950 </span>                :            : {
+<span class="lineNum">     951 </span>                :            :     static int init_status = -1;
+<span class="lineNum">     952 </span>        [<span class="branchCov" title="Branch 0 was taken 702 times"> + </span><span class="branchCov" title="Branch 1 was taken 58691 times"> + </span>]:<span class="lineCov">      59393 :     if (init_status &lt; 0) {</span>
+<span class="lineNum">     953 </span>                :<span class="lineCov">        702 :         init_status = do_ssl_init();</span>
+<span class="lineNum">     954 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 702 times"> + </span>]:<span class="lineCov">        702 :         ovs_assert(init_status &gt;= 0);</span>
+<span class="lineNum">     955 </span>                :            :     }
+<span class="lineNum">     956 </span>                :<span class="lineCov">      59393 :     return init_status;</span>
+<span class="lineNum">     957 </span>                :            : }
+<a name="958"><span class="lineNum">     958 </span>                :            : </a>
+<span class="lineNum">     959 </span>                :            : static int
+<span class="lineNum">     960 </span>                :<span class="lineCov">        702 : do_ssl_init(void)</span>
+<span class="lineNum">     961 </span>                :            : {
+<span class="lineNum">     962 </span>                :            :     SSL_METHOD *method;
+<span class="lineNum">     963 </span>                :            : 
+<span class="lineNum">     964 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     965 </span>                :            :     /* The following call is needed if we &quot;#include &lt;openssl/applink.c&gt;&quot;. */
+<span class="lineNum">     966 </span>                :            :     CRYPTO_malloc_init();
+<span class="lineNum">     967 </span>                :            : #endif
+<span class="lineNum">     968 </span>                :<span class="lineCov">        702 :     SSL_library_init();</span>
+<span class="lineNum">     969 </span>                :<span class="lineCov">        702 :     SSL_load_error_strings();</span>
+<span class="lineNum">     970 </span>                :            : 
+<span class="lineNum">     971 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 702 times"> + </span>]:<span class="lineCov">        702 :     if (!RAND_status()) {</span>
+<span class="lineNum">     972 </span>                :            :         /* We occasionally see OpenSSL fail to seed its random number generator
+<span class="lineNum">     973 </span>                :            :          * in heavily loaded hypervisors.  I suspect the following scenario:
+<span class="lineNum">     974 </span>                :            :          *
+<span class="lineNum">     975 </span>                :            :          * 1. OpenSSL calls read() to get 32 bytes from /dev/urandom.
+<span class="lineNum">     976 </span>                :            :          * 2. The kernel generates 10 bytes of randomness and copies it out.
+<span class="lineNum">     977 </span>                :            :          * 3. A signal arrives (perhaps SIGALRM).
+<span class="lineNum">     978 </span>                :            :          * 4. The kernel interrupts the system call to service the signal.
+<span class="lineNum">     979 </span>                :            :          * 5. Userspace gets 10 bytes of entropy.
+<span class="lineNum">     980 </span>                :            :          * 6. OpenSSL doesn't read again to get the final 22 bytes.  Therefore
+<span class="lineNum">     981 </span>                :            :          *    OpenSSL doesn't have enough entropy to consider itself
+<span class="lineNum">     982 </span>                :            :          *    initialized.
+<span class="lineNum">     983 </span>                :            :          *
+<span class="lineNum">     984 </span>                :            :          * The only part I'm not entirely sure about is #6, because the OpenSSL
+<span class="lineNum">     985 </span>                :            :          * code is so hard to read. */
+<span class="lineNum">     986 </span>                :            :         uint8_t seed[32];
+<span class="lineNum">     987 </span>                :            :         int retval;
+<span class="lineNum">     988 </span>                :            : 
+<span class="lineNum">     989 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN(&quot;OpenSSL random seeding failed, reseeding ourselves&quot;);</span>
+<span class="lineNum">     990 </span>                :            : 
+<span class="lineNum">     991 </span>                :<span class="lineNoCov">          0 :         retval = get_entropy(seed, sizeof seed);</span>
+<span class="lineNum">     992 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (retval) {</span>
+<span class="lineNum">     993 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_ERR(&quot;failed to obtain entropy (%s)&quot;,</span>
+<span class="lineNum">     994 </span>                :            :                      ovs_retval_to_string(retval));
+<span class="lineNum">     995 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             return retval &gt; 0 ? retval : ENOPROTOOPT;</span>
+<span class="lineNum">     996 </span>                :            :         }
+<span class="lineNum">     997 </span>                :            : 
+<span class="lineNum">     998 </span>                :<span class="lineNoCov">          0 :         RAND_seed(seed, sizeof seed);</span>
+<span class="lineNum">     999 </span>                :            :     }
+<span class="lineNum">    1000 </span>                :            : 
+<span class="lineNum">    1001 </span>                :            :     /* OpenSSL has a bunch of &quot;connection methods&quot;: SSLv2_method(),
+<span class="lineNum">    1002 </span>                :            :      * SSLv3_method(), TLSv1_method(), SSLv23_method(), ...  Most of these
+<span class="lineNum">    1003 </span>                :            :      * support exactly one version of SSL, e.g. TLSv1_method() supports TLSv1
+<span class="lineNum">    1004 </span>                :            :      * only, not any earlier *or later* version.  The only exception is
+<span class="lineNum">    1005 </span>                :            :      * SSLv23_method(), which in fact supports *any* version of SSL and TLS.
+<span class="lineNum">    1006 </span>                :            :      * We don't want SSLv2 or SSLv3 support, so we turn it off below with
+<span class="lineNum">    1007 </span>                :            :      * SSL_CTX_set_options().
+<span class="lineNum">    1008 </span>                :            :      *
+<span class="lineNum">    1009 </span>                :            :      * The cast is needed to avoid a warning with newer versions of OpenSSL in
+<span class="lineNum">    1010 </span>                :            :      * which SSLv23_method() returns a &quot;const&quot; pointer. */
+<span class="lineNum">    1011 </span>                :<span class="lineCov">        702 :     method = CONST_CAST(SSL_METHOD *, SSLv23_method());</span>
+<span class="lineNum">    1012 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 702 times"> + </span>]:<span class="lineCov">        702 :     if (method == NULL) {</span>
+<span class="lineNum">    1013 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;TLSv1_method: %s&quot;, ERR_error_string(ERR_get_error(), NULL));</span>
+<span class="lineNum">    1014 </span>                :<span class="lineNoCov">          0 :         return ENOPROTOOPT;</span>
+<span class="lineNum">    1015 </span>                :            :     }
+<span class="lineNum">    1016 </span>                :            : 
+<span class="lineNum">    1017 </span>                :<span class="lineCov">        702 :     ctx = SSL_CTX_new(method);</span>
+<span class="lineNum">    1018 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 702 times"> + </span>]:<span class="lineCov">        702 :     if (ctx == NULL) {</span>
+<span class="lineNum">    1019 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;SSL_CTX_new: %s&quot;, ERR_error_string(ERR_get_error(), NULL));</span>
+<span class="lineNum">    1020 </span>                :<span class="lineNoCov">          0 :         return ENOPROTOOPT;</span>
+<span class="lineNum">    1021 </span>                :            :     }
+<span class="lineNum">    1022 </span>                :<span class="lineCov">        702 :     SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);</span>
+<span class="lineNum">    1023 </span>                :<span class="lineCov">        702 :     SSL_CTX_set_tmp_dh_callback(ctx, tmp_dh_callback);</span>
+<span class="lineNum">    1024 </span>                :<span class="lineCov">        702 :     SSL_CTX_set_mode(ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);</span>
+<span class="lineNum">    1025 </span>                :<span class="lineCov">        702 :     SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);</span>
+<span class="lineNum">    1026 </span>                :<span class="lineCov">        702 :     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,</span>
+<span class="lineNum">    1027 </span>                :            :                        NULL);
+<span class="lineNum">    1028 </span>                :            : 
+<span class="lineNum">    1029 </span>                :<span class="lineCov">        702 :     return 0;</span>
+<span class="lineNum">    1030 </span>                :            : }
+<a name="1031"><span class="lineNum">    1031 </span>                :            : </a>
+<span class="lineNum">    1032 </span>                :            : static DH *
+<span class="lineNum">    1033 </span>                :<span class="lineCov">        109 : tmp_dh_callback(SSL *ssl OVS_UNUSED, int is_export OVS_UNUSED, int keylength)</span>
+<span class="lineNum">    1034 </span>                :            : {
+<span class="lineNum">    1035 </span>                :            :     struct dh {
+<span class="lineNum">    1036 </span>                :            :         int keylength;
+<span class="lineNum">    1037 </span>                :            :         DH *dh;
+<span class="lineNum">    1038 </span>                :            :         DH *(*constructor)(void);
+<span class="lineNum">    1039 </span>                :            :     };
+<span class="lineNum">    1040 </span>                :            : 
+<span class="lineNum">    1041 </span>                :            :     static struct dh dh_table[] = {
+<span class="lineNum">    1042 </span>                :            :         {1024, NULL, get_dh1024},
+<span class="lineNum">    1043 </span>                :            :         {2048, NULL, get_dh2048},
+<span class="lineNum">    1044 </span>                :            :         {4096, NULL, get_dh4096},
+<span class="lineNum">    1045 </span>                :            :     };
+<span class="lineNum">    1046 </span>                :            : 
+<span class="lineNum">    1047 </span>                :            :     struct dh *dh;
+<span class="lineNum">    1048 </span>                :            : 
+<span class="lineNum">    1049 </span>        [<span class="branchCov" title="Branch 0 was taken 109 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        109 :     for (dh = dh_table; dh &lt; &amp;dh_table[ARRAY_SIZE(dh_table)]; dh++) {</span>
+<span class="lineNum">    1050 </span>        [<span class="branchCov" title="Branch 0 was taken 109 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        109 :         if (dh-&gt;keylength == keylength) {</span>
+<span class="lineNum">    1051 </span>        [<span class="branchCov" title="Branch 0 was taken 33 times"> + </span><span class="branchCov" title="Branch 1 was taken 76 times"> + </span>]:<span class="lineCov">        109 :             if (!dh-&gt;dh) {</span>
+<span class="lineNum">    1052 </span>                :<span class="lineCov">         33 :                 dh-&gt;dh = dh-&gt;constructor();</span>
+<span class="lineNum">    1053 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 33 times"> + </span>]:<span class="lineCov">         33 :                 if (!dh-&gt;dh) {</span>
+<span class="lineNum">    1054 </span>                :<span class="lineNoCov">          0 :                     out_of_memory();</span>
+<span class="lineNum">    1055 </span>                :            :                 }
+<span class="lineNum">    1056 </span>                :            :             }
+<span class="lineNum">    1057 </span>                :<span class="lineCov">        109 :             return dh-&gt;dh;</span>
+<span class="lineNum">    1058 </span>                :            :         }
+<span class="lineNum">    1059 </span>                :            :     }
+<span class="lineNum">    1060 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     VLOG_ERR_RL(&amp;rl, &quot;no Diffie-Hellman parameters for key length %d&quot;,</span>
+<span class="lineNum">    1061 </span>                :            :                 keylength);
+<span class="lineNum">    1062 </span>                :<span class="lineCov">        109 :     return NULL;</span>
+<span class="lineNum">    1063 </span>                :            : }
+<span class="lineNum">    1064 </span>                :            : 
+<a name="1065"><span class="lineNum">    1065 </span>                :            : /* Returns true if SSL is at least partially configured. */</a>
+<span class="lineNum">    1066 </span>                :            : bool
+<span class="lineNum">    1067 </span>                :<span class="lineNoCov">          0 : stream_ssl_is_configured(void)</span>
+<span class="lineNum">    1068 </span>                :            : {
+<span class="lineNum">    1069 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     return private_key.file_name || certificate.file_name || ca_cert.file_name;</span>
+<span class="lineNum">         </span>        [<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]
+<span class="lineNum">    1070 </span>                :            : }
+<a name="1071"><span class="lineNum">    1071 </span>                :            : </a>
+<span class="lineNum">    1072 </span>                :            : static bool
+<span class="lineNum">    1073 </span>                :<span class="lineCov">      59247 : update_ssl_config(struct ssl_config_file *config, const char *file_name)</span>
+<span class="lineNum">    1074 </span>                :            : {
+<span class="lineNum">    1075 </span>                :            :     struct timespec mtime;
+<span class="lineNum">    1076 </span>                :            :     int error;
+<span class="lineNum">    1077 </span>                :            : 
+<span class="lineNum">    1078 </span>[<span class="branchCov" title="Branch 1 was taken 59247 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>][<span class="branchCov" title="Branch 3 was taken 56703 times"> + </span><span class="branchCov" title="Branch 4 was taken 2544 times"> + </span>]:<span class="lineCov">      59247 :     if (ssl_init() || !file_name) {</span>
+<span class="lineNum">    1079 </span>                :<span class="lineCov">      56703 :         return false;</span>
+<span class="lineNum">    1080 </span>                :            :     }
+<span class="lineNum">    1081 </span>                :            : 
+<span class="lineNum">    1082 </span>                :            :     /* If the file name hasn't changed and neither has the file contents, stop
+<span class="lineNum">    1083 </span>                :            :      * here. */
+<span class="lineNum">    1084 </span>                :<span class="lineCov">       2544 :     error = get_mtime(file_name, &amp;mtime);</span>
+<span class="lineNum">    1085 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2544 times"> + </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">       2544 :     if (error &amp;&amp; error != ENOENT) {</span>
+<span class="lineNum">    1086 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;%s: stat failed (%s)&quot;,</span>
+<span class="lineNum">    1087 </span>                :            :                     file_name, ovs_strerror(error));
+<span class="lineNum">    1088 </span>                :            :     }
+<span class="lineNum">    1089 </span>        [<span class="branchCov" title="Branch 0 was taken 2130 times"> + </span><span class="branchCov" title="Branch 1 was taken 414 times"> + </span>]:<span class="lineCov">       2544 :     if (config-&gt;file_name</span>
+<span class="lineNum">    1090 </span>        [<span class="branchCov" title="Branch 0 was taken 2130 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       2130 :         &amp;&amp; !strcmp(config-&gt;file_name, file_name)</span>
+<span class="lineNum">    1091 </span>        [<span class="branchCov" title="Branch 0 was taken 2130 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       2130 :         &amp;&amp; mtime.tv_sec == config-&gt;mtime.tv_sec</span>
+<span class="lineNum">    1092 </span>        [<span class="branchCov" title="Branch 0 was taken 2130 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       2130 :         &amp;&amp; mtime.tv_nsec == config-&gt;mtime.tv_nsec) {</span>
+<span class="lineNum">    1093 </span>                :<span class="lineCov">       2130 :         return false;</span>
+<span class="lineNum">    1094 </span>                :            :     }
+<span class="lineNum">    1095 </span>                :            : 
+<span class="lineNum">    1096 </span>                :            :     /* Update 'config'. */
+<span class="lineNum">    1097 </span>                :<span class="lineCov">        414 :     config-&gt;mtime = mtime;</span>
+<span class="lineNum">    1098 </span>        [<span class="branchCov" title="Branch 0 was taken 414 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        414 :     if (file_name != config-&gt;file_name) {</span>
+<span class="lineNum">    1099 </span>                :<span class="lineCov">        414 :         free(config-&gt;file_name);</span>
+<span class="lineNum">    1100 </span>                :<span class="lineCov">        414 :         config-&gt;file_name = xstrdup(file_name);</span>
+<span class="lineNum">    1101 </span>                :            :     }
+<span class="lineNum">    1102 </span>                :<span class="lineCov">      59247 :     return true;</span>
+<span class="lineNum">    1103 </span>                :            : }
+<a name="1104"><span class="lineNum">    1104 </span>                :            : </a>
+<span class="lineNum">    1105 </span>                :            : static void
+<span class="lineNum">    1106 </span>                :<span class="lineCov">        165 : stream_ssl_set_private_key_file__(const char *file_name)</span>
+<span class="lineNum">    1107 </span>                :            : {
+<span class="lineNum">    1108 </span>        [<span class="branchCov" title="Branch 1 was taken 165 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        165 :     if (SSL_CTX_use_PrivateKey_file(ctx, file_name, SSL_FILETYPE_PEM) == 1) {</span>
+<span class="lineNum">    1109 </span>                :<span class="lineCov">        165 :         private_key.read = true;</span>
+<span class="lineNum">    1110 </span>                :            :     } else {
+<span class="lineNum">    1111 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;SSL_use_PrivateKey_file: %s&quot;,</span>
+<span class="lineNum">    1112 </span>                :            :                  ERR_error_string(ERR_get_error(), NULL));
+<span class="lineNum">    1113 </span>                :            :     }
+<span class="lineNum">    1114 </span>                :<span class="lineCov">        165 : }</span>
+<a name="1115"><span class="lineNum">    1115 </span>                :            : </a>
+<span class="lineNum">    1116 </span>                :            : void
+<span class="lineNum">    1117 </span>                :<span class="lineCov">        111 : stream_ssl_set_private_key_file(const char *file_name)</span>
+<span class="lineNum">    1118 </span>                :            : {
+<span class="lineNum">    1119 </span>        [<span class="branchCov" title="Branch 1 was taken 111 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        111 :     if (update_ssl_config(&amp;private_key, file_name)) {</span>
+<span class="lineNum">    1120 </span>                :<span class="lineCov">        111 :         stream_ssl_set_private_key_file__(file_name);</span>
+<span class="lineNum">    1121 </span>                :            :     }
+<span class="lineNum">    1122 </span>                :<span class="lineCov">        111 : }</span>
+<a name="1123"><span class="lineNum">    1123 </span>                :            : </a>
+<span class="lineNum">    1124 </span>                :            : static void
+<span class="lineNum">    1125 </span>                :<span class="lineCov">        165 : stream_ssl_set_certificate_file__(const char *file_name)</span>
+<span class="lineNum">    1126 </span>                :            : {
+<span class="lineNum">    1127 </span>        [<span class="branchCov" title="Branch 1 was taken 165 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        165 :     if (SSL_CTX_use_certificate_chain_file(ctx, file_name) == 1) {</span>
+<span class="lineNum">    1128 </span>                :<span class="lineCov">        165 :         certificate.read = true;</span>
+<span class="lineNum">    1129 </span>                :            :     } else {
+<span class="lineNum">    1130 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;SSL_use_certificate_file: %s&quot;,</span>
+<span class="lineNum">    1131 </span>                :            :                  ERR_error_string(ERR_get_error(), NULL));
+<span class="lineNum">    1132 </span>                :            :     }
+<span class="lineNum">    1133 </span>                :<span class="lineCov">        165 : }</span>
+<a name="1134"><span class="lineNum">    1134 </span>                :            : </a>
+<span class="lineNum">    1135 </span>                :            : void
+<span class="lineNum">    1136 </span>                :<span class="lineCov">        111 : stream_ssl_set_certificate_file(const char *file_name)</span>
+<span class="lineNum">    1137 </span>                :            : {
+<span class="lineNum">    1138 </span>        [<span class="branchCov" title="Branch 1 was taken 111 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        111 :     if (update_ssl_config(&amp;certificate, file_name)) {</span>
+<span class="lineNum">    1139 </span>                :<span class="lineCov">        111 :         stream_ssl_set_certificate_file__(file_name);</span>
+<span class="lineNum">    1140 </span>                :            :     }
+<span class="lineNum">    1141 </span>                :<span class="lineCov">        111 : }</span>
+<span class="lineNum">    1142 </span>                :            : 
+<span class="lineNum">    1143 </span>                :            : /* Sets the private key and certificate files in one operation.  Use this
+<span class="lineNum">    1144 </span>                :            :  * interface, instead of calling stream_ssl_set_private_key_file() and
+<span class="lineNum">    1145 </span>                :            :  * stream_ssl_set_certificate_file() individually, in the main loop of a
+<span class="lineNum">    1146 </span>                :            :  * long-running program whose key and certificate might change at runtime.
+<span class="lineNum">    1147 </span>                :            :  *
+<span class="lineNum">    1148 </span>                :            :  * This is important because of OpenSSL's behavior.  If an OpenSSL context
+<span class="lineNum">    1149 </span>                :            :  * already has a certificate, and stream_ssl_set_private_key_file() is called
+<span class="lineNum">    1150 </span>                :            :  * to install a new private key, OpenSSL will report an error because the new
+<span class="lineNum">    1151 </span>                :            :  * private key does not match the old certificate.  The other order, of setting
+<span class="lineNum">    1152 </span>                :            :  * a new certificate, then setting a new private key, does work.
+<span class="lineNum">    1153 </span>                :            :  *
+<span class="lineNum">    1154 </span>                :            :  * If this were the only problem, calling stream_ssl_set_certificate_file()
+<span class="lineNum">    1155 </span>                :            :  * before stream_ssl_set_private_key_file() would fix it.  But, if the private
+<span class="lineNum">    1156 </span>                :            :  * key is changed before the certificate (e.g. someone &quot;scp&quot;s or &quot;mv&quot;s the new
+<span class="lineNum">    1157 </span>                :            :  * private key in place before the certificate), then OpenSSL would reject that
+<span class="lineNum">    1158 </span>                :            :  * change, and then the change of certificate would succeed, but there would be
+<span class="lineNum">    1159 </span>                :            :  * no associated private key (because it had only changed once and therefore
+<span class="lineNum">    1160 </span>                :            :  * there was no point in re-reading it).
+<span class="lineNum">    1161 </span>                :            :  *
+<span class="lineNum">    1162 </span>                :            :  * This function avoids both problems by, whenever either the certificate or
+<span class="lineNum">    1163 </span>                :            :  * the private key file changes, re-reading both of them, in the correct order.
+<a name="1164"><span class="lineNum">    1164 </span>                :            :  */</a>
+<span class="lineNum">    1165 </span>                :            : void
+<span class="lineNum">    1166 </span>                :<span class="lineCov">      19647 : stream_ssl_set_key_and_cert(const char *private_key_file,</span>
+<span class="lineNum">    1167 </span>                :            :                             const char *certificate_file)
+<span class="lineNum">    1168 </span>                :            : {
+<span class="lineNum">    1169 </span>        [<span class="branchCov" title="Branch 1 was taken 19620 times"> + </span><span class="branchCov" title="Branch 2 was taken 27 times"> + </span>]:<span class="lineCov">      19647 :     if (update_ssl_config(&amp;private_key, private_key_file)</span>
+<span class="lineNum">    1170 </span>        [<span class="branchCov" title="Branch 1 was taken 27 times"> + </span><span class="branchCov" title="Branch 2 was taken 19593 times"> + </span>]:<span class="lineCov">      19620 :         || update_ssl_config(&amp;certificate, certificate_file)) {</span>
+<span class="lineNum">    1171 </span>                :<span class="lineCov">         54 :         stream_ssl_set_certificate_file__(certificate_file);</span>
+<span class="lineNum">    1172 </span>                :<span class="lineCov">         54 :         stream_ssl_set_private_key_file__(private_key_file);</span>
+<span class="lineNum">    1173 </span>                :            :     }
+<span class="lineNum">    1174 </span>                :<span class="lineCov">      19647 : }</span>
+<span class="lineNum">    1175 </span>                :            : 
+<span class="lineNum">    1176 </span>                :            : /* Reads the X509 certificate or certificates in file 'file_name'.  On success,
+<span class="lineNum">    1177 </span>                :            :  * stores the address of the first element in an array of pointers to
+<span class="lineNum">    1178 </span>                :            :  * certificates in '*certs' and the number of certificates in the array in
+<span class="lineNum">    1179 </span>                :            :  * '*n_certs', and returns 0.  On failure, stores a null pointer in '*certs', 0
+<span class="lineNum">    1180 </span>                :            :  * in '*n_certs', and returns a positive errno value.
+<span class="lineNum">    1181 </span>                :            :  *
+<a name="1182"><span class="lineNum">    1182 </span>                :            :  * The caller is responsible for freeing '*certs'. */</a>
+<span class="lineNum">    1183 </span>                :            : static int
+<span class="lineNum">    1184 </span>                :<span class="lineCov">        138 : read_cert_file(const char *file_name, X509 ***certs, size_t *n_certs)</span>
+<span class="lineNum">    1185 </span>                :            : {
+<span class="lineNum">    1186 </span>                :            :     FILE *file;
+<span class="lineNum">    1187 </span>                :<span class="lineCov">        138 :     size_t allocated_certs = 0;</span>
+<span class="lineNum">    1188 </span>                :            : 
+<span class="lineNum">    1189 </span>                :<span class="lineCov">        138 :     *certs = NULL;</span>
+<span class="lineNum">    1190 </span>                :<span class="lineCov">        138 :     *n_certs = 0;</span>
+<span class="lineNum">    1191 </span>                :            : 
+<span class="lineNum">    1192 </span>                :<span class="lineCov">        138 :     file = fopen(file_name, &quot;r&quot;);</span>
+<span class="lineNum">    1193 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 138 times"> + </span>]:<span class="lineCov">        138 :     if (!file) {</span>
+<span class="lineNum">    1194 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;failed to open %s for reading: %s&quot;,</span>
+<span class="lineNum">    1195 </span>                :            :                  file_name, ovs_strerror(errno));
+<span class="lineNum">    1196 </span>                :<span class="lineNoCov">          0 :         return errno;</span>
+<span class="lineNum">    1197 </span>                :            :     }
+<span class="lineNum">    1198 </span>                :            : 
+<span class="lineNum">    1199 </span>                :            :     for (;;) {
+<span class="lineNum">    1200 </span>                :            :         X509 *certificate;
+<span class="lineNum">    1201 </span>                :            :         int c;
+<span class="lineNum">    1202 </span>                :            : 
+<span class="lineNum">    1203 </span>                :            :         /* Read certificate from file. */
+<span class="lineNum">    1204 </span>                :<span class="lineCov">        138 :         certificate = PEM_read_X509(file, NULL, NULL, NULL);</span>
+<span class="lineNum">    1205 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 138 times"> + </span>]:<span class="lineCov">        138 :         if (!certificate) {</span>
+<span class="lineNum">    1206 </span>                :            :             size_t i;
+<span class="lineNum">    1207 </span>                :            : 
+<span class="lineNum">    1208 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_ERR(&quot;PEM_read_X509 failed reading %s: %s&quot;,</span>
+<span class="lineNum">    1209 </span>                :            :                      file_name, ERR_error_string(ERR_get_error(), NULL));
+<span class="lineNum">    1210 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             for (i = 0; i &lt; *n_certs; i++) {</span>
+<span class="lineNum">    1211 </span>                :<span class="lineNoCov">          0 :                 X509_free((*certs)[i]);</span>
+<span class="lineNum">    1212 </span>                :            :             }
+<span class="lineNum">    1213 </span>                :<span class="lineNoCov">          0 :             free(*certs);</span>
+<span class="lineNum">    1214 </span>                :<span class="lineNoCov">          0 :             *certs = NULL;</span>
+<span class="lineNum">    1215 </span>                :<span class="lineNoCov">          0 :             *n_certs = 0;</span>
+<span class="lineNum">    1216 </span>                :<span class="lineNoCov">          0 :             return EIO;</span>
+<span class="lineNum">    1217 </span>                :            :         }
+<span class="lineNum">    1218 </span>                :            : 
+<span class="lineNum">    1219 </span>                :            :         /* Add certificate to array. */
+<span class="lineNum">    1220 </span>        [<span class="branchCov" title="Branch 0 was taken 138 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        138 :         if (*n_certs &gt;= allocated_certs) {</span>
+<span class="lineNum">    1221 </span>                :<span class="lineCov">        138 :             *certs = x2nrealloc(*certs, &amp;allocated_certs, sizeof **certs);</span>
+<span class="lineNum">    1222 </span>                :            :         }
+<span class="lineNum">    1223 </span>                :<span class="lineCov">        138 :         (*certs)[(*n_certs)++] = certificate;</span>
+<span class="lineNum">    1224 </span>                :            : 
+<span class="lineNum">    1225 </span>                :            :         /* Are there additional certificates in the file? */
+<span class="lineNum">    1226 </span>                :            :         do {
+<span class="lineNum">    1227 </span>                :<span class="lineCov">        138 :             c = getc(file);</span>
+<span class="lineNum">    1228 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 138 times"> + </span>]:<span class="lineCov">        138 :         } while (isspace(c));</span>
+<span class="lineNum">    1229 </span>        [<span class="branchCov" title="Branch 0 was taken 138 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        138 :         if (c == EOF) {</span>
+<span class="lineNum">    1230 </span>                :<span class="lineCov">        138 :             break;</span>
+<span class="lineNum">    1231 </span>                :            :         }
+<span class="lineNum">    1232 </span>                :<span class="lineNoCov">          0 :         ungetc(c, file);</span>
+<span class="lineNum">    1233 </span>                :<span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">    1234 </span>                :<span class="lineCov">        138 :     fclose(file);</span>
+<span class="lineNum">    1235 </span>                :<span class="lineCov">        138 :     return 0;</span>
+<span class="lineNum">    1236 </span>                :            : }
+<span class="lineNum">    1237 </span>                :            : 
+<span class="lineNum">    1238 </span>                :            : 
+<span class="lineNum">    1239 </span>                :            : /* Sets 'file_name' as the name of a file containing one or more X509
+<span class="lineNum">    1240 </span>                :            :  * certificates to send to the peer.  Typical use in OpenFlow is to send the CA
+<span class="lineNum">    1241 </span>                :            :  * certificate to the peer, which enables a switch to pick up the controller's
+<a name="1242"><span class="lineNum">    1242 </span>                :            :  * CA certificate on its first connection. */</a>
+<span class="lineNum">    1243 </span>                :            : void
+<span class="lineNum">    1244 </span>                :<span class="lineNoCov">          0 : stream_ssl_set_peer_ca_cert_file(const char *file_name)</span>
+<span class="lineNum">    1245 </span>                :            : {
+<span class="lineNum">    1246 </span>                :            :     X509 **certs;
+<span class="lineNum">    1247 </span>                :            :     size_t n_certs;
+<span class="lineNum">    1248 </span>                :            :     size_t i;
+<span class="lineNum">    1249 </span>                :            : 
+<span class="lineNum">    1250 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (ssl_init()) {</span>
+<span class="lineNum">    1251 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">    1252 </span>                :            :     }
+<span class="lineNum">    1253 </span>                :            : 
+<span class="lineNum">    1254 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!read_cert_file(file_name, &amp;certs, &amp;n_certs)) {</span>
+<span class="lineNum">    1255 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         for (i = 0; i &lt; n_certs; i++) {</span>
+<span class="lineNum">    1256 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (SSL_CTX_add_extra_chain_cert(ctx, certs[i]) != 1) {</span>
+<span class="lineNum">    1257 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_ERR(&quot;SSL_CTX_add_extra_chain_cert: %s&quot;,</span>
+<span class="lineNum">    1258 </span>                :            :                          ERR_error_string(ERR_get_error(), NULL));
+<span class="lineNum">    1259 </span>                :            :             }
+<span class="lineNum">    1260 </span>                :            :         }
+<span class="lineNum">    1261 </span>                :<span class="lineNoCov">          0 :         free(certs);</span>
+<span class="lineNum">    1262 </span>                :            :     }
+<span class="lineNum">    1263 </span>                :            : }
+<span class="lineNum">    1264 </span>                :            : 
+<a name="1265"><span class="lineNum">    1265 </span>                :            : /* Logs fingerprint of CA certificate 'cert' obtained from 'file_name'. */</a>
+<span class="lineNum">    1266 </span>                :            : static void
+<span class="lineNum">    1267 </span>                :<span class="lineCov">        138 : log_ca_cert(const char *file_name, X509 *cert)</span>
+<span class="lineNum">    1268 </span>                :            : {
+<span class="lineNum">    1269 </span>                :            :     unsigned char digest[EVP_MAX_MD_SIZE];
+<span class="lineNum">    1270 </span>                :            :     unsigned int n_bytes;
+<span class="lineNum">    1271 </span>                :            :     struct ds fp;
+<span class="lineNum">    1272 </span>                :            :     char *subject;
+<span class="lineNum">    1273 </span>                :            : 
+<span class="lineNum">    1274 </span>                :<span class="lineCov">        138 :     ds_init(&amp;fp);</span>
+<span class="lineNum">    1275 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 138 times"> + </span>]:<span class="lineCov">        138 :     if (!X509_digest(cert, EVP_sha1(), digest, &amp;n_bytes)) {</span>
+<span class="lineNum">    1276 </span>                :<span class="lineNoCov">          0 :         ds_put_cstr(&amp;fp, &quot;&lt;out of memory&gt;&quot;);</span>
+<span class="lineNum">    1277 </span>                :            :     } else {
+<span class="lineNum">    1278 </span>                :            :         unsigned int i;
+<span class="lineNum">    1279 </span>        [<span class="branchCov" title="Branch 0 was taken 2760 times"> + </span><span class="branchCov" title="Branch 1 was taken 138 times"> + </span>]:<span class="lineCov">       2898 :         for (i = 0; i &lt; n_bytes; i++) {</span>
+<span class="lineNum">    1280 </span>        [<span class="branchCov" title="Branch 0 was taken 2622 times"> + </span><span class="branchCov" title="Branch 1 was taken 138 times"> + </span>]:<span class="lineCov">       2760 :             if (i) {</span>
+<span class="lineNum">    1281 </span>                :<span class="lineCov">       2622 :                 ds_put_char(&amp;fp, ':');</span>
+<span class="lineNum">    1282 </span>                :            :             }
+<span class="lineNum">    1283 </span>                :<span class="lineCov">       2760 :             ds_put_format(&amp;fp, &quot;%02x&quot;, digest[i]);</span>
+<span class="lineNum">    1284 </span>                :            :         }
+<span class="lineNum">    1285 </span>                :            :     }
+<span class="lineNum">    1286 </span>                :<span class="lineCov">        138 :     subject = X509_NAME_oneline(X509_get_subject_name(cert), NULL, 0);</span>
+<span class="lineNum">    1287 </span>[<span class="branchCov" title="Branch 0 was taken 138 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 3 was taken 138 times"> + </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span>]:<span class="lineCov">        138 :     VLOG_INFO(&quot;Trusting CA cert from %s (%s) (fingerprint %s)&quot;, file_name,</span>
+<span class="lineNum">    1288 </span>                :            :               subject ? subject : &quot;&lt;out of memory&gt;&quot;, ds_cstr(&amp;fp));
+<span class="lineNum">    1289 </span>                :<span class="lineCov">        138 :     OPENSSL_free(subject);</span>
+<span class="lineNum">    1290 </span>                :<span class="lineCov">        138 :     ds_destroy(&amp;fp);</span>
+<span class="lineNum">    1291 </span>                :<span class="lineCov">        138 : }</span>
+<a name="1292"><span class="lineNum">    1292 </span>                :            : </a>
+<span class="lineNum">    1293 </span>                :            : static void
+<span class="lineNum">    1294 </span>                :<span class="lineCov">      19758 : stream_ssl_set_ca_cert_file__(const char *file_name,</span>
+<span class="lineNum">    1295 </span>                :            :                               bool bootstrap, bool force)
+<span class="lineNum">    1296 </span>                :            : {
+<span class="lineNum">    1297 </span>                :            :     X509 **certs;
+<span class="lineNum">    1298 </span>                :            :     size_t n_certs;
+<span class="lineNum">    1299 </span>                :            :     struct stat s;
+<span class="lineNum">    1300 </span>                :            : 
+<span class="lineNum">    1301 </span>[<span class="branchCov" title="Branch 1 was taken 19620 times"> + </span><span class="branchCov" title="Branch 2 was taken 138 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 19620 times"> + </span>]:<span class="lineCov">      19758 :     if (!update_ssl_config(&amp;ca_cert, file_name) &amp;&amp; !force) {</span>
+<span class="lineNum">    1302 </span>                :            :         return;
+<span class="lineNum">    1303 </span>                :            :     }
+<span class="lineNum">    1304 </span>                :            : 
+<span class="lineNum">    1305 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 138 times"> + </span>]:<span class="lineCov">        138 :     if (!strcmp(file_name, &quot;none&quot;)) {</span>
+<span class="lineNum">    1306 </span>                :<span class="lineNoCov">          0 :         verify_peer_cert = false;</span>
+<span class="lineNum">    1307 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN(&quot;Peer certificate validation disabled &quot;</span>
+<span class="lineNum">    1308 </span>                :            :                   &quot;(this is a security risk)&quot;);
+<span class="lineNum">    1309 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 138 times"> + </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineCov">        138 :     } else if (bootstrap &amp;&amp; stat(file_name, &amp;s) &amp;&amp; errno == ENOENT) {</span>
+<span class="lineNum">         </span>        [<span class="branchNoExec" title="Branch 6 was not executed"> # </span><span class="branchNoExec" title="Branch 7 was not executed"> # </span>]
+<span class="lineNum">    1310 </span>                :<span class="lineNoCov">          0 :         bootstrap_ca_cert = true;</span>
+<span class="lineNum">    1311 </span>        [<span class="branchCov" title="Branch 1 was taken 138 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        138 :     } else if (!read_cert_file(file_name, &amp;certs, &amp;n_certs)) {</span>
+<span class="lineNum">    1312 </span>                :            :         size_t i;
+<span class="lineNum">    1313 </span>                :            : 
+<span class="lineNum">    1314 </span>                :            :         /* Set up list of CAs that the server will accept from the client. */
+<span class="lineNum">    1315 </span>        [<span class="branchCov" title="Branch 0 was taken 138 times"> + </span><span class="branchCov" title="Branch 1 was taken 138 times"> + </span>]:<span class="lineCov">        276 :         for (i = 0; i &lt; n_certs; i++) {</span>
+<span class="lineNum">    1316 </span>                :            :             /* SSL_CTX_add_client_CA makes a copy of the relevant data. */
+<span class="lineNum">    1317 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 138 times"> + </span>]:<span class="lineCov">        138 :             if (SSL_CTX_add_client_CA(ctx, certs[i]) != 1) {</span>
+<span class="lineNum">    1318 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_ERR(&quot;failed to add client certificate %&quot;PRIuSIZE&quot; from %s: %s&quot;,</span>
+<span class="lineNum">    1319 </span>                :            :                          i, file_name,
+<span class="lineNum">    1320 </span>                :            :                          ERR_error_string(ERR_get_error(), NULL));
+<span class="lineNum">    1321 </span>                :            :             } else {
+<span class="lineNum">    1322 </span>                :<span class="lineCov">        138 :                 log_ca_cert(file_name, certs[i]);</span>
+<span class="lineNum">    1323 </span>                :            :             }
+<span class="lineNum">    1324 </span>                :<span class="lineCov">        138 :             X509_free(certs[i]);</span>
+<span class="lineNum">    1325 </span>                :            :         }
+<span class="lineNum">    1326 </span>                :<span class="lineCov">        138 :         free(certs);</span>
+<span class="lineNum">    1327 </span>                :            : 
+<span class="lineNum">    1328 </span>                :            :         /* Set up CAs for OpenSSL to trust in verifying the peer's
+<span class="lineNum">    1329 </span>                :            :          * certificate. */
+<span class="lineNum">    1330 </span>                :<span class="lineCov">        138 :         SSL_CTX_set_cert_store(ctx, X509_STORE_new());</span>
+<span class="lineNum">    1331 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 138 times"> + </span>]:<span class="lineCov">        138 :         if (SSL_CTX_load_verify_locations(ctx, file_name, NULL) != 1) {</span>
+<span class="lineNum">    1332 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_ERR(&quot;SSL_CTX_load_verify_locations: %s&quot;,</span>
+<span class="lineNum">    1333 </span>                :            :                      ERR_error_string(ERR_get_error(), NULL));
+<span class="lineNum">    1334 </span>                :            :             return;
+<span class="lineNum">    1335 </span>                :            :         }
+<span class="lineNum">    1336 </span>                :            : 
+<span class="lineNum">    1337 </span>                :<span class="lineCov">        138 :         bootstrap_ca_cert = false;</span>
+<span class="lineNum">    1338 </span>                :            :     }
+<span class="lineNum">    1339 </span>                :<span class="lineCov">      19758 :     ca_cert.read = true;</span>
+<span class="lineNum">    1340 </span>                :            : }
+<span class="lineNum">    1341 </span>                :            : 
+<span class="lineNum">    1342 </span>                :            : /* Sets 'file_name' as the name of the file from which to read the CA
+<span class="lineNum">    1343 </span>                :            :  * certificate used to verify the peer within SSL connections.  If 'bootstrap'
+<span class="lineNum">    1344 </span>                :            :  * is false, the file must exist.  If 'bootstrap' is false, then the file is
+<span class="lineNum">    1345 </span>                :            :  * read if it is exists; if it does not, then it will be created from the CA
+<a name="1346"><span class="lineNum">    1346 </span>                :            :  * certificate received from the peer on the first SSL connection. */</a>
+<span class="lineNum">    1347 </span>                :            : void
+<span class="lineNum">    1348 </span>                :<span class="lineCov">      19758 : stream_ssl_set_ca_cert_file(const char *file_name, bool bootstrap)</span>
+<span class="lineNum">    1349 </span>                :            : {
+<span class="lineNum">    1350 </span>                :<span class="lineCov">      19758 :     stream_ssl_set_ca_cert_file__(file_name, bootstrap, false);</span>
+<span class="lineNum">    1351 </span>                :<span class="lineCov">      19758 : }</span>
+<span class="lineNum">    1352 </span>                :            : 
+<span class="lineNum">    1353 </span>                :            : /* SSL protocol logging. */
+<a name="1354"><span class="lineNum">    1354 </span>                :            : </a>
+<span class="lineNum">    1355 </span>                :            : static const char *
+<span class="lineNum">    1356 </span>                :<span class="lineCov">         12 : ssl_alert_level_to_string(uint8_t type)</span>
+<span class="lineNum">    1357 </span>                :            : {
+<span class="lineNum">    1358 </span>     [<span class="branchCov" title="Branch 0 was taken 12 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">         12 :     switch (type) {</span>
+<span class="lineNum">    1359 </span>                :<span class="lineCov">         12 :     case 1: return &quot;warning&quot;;</span>
+<span class="lineNum">    1360 </span>                :<span class="lineNoCov">          0 :     case 2: return &quot;fatal&quot;;</span>
+<span class="lineNum">    1361 </span>                :<span class="lineCov">         12 :     default: return &quot;&lt;unknown&gt;&quot;;</span>
+<span class="lineNum">    1362 </span>                :            :     }
+<span class="lineNum">    1363 </span>                :            : }
+<a name="1364"><span class="lineNum">    1364 </span>                :            : </a>
+<span class="lineNum">    1365 </span>                :            : static const char *
+<span class="lineNum">    1366 </span>                :<span class="lineCov">         12 : ssl_alert_description_to_string(uint8_t type)</span>
+<span class="lineNum">    1367 </span>                :            : {
+<span class="lineNum">    1368 </span>  [<span class="branchCov" title="Branch 0 was taken 12 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span> :<span class="lineCov">         12 :     switch (type) {</span>
+<span class="lineNum">         </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchNoCov" title="Branch 6 was not taken"> - </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span><span class="branchNoCov" title="Branch 8 was not taken"> - </span> 
+<span class="lineNum">         </span><span class="branchNoCov" title="Branch 9 was not taken"> - </span><span class="branchNoCov" title="Branch 10 was not taken"> - </span><span class="branchNoCov" title="Branch 11 was not taken"> - </span><span class="branchNoCov" title="Branch 12 was not taken"> - </span><span class="branchNoCov" title="Branch 13 was not taken"> - </span> 
+<span class="lineNum">         </span><span class="branchNoCov" title="Branch 14 was not taken"> - </span><span class="branchNoCov" title="Branch 15 was not taken"> - </span><span class="branchNoCov" title="Branch 16 was not taken"> - </span><span class="branchNoCov" title="Branch 17 was not taken"> - </span><span class="branchNoCov" title="Branch 18 was not taken"> - </span> 
+<span class="lineNum">         </span>   <span class="branchNoCov" title="Branch 19 was not taken"> - </span><span class="branchNoCov" title="Branch 20 was not taken"> - </span><span class="branchNoCov" title="Branch 21 was not taken"> - </span><span class="branchNoCov" title="Branch 22 was not taken"> - </span> 
+<span class="lineNum">         </span>            <span class="branchNoCov" title="Branch 23 was not taken"> - </span>]
+<span class="lineNum">    1369 </span>                :<span class="lineCov">         12 :     case 0: return &quot;close_notify&quot;;</span>
+<span class="lineNum">    1370 </span>                :<span class="lineNoCov">          0 :     case 10: return &quot;unexpected_message&quot;;</span>
+<span class="lineNum">    1371 </span>                :<span class="lineNoCov">          0 :     case 20: return &quot;bad_record_mac&quot;;</span>
+<span class="lineNum">    1372 </span>                :<span class="lineNoCov">          0 :     case 21: return &quot;decryption_failed&quot;;</span>
+<span class="lineNum">    1373 </span>                :<span class="lineNoCov">          0 :     case 22: return &quot;record_overflow&quot;;</span>
+<span class="lineNum">    1374 </span>                :<span class="lineNoCov">          0 :     case 30: return &quot;decompression_failure&quot;;</span>
+<span class="lineNum">    1375 </span>                :<span class="lineNoCov">          0 :     case 40: return &quot;handshake_failure&quot;;</span>
+<span class="lineNum">    1376 </span>                :<span class="lineNoCov">          0 :     case 42: return &quot;bad_certificate&quot;;</span>
+<span class="lineNum">    1377 </span>                :<span class="lineNoCov">          0 :     case 43: return &quot;unsupported_certificate&quot;;</span>
+<span class="lineNum">    1378 </span>                :<span class="lineNoCov">          0 :     case 44: return &quot;certificate_revoked&quot;;</span>
+<span class="lineNum">    1379 </span>                :<span class="lineNoCov">          0 :     case 45: return &quot;certificate_expired&quot;;</span>
+<span class="lineNum">    1380 </span>                :<span class="lineNoCov">          0 :     case 46: return &quot;certificate_unknown&quot;;</span>
+<span class="lineNum">    1381 </span>                :<span class="lineNoCov">          0 :     case 47: return &quot;illegal_parameter&quot;;</span>
+<span class="lineNum">    1382 </span>                :<span class="lineNoCov">          0 :     case 48: return &quot;unknown_ca&quot;;</span>
+<span class="lineNum">    1383 </span>                :<span class="lineNoCov">          0 :     case 49: return &quot;access_denied&quot;;</span>
+<span class="lineNum">    1384 </span>                :<span class="lineNoCov">          0 :     case 50: return &quot;decode_error&quot;;</span>
+<span class="lineNum">    1385 </span>                :<span class="lineNoCov">          0 :     case 51: return &quot;decrypt_error&quot;;</span>
+<span class="lineNum">    1386 </span>                :<span class="lineNoCov">          0 :     case 60: return &quot;export_restriction&quot;;</span>
+<span class="lineNum">    1387 </span>                :<span class="lineNoCov">          0 :     case 70: return &quot;protocol_version&quot;;</span>
+<span class="lineNum">    1388 </span>                :<span class="lineNoCov">          0 :     case 71: return &quot;insufficient_security&quot;;</span>
+<span class="lineNum">    1389 </span>                :<span class="lineNoCov">          0 :     case 80: return &quot;internal_error&quot;;</span>
+<span class="lineNum">    1390 </span>                :<span class="lineNoCov">          0 :     case 90: return &quot;user_canceled&quot;;</span>
+<span class="lineNum">    1391 </span>                :<span class="lineNoCov">          0 :     case 100: return &quot;no_renegotiation&quot;;</span>
+<span class="lineNum">    1392 </span>                :<span class="lineCov">         12 :     default: return &quot;&lt;unknown&gt;&quot;;</span>
+<span class="lineNum">    1393 </span>                :            :     }
+<span class="lineNum">    1394 </span>                :            : }
+<a name="1395"><span class="lineNum">    1395 </span>                :            : </a>
+<span class="lineNum">    1396 </span>                :            : static const char *
+<span class="lineNum">    1397 </span>                :<span class="lineCov">        140 : ssl_handshake_type_to_string(uint8_t type)</span>
+<span class="lineNum">    1398 </span>                :            : {
+<span class="lineNum">    1399 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span><span class="branchCov" title="Branch 2 was taken 12 times"> + </span><span class="branchCov" title="Branch 3 was taken 24 times"> + </span> :<span class="lineCov">        140 :     switch (type) {</span>
+<span class="lineNum">         </span><span class="branchCov" title="Branch 4 was taken 12 times"> + </span><span class="branchCov" title="Branch 5 was taken 12 times"> + </span><span class="branchCov" title="Branch 6 was taken 6 times"> + </span><span class="branchCov" title="Branch 7 was taken 12 times"> + </span><span class="branchCov" title="Branch 8 was taken 12 times"> + </span> 
+<span class="lineNum">         </span>         <span class="branchCov" title="Branch 9 was taken 24 times"> + </span><span class="branchCov" title="Branch 10 was taken 12 times"> + </span>]
+<span class="lineNum">    1400 </span>                :<span class="lineNoCov">          0 :     case 0: return &quot;hello_request&quot;;</span>
+<span class="lineNum">    1401 </span>                :<span class="lineCov">         14 :     case 1: return &quot;client_hello&quot;;</span>
+<span class="lineNum">    1402 </span>                :<span class="lineCov">         12 :     case 2: return &quot;server_hello&quot;;</span>
+<span class="lineNum">    1403 </span>                :<span class="lineCov">         24 :     case 11: return &quot;certificate&quot;;</span>
+<span class="lineNum">    1404 </span>                :<span class="lineCov">         12 :     case 12: return &quot;server_key_exchange&quot;;</span>
+<span class="lineNum">    1405 </span>                :<span class="lineCov">         12 :     case 13: return &quot;certificate_request&quot;;</span>
+<span class="lineNum">    1406 </span>                :<span class="lineCov">          6 :     case 14: return &quot;server_hello_done&quot;;</span>
+<span class="lineNum">    1407 </span>                :<span class="lineCov">         12 :     case 15: return &quot;certificate_verify&quot;;</span>
+<span class="lineNum">    1408 </span>                :<span class="lineCov">         12 :     case 16: return &quot;client_key_exchange&quot;;</span>
+<span class="lineNum">    1409 </span>                :<span class="lineCov">         24 :     case 20: return &quot;finished&quot;;</span>
+<span class="lineNum">    1410 </span>                :<span class="lineCov">        140 :     default: return &quot;&lt;unknown&gt;&quot;;</span>
+<span class="lineNum">    1411 </span>                :            :     }
+<span class="lineNum">    1412 </span>                :            : }
+<a name="1413"><span class="lineNum">    1413 </span>                :            : </a>
+<span class="lineNum">    1414 </span>                :            : static void
+<span class="lineNum">    1415 </span>                :<span class="lineCov">        176 : ssl_protocol_cb(int write_p, int version OVS_UNUSED, int content_type,</span>
+<span class="lineNum">    1416 </span>                :            :                 const void *buf_, size_t len, SSL *ssl OVS_UNUSED, void *sslv_)
+<span class="lineNum">    1417 </span>                :            : {
+<span class="lineNum">    1418 </span>                :<span class="lineCov">        176 :     const struct ssl_stream *sslv = sslv_;</span>
+<span class="lineNum">    1419 </span>                :<span class="lineCov">        176 :     const uint8_t *buf = buf_;</span>
+<span class="lineNum">    1420 </span>                :            :     struct ds details;
+<span class="lineNum">    1421 </span>                :            : 
+<span class="lineNum">    1422 </span>        [<span class="branchCov" title="Branch 1 was taken 176 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        176 :     if (!VLOG_IS_DBG_ENABLED()) {</span>
+<span class="lineNum">    1423 </span>                :<span class="lineCov">        176 :         return;</span>
+<span class="lineNum">    1424 </span>                :            :     }
+<span class="lineNum">    1425 </span>                :            : 
+<span class="lineNum">    1426 </span>                :<span class="lineCov">        176 :     ds_init(&amp;details);</span>
+<span class="lineNum">    1427 </span>        [<span class="branchCov" title="Branch 0 was taken 24 times"> + </span><span class="branchCov" title="Branch 1 was taken 152 times"> + </span>]:<span class="lineCov">        176 :     if (content_type == 20) {</span>
+<span class="lineNum">    1428 </span>                :<span class="lineCov">         24 :         ds_put_cstr(&amp;details, &quot;change_cipher_spec&quot;);</span>
+<span class="lineNum">    1429 </span>        [<span class="branchCov" title="Branch 0 was taken 12 times"> + </span><span class="branchCov" title="Branch 1 was taken 140 times"> + </span>]:<span class="lineCov">        152 :     } else if (content_type == 21) {</span>
+<span class="lineNum">    1430 </span>                :<span class="lineCov">         12 :         ds_put_format(&amp;details, &quot;alert: %s, %s&quot;,</span>
+<span class="lineNum">    1431 </span>                :<span class="lineCov">         12 :                       ssl_alert_level_to_string(buf[0]),</span>
+<span class="lineNum">    1432 </span>                :<span class="lineCov">         12 :                       ssl_alert_description_to_string(buf[1]));</span>
+<span class="lineNum">    1433 </span>        [<span class="branchCov" title="Branch 0 was taken 140 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        140 :     } else if (content_type == 22) {</span>
+<span class="lineNum">    1434 </span>                :<span class="lineCov">        140 :         ds_put_format(&amp;details, &quot;handshake: %s&quot;,</span>
+<span class="lineNum">    1435 </span>                :<span class="lineCov">        140 :                       ssl_handshake_type_to_string(buf[0]));</span>
+<span class="lineNum">    1436 </span>                :            :     } else {
+<span class="lineNum">    1437 </span>                :<span class="lineNoCov">          0 :         ds_put_format(&amp;details, &quot;type %d&quot;, content_type);</span>
+<span class="lineNum">    1438 </span>                :            :     }
+<span class="lineNum">    1439 </span>                :            : 
+<span class="lineNum">    1440 </span>[<span class="branchCov" title="Branch 0 was taken 176 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 4 was taken 89 times"> + </span><span class="branchCov" title="Branch 5 was taken 87 times"> + </span>]:<span class="lineCov">        176 :     VLOG_DBG(&quot;%s%u%s%s %s (%&quot;PRIuSIZE&quot; bytes)&quot;,</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 6 was taken 92 times"> + </span><span class="branchCov" title="Branch 7 was taken 84 times"> + </span>]
+<span class="lineNum">    1441 </span>                :            :              sslv-&gt;type == CLIENT ? &quot;client&quot; : &quot;server&quot;,
+<span class="lineNum">    1442 </span>                :            :              sslv-&gt;session_nr, write_p ? &quot;--&gt;&quot; : &quot;&lt;--&quot;,
+<span class="lineNum">    1443 </span>                :            :              stream_get_name(&amp;sslv-&gt;stream), ds_cstr(&amp;details), len);
+<span class="lineNum">    1444 </span>                :            : 
+<span class="lineNum">    1445 </span>                :<span class="lineCov">        176 :     ds_destroy(&amp;details);</span>
+<span class="lineNum">    1446 </span>                :            : }
+<a name="1447"><span class="lineNum">    1447 </span>                :            : </a>
+<span class="lineNum">    1448 </span>                :            : static void
+<span class="lineNum">    1449 </span>                :<span class="lineCov">        256 : clear_handle(int fd OVS_UNUSED, HANDLE wevent OVS_UNUSED)</span>
+<span class="lineNum">    1450 </span>                :            : {
+<span class="lineNum">    1451 </span>                :            : #ifdef _WIN32
+<span class="lineNum">    1452 </span>                :            :     if (fd) {
+<span class="lineNum">    1453 </span>                :            :         WSAEventSelect(fd, NULL, 0);
+<span class="lineNum">    1454 </span>                :            :     }
+<span class="lineNum">    1455 </span>                :            :     if (wevent) {
+<span class="lineNum">    1456 </span>                :            :         CloseHandle(wevent);
+<span class="lineNum">    1457 </span>                :            :     }
+<span class="lineNum">    1458 </span>                :            : #endif
+<span class="lineNum">    1459 </span>                :<span class="lineCov">        256 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

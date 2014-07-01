@@ -1,0 +1,1535 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/rconn.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - rconn.c<span style="font-size: 80%;"> (source / <a href="rconn.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">290</td>
+            <td class="headerCovTableEntry">511</td>
+            <td class="headerCovTableEntryLo">56.8 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">58</td>
+            <td class="headerCovTableEntry">96</td>
+            <td class="headerCovTableEntryLo">60.4 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">86</td>
+            <td class="headerCovTableEntry">239</td>
+            <td class="headerCovTableEntryLo">36.0 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2008, 2009, 2010, 2011, 2012, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;rconn.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &lt;limits.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &quot;coverage.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;ofp-msgs.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;ofp-util.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;openflow/openflow.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;sat-math.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;vconn.h&quot;
+<a name="33"><span class="lineNum">      33 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      34 </span>                :            : 
+<a name="35"><span class="lineNum">      35 </span>                :<span class="lineCov">        525 : VLOG_DEFINE_THIS_MODULE(rconn);</span></a>
+<a name="36"><span class="lineNum">      36 </span>                :            : </a>
+<a name="37"><span class="lineNum">      37 </span>                :<span class="lineCov">      18843 : COVERAGE_DEFINE(rconn_discarded);</span></a>
+<a name="38"><span class="lineNum">      38 </span>                :<span class="lineCov">      18843 : COVERAGE_DEFINE(rconn_overflow);</span></a>
+<span class="lineNum">      39 </span>                :<span class="lineCov">      59286 : COVERAGE_DEFINE(rconn_queued);</span>
+<span class="lineNum">      40 </span>                :<span class="lineCov">      59286 : COVERAGE_DEFINE(rconn_sent);</span>
+<span class="lineNum">      41 </span>                :            : 
+<span class="lineNum">      42 </span>                :            : /* The connection states have the following meanings:
+<span class="lineNum">      43 </span>                :            :  *
+<span class="lineNum">      44 </span>                :            :  *    - S_VOID: No connection information is configured.
+<span class="lineNum">      45 </span>                :            :  *
+<span class="lineNum">      46 </span>                :            :  *    - S_BACKOFF: Waiting for a period of time before reconnecting.
+<span class="lineNum">      47 </span>                :            :  *
+<span class="lineNum">      48 </span>                :            :  *    - S_CONNECTING: A connection attempt is in progress and has not yet
+<span class="lineNum">      49 </span>                :            :  *      succeeded or failed.
+<span class="lineNum">      50 </span>                :            :  *
+<span class="lineNum">      51 </span>                :            :  *    - S_ACTIVE: A connection has been established and appears to be healthy.
+<span class="lineNum">      52 </span>                :            :  *
+<span class="lineNum">      53 </span>                :            :  *    - S_IDLE: A connection has been established but has been idle for some
+<span class="lineNum">      54 </span>                :            :  *      time.  An echo request has been sent, but no reply has yet been
+<span class="lineNum">      55 </span>                :            :  *      received.
+<span class="lineNum">      56 </span>                :            :  *
+<span class="lineNum">      57 </span>                :            :  *    - S_DISCONNECTED: An unreliable connection has disconnected and cannot be
+<span class="lineNum">      58 </span>                :            :  *      automatically retried.
+<span class="lineNum">      59 </span>                :            :  */
+<span class="lineNum">      60 </span>                :            : #define STATES                                  \
+<span class="lineNum">      61 </span>                :            :     STATE(VOID, 1 &lt;&lt; 0)                         \
+<span class="lineNum">      62 </span>                :            :     STATE(BACKOFF, 1 &lt;&lt; 1)                      \
+<span class="lineNum">      63 </span>                :            :     STATE(CONNECTING, 1 &lt;&lt; 2)                   \
+<span class="lineNum">      64 </span>                :            :     STATE(ACTIVE, 1 &lt;&lt; 3)                       \
+<span class="lineNum">      65 </span>                :            :     STATE(IDLE, 1 &lt;&lt; 4)                         \
+<span class="lineNum">      66 </span>                :            :     STATE(DISCONNECTED, 1 &lt;&lt; 5)
+<span class="lineNum">      67 </span>                :            : enum state {
+<span class="lineNum">      68 </span>                :            : #define STATE(NAME, VALUE) S_##NAME = VALUE,
+<span class="lineNum">      69 </span>                :            :     STATES
+<span class="lineNum">      70 </span>                :            : #undef STATE
+<span class="lineNum">      71 </span>                :            : };
+<a name="72"><span class="lineNum">      72 </span>                :            : </a>
+<span class="lineNum">      73 </span>                :            : static const char *
+<span class="lineNum">      74 </span>                :<span class="lineNoCov">          0 : state_name(enum state state)</span>
+<span class="lineNum">      75 </span>                :            : {
+<span class="lineNum">      76 </span>  [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span> :<span class="lineNoCov">          0 :     switch (state) {</span>
+<span class="lineNum">         </span>      <span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span><span class="branchNoExec" title="Branch 6 was not executed"> # </span>]
+<span class="lineNum">      77 </span>                :            : #define STATE(NAME, VALUE) case S_##NAME: return #NAME;
+<span class="lineNum">      78 </span>                :<span class="lineNoCov">          0 :         STATES</span>
+<span class="lineNum">      79 </span>                :            : #undef STATE
+<span class="lineNum">      80 </span>                :            :     }
+<span class="lineNum">      81 </span>                :<span class="lineNoCov">          0 :     return &quot;***ERROR***&quot;;</span>
+<span class="lineNum">      82 </span>                :            : }
+<span class="lineNum">      83 </span>                :            : 
+<span class="lineNum">      84 </span>                :            : /* A reliable connection to an OpenFlow switch or controller.
+<span class="lineNum">      85 </span>                :            :  *
+<span class="lineNum">      86 </span>                :            :  * See the large comment in rconn.h for more information. */
+<span class="lineNum">      87 </span>                :            : struct rconn {
+<span class="lineNum">      88 </span>                :            :     struct ovs_mutex mutex;
+<span class="lineNum">      89 </span>                :            : 
+<span class="lineNum">      90 </span>                :            :     enum state state;
+<span class="lineNum">      91 </span>                :            :     time_t state_entered;
+<span class="lineNum">      92 </span>                :            : 
+<span class="lineNum">      93 </span>                :            :     struct vconn *vconn;
+<span class="lineNum">      94 </span>                :            :     char *name;                 /* Human-readable descriptive name. */
+<span class="lineNum">      95 </span>                :            :     char *target;               /* vconn name, passed to vconn_open(). */
+<span class="lineNum">      96 </span>                :            :     bool reliable;
+<span class="lineNum">      97 </span>                :            : 
+<span class="lineNum">      98 </span>                :            :     struct list txq;            /* Contains &quot;struct ofpbuf&quot;s. */
+<span class="lineNum">      99 </span>                :            : 
+<span class="lineNum">     100 </span>                :            :     int backoff;
+<span class="lineNum">     101 </span>                :            :     int max_backoff;
+<span class="lineNum">     102 </span>                :            :     time_t backoff_deadline;
+<span class="lineNum">     103 </span>                :            :     time_t last_connected;
+<span class="lineNum">     104 </span>                :            :     time_t last_disconnected;
+<span class="lineNum">     105 </span>                :            :     unsigned int packets_sent;
+<span class="lineNum">     106 </span>                :            :     unsigned int seqno;
+<span class="lineNum">     107 </span>                :            :     int last_error;
+<span class="lineNum">     108 </span>                :            : 
+<span class="lineNum">     109 </span>                :            :     /* In S_ACTIVE and S_IDLE, probably_admitted reports whether we believe
+<span class="lineNum">     110 </span>                :            :      * that the peer has made a (positive) admission control decision on our
+<span class="lineNum">     111 </span>                :            :      * connection.  If we have not yet been (probably) admitted, then the
+<span class="lineNum">     112 </span>                :            :      * connection does not reset the timer used for deciding whether the switch
+<span class="lineNum">     113 </span>                :            :      * should go into fail-open mode.
+<span class="lineNum">     114 </span>                :            :      *
+<span class="lineNum">     115 </span>                :            :      * last_admitted reports the last time we believe such a positive admission
+<span class="lineNum">     116 </span>                :            :      * control decision was made. */
+<span class="lineNum">     117 </span>                :            :     bool probably_admitted;
+<span class="lineNum">     118 </span>                :            :     time_t last_admitted;
+<span class="lineNum">     119 </span>                :            : 
+<span class="lineNum">     120 </span>                :            :     /* These values are simply for statistics reporting, not used directly by
+<span class="lineNum">     121 </span>                :            :      * anything internal to the rconn (or ofproto for that matter). */
+<span class="lineNum">     122 </span>                :            :     unsigned int packets_received;
+<span class="lineNum">     123 </span>                :            :     unsigned int n_attempted_connections, n_successful_connections;
+<span class="lineNum">     124 </span>                :            :     time_t creation_time;
+<span class="lineNum">     125 </span>                :            :     unsigned long int total_time_connected;
+<span class="lineNum">     126 </span>                :            : 
+<span class="lineNum">     127 </span>                :            :     /* Throughout this file, &quot;probe&quot; is shorthand for &quot;inactivity probe&quot;.  When
+<span class="lineNum">     128 </span>                :            :      * no activity has been observed from the peer for a while, we send out an
+<span class="lineNum">     129 </span>                :            :      * echo request as an inactivity probe packet.  We should receive back a
+<span class="lineNum">     130 </span>                :            :      * response.
+<span class="lineNum">     131 </span>                :            :      *
+<span class="lineNum">     132 </span>                :            :      * &quot;Activity&quot; is defined as either receiving an OpenFlow message from the
+<span class="lineNum">     133 </span>                :            :      * peer or successfully sending a message that had been in 'txq'. */
+<span class="lineNum">     134 </span>                :            :     int probe_interval;         /* Secs of inactivity before sending probe. */
+<span class="lineNum">     135 </span>                :            :     time_t last_activity;       /* Last time we saw some activity. */
+<span class="lineNum">     136 </span>                :            : 
+<span class="lineNum">     137 </span>                :            :     uint8_t dscp;
+<span class="lineNum">     138 </span>                :            : 
+<span class="lineNum">     139 </span>                :            :     /* Messages sent or received are copied to the monitor connections. */
+<span class="lineNum">     140 </span>                :            : #define MAX_MONITORS 8
+<span class="lineNum">     141 </span>                :            :     struct vconn *monitors[8];
+<span class="lineNum">     142 </span>                :            :     size_t n_monitors;
+<span class="lineNum">     143 </span>                :            : 
+<span class="lineNum">     144 </span>                :            :     uint32_t allowed_versions;
+<a name="145"><span class="lineNum">     145 </span>                :            : };</a>
+<span class="lineNum">     146 </span>                :            : 
+<span class="lineNum">     147 </span>                :<span class="lineNoCov">          0 : uint32_t rconn_get_allowed_versions(const struct rconn *rconn)</span>
+<span class="lineNum">     148 </span>                :            : {
+<span class="lineNum">     149 </span>                :<span class="lineNoCov">          0 :     return rconn-&gt;allowed_versions;</span>
+<span class="lineNum">     150 </span>                :            : }
+<span class="lineNum">     151 </span>                :            : 
+<span class="lineNum">     152 </span>                :            : static unsigned int elapsed_in_this_state(const struct rconn *rc)
+<span class="lineNum">     153 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex);
+<span class="lineNum">     154 </span>                :            : static unsigned int timeout(const struct rconn *rc) OVS_REQUIRES(rc-&gt;mutex);
+<span class="lineNum">     155 </span>                :            : static bool timed_out(const struct rconn *rc) OVS_REQUIRES(rc-&gt;mutex);
+<span class="lineNum">     156 </span>                :            : static void state_transition(struct rconn *rc, enum state)
+<span class="lineNum">     157 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex);
+<span class="lineNum">     158 </span>                :            : static void rconn_set_target__(struct rconn *rc,
+<span class="lineNum">     159 </span>                :            :                                const char *target, const char *name)
+<span class="lineNum">     160 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex);
+<span class="lineNum">     161 </span>                :            : static int rconn_send__(struct rconn *rc, struct ofpbuf *,
+<span class="lineNum">     162 </span>                :            :                         struct rconn_packet_counter *)
+<span class="lineNum">     163 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex);
+<span class="lineNum">     164 </span>                :            : static int try_send(struct rconn *rc) OVS_REQUIRES(rc-&gt;mutex);
+<span class="lineNum">     165 </span>                :            : static void reconnect(struct rconn *rc) OVS_REQUIRES(rc-&gt;mutex);
+<span class="lineNum">     166 </span>                :            : static void report_error(struct rconn *rc, int error) OVS_REQUIRES(rc-&gt;mutex);
+<span class="lineNum">     167 </span>                :            : static void rconn_disconnect__(struct rconn *rc) OVS_REQUIRES(rc-&gt;mutex);
+<span class="lineNum">     168 </span>                :            : static void disconnect(struct rconn *rc, int error) OVS_REQUIRES(rc-&gt;mutex);
+<span class="lineNum">     169 </span>                :            : static void flush_queue(struct rconn *rc) OVS_REQUIRES(rc-&gt;mutex);
+<span class="lineNum">     170 </span>                :            : static void close_monitor(struct rconn *rc, size_t idx, int retval)
+<span class="lineNum">     171 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex);
+<span class="lineNum">     172 </span>                :            : static void copy_to_monitor(struct rconn *, const struct ofpbuf *);
+<span class="lineNum">     173 </span>                :            : static bool is_connected_state(enum state);
+<span class="lineNum">     174 </span>                :            : static bool is_admitted_msg(const struct ofpbuf *);
+<span class="lineNum">     175 </span>                :            : static bool rconn_logging_connection_attempts__(const struct rconn *rc)
+<span class="lineNum">     176 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex);
+<span class="lineNum">     177 </span>                :            : static int rconn_get_version__(const struct rconn *rconn)
+<span class="lineNum">     178 </span>                :            :     OVS_REQUIRES(rconn-&gt;mutex);
+<span class="lineNum">     179 </span>                :            : 
+<span class="lineNum">     180 </span>                :            : /* The following prototypes duplicate those in rconn.h, but there we weren't
+<span class="lineNum">     181 </span>                :            :  * able to add the OVS_EXCLUDED annotations because the definition of struct
+<span class="lineNum">     182 </span>                :            :  * rconn was not visible. */
+<span class="lineNum">     183 </span>                :            : 
+<span class="lineNum">     184 </span>                :            : void rconn_set_max_backoff(struct rconn *rc, int max_backoff)
+<span class="lineNum">     185 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex);
+<span class="lineNum">     186 </span>                :            : void rconn_connect(struct rconn *rc, const char *target, const char *name)
+<span class="lineNum">     187 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex);
+<span class="lineNum">     188 </span>                :            : void rconn_connect_unreliably(struct rconn *rc,
+<span class="lineNum">     189 </span>                :            :                               struct vconn *vconn, const char *name)
+<span class="lineNum">     190 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex);
+<span class="lineNum">     191 </span>                :            : void rconn_reconnect(struct rconn *rc) OVS_EXCLUDED(rc-&gt;mutex);
+<span class="lineNum">     192 </span>                :            : void rconn_disconnect(struct rconn *rc) OVS_EXCLUDED(rc-&gt;mutex);
+<span class="lineNum">     193 </span>                :            : void rconn_run(struct rconn *rc) OVS_EXCLUDED(rc-&gt;mutex);
+<span class="lineNum">     194 </span>                :            : void rconn_run_wait(struct rconn *rc) OVS_EXCLUDED(rc-&gt;mutex);
+<span class="lineNum">     195 </span>                :            : struct ofpbuf *rconn_recv(struct rconn *rc) OVS_EXCLUDED(rc-&gt;mutex);
+<span class="lineNum">     196 </span>                :            : void rconn_recv_wait(struct rconn *rc) OVS_EXCLUDED(rc-&gt;mutex);
+<span class="lineNum">     197 </span>                :            : int rconn_send(struct rconn *rc, struct ofpbuf *b,
+<span class="lineNum">     198 </span>                :            :                struct rconn_packet_counter *counter)
+<span class="lineNum">     199 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex);
+<span class="lineNum">     200 </span>                :            : int rconn_send_with_limit(struct rconn *rc, struct ofpbuf *b,
+<span class="lineNum">     201 </span>                :            :                           struct rconn_packet_counter *counter,
+<span class="lineNum">     202 </span>                :            :                           int queue_limit)
+<span class="lineNum">     203 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex);
+<span class="lineNum">     204 </span>                :            : void rconn_add_monitor(struct rconn *rc, struct vconn *vconn)
+<span class="lineNum">     205 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex);
+<span class="lineNum">     206 </span>                :            : void rconn_set_name(struct rconn *rc, const char *new_name)
+<span class="lineNum">     207 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex);
+<span class="lineNum">     208 </span>                :            : bool rconn_is_admitted(const struct rconn *rconn) OVS_EXCLUDED(rconn-&gt;mutex);
+<span class="lineNum">     209 </span>                :            : int rconn_failure_duration(const struct rconn *rconn)
+<span class="lineNum">     210 </span>                :            :     OVS_EXCLUDED(rconn-&gt;mutex);
+<span class="lineNum">     211 </span>                :            : ovs_be16 rconn_get_local_port(const struct rconn *rconn)
+<span class="lineNum">     212 </span>                :            :     OVS_EXCLUDED(rconn-&gt;mutex);
+<span class="lineNum">     213 </span>                :            : int rconn_get_version(const struct rconn *rconn) OVS_EXCLUDED(rconn-&gt;mutex);
+<span class="lineNum">     214 </span>                :            : unsigned int rconn_count_txqlen(const struct rconn *rc)
+<span class="lineNum">     215 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex);
+<span class="lineNum">     216 </span>                :            : 
+<span class="lineNum">     217 </span>                :            : 
+<span class="lineNum">     218 </span>                :            : /* Creates and returns a new rconn.
+<span class="lineNum">     219 </span>                :            :  *
+<span class="lineNum">     220 </span>                :            :  * 'probe_interval' is a number of seconds.  If the interval passes once
+<span class="lineNum">     221 </span>                :            :  * without an OpenFlow message being received from the peer, the rconn sends
+<span class="lineNum">     222 </span>                :            :  * out an &quot;echo request&quot; message.  If the interval passes again without a
+<span class="lineNum">     223 </span>                :            :  * message being received, the rconn disconnects and re-connects to the peer.
+<span class="lineNum">     224 </span>                :            :  * Setting 'probe_interval' to 0 disables this behavior.
+<span class="lineNum">     225 </span>                :            :  *
+<span class="lineNum">     226 </span>                :            :  * 'max_backoff' is the maximum number of seconds between attempts to connect
+<span class="lineNum">     227 </span>                :            :  * to the peer.  The actual interval starts at 1 second and doubles on each
+<span class="lineNum">     228 </span>                :            :  * failure until it reaches 'max_backoff'.  If 0 is specified, the default of
+<span class="lineNum">     229 </span>                :            :  * 8 seconds is used.
+<span class="lineNum">     230 </span>                :            :  *
+<span class="lineNum">     231 </span>                :            :  * The new rconn is initially unconnected.  Use rconn_connect() or
+<span class="lineNum">     232 </span>                :            :  * rconn_connect_unreliably() to connect it.
+<span class="lineNum">     233 </span>                :            :  *
+<span class="lineNum">     234 </span>                :            :  * Connections made by the rconn will automatically negotiate an OpenFlow
+<span class="lineNum">     235 </span>                :            :  * protocol version acceptable to both peers on the connection.  The version
+<span class="lineNum">     236 </span>                :            :  * negotiated will be one of those in the 'allowed_versions' bitmap: version
+<span class="lineNum">     237 </span>                :            :  * 'x' is allowed if allowed_versions &amp; (1 &lt;&lt; x) is nonzero.  (The underlying
+<span class="lineNum">     238 </span>                :            :  * vconn will treat an 'allowed_versions' of 0 as OFPUTIL_DEFAULT_VERSIONS.)
+<a name="239"><span class="lineNum">     239 </span>                :            :  */</a>
+<span class="lineNum">     240 </span>                :            : struct rconn *
+<span class="lineNum">     241 </span>                :<span class="lineCov">       1900 : rconn_create(int probe_interval, int max_backoff, uint8_t dscp,</span>
+<span class="lineNum">     242 </span>                :            :              uint32_t allowed_versions)
+<span class="lineNum">     243 </span>                :            : {
+<span class="lineNum">     244 </span>                :<span class="lineCov">       1900 :     struct rconn *rc = xzalloc(sizeof *rc);</span>
+<span class="lineNum">     245 </span>                :            : 
+<span class="lineNum">     246 </span>                :<span class="lineCov">       1900 :     ovs_mutex_init(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     247 </span>                :            : 
+<span class="lineNum">     248 </span>                :<span class="lineCov">       1900 :     rc-&gt;state = S_VOID;</span>
+<span class="lineNum">     249 </span>                :<span class="lineCov">       1900 :     rc-&gt;state_entered = time_now();</span>
+<span class="lineNum">     250 </span>                :            : 
+<span class="lineNum">     251 </span>                :<span class="lineCov">       1900 :     rc-&gt;vconn = NULL;</span>
+<span class="lineNum">     252 </span>                :<span class="lineCov">       1900 :     rc-&gt;name = xstrdup(&quot;void&quot;);</span>
+<span class="lineNum">     253 </span>                :<span class="lineCov">       1900 :     rc-&gt;target = xstrdup(&quot;void&quot;);</span>
+<span class="lineNum">     254 </span>                :<span class="lineCov">       1900 :     rc-&gt;reliable = false;</span>
+<span class="lineNum">     255 </span>                :            : 
+<span class="lineNum">     256 </span>                :<span class="lineCov">       1900 :     list_init(&amp;rc-&gt;txq);</span>
+<span class="lineNum">     257 </span>                :            : 
+<span class="lineNum">     258 </span>                :<span class="lineCov">       1900 :     rc-&gt;backoff = 0;</span>
+<span class="lineNum">     259 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1900 times"> + </span>]:<span class="lineCov">       1900 :     rc-&gt;max_backoff = max_backoff ? max_backoff : 8;</span>
+<span class="lineNum">     260 </span>                :<span class="lineCov">       1900 :     rc-&gt;backoff_deadline = TIME_MIN;</span>
+<span class="lineNum">     261 </span>                :<span class="lineCov">       1900 :     rc-&gt;last_connected = TIME_MIN;</span>
+<span class="lineNum">     262 </span>                :<span class="lineCov">       1900 :     rc-&gt;last_disconnected = TIME_MIN;</span>
+<span class="lineNum">     263 </span>                :<span class="lineCov">       1900 :     rc-&gt;seqno = 0;</span>
+<span class="lineNum">     264 </span>                :            : 
+<span class="lineNum">     265 </span>                :<span class="lineCov">       1900 :     rc-&gt;packets_sent = 0;</span>
+<span class="lineNum">     266 </span>                :            : 
+<span class="lineNum">     267 </span>                :<span class="lineCov">       1900 :     rc-&gt;probably_admitted = false;</span>
+<span class="lineNum">     268 </span>                :<span class="lineCov">       1900 :     rc-&gt;last_admitted = time_now();</span>
+<span class="lineNum">     269 </span>                :            : 
+<span class="lineNum">     270 </span>                :<span class="lineCov">       1900 :     rc-&gt;packets_received = 0;</span>
+<span class="lineNum">     271 </span>                :<span class="lineCov">       1900 :     rc-&gt;n_attempted_connections = 0;</span>
+<span class="lineNum">     272 </span>                :<span class="lineCov">       1900 :     rc-&gt;n_successful_connections = 0;</span>
+<span class="lineNum">     273 </span>                :<span class="lineCov">       1900 :     rc-&gt;creation_time = time_now();</span>
+<span class="lineNum">     274 </span>                :<span class="lineCov">       1900 :     rc-&gt;total_time_connected = 0;</span>
+<span class="lineNum">     275 </span>                :            : 
+<span class="lineNum">     276 </span>                :<span class="lineCov">       1900 :     rc-&gt;last_activity = time_now();</span>
+<span class="lineNum">     277 </span>                :            : 
+<span class="lineNum">     278 </span>                :<span class="lineCov">       1900 :     rconn_set_probe_interval(rc, probe_interval);</span>
+<span class="lineNum">     279 </span>                :<span class="lineCov">       1900 :     rconn_set_dscp(rc, dscp);</span>
+<span class="lineNum">     280 </span>                :            : 
+<span class="lineNum">     281 </span>                :<span class="lineCov">       1900 :     rc-&gt;n_monitors = 0;</span>
+<span class="lineNum">     282 </span>                :<span class="lineCov">       1900 :     rc-&gt;allowed_versions = allowed_versions;</span>
+<span class="lineNum">     283 </span>                :            : 
+<span class="lineNum">     284 </span>                :<span class="lineCov">       1900 :     return rc;</span>
+<span class="lineNum">     285 </span>                :            : }
+<a name="286"><span class="lineNum">     286 </span>                :            : </a>
+<span class="lineNum">     287 </span>                :            : void
+<span class="lineNum">     288 </span>                :<span class="lineNoCov">          0 : rconn_set_max_backoff(struct rconn *rc, int max_backoff)</span>
+<span class="lineNum">     289 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex)
+<span class="lineNum">     290 </span>                :            : {
+<span class="lineNum">     291 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     292 </span>                :<span class="lineNoCov">          0 :     rc-&gt;max_backoff = MAX(1, max_backoff);</span>
+<span class="lineNum">     293 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (rc-&gt;state == S_BACKOFF &amp;&amp; rc-&gt;backoff &gt; max_backoff) {</span>
+<span class="lineNum">     294 </span>                :<span class="lineNoCov">          0 :         rc-&gt;backoff = max_backoff;</span>
+<span class="lineNum">     295 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (rc-&gt;backoff_deadline &gt; time_now() + max_backoff) {</span>
+<span class="lineNum">     296 </span>                :<span class="lineNoCov">          0 :             rc-&gt;backoff_deadline = time_now() + max_backoff;</span>
+<span class="lineNum">     297 </span>                :            :         }
+<span class="lineNum">     298 </span>                :            :     }
+<span class="lineNum">     299 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     300 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="301"><span class="lineNum">     301 </span>                :            : </a>
+<span class="lineNum">     302 </span>                :            : int
+<span class="lineNum">     303 </span>                :<span class="lineNoCov">          0 : rconn_get_max_backoff(const struct rconn *rc)</span>
+<span class="lineNum">     304 </span>                :            : {
+<span class="lineNum">     305 </span>                :<span class="lineNoCov">          0 :     return rc-&gt;max_backoff;</span>
+<span class="lineNum">     306 </span>                :            : }
+<a name="307"><span class="lineNum">     307 </span>                :            : </a>
+<span class="lineNum">     308 </span>                :            : void
+<span class="lineNum">     309 </span>                :<span class="lineCov">       1900 : rconn_set_dscp(struct rconn *rc, uint8_t dscp)</span>
+<span class="lineNum">     310 </span>                :            : {
+<span class="lineNum">     311 </span>                :<span class="lineCov">       1900 :     rc-&gt;dscp = dscp;</span>
+<span class="lineNum">     312 </span>                :<span class="lineCov">       1900 : }</span>
+<a name="313"><span class="lineNum">     313 </span>                :            : </a>
+<span class="lineNum">     314 </span>                :            : uint8_t
+<span class="lineNum">     315 </span>                :<span class="lineNoCov">          0 : rconn_get_dscp(const struct rconn *rc)</span>
+<span class="lineNum">     316 </span>                :            : {
+<span class="lineNum">     317 </span>                :<span class="lineNoCov">          0 :     return rc-&gt;dscp;</span>
+<span class="lineNum">     318 </span>                :            : }
+<a name="319"><span class="lineNum">     319 </span>                :            : </a>
+<span class="lineNum">     320 </span>                :            : void
+<span class="lineNum">     321 </span>                :<span class="lineCov">       1900 : rconn_set_probe_interval(struct rconn *rc, int probe_interval)</span>
+<span class="lineNum">     322 </span>                :            : {
+<span class="lineNum">     323 </span>        [<span class="branchCov" title="Branch 0 was taken 1900 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       1900 :     rc-&gt;probe_interval = probe_interval ? MAX(5, probe_interval) : 0;</span>
+<span class="lineNum">     324 </span>                :<span class="lineCov">       1900 : }</span>
+<a name="325"><span class="lineNum">     325 </span>                :            : </a>
+<span class="lineNum">     326 </span>                :            : int
+<span class="lineNum">     327 </span>                :<span class="lineNoCov">          0 : rconn_get_probe_interval(const struct rconn *rc)</span>
+<span class="lineNum">     328 </span>                :            : {
+<span class="lineNum">     329 </span>                :<span class="lineNoCov">          0 :     return rc-&gt;probe_interval;</span>
+<span class="lineNum">     330 </span>                :            : }
+<span class="lineNum">     331 </span>                :            : 
+<span class="lineNum">     332 </span>                :            : /* Drops any existing connection on 'rc', then sets up 'rc' to connect to
+<span class="lineNum">     333 </span>                :            :  * 'target' and reconnect as needed.  'target' should be a remote OpenFlow
+<span class="lineNum">     334 </span>                :            :  * target in a form acceptable to vconn_open().
+<span class="lineNum">     335 </span>                :            :  *
+<span class="lineNum">     336 </span>                :            :  * If 'name' is nonnull, then it is used in log messages in place of 'target'.
+<span class="lineNum">     337 </span>                :            :  * It should presumably give more information to a human reader than 'target',
+<a name="338"><span class="lineNum">     338 </span>                :            :  * but it need not be acceptable to vconn_open(). */</a>
+<span class="lineNum">     339 </span>                :            : void
+<span class="lineNum">     340 </span>                :<span class="lineNoCov">          0 : rconn_connect(struct rconn *rc, const char *target, const char *name)</span>
+<span class="lineNum">     341 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex)
+<span class="lineNum">     342 </span>                :            : {
+<span class="lineNum">     343 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     344 </span>                :<span class="lineNoCov">          0 :     rconn_disconnect__(rc);</span>
+<span class="lineNum">     345 </span>                :<span class="lineNoCov">          0 :     rconn_set_target__(rc, target, name);</span>
+<span class="lineNum">     346 </span>                :<span class="lineNoCov">          0 :     rc-&gt;reliable = true;</span>
+<span class="lineNum">     347 </span>                :<span class="lineNoCov">          0 :     reconnect(rc);</span>
+<span class="lineNum">     348 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     349 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     350 </span>                :            : 
+<span class="lineNum">     351 </span>                :            : /* Drops any existing connection on 'rc', then configures 'rc' to use
+<span class="lineNum">     352 </span>                :            :  * 'vconn'.  If the connection on 'vconn' drops, 'rc' will not reconnect on it
+<span class="lineNum">     353 </span>                :            :  * own.
+<span class="lineNum">     354 </span>                :            :  *
+<span class="lineNum">     355 </span>                :            :  * By default, the target obtained from vconn_get_name(vconn) is used in log
+<span class="lineNum">     356 </span>                :            :  * messages.  If 'name' is nonnull, then it is used instead.  It should
+<span class="lineNum">     357 </span>                :            :  * presumably give more information to a human reader than the target, but it
+<a name="358"><span class="lineNum">     358 </span>                :            :  * need not be acceptable to vconn_open(). */</a>
+<span class="lineNum">     359 </span>                :            : void
+<span class="lineNum">     360 </span>                :<span class="lineCov">       1900 : rconn_connect_unreliably(struct rconn *rc,</span>
+<span class="lineNum">     361 </span>                :            :                          struct vconn *vconn, const char *name)
+<span class="lineNum">     362 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex)
+<span class="lineNum">     363 </span>                :            : {
+<span class="lineNum">     364 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1900 times"> + </span>]:<span class="lineCov">       1900 :     ovs_assert(vconn != NULL);</span>
+<span class="lineNum">     365 </span>                :            : 
+<span class="lineNum">     366 </span>                :<span class="lineCov">       1900 :     ovs_mutex_lock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     367 </span>                :<span class="lineCov">       1900 :     rconn_disconnect__(rc);</span>
+<span class="lineNum">     368 </span>                :<span class="lineCov">       1900 :     rconn_set_target__(rc, vconn_get_name(vconn), name);</span>
+<span class="lineNum">     369 </span>                :<span class="lineCov">       1900 :     rc-&gt;reliable = false;</span>
+<span class="lineNum">     370 </span>                :<span class="lineCov">       1900 :     rc-&gt;vconn = vconn;</span>
+<span class="lineNum">     371 </span>                :<span class="lineCov">       1900 :     rc-&gt;last_connected = time_now();</span>
+<span class="lineNum">     372 </span>                :<span class="lineCov">       1900 :     state_transition(rc, S_ACTIVE);</span>
+<span class="lineNum">     373 </span>                :<span class="lineCov">       1900 :     ovs_mutex_unlock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     374 </span>                :<span class="lineCov">       1900 : }</span>
+<span class="lineNum">     375 </span>                :            : 
+<a name="376"><span class="lineNum">     376 </span>                :            : /* If 'rc' is connected, forces it to drop the connection and reconnect. */</a>
+<span class="lineNum">     377 </span>                :            : void
+<span class="lineNum">     378 </span>                :<span class="lineNoCov">          0 : rconn_reconnect(struct rconn *rc)</span>
+<span class="lineNum">     379 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex)
+<span class="lineNum">     380 </span>                :            : {
+<span class="lineNum">     381 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     382 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (rc-&gt;state &amp; (S_ACTIVE | S_IDLE)) {</span>
+<span class="lineNum">     383 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_INFO(&quot;%s: disconnecting&quot;, rc-&gt;name);</span>
+<span class="lineNum">     384 </span>                :<span class="lineNoCov">          0 :         disconnect(rc, 0);</span>
+<span class="lineNum">     385 </span>                :            :     }
+<span class="lineNum">     386 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     387 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="388"><span class="lineNum">     388 </span>                :            : </a>
+<span class="lineNum">     389 </span>                :            : static void
+<span class="lineNum">     390 </span>                :<span class="lineCov">       1900 : rconn_disconnect__(struct rconn *rc)</span>
+<span class="lineNum">     391 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">     392 </span>                :            : {
+<span class="lineNum">     393 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1900 times"> + </span>]:<span class="lineCov">       1900 :     if (rc-&gt;state != S_VOID) {</span>
+<span class="lineNum">     394 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (rc-&gt;vconn) {</span>
+<span class="lineNum">     395 </span>                :<span class="lineNoCov">          0 :             vconn_close(rc-&gt;vconn);</span>
+<span class="lineNum">     396 </span>                :<span class="lineNoCov">          0 :             rc-&gt;vconn = NULL;</span>
+<span class="lineNum">     397 </span>                :            :         }
+<span class="lineNum">     398 </span>                :<span class="lineNoCov">          0 :         rconn_set_target__(rc, &quot;void&quot;, NULL);</span>
+<span class="lineNum">     399 </span>                :<span class="lineNoCov">          0 :         rc-&gt;reliable = false;</span>
+<span class="lineNum">     400 </span>                :            : 
+<span class="lineNum">     401 </span>                :<span class="lineNoCov">          0 :         rc-&gt;backoff = 0;</span>
+<span class="lineNum">     402 </span>                :<span class="lineNoCov">          0 :         rc-&gt;backoff_deadline = TIME_MIN;</span>
+<span class="lineNum">     403 </span>                :            : 
+<span class="lineNum">     404 </span>                :<span class="lineNoCov">          0 :         state_transition(rc, S_VOID);</span>
+<span class="lineNum">     405 </span>                :            :     }
+<span class="lineNum">     406 </span>                :<span class="lineCov">       1900 : }</span>
+<a name="407"><span class="lineNum">     407 </span>                :            : </a>
+<span class="lineNum">     408 </span>                :            : void
+<span class="lineNum">     409 </span>                :<span class="lineNoCov">          0 : rconn_disconnect(struct rconn *rc)</span>
+<span class="lineNum">     410 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex)
+<span class="lineNum">     411 </span>                :            : {
+<span class="lineNum">     412 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     413 </span>                :<span class="lineNoCov">          0 :     rconn_disconnect__(rc);</span>
+<span class="lineNum">     414 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     415 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     416 </span>                :            : 
+<a name="417"><span class="lineNum">     417 </span>                :            : /* Disconnects 'rc' and frees the underlying storage. */</a>
+<span class="lineNum">     418 </span>                :            : void
+<span class="lineNum">     419 </span>                :<span class="lineCov">       1899 : rconn_destroy(struct rconn *rc)</span>
+<span class="lineNum">     420 </span>                :            : {
+<span class="lineNum">     421 </span>        [<span class="branchCov" title="Branch 0 was taken 1899 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       1899 :     if (rc) {</span>
+<span class="lineNum">     422 </span>                :            :         size_t i;
+<span class="lineNum">     423 </span>                :            : 
+<span class="lineNum">     424 </span>                :<span class="lineCov">       1899 :         ovs_mutex_lock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     425 </span>                :<span class="lineCov">       1899 :         free(rc-&gt;name);</span>
+<span class="lineNum">     426 </span>                :<span class="lineCov">       1899 :         free(rc-&gt;target);</span>
+<span class="lineNum">     427 </span>                :<span class="lineCov">       1899 :         vconn_close(rc-&gt;vconn);</span>
+<span class="lineNum">     428 </span>                :<span class="lineCov">       1899 :         flush_queue(rc);</span>
+<span class="lineNum">     429 </span>                :<span class="lineCov">       1899 :         ofpbuf_list_delete(&amp;rc-&gt;txq);</span>
+<span class="lineNum">     430 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1899 times"> + </span>]:<span class="lineCov">       1899 :         for (i = 0; i &lt; rc-&gt;n_monitors; i++) {</span>
+<span class="lineNum">     431 </span>                :<span class="lineNoCov">          0 :             vconn_close(rc-&gt;monitors[i]);</span>
+<span class="lineNum">     432 </span>                :            :         }
+<span class="lineNum">     433 </span>                :<span class="lineCov">       1899 :         ovs_mutex_unlock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     434 </span>                :<span class="lineCov">       1899 :         ovs_mutex_destroy(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     435 </span>                :            : 
+<span class="lineNum">     436 </span>                :<span class="lineCov">       1899 :         free(rc);</span>
+<span class="lineNum">     437 </span>                :            :     }
+<span class="lineNum">     438 </span>                :<span class="lineCov">       1899 : }</span>
+<a name="439"><span class="lineNum">     439 </span>                :            : </a>
+<span class="lineNum">     440 </span>                :            : static unsigned int
+<span class="lineNum">     441 </span>                :<span class="lineNoCov">          0 : timeout_VOID(const struct rconn *rc OVS_UNUSED)</span>
+<span class="lineNum">     442 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">     443 </span>                :            : {
+<span class="lineNum">     444 </span>                :<span class="lineNoCov">          0 :     return UINT_MAX;</span>
+<span class="lineNum">     445 </span>                :            : }
+<a name="446"><span class="lineNum">     446 </span>                :            : </a>
+<span class="lineNum">     447 </span>                :            : static void
+<span class="lineNum">     448 </span>                :<span class="lineNoCov">          0 : run_VOID(struct rconn *rc OVS_UNUSED)</span>
+<span class="lineNum">     449 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">     450 </span>                :            : {
+<span class="lineNum">     451 </span>                :            :     /* Nothing to do. */
+<span class="lineNum">     452 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="453"><span class="lineNum">     453 </span>                :            : </a>
+<span class="lineNum">     454 </span>                :            : static void
+<span class="lineNum">     455 </span>                :<span class="lineNoCov">          0 : reconnect(struct rconn *rc)</span>
+<span class="lineNum">     456 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">     457 </span>                :            : {
+<span class="lineNum">     458 </span>                :            :     int retval;
+<span class="lineNum">     459 </span>                :            : 
+<span class="lineNum">     460 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (rconn_logging_connection_attempts__(rc)) {</span>
+<span class="lineNum">     461 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_INFO(&quot;%s: connecting...&quot;, rc-&gt;name);</span>
+<span class="lineNum">     462 </span>                :            :     }
+<span class="lineNum">     463 </span>                :<span class="lineNoCov">          0 :     rc-&gt;n_attempted_connections++;</span>
+<span class="lineNum">     464 </span>                :<span class="lineNoCov">          0 :     retval = vconn_open(rc-&gt;target, rc-&gt;allowed_versions, rc-&gt;dscp,</span>
+<span class="lineNum">     465 </span>                :            :                         &amp;rc-&gt;vconn);
+<span class="lineNum">     466 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!retval) {</span>
+<span class="lineNum">     467 </span>                :<span class="lineNoCov">          0 :         rc-&gt;backoff_deadline = time_now() + rc-&gt;backoff;</span>
+<span class="lineNum">     468 </span>                :<span class="lineNoCov">          0 :         state_transition(rc, S_CONNECTING);</span>
+<span class="lineNum">     469 </span>                :            :     } else {
+<span class="lineNum">     470 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN(&quot;%s: connection failed (%s)&quot;,</span>
+<span class="lineNum">     471 </span>                :            :                   rc-&gt;name, ovs_strerror(retval));
+<span class="lineNum">     472 </span>                :<span class="lineNoCov">          0 :         rc-&gt;backoff_deadline = TIME_MAX; /* Prevent resetting backoff. */</span>
+<span class="lineNum">     473 </span>                :<span class="lineNoCov">          0 :         disconnect(rc, retval);</span>
+<span class="lineNum">     474 </span>                :            :     }
+<span class="lineNum">     475 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="476"><span class="lineNum">     476 </span>                :            : </a>
+<span class="lineNum">     477 </span>                :            : static unsigned int
+<span class="lineNum">     478 </span>                :<span class="lineNoCov">          0 : timeout_BACKOFF(const struct rconn *rc)</span>
+<span class="lineNum">     479 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">     480 </span>                :            : {
+<span class="lineNum">     481 </span>                :<span class="lineNoCov">          0 :     return rc-&gt;backoff;</span>
+<span class="lineNum">     482 </span>                :            : }
+<a name="483"><span class="lineNum">     483 </span>                :            : </a>
+<span class="lineNum">     484 </span>                :            : static void
+<span class="lineNum">     485 </span>                :<span class="lineNoCov">          0 : run_BACKOFF(struct rconn *rc)</span>
+<span class="lineNum">     486 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">     487 </span>                :            : {
+<span class="lineNum">     488 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (timed_out(rc)) {</span>
+<span class="lineNum">     489 </span>                :<span class="lineNoCov">          0 :         reconnect(rc);</span>
+<span class="lineNum">     490 </span>                :            :     }
+<span class="lineNum">     491 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="492"><span class="lineNum">     492 </span>                :            : </a>
+<span class="lineNum">     493 </span>                :            : static unsigned int
+<span class="lineNum">     494 </span>                :<span class="lineNoCov">          0 : timeout_CONNECTING(const struct rconn *rc)</span>
+<span class="lineNum">     495 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">     496 </span>                :            : {
+<span class="lineNum">     497 </span>                :<span class="lineNoCov">          0 :     return MAX(1, rc-&gt;backoff);</span>
+<span class="lineNum">     498 </span>                :            : }
+<a name="499"><span class="lineNum">     499 </span>                :            : </a>
+<span class="lineNum">     500 </span>                :            : static void
+<span class="lineNum">     501 </span>                :<span class="lineNoCov">          0 : run_CONNECTING(struct rconn *rc)</span>
+<span class="lineNum">     502 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">     503 </span>                :            : {
+<span class="lineNum">     504 </span>                :<span class="lineNoCov">          0 :     int retval = vconn_connect(rc-&gt;vconn);</span>
+<span class="lineNum">     505 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!retval) {</span>
+<span class="lineNum">     506 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_INFO(&quot;%s: connected&quot;, rc-&gt;name);</span>
+<span class="lineNum">     507 </span>                :<span class="lineNoCov">          0 :         rc-&gt;n_successful_connections++;</span>
+<span class="lineNum">     508 </span>                :<span class="lineNoCov">          0 :         state_transition(rc, S_ACTIVE);</span>
+<span class="lineNum">     509 </span>                :<span class="lineNoCov">          0 :         rc-&gt;last_connected = rc-&gt;state_entered;</span>
+<span class="lineNum">     510 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     } else if (retval != EAGAIN) {</span>
+<span class="lineNum">     511 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (rconn_logging_connection_attempts__(rc)) {</span>
+<span class="lineNum">     512 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_INFO(&quot;%s: connection failed (%s)&quot;,</span>
+<span class="lineNum">     513 </span>                :            :                       rc-&gt;name, ovs_strerror(retval));
+<span class="lineNum">     514 </span>                :            :         }
+<span class="lineNum">     515 </span>                :<span class="lineNoCov">          0 :         disconnect(rc, retval);</span>
+<span class="lineNum">     516 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     } else if (timed_out(rc)) {</span>
+<span class="lineNum">     517 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (rconn_logging_connection_attempts__(rc)) {</span>
+<span class="lineNum">     518 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_INFO(&quot;%s: connection timed out&quot;, rc-&gt;name);</span>
+<span class="lineNum">     519 </span>                :            :         }
+<span class="lineNum">     520 </span>                :<span class="lineNoCov">          0 :         rc-&gt;backoff_deadline = TIME_MAX; /* Prevent resetting backoff. */</span>
+<span class="lineNum">     521 </span>                :<span class="lineNoCov">          0 :         disconnect(rc, ETIMEDOUT);</span>
+<span class="lineNum">     522 </span>                :            :     }
+<span class="lineNum">     523 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="524"><span class="lineNum">     524 </span>                :            : </a>
+<span class="lineNum">     525 </span>                :            : static void
+<span class="lineNum">     526 </span>                :<span class="lineCov">      12220 : do_tx_work(struct rconn *rc)</span>
+<span class="lineNum">     527 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">     528 </span>                :            : {
+<span class="lineNum">     529 </span>        [<span class="branchCov" title="Branch 1 was taken 10398 times"> + </span><span class="branchCov" title="Branch 2 was taken 1822 times"> + </span>]:<span class="lineCov">      12220 :     if (list_is_empty(&amp;rc-&gt;txq)) {</span>
+<span class="lineNum">     530 </span>                :<span class="lineCov">      12220 :         return;</span>
+<span class="lineNum">     531 </span>                :            :     }
+<span class="lineNum">     532 </span>        [<span class="branchCov" title="Branch 1 was taken 4165 times"> + </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">       4166 :     while (!list_is_empty(&amp;rc-&gt;txq)) {</span>
+<span class="lineNum">     533 </span>                :<span class="lineCov">       4165 :         int error = try_send(rc);</span>
+<span class="lineNum">     534 </span>        [<span class="branchCov" title="Branch 0 was taken 1821 times"> + </span><span class="branchCov" title="Branch 1 was taken 2344 times"> + </span>]:<span class="lineCov">       4165 :         if (error) {</span>
+<span class="lineNum">     535 </span>                :<span class="lineCov">       1821 :             break;</span>
+<span class="lineNum">     536 </span>                :            :         }
+<span class="lineNum">     537 </span>                :<span class="lineCov">       2344 :         rc-&gt;last_activity = time_now();</span>
+<span class="lineNum">     538 </span>                :            :     }
+<span class="lineNum">     539 </span>        [<span class="branchCov" title="Branch 1 was taken 1 time"> + </span><span class="branchCov" title="Branch 2 was taken 1821 times"> + </span>]:<span class="lineCov">       1822 :     if (list_is_empty(&amp;rc-&gt;txq)) {</span>
+<span class="lineNum">     540 </span>                :<span class="lineCov">          1 :         poll_immediate_wake();</span>
+<span class="lineNum">     541 </span>                :            :     }
+<span class="lineNum">     542 </span>                :            : }
+<a name="543"><span class="lineNum">     543 </span>                :            : </a>
+<span class="lineNum">     544 </span>                :            : static unsigned int
+<span class="lineNum">     545 </span>                :<span class="lineCov">      24401 : timeout_ACTIVE(const struct rconn *rc)</span>
+<span class="lineNum">     546 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">     547 </span>                :            : {
+<span class="lineNum">     548 </span>        [<span class="branchCov" title="Branch 0 was taken 24401 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      24401 :     if (rc-&gt;probe_interval) {</span>
+<span class="lineNum">     549 </span>                :<span class="lineCov">      24401 :         unsigned int base = MAX(rc-&gt;last_activity, rc-&gt;state_entered);</span>
+<span class="lineNum">     550 </span>                :<span class="lineCov">      24401 :         unsigned int arg = base + rc-&gt;probe_interval - rc-&gt;state_entered;</span>
+<span class="lineNum">     551 </span>                :<span class="lineCov">      24401 :         return arg;</span>
+<span class="lineNum">     552 </span>                :            :     }
+<span class="lineNum">     553 </span>                :<span class="lineCov">      24401 :     return UINT_MAX;</span>
+<span class="lineNum">     554 </span>                :            : }
+<a name="555"><span class="lineNum">     555 </span>                :            : </a>
+<span class="lineNum">     556 </span>                :            : static void
+<span class="lineNum">     557 </span>                :<span class="lineCov">      12220 : run_ACTIVE(struct rconn *rc)</span>
+<span class="lineNum">     558 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">     559 </span>                :            : {
+<span class="lineNum">     560 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 12220 times"> + </span>]:<span class="lineCov">      12220 :     if (timed_out(rc)) {</span>
+<span class="lineNum">     561 </span>                :<span class="lineNoCov">          0 :         unsigned int base = MAX(rc-&gt;last_activity, rc-&gt;state_entered);</span>
+<span class="lineNum">     562 </span>                :            :         int version;
+<span class="lineNum">     563 </span>                :            : 
+<span class="lineNum">     564 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_DBG(&quot;%s: idle %u seconds, sending inactivity probe&quot;,</span>
+<span class="lineNum">     565 </span>                :            :                  rc-&gt;name, (unsigned int) (time_now() - base));
+<span class="lineNum">     566 </span>                :            : 
+<span class="lineNum">     567 </span>                :<span class="lineNoCov">          0 :         version = rconn_get_version__(rc);</span>
+<span class="lineNum">     568 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         ovs_assert(version &gt;= 0 &amp;&amp; version &lt;= 0xff);</span>
+<span class="lineNum">     569 </span>                :            : 
+<span class="lineNum">     570 </span>                :            :         /* Ordering is important here: rconn_send() can transition to BACKOFF,
+<span class="lineNum">     571 </span>                :            :          * and we don't want to transition back to IDLE if so, because then we
+<span class="lineNum">     572 </span>                :            :          * can end up queuing a packet with vconn == NULL and then *boom*. */
+<span class="lineNum">     573 </span>                :<span class="lineNoCov">          0 :         state_transition(rc, S_IDLE);</span>
+<span class="lineNum">     574 </span>                :<span class="lineNoCov">          0 :         rconn_send__(rc, make_echo_request(version), NULL);</span>
+<span class="lineNum">     575 </span>                :<span class="lineCov">      12220 :         return;</span>
+<span class="lineNum">     576 </span>                :            :     }
+<span class="lineNum">     577 </span>                :            : 
+<span class="lineNum">     578 </span>                :<span class="lineCov">      12220 :     do_tx_work(rc);</span>
+<span class="lineNum">     579 </span>                :            : }
+<a name="580"><span class="lineNum">     580 </span>                :            : </a>
+<span class="lineNum">     581 </span>                :            : static unsigned int
+<span class="lineNum">     582 </span>                :<span class="lineNoCov">          0 : timeout_IDLE(const struct rconn *rc)</span>
+<span class="lineNum">     583 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">     584 </span>                :            : {
+<span class="lineNum">     585 </span>                :<span class="lineNoCov">          0 :     return rc-&gt;probe_interval;</span>
+<span class="lineNum">     586 </span>                :            : }
+<a name="587"><span class="lineNum">     587 </span>                :            : </a>
+<span class="lineNum">     588 </span>                :            : static void
+<span class="lineNum">     589 </span>                :<span class="lineNoCov">          0 : run_IDLE(struct rconn *rc)</span>
+<span class="lineNum">     590 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">     591 </span>                :            : {
+<span class="lineNum">     592 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (timed_out(rc)) {</span>
+<span class="lineNum">     593 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;%s: no response to inactivity probe after %u &quot;</span>
+<span class="lineNum">     594 </span>                :            :                  &quot;seconds, disconnecting&quot;,
+<span class="lineNum">     595 </span>                :            :                  rc-&gt;name, elapsed_in_this_state(rc));
+<span class="lineNum">     596 </span>                :<span class="lineNoCov">          0 :         disconnect(rc, ETIMEDOUT);</span>
+<span class="lineNum">     597 </span>                :            :     } else {
+<span class="lineNum">     598 </span>                :<span class="lineNoCov">          0 :         do_tx_work(rc);</span>
+<span class="lineNum">     599 </span>                :            :     }
+<span class="lineNum">     600 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="601"><span class="lineNum">     601 </span>                :            : </a>
+<span class="lineNum">     602 </span>                :            : static unsigned int
+<span class="lineNum">     603 </span>                :<span class="lineNoCov">          0 : timeout_DISCONNECTED(const struct rconn *rc OVS_UNUSED)</span>
+<span class="lineNum">     604 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">     605 </span>                :            : {
+<span class="lineNum">     606 </span>                :<span class="lineNoCov">          0 :     return UINT_MAX;</span>
+<span class="lineNum">     607 </span>                :            : }
+<a name="608"><span class="lineNum">     608 </span>                :            : </a>
+<span class="lineNum">     609 </span>                :            : static void
+<span class="lineNum">     610 </span>                :<span class="lineNoCov">          0 : run_DISCONNECTED(struct rconn *rc OVS_UNUSED)</span>
+<span class="lineNum">     611 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">     612 </span>                :            : {
+<span class="lineNum">     613 </span>                :            :     /* Nothing to do. */
+<span class="lineNum">     614 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     615 </span>                :            : 
+<span class="lineNum">     616 </span>                :            : /* Performs whatever activities are necessary to maintain 'rc': if 'rc' is
+<span class="lineNum">     617 </span>                :            :  * disconnected, attempts to (re)connect, backing off as necessary; if 'rc' is
+<a name="618"><span class="lineNum">     618 </span>                :            :  * connected, attempts to send packets in the send queue, if any. */</a>
+<span class="lineNum">     619 </span>                :            : void
+<span class="lineNum">     620 </span>                :<span class="lineCov">      12220 : rconn_run(struct rconn *rc)</span>
+<span class="lineNum">     621 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex)
+<span class="lineNum">     622 </span>                :            : {
+<span class="lineNum">     623 </span>                :            :     int old_state;
+<span class="lineNum">     624 </span>                :            :     size_t i;
+<span class="lineNum">     625 </span>                :            : 
+<span class="lineNum">     626 </span>                :<span class="lineCov">      12220 :     ovs_mutex_lock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     627 </span>        [<span class="branchCov" title="Branch 0 was taken 12220 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      12220 :     if (rc-&gt;vconn) {</span>
+<span class="lineNum">     628 </span>                :            :         int error;
+<span class="lineNum">     629 </span>                :            : 
+<span class="lineNum">     630 </span>                :<span class="lineCov">      12220 :         vconn_run(rc-&gt;vconn);</span>
+<span class="lineNum">     631 </span>                :            : 
+<span class="lineNum">     632 </span>                :<span class="lineCov">      12220 :         error = vconn_get_status(rc-&gt;vconn);</span>
+<span class="lineNum">     633 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 12220 times"> + </span>]:<span class="lineCov">      12220 :         if (error) {</span>
+<span class="lineNum">     634 </span>                :<span class="lineNoCov">          0 :             report_error(rc, error);</span>
+<span class="lineNum">     635 </span>                :<span class="lineNoCov">          0 :             disconnect(rc, error);</span>
+<span class="lineNum">     636 </span>                :            :         }
+<span class="lineNum">     637 </span>                :            :     }
+<span class="lineNum">     638 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 12220 times"> + </span>]:<span class="lineCov">      12220 :     for (i = 0; i &lt; rc-&gt;n_monitors; ) {</span>
+<span class="lineNum">     639 </span>                :            :         struct ofpbuf *msg;
+<span class="lineNum">     640 </span>                :            :         int retval;
+<span class="lineNum">     641 </span>                :            : 
+<span class="lineNum">     642 </span>                :<span class="lineNoCov">          0 :         vconn_run(rc-&gt;monitors[i]);</span>
+<span class="lineNum">     643 </span>                :            : 
+<span class="lineNum">     644 </span>                :            :         /* Drain any stray message that came in on the monitor connection. */
+<span class="lineNum">     645 </span>                :<span class="lineNoCov">          0 :         retval = vconn_recv(rc-&gt;monitors[i], &amp;msg);</span>
+<span class="lineNum">     646 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!retval) {</span>
+<span class="lineNum">     647 </span>                :<span class="lineNoCov">          0 :             ofpbuf_delete(msg);</span>
+<span class="lineNum">     648 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         } else if (retval != EAGAIN) {</span>
+<span class="lineNum">     649 </span>                :<span class="lineNoCov">          0 :             close_monitor(rc, i, retval);</span>
+<span class="lineNum">     650 </span>                :<span class="lineNoCov">          0 :             continue;</span>
+<span class="lineNum">     651 </span>                :            :         }
+<span class="lineNum">     652 </span>                :<span class="lineNoCov">          0 :         i++;</span>
+<span class="lineNum">     653 </span>                :            :     }
+<span class="lineNum">     654 </span>                :            : 
+<span class="lineNum">     655 </span>                :            :     do {
+<span class="lineNum">     656 </span>                :<span class="lineCov">      12220 :         old_state = rc-&gt;state;</span>
+<span class="lineNum">     657 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 12220 times"> + </span> :<span class="lineCov">      12220 :         switch (rc-&gt;state) {</span>
+<span class="lineNum">         </span>      <span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchNoCov" title="Branch 6 was not taken"> - </span>]
+<span class="lineNum">     658 </span>                :            : #define STATE(NAME, VALUE) case S_##NAME: run_##NAME(rc); break;
+<span class="lineNum">     659 </span>                :<span class="lineCov">      12220 :             STATES</span>
+<span class="lineNum">     660 </span>                :            : #undef STATE
+<span class="lineNum">     661 </span>                :            :         default:
+<span class="lineNum">     662 </span>                :<span class="lineNoCov">          0 :             OVS_NOT_REACHED();</span>
+<span class="lineNum">     663 </span>                :            :         }
+<span class="lineNum">     664 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 12220 times"> + </span>]:<span class="lineCov">      12220 :     } while (rc-&gt;state != old_state);</span>
+<span class="lineNum">     665 </span>                :<span class="lineCov">      12220 :     ovs_mutex_unlock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     666 </span>                :<span class="lineCov">      12220 : }</span>
+<span class="lineNum">     667 </span>                :            : 
+<span class="lineNum">     668 </span>                :            : /* Causes the next call to poll_block() to wake up when rconn_run() should be
+<a name="669"><span class="lineNum">     669 </span>                :            :  * called on 'rc'. */</a>
+<span class="lineNum">     670 </span>                :            : void
+<span class="lineNum">     671 </span>                :<span class="lineCov">      12181 : rconn_run_wait(struct rconn *rc)</span>
+<span class="lineNum">     672 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex)
+<span class="lineNum">     673 </span>                :            : {
+<span class="lineNum">     674 </span>                :            :     unsigned int timeo;
+<span class="lineNum">     675 </span>                :            :     size_t i;
+<span class="lineNum">     676 </span>                :            : 
+<span class="lineNum">     677 </span>                :<span class="lineCov">      12181 :     ovs_mutex_lock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     678 </span>        [<span class="branchCov" title="Branch 0 was taken 12181 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      12181 :     if (rc-&gt;vconn) {</span>
+<span class="lineNum">     679 </span>                :<span class="lineCov">      12181 :         vconn_run_wait(rc-&gt;vconn);</span>
+<span class="lineNum">     680 </span>[<span class="branchCov" title="Branch 0 was taken 12181 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 3 was taken 1822 times"> + </span><span class="branchCov" title="Branch 4 was taken 10359 times"> + </span>]:<span class="lineCov">      12181 :         if ((rc-&gt;state &amp; (S_ACTIVE | S_IDLE)) &amp;&amp; !list_is_empty(&amp;rc-&gt;txq)) {</span>
+<span class="lineNum">     681 </span>                :<span class="lineCov">       1822 :             vconn_wait(rc-&gt;vconn, WAIT_SEND);</span>
+<span class="lineNum">     682 </span>                :            :         }
+<span class="lineNum">     683 </span>                :            :     }
+<span class="lineNum">     684 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 12181 times"> + </span>]:<span class="lineCov">      12181 :     for (i = 0; i &lt; rc-&gt;n_monitors; i++) {</span>
+<span class="lineNum">     685 </span>                :<span class="lineNoCov">          0 :         vconn_run_wait(rc-&gt;monitors[i]);</span>
+<span class="lineNum">     686 </span>                :<span class="lineNoCov">          0 :         vconn_recv_wait(rc-&gt;monitors[i]);</span>
+<span class="lineNum">     687 </span>                :            :     }
+<span class="lineNum">     688 </span>                :            : 
+<span class="lineNum">     689 </span>                :<span class="lineCov">      12181 :     timeo = timeout(rc);</span>
+<span class="lineNum">     690 </span>        [<span class="branchCov" title="Branch 0 was taken 12181 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      12181 :     if (timeo != UINT_MAX) {</span>
+<span class="lineNum">     691 </span>                :<span class="lineCov">      12181 :         long long int expires = sat_add(rc-&gt;state_entered, timeo);</span>
+<span class="lineNum">     692 </span>                :<span class="lineCov">      12181 :         poll_timer_wait_until(expires * 1000);</span>
+<span class="lineNum">     693 </span>                :            :     }
+<span class="lineNum">     694 </span>                :<span class="lineCov">      12181 :     ovs_mutex_unlock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     695 </span>                :<span class="lineCov">      12181 : }</span>
+<span class="lineNum">     696 </span>                :            : 
+<span class="lineNum">     697 </span>                :            : /* Attempts to receive a packet from 'rc'.  If successful, returns the packet;
+<span class="lineNum">     698 </span>                :            :  * otherwise, returns a null pointer.  The caller is responsible for freeing
+<a name="699"><span class="lineNum">     699 </span>                :            :  * the packet (with ofpbuf_delete()). */</a>
+<span class="lineNum">     700 </span>                :            : struct ofpbuf *
+<span class="lineNum">     701 </span>                :<span class="lineCov">      32561 : rconn_recv(struct rconn *rc)</span>
+<span class="lineNum">     702 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex)
+<span class="lineNum">     703 </span>                :            : {
+<span class="lineNum">     704 </span>                :<span class="lineCov">      32561 :     struct ofpbuf *buffer = NULL;</span>
+<span class="lineNum">     705 </span>                :            : 
+<span class="lineNum">     706 </span>                :<span class="lineCov">      32561 :     ovs_mutex_lock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     707 </span>        [<span class="branchCov" title="Branch 0 was taken 32561 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      32561 :     if (rc-&gt;state &amp; (S_ACTIVE | S_IDLE)) {</span>
+<span class="lineNum">     708 </span>                :<span class="lineCov">      32561 :         int error = vconn_recv(rc-&gt;vconn, &amp;buffer);</span>
+<span class="lineNum">     709 </span>        [<span class="branchCov" title="Branch 0 was taken 20443 times"> + </span><span class="branchCov" title="Branch 1 was taken 12118 times"> + </span>]:<span class="lineCov">      32561 :         if (!error) {</span>
+<span class="lineNum">     710 </span>                :<span class="lineCov">      20443 :             copy_to_monitor(rc, buffer);</span>
+<span class="lineNum">     711 </span>[<span class="branchCov" title="Branch 0 was taken 2089 times"> + </span><span class="branchCov" title="Branch 1 was taken 18354 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 284 times"> + </span><span class="branchCov" title="Branch 4 was taken 1805 times"> + </span>]:<span class="lineCov">      20443 :             if (rc-&gt;probably_admitted || is_admitted_msg(buffer)</span>
+<span class="lineNum">     712 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 284 times"> + </span>]:<span class="lineCov">        284 :                 || time_now() - rc-&gt;last_connected &gt;= 30) {</span>
+<span class="lineNum">     713 </span>                :<span class="lineCov">      20159 :                 rc-&gt;probably_admitted = true;</span>
+<span class="lineNum">     714 </span>                :<span class="lineCov">      20159 :                 rc-&gt;last_admitted = time_now();</span>
+<span class="lineNum">     715 </span>                :            :             }
+<span class="lineNum">     716 </span>                :<span class="lineCov">      20443 :             rc-&gt;last_activity = time_now();</span>
+<span class="lineNum">     717 </span>                :<span class="lineCov">      20443 :             rc-&gt;packets_received++;</span>
+<span class="lineNum">     718 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 20443 times"> + </span>]:<span class="lineCov">      20443 :             if (rc-&gt;state == S_IDLE) {</span>
+<span class="lineNum">     719 </span>                :<span class="lineNoCov">          0 :                 state_transition(rc, S_ACTIVE);</span>
+<span class="lineNum">     720 </span>                :            :             }
+<span class="lineNum">     721 </span>        [<span class="branchCov" title="Branch 0 was taken 1899 times"> + </span><span class="branchCov" title="Branch 1 was taken 10219 times"> + </span>]:<span class="lineCov">      12118 :         } else if (error != EAGAIN) {</span>
+<span class="lineNum">     722 </span>                :<span class="lineCov">       1899 :             report_error(rc, error);</span>
+<span class="lineNum">     723 </span>                :<span class="lineCov">       1899 :             disconnect(rc, error);</span>
+<span class="lineNum">     724 </span>                :            :         }
+<span class="lineNum">     725 </span>                :            :     }
+<span class="lineNum">     726 </span>                :<span class="lineCov">      32561 :     ovs_mutex_unlock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     727 </span>                :            : 
+<span class="lineNum">     728 </span>                :<span class="lineCov">      32561 :     return buffer;</span>
+<span class="lineNum">     729 </span>                :            : }
+<span class="lineNum">     730 </span>                :            : 
+<span class="lineNum">     731 </span>                :            : /* Causes the next call to poll_block() to wake up when a packet may be ready
+<a name="732"><span class="lineNum">     732 </span>                :            :  * to be received by vconn_recv() on 'rc'.  */</a>
+<span class="lineNum">     733 </span>                :            : void
+<span class="lineNum">     734 </span>                :<span class="lineCov">      12181 : rconn_recv_wait(struct rconn *rc)</span>
+<span class="lineNum">     735 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex)
+<span class="lineNum">     736 </span>                :            : {
+<span class="lineNum">     737 </span>                :<span class="lineCov">      12181 :     ovs_mutex_lock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     738 </span>        [<span class="branchCov" title="Branch 0 was taken 12181 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      12181 :     if (rc-&gt;vconn) {</span>
+<span class="lineNum">     739 </span>                :<span class="lineCov">      12181 :         vconn_wait(rc-&gt;vconn, WAIT_RECV);</span>
+<span class="lineNum">     740 </span>                :            :     }
+<span class="lineNum">     741 </span>                :<span class="lineCov">      12181 :     ovs_mutex_unlock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     742 </span>                :<span class="lineCov">      12181 : }</span>
+<a name="743"><span class="lineNum">     743 </span>                :            : </a>
+<span class="lineNum">     744 </span>                :            : static int
+<span class="lineNum">     745 </span>                :<span class="lineCov">      13481 : rconn_send__(struct rconn *rc, struct ofpbuf *b,</span>
+<span class="lineNum">     746 </span>                :            :            struct rconn_packet_counter *counter)
+<span class="lineNum">     747 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">     748 </span>                :            : {
+<span class="lineNum">     749 </span>        [<span class="branchCov" title="Branch 1 was taken 13481 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">      13481 :     if (rconn_is_connected(rc)) {</span>
+<span class="lineNum">     750 </span>                :<span class="lineCov">      13481 :         COVERAGE_INC(rconn_queued);</span>
+<span class="lineNum">     751 </span>                :<span class="lineCov">      13481 :         copy_to_monitor(rc, b);</span>
+<span class="lineNum">     752 </span>                :            : 
+<span class="lineNum">     753 </span>        [<span class="branchCov" title="Branch 0 was taken 13456 times"> + </span><span class="branchCov" title="Branch 1 was taken 25 times"> + </span>]:<span class="lineCov">      13481 :         if (counter) {</span>
+<span class="lineNum">     754 </span>                :<span class="lineCov">      13456 :             rconn_packet_counter_inc(counter, ofpbuf_size(b));</span>
+<span class="lineNum">     755 </span>                :            :         }
+<span class="lineNum">     756 </span>                :            : 
+<span class="lineNum">     757 </span>                :            :         /* Reuse 'frame' as a private pointer while 'b' is in txq. */
+<span class="lineNum">     758 </span>                :<span class="lineCov">      13481 :         ofpbuf_set_frame(b, counter);</span>
+<span class="lineNum">     759 </span>                :            : 
+<span class="lineNum">     760 </span>                :<span class="lineCov">      13481 :         list_push_back(&amp;rc-&gt;txq, &amp;b-&gt;list_node);</span>
+<span class="lineNum">     761 </span>                :            : 
+<span class="lineNum">     762 </span>                :            :         /* If the queue was empty before we added 'b', try to send some
+<span class="lineNum">     763 </span>                :            :          * packets.  (But if the queue had packets in it, it's because the
+<span class="lineNum">     764 </span>                :            :          * vconn is backlogged and there's no point in stuffing more into it
+<span class="lineNum">     765 </span>                :            :          * now.  We'll get back to that in rconn_run().) */
+<span class="lineNum">     766 </span>        [<span class="branchCov" title="Branch 0 was taken 11138 times"> + </span><span class="branchCov" title="Branch 1 was taken 2343 times"> + </span>]:<span class="lineCov">      13481 :         if (rc-&gt;txq.next == &amp;b-&gt;list_node) {</span>
+<span class="lineNum">     767 </span>                :<span class="lineCov">      11138 :             try_send(rc);</span>
+<span class="lineNum">     768 </span>                :            :         }
+<span class="lineNum">     769 </span>                :<span class="lineCov">      13481 :         return 0;</span>
+<span class="lineNum">     770 </span>                :            :     } else {
+<span class="lineNum">     771 </span>                :<span class="lineNoCov">          0 :         ofpbuf_delete(b);</span>
+<span class="lineNum">     772 </span>                :<span class="lineCov">      13481 :         return ENOTCONN;</span>
+<span class="lineNum">     773 </span>                :            :     }
+<span class="lineNum">     774 </span>                :            : }
+<span class="lineNum">     775 </span>                :            : 
+<span class="lineNum">     776 </span>                :            : /* Sends 'b' on 'rc'.  Returns 0 if successful, or ENOTCONN if 'rc' is not
+<span class="lineNum">     777 </span>                :            :  * currently connected.  Takes ownership of 'b'.
+<span class="lineNum">     778 </span>                :            :  *
+<span class="lineNum">     779 </span>                :            :  * If 'counter' is non-null, then 'counter' will be incremented while the
+<span class="lineNum">     780 </span>                :            :  * packet is in flight, then decremented when it has been sent (or discarded
+<span class="lineNum">     781 </span>                :            :  * due to disconnection).  Because 'b' may be sent (or discarded) before this
+<span class="lineNum">     782 </span>                :            :  * function returns, the caller may not be able to observe any change in
+<span class="lineNum">     783 </span>                :            :  * 'counter'.
+<span class="lineNum">     784 </span>                :            :  *
+<span class="lineNum">     785 </span>                :            :  * There is no rconn_send_wait() function: an rconn has a send queue that it
+<span class="lineNum">     786 </span>                :            :  * takes care of sending if you call rconn_run(), which will have the side
+<a name="787"><span class="lineNum">     787 </span>                :            :  * effect of waking up poll_block(). */</a>
+<span class="lineNum">     788 </span>                :            : int
+<span class="lineNum">     789 </span>                :<span class="lineCov">      13211 : rconn_send(struct rconn *rc, struct ofpbuf *b,</span>
+<span class="lineNum">     790 </span>                :            :            struct rconn_packet_counter *counter)
+<span class="lineNum">     791 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex)
+<span class="lineNum">     792 </span>                :            : {
+<span class="lineNum">     793 </span>                :            :     int error;
+<span class="lineNum">     794 </span>                :            : 
+<span class="lineNum">     795 </span>                :<span class="lineCov">      13211 :     ovs_mutex_lock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     796 </span>                :<span class="lineCov">      13211 :     error = rconn_send__(rc, b, counter);</span>
+<span class="lineNum">     797 </span>                :<span class="lineCov">      13211 :     ovs_mutex_unlock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     798 </span>                :            : 
+<span class="lineNum">     799 </span>                :<span class="lineCov">      13211 :     return error;</span>
+<span class="lineNum">     800 </span>                :            : }
+<span class="lineNum">     801 </span>                :            : 
+<span class="lineNum">     802 </span>                :            : /* Sends 'b' on 'rc'.  Increments 'counter' while the packet is in flight; it
+<span class="lineNum">     803 </span>                :            :  * will be decremented when it has been sent (or discarded due to
+<span class="lineNum">     804 </span>                :            :  * disconnection).  Returns 0 if successful, EAGAIN if 'counter-&gt;n' is already
+<span class="lineNum">     805 </span>                :            :  * at least as large as 'queue_limit', or ENOTCONN if 'rc' is not currently
+<span class="lineNum">     806 </span>                :            :  * connected.  Regardless of return value, 'b' is destroyed.
+<span class="lineNum">     807 </span>                :            :  *
+<span class="lineNum">     808 </span>                :            :  * Because 'b' may be sent (or discarded) before this function returns, the
+<span class="lineNum">     809 </span>                :            :  * caller may not be able to observe any change in 'counter'.
+<span class="lineNum">     810 </span>                :            :  *
+<span class="lineNum">     811 </span>                :            :  * There is no rconn_send_wait() function: an rconn has a send queue that it
+<span class="lineNum">     812 </span>                :            :  * takes care of sending if you call rconn_run(), which will have the side
+<a name="813"><span class="lineNum">     813 </span>                :            :  * effect of waking up poll_block(). */</a>
+<span class="lineNum">     814 </span>                :            : int
+<span class="lineNum">     815 </span>                :<span class="lineCov">        270 : rconn_send_with_limit(struct rconn *rc, struct ofpbuf *b,</span>
+<span class="lineNum">     816 </span>                :            :                       struct rconn_packet_counter *counter, int queue_limit)
+<span class="lineNum">     817 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex)
+<span class="lineNum">     818 </span>                :            : {
+<span class="lineNum">     819 </span>                :            :     int error;
+<span class="lineNum">     820 </span>                :            : 
+<span class="lineNum">     821 </span>                :<span class="lineCov">        270 :     ovs_mutex_lock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     822 </span>        [<span class="branchCov" title="Branch 1 was taken 270 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        270 :     if (rconn_packet_counter_n_packets(counter) &lt; queue_limit) {</span>
+<span class="lineNum">     823 </span>                :<span class="lineCov">        270 :         error = rconn_send__(rc, b, counter);</span>
+<span class="lineNum">     824 </span>                :            :     } else {
+<span class="lineNum">     825 </span>                :<span class="lineNoCov">          0 :         COVERAGE_INC(rconn_overflow);</span>
+<span class="lineNum">     826 </span>                :<span class="lineNoCov">          0 :         ofpbuf_delete(b);</span>
+<span class="lineNum">     827 </span>                :<span class="lineNoCov">          0 :         error = EAGAIN;</span>
+<span class="lineNum">     828 </span>                :            :     }
+<span class="lineNum">     829 </span>                :<span class="lineCov">        270 :     ovs_mutex_unlock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     830 </span>                :            : 
+<span class="lineNum">     831 </span>                :<span class="lineCov">        270 :     return error;</span>
+<span class="lineNum">     832 </span>                :            : }
+<span class="lineNum">     833 </span>                :            : 
+<span class="lineNum">     834 </span>                :            : /* Returns the total number of packets successfully sent on the underlying
+<span class="lineNum">     835 </span>                :            :  * vconn.  A packet is not counted as sent while it is still queued in the
+<a name="836"><span class="lineNum">     836 </span>                :            :  * rconn, only when it has been successfuly passed to the vconn.  */</a>
+<span class="lineNum">     837 </span>                :            : unsigned int
+<span class="lineNum">     838 </span>                :<span class="lineNoCov">          0 : rconn_packets_sent(const struct rconn *rc)</span>
+<span class="lineNum">     839 </span>                :            : {
+<span class="lineNum">     840 </span>                :<span class="lineNoCov">          0 :     return rc-&gt;packets_sent;</span>
+<span class="lineNum">     841 </span>                :            : }
+<span class="lineNum">     842 </span>                :            : 
+<span class="lineNum">     843 </span>                :            : /* Adds 'vconn' to 'rc' as a monitoring connection, to which all messages sent
+<a name="844"><span class="lineNum">     844 </span>                :            :  * and received on 'rconn' will be copied.  'rc' takes ownership of 'vconn'. */</a>
+<span class="lineNum">     845 </span>                :            : void
+<span class="lineNum">     846 </span>                :<span class="lineNoCov">          0 : rconn_add_monitor(struct rconn *rc, struct vconn *vconn)</span>
+<span class="lineNum">     847 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex)
+<span class="lineNum">     848 </span>                :            : {
+<span class="lineNum">     849 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     850 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (rc-&gt;n_monitors &lt; ARRAY_SIZE(rc-&gt;monitors)) {</span>
+<span class="lineNum">     851 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_INFO(&quot;new monitor connection from %s&quot;, vconn_get_name(vconn));</span>
+<span class="lineNum">     852 </span>                :<span class="lineNoCov">          0 :         rc-&gt;monitors[rc-&gt;n_monitors++] = vconn;</span>
+<span class="lineNum">     853 </span>                :            :     } else {
+<span class="lineNum">     854 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_DBG(&quot;too many monitor connections, discarding %s&quot;,</span>
+<span class="lineNum">     855 </span>                :            :                  vconn_get_name(vconn));
+<span class="lineNum">     856 </span>                :<span class="lineNoCov">          0 :         vconn_close(vconn);</span>
+<span class="lineNum">     857 </span>                :            :     }
+<span class="lineNum">     858 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     859 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     860 </span>                :            : 
+<span class="lineNum">     861 </span>                :            : /* Returns 'rc''s name.  This is a name for human consumption, appropriate for
+<span class="lineNum">     862 </span>                :            :  * use in log messages.  It is not necessarily a name that may be passed
+<a name="863"><span class="lineNum">     863 </span>                :            :  * directly to, e.g., vconn_open(). */</a>
+<span class="lineNum">     864 </span>                :            : const char *
+<span class="lineNum">     865 </span>                :<span class="lineCov">        397 : rconn_get_name(const struct rconn *rc)</span>
+<span class="lineNum">     866 </span>                :            : {
+<span class="lineNum">     867 </span>                :<span class="lineCov">        397 :     return rc-&gt;name;</span>
+<span class="lineNum">     868 </span>                :            : }
+<span class="lineNum">     869 </span>                :            : 
+<a name="870"><span class="lineNum">     870 </span>                :            : /* Sets 'rc''s name to 'new_name'. */</a>
+<span class="lineNum">     871 </span>                :            : void
+<span class="lineNum">     872 </span>                :<span class="lineNoCov">          0 : rconn_set_name(struct rconn *rc, const char *new_name)</span>
+<span class="lineNum">     873 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex)
+<span class="lineNum">     874 </span>                :            : {
+<span class="lineNum">     875 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     876 </span>                :<span class="lineNoCov">          0 :     free(rc-&gt;name);</span>
+<span class="lineNum">     877 </span>                :<span class="lineNoCov">          0 :     rc-&gt;name = xstrdup(new_name);</span>
+<span class="lineNum">     878 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">     879 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     880 </span>                :            : 
+<span class="lineNum">     881 </span>                :            : /* Returns 'rc''s target.  This is intended to be a string that may be passed
+<a name="882"><span class="lineNum">     882 </span>                :            :  * directly to, e.g., vconn_open(). */</a>
+<span class="lineNum">     883 </span>                :            : const char *
+<span class="lineNum">     884 </span>                :<span class="lineNoCov">          0 : rconn_get_target(const struct rconn *rc)</span>
+<span class="lineNum">     885 </span>                :            : {
+<span class="lineNum">     886 </span>                :<span class="lineNoCov">          0 :     return rc-&gt;target;</span>
+<span class="lineNum">     887 </span>                :            : }
+<span class="lineNum">     888 </span>                :            : 
+<span class="lineNum">     889 </span>                :            : /* Returns true if 'rconn' is connected or in the process of reconnecting,
+<a name="890"><span class="lineNum">     890 </span>                :            :  * false if 'rconn' is disconnected and will not reconnect on its own. */</a>
+<span class="lineNum">     891 </span>                :            : bool
+<span class="lineNum">     892 </span>                :<span class="lineCov">      12220 : rconn_is_alive(const struct rconn *rconn)</span>
+<span class="lineNum">     893 </span>                :            : {
+<span class="lineNum">     894 </span>[<span class="branchCov" title="Branch 0 was taken 12220 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 10321 times"> + </span><span class="branchCov" title="Branch 3 was taken 1899 times"> + </span>]:<span class="lineCov">      12220 :     return rconn-&gt;state != S_VOID &amp;&amp; rconn-&gt;state != S_DISCONNECTED;</span>
+<span class="lineNum">     895 </span>                :            : }
+<span class="lineNum">     896 </span>                :            : 
+<a name="897"><span class="lineNum">     897 </span>                :            : /* Returns true if 'rconn' is connected, false otherwise. */</a>
+<span class="lineNum">     898 </span>                :            : bool
+<span class="lineNum">     899 </span>                :<span class="lineCov">      28841 : rconn_is_connected(const struct rconn *rconn)</span>
+<span class="lineNum">     900 </span>                :            : {
+<span class="lineNum">     901 </span>                :<span class="lineCov">      28841 :     return is_connected_state(rconn-&gt;state);</span>
+<span class="lineNum">     902 </span>                :            : }
+<a name="903"><span class="lineNum">     903 </span>                :            : </a>
+<span class="lineNum">     904 </span>                :            : static bool
+<span class="lineNum">     905 </span>                :<span class="lineNoCov">          0 : rconn_is_admitted__(const struct rconn *rconn)</span>
+<span class="lineNum">     906 </span>                :            :     OVS_REQUIRES(rconn-&gt;mutex)
+<span class="lineNum">     907 </span>                :            : {
+<span class="lineNum">     908 </span>                :<span class="lineNoCov">          0 :     return (rconn_is_connected(rconn)</span>
+<span class="lineNum">     909 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; rconn-&gt;last_admitted &gt;= rconn-&gt;last_connected);</span>
+<span class="lineNum">     910 </span>                :            : }
+<span class="lineNum">     911 </span>                :            : 
+<span class="lineNum">     912 </span>                :            : /* Returns true if 'rconn' is connected and thought to have been accepted by
+<a name="913"><span class="lineNum">     913 </span>                :            :  * the peer's admission-control policy. */</a>
+<span class="lineNum">     914 </span>                :            : bool
+<span class="lineNum">     915 </span>                :<span class="lineNoCov">          0 : rconn_is_admitted(const struct rconn *rconn)</span>
+<span class="lineNum">     916 </span>                :            :     OVS_EXCLUDED(rconn-&gt;mutex)
+<span class="lineNum">     917 </span>                :            : {
+<span class="lineNum">     918 </span>                :            :     bool admitted;
+<span class="lineNum">     919 </span>                :            : 
+<span class="lineNum">     920 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;rconn-&gt;mutex);</span>
+<span class="lineNum">     921 </span>                :<span class="lineNoCov">          0 :     admitted = rconn_is_admitted__(rconn);</span>
+<span class="lineNum">     922 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rconn-&gt;mutex);</span>
+<span class="lineNum">     923 </span>                :            : 
+<span class="lineNum">     924 </span>                :<span class="lineNoCov">          0 :     return admitted;</span>
+<span class="lineNum">     925 </span>                :            : }
+<span class="lineNum">     926 </span>                :            : 
+<span class="lineNum">     927 </span>                :            : /* Returns 0 if 'rconn' is currently connected and considered to have been
+<span class="lineNum">     928 </span>                :            :  * accepted by the peer's admission-control policy, otherwise the number of
+<a name="929"><span class="lineNum">     929 </span>                :            :  * seconds since 'rconn' was last in such a state. */</a>
+<span class="lineNum">     930 </span>                :            : int
+<span class="lineNum">     931 </span>                :<span class="lineNoCov">          0 : rconn_failure_duration(const struct rconn *rconn)</span>
+<span class="lineNum">     932 </span>                :            :     OVS_EXCLUDED(rconn-&gt;mutex)
+<span class="lineNum">     933 </span>                :            : {
+<span class="lineNum">     934 </span>                :            :     int duration;
+<span class="lineNum">     935 </span>                :            : 
+<span class="lineNum">     936 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;rconn-&gt;mutex);</span>
+<span class="lineNum">     937 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     duration = (rconn_is_admitted__(rconn)</span>
+<span class="lineNum">     938 </span>                :            :                 ? 0
+<span class="lineNum">     939 </span>                :<span class="lineNoCov">          0 :                 : time_now() - rconn-&gt;last_admitted);</span>
+<span class="lineNum">     940 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rconn-&gt;mutex);</span>
+<span class="lineNum">     941 </span>                :            : 
+<span class="lineNum">     942 </span>                :<span class="lineNoCov">          0 :     return duration;</span>
+<span class="lineNum">     943 </span>                :            : }
+<a name="944"><span class="lineNum">     944 </span>                :            : </a>
+<span class="lineNum">     945 </span>                :            : static int
+<span class="lineNum">     946 </span>                :<span class="lineCov">        738 : rconn_get_version__(const struct rconn *rconn)</span>
+<span class="lineNum">     947 </span>                :            :     OVS_REQUIRES(rconn-&gt;mutex)
+<span class="lineNum">     948 </span>                :            : {
+<span class="lineNum">     949 </span>        [<span class="branchCov" title="Branch 0 was taken 738 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        738 :     return rconn-&gt;vconn ? vconn_get_version(rconn-&gt;vconn) : -1;</span>
+<span class="lineNum">     950 </span>                :            : }
+<span class="lineNum">     951 </span>                :            : 
+<span class="lineNum">     952 </span>                :            : /* Returns the OpenFlow version negotiated with the peer, or -1 if there is
+<a name="953"><span class="lineNum">     953 </span>                :            :  * currently no connection or if version negotiation is not yet complete. */</a>
+<span class="lineNum">     954 </span>                :            : int
+<span class="lineNum">     955 </span>                :<span class="lineCov">        738 : rconn_get_version(const struct rconn *rconn)</span>
+<span class="lineNum">     956 </span>                :            :     OVS_EXCLUDED(rconn-&gt;mutex)
+<span class="lineNum">     957 </span>                :            : {
+<span class="lineNum">     958 </span>                :            :     int version;
+<span class="lineNum">     959 </span>                :            : 
+<span class="lineNum">     960 </span>                :<span class="lineCov">        738 :     ovs_mutex_lock(&amp;rconn-&gt;mutex);</span>
+<span class="lineNum">     961 </span>                :<span class="lineCov">        738 :     version = rconn_get_version__(rconn);</span>
+<span class="lineNum">     962 </span>                :<span class="lineCov">        738 :     ovs_mutex_unlock(&amp;rconn-&gt;mutex);</span>
+<span class="lineNum">     963 </span>                :            : 
+<span class="lineNum">     964 </span>                :<span class="lineCov">        738 :     return version;</span>
+<span class="lineNum">     965 </span>                :            : }
+<span class="lineNum">     966 </span>                :            : 
+<span class="lineNum">     967 </span>                :            : /* Returns the total number of packets successfully received by the underlying
+<a name="968"><span class="lineNum">     968 </span>                :            :  * vconn.  */</a>
+<span class="lineNum">     969 </span>                :            : unsigned int
+<span class="lineNum">     970 </span>                :<span class="lineNoCov">          0 : rconn_packets_received(const struct rconn *rc)</span>
+<span class="lineNum">     971 </span>                :            : {
+<span class="lineNum">     972 </span>                :<span class="lineNoCov">          0 :     return rc-&gt;packets_received;</span>
+<span class="lineNum">     973 </span>                :            : }
+<span class="lineNum">     974 </span>                :            : 
+<span class="lineNum">     975 </span>                :            : /* Returns a string representing the internal state of 'rc'.  The caller must
+<a name="976"><span class="lineNum">     976 </span>                :            :  * not modify or free the string. */</a>
+<span class="lineNum">     977 </span>                :            : const char *
+<span class="lineNum">     978 </span>                :<span class="lineNoCov">          0 : rconn_get_state(const struct rconn *rc)</span>
+<span class="lineNum">     979 </span>                :            : {
+<span class="lineNum">     980 </span>                :<span class="lineNoCov">          0 :     return state_name(rc-&gt;state);</span>
+<span class="lineNum">     981 </span>                :            : }
+<span class="lineNum">     982 </span>                :            : 
+<span class="lineNum">     983 </span>                :            : /* Returns the time at which the last successful connection was made by
+<a name="984"><span class="lineNum">     984 </span>                :            :  * 'rc'. Returns TIME_MIN if never connected. */</a>
+<span class="lineNum">     985 </span>                :            : time_t
+<span class="lineNum">     986 </span>                :<span class="lineNoCov">          0 : rconn_get_last_connection(const struct rconn *rc)</span>
+<span class="lineNum">     987 </span>                :            : {
+<span class="lineNum">     988 </span>                :<span class="lineNoCov">          0 :     return rc-&gt;last_connected;</span>
+<span class="lineNum">     989 </span>                :            : }
+<span class="lineNum">     990 </span>                :            : 
+<span class="lineNum">     991 </span>                :            : /* Returns the time at which 'rc' was last disconnected. Returns TIME_MIN
+<a name="992"><span class="lineNum">     992 </span>                :            :  * if never disconnected. */</a>
+<span class="lineNum">     993 </span>                :            : time_t
+<span class="lineNum">     994 </span>                :<span class="lineNoCov">          0 : rconn_get_last_disconnect(const struct rconn *rc)</span>
+<span class="lineNum">     995 </span>                :            : {
+<span class="lineNum">     996 </span>                :<span class="lineNoCov">          0 :     return rc-&gt;last_disconnected;</span>
+<span class="lineNum">     997 </span>                :            : }
+<span class="lineNum">     998 </span>                :            : 
+<span class="lineNum">     999 </span>                :            : /* Returns 'rc''s current connection sequence number, a number that changes
+<a name="1000"><span class="lineNum">    1000 </span>                :            :  * every time that 'rconn' connects or disconnects. */</a>
+<span class="lineNum">    1001 </span>                :            : unsigned int
+<span class="lineNum">    1002 </span>                :<span class="lineNoCov">          0 : rconn_get_connection_seqno(const struct rconn *rc)</span>
+<span class="lineNum">    1003 </span>                :            : {
+<span class="lineNum">    1004 </span>                :<span class="lineNoCov">          0 :     return rc-&gt;seqno;</span>
+<span class="lineNum">    1005 </span>                :            : }
+<span class="lineNum">    1006 </span>                :            : 
+<span class="lineNum">    1007 </span>                :            : /* Returns a value that explains why 'rc' last disconnected:
+<span class="lineNum">    1008 </span>                :            :  *
+<span class="lineNum">    1009 </span>                :            :  *   - 0 means that the last disconnection was caused by a call to
+<span class="lineNum">    1010 </span>                :            :  *     rconn_disconnect(), or that 'rc' is new and has not yet completed its
+<span class="lineNum">    1011 </span>                :            :  *     initial connection or connection attempt.
+<span class="lineNum">    1012 </span>                :            :  *
+<span class="lineNum">    1013 </span>                :            :  *   - EOF means that the connection was closed in the normal way by the peer.
+<span class="lineNum">    1014 </span>                :            :  *
+<span class="lineNum">    1015 </span>                :            :  *   - A positive integer is an errno value that represents the error.
+<a name="1016"><span class="lineNum">    1016 </span>                :            :  */</a>
+<span class="lineNum">    1017 </span>                :            : int
+<span class="lineNum">    1018 </span>                :<span class="lineNoCov">          0 : rconn_get_last_error(const struct rconn *rc)</span>
+<span class="lineNum">    1019 </span>                :            : {
+<span class="lineNum">    1020 </span>                :<span class="lineNoCov">          0 :     return rc-&gt;last_error;</span>
+<span class="lineNum">    1021 </span>                :            : }
+<span class="lineNum">    1022 </span>                :            : 
+<a name="1023"><span class="lineNum">    1023 </span>                :            : /* Returns the number of messages queued for transmission on 'rc'. */</a>
+<span class="lineNum">    1024 </span>                :            : unsigned int
+<span class="lineNum">    1025 </span>                :<span class="lineNoCov">          0 : rconn_count_txqlen(const struct rconn *rc)</span>
+<span class="lineNum">    1026 </span>                :            :     OVS_EXCLUDED(rc-&gt;mutex)
+<span class="lineNum">    1027 </span>                :            : {
+<span class="lineNum">    1028 </span>                :            :     unsigned int len;
+<span class="lineNum">    1029 </span>                :            : 
+<span class="lineNum">    1030 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">    1031 </span>                :<span class="lineNoCov">          0 :     len = list_size(&amp;rc-&gt;txq);</span>
+<span class="lineNum">    1032 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rc-&gt;mutex);</span>
+<span class="lineNum">    1033 </span>                :            : 
+<span class="lineNum">    1034 </span>                :<span class="lineNoCov">          0 :     return len;</span>
+<span class="lineNum">    1035 </span>                :            : }
+<a name="1036"><span class="lineNum">    1036 </span>                :            : </a>
+<span class="lineNum">    1037 </span>                :            : struct rconn_packet_counter *
+<span class="lineNum">    1038 </span>                :<span class="lineCov">      11397 : rconn_packet_counter_create(void)</span>
+<span class="lineNum">    1039 </span>                :            : {
+<span class="lineNum">    1040 </span>                :<span class="lineCov">      11397 :     struct rconn_packet_counter *c = xzalloc(sizeof *c);</span>
+<span class="lineNum">    1041 </span>                :<span class="lineCov">      11397 :     ovs_mutex_init(&amp;c-&gt;mutex);</span>
+<span class="lineNum">    1042 </span>                :<span class="lineCov">      11397 :     ovs_mutex_lock(&amp;c-&gt;mutex);</span>
+<span class="lineNum">    1043 </span>                :<span class="lineCov">      11397 :     c-&gt;ref_cnt = 1;</span>
+<span class="lineNum">    1044 </span>                :<span class="lineCov">      11397 :     ovs_mutex_unlock(&amp;c-&gt;mutex);</span>
+<span class="lineNum">    1045 </span>                :<span class="lineCov">      11397 :     return c;</span>
+<span class="lineNum">    1046 </span>                :            : }
+<a name="1047"><span class="lineNum">    1047 </span>                :            : </a>
+<span class="lineNum">    1048 </span>                :            : void
+<span class="lineNum">    1049 </span>                :<span class="lineCov">      17094 : rconn_packet_counter_destroy(struct rconn_packet_counter *c)</span>
+<span class="lineNum">    1050 </span>                :            : {
+<span class="lineNum">    1051 </span>        [<span class="branchCov" title="Branch 0 was taken 11394 times"> + </span><span class="branchCov" title="Branch 1 was taken 5700 times"> + </span>]:<span class="lineCov">      17094 :     if (c) {</span>
+<span class="lineNum">    1052 </span>                :            :         bool dead;
+<span class="lineNum">    1053 </span>                :            : 
+<span class="lineNum">    1054 </span>                :<span class="lineCov">      11394 :         ovs_mutex_lock(&amp;c-&gt;mutex);</span>
+<span class="lineNum">    1055 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 11394 times"> + </span>]:<span class="lineCov">      11394 :         ovs_assert(c-&gt;ref_cnt &gt; 0);</span>
+<span class="lineNum">    1056 </span>[<span class="branchCov" title="Branch 0 was taken 11394 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 11394 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">      11394 :         dead = !--c-&gt;ref_cnt &amp;&amp; !c-&gt;n_packets;</span>
+<span class="lineNum">    1057 </span>                :<span class="lineCov">      11394 :         ovs_mutex_unlock(&amp;c-&gt;mutex);</span>
+<span class="lineNum">    1058 </span>                :            : 
+<span class="lineNum">    1059 </span>        [<span class="branchCov" title="Branch 0 was taken 11394 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      11394 :         if (dead) {</span>
+<span class="lineNum">    1060 </span>                :<span class="lineCov">      11394 :             ovs_mutex_destroy(&amp;c-&gt;mutex);</span>
+<span class="lineNum">    1061 </span>                :<span class="lineCov">      11394 :             free(c);</span>
+<span class="lineNum">    1062 </span>                :            :         }
+<span class="lineNum">    1063 </span>                :            :     }
+<span class="lineNum">    1064 </span>                :<span class="lineCov">      17094 : }</span>
+<a name="1065"><span class="lineNum">    1065 </span>                :            : </a>
+<span class="lineNum">    1066 </span>                :            : void
+<span class="lineNum">    1067 </span>                :<span class="lineCov">      13456 : rconn_packet_counter_inc(struct rconn_packet_counter *c, unsigned int n_bytes)</span>
+<span class="lineNum">    1068 </span>                :            : {
+<span class="lineNum">    1069 </span>                :<span class="lineCov">      13456 :     ovs_mutex_lock(&amp;c-&gt;mutex);</span>
+<span class="lineNum">    1070 </span>                :<span class="lineCov">      13456 :     c-&gt;n_packets++;</span>
+<span class="lineNum">    1071 </span>                :<span class="lineCov">      13456 :     c-&gt;n_bytes += n_bytes;</span>
+<span class="lineNum">    1072 </span>                :<span class="lineCov">      13456 :     ovs_mutex_unlock(&amp;c-&gt;mutex);</span>
+<span class="lineNum">    1073 </span>                :<span class="lineCov">      13456 : }</span>
+<a name="1074"><span class="lineNum">    1074 </span>                :            : </a>
+<span class="lineNum">    1075 </span>                :            : void
+<span class="lineNum">    1076 </span>                :<span class="lineCov">      13456 : rconn_packet_counter_dec(struct rconn_packet_counter *c, unsigned int n_bytes)</span>
+<span class="lineNum">    1077 </span>                :            : {
+<span class="lineNum">    1078 </span>                :<span class="lineCov">      13456 :     bool dead = false;</span>
+<span class="lineNum">    1079 </span>                :            : 
+<span class="lineNum">    1080 </span>                :<span class="lineCov">      13456 :     ovs_mutex_lock(&amp;c-&gt;mutex);</span>
+<span class="lineNum">    1081 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 13456 times"> + </span>]:<span class="lineCov">      13456 :     ovs_assert(c-&gt;n_packets &gt; 0);</span>
+<span class="lineNum">    1082 </span>[<span class="branchCov" title="Branch 0 was taken 11113 times"> + </span><span class="branchCov" title="Branch 1 was taken 2343 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 13456 times"> + </span>]:<span class="lineCov">      13456 :     ovs_assert(c-&gt;n_packets == 1</span>
+<span class="lineNum">    1083 </span>                :            :                ? c-&gt;n_bytes == n_bytes
+<span class="lineNum">    1084 </span>                :            :                : c-&gt;n_bytes &gt; n_bytes);
+<span class="lineNum">    1085 </span>                :<span class="lineCov">      13456 :     c-&gt;n_packets--;</span>
+<span class="lineNum">    1086 </span>                :<span class="lineCov">      13456 :     c-&gt;n_bytes -= n_bytes;</span>
+<span class="lineNum">    1087 </span>[<span class="branchCov" title="Branch 0 was taken 11113 times"> + </span><span class="branchCov" title="Branch 1 was taken 2343 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 11113 times"> + </span>]:<span class="lineCov">      13456 :     dead = !c-&gt;n_packets &amp;&amp; !c-&gt;ref_cnt;</span>
+<span class="lineNum">    1088 </span>                :<span class="lineCov">      13456 :     ovs_mutex_unlock(&amp;c-&gt;mutex);</span>
+<span class="lineNum">    1089 </span>                :            : 
+<span class="lineNum">    1090 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 13456 times"> + </span>]:<span class="lineCov">      13456 :     if (dead) {</span>
+<span class="lineNum">    1091 </span>                :<span class="lineNoCov">          0 :         ovs_mutex_destroy(&amp;c-&gt;mutex);</span>
+<span class="lineNum">    1092 </span>                :<span class="lineNoCov">          0 :         free(c);</span>
+<span class="lineNum">    1093 </span>                :            :     }
+<span class="lineNum">    1094 </span>                :<span class="lineCov">      13456 : }</span>
+<a name="1095"><span class="lineNum">    1095 </span>                :            : </a>
+<span class="lineNum">    1096 </span>                :            : unsigned int
+<span class="lineNum">    1097 </span>                :<span class="lineCov">      46891 : rconn_packet_counter_n_packets(const struct rconn_packet_counter *c)</span>
+<span class="lineNum">    1098 </span>                :            : {
+<span class="lineNum">    1099 </span>                :            :     unsigned int n;
+<span class="lineNum">    1100 </span>                :            : 
+<span class="lineNum">    1101 </span>                :<span class="lineCov">      46891 :     ovs_mutex_lock(&amp;c-&gt;mutex);</span>
+<span class="lineNum">    1102 </span>                :<span class="lineCov">      46891 :     n = c-&gt;n_packets;</span>
+<span class="lineNum">    1103 </span>                :<span class="lineCov">      46891 :     ovs_mutex_unlock(&amp;c-&gt;mutex);</span>
+<span class="lineNum">    1104 </span>                :            : 
+<span class="lineNum">    1105 </span>                :<span class="lineCov">      46891 :     return n;</span>
+<span class="lineNum">    1106 </span>                :            : }
+<a name="1107"><span class="lineNum">    1107 </span>                :            : </a>
+<span class="lineNum">    1108 </span>                :            : unsigned int
+<span class="lineNum">    1109 </span>                :<span class="lineCov">       2677 : rconn_packet_counter_n_bytes(const struct rconn_packet_counter *c)</span>
+<span class="lineNum">    1110 </span>                :            : {
+<span class="lineNum">    1111 </span>                :            :     unsigned int n;
+<span class="lineNum">    1112 </span>                :            : 
+<span class="lineNum">    1113 </span>                :<span class="lineCov">       2677 :     ovs_mutex_lock(&amp;c-&gt;mutex);</span>
+<span class="lineNum">    1114 </span>                :<span class="lineCov">       2677 :     n = c-&gt;n_bytes;</span>
+<span class="lineNum">    1115 </span>                :<span class="lineCov">       2677 :     ovs_mutex_unlock(&amp;c-&gt;mutex);</span>
+<span class="lineNum">    1116 </span>                :            : 
+<span class="lineNum">    1117 </span>                :<span class="lineCov">       2677 :     return n;</span>
+<span class="lineNum">    1118 </span>                :            : }
+<span class="lineNum">    1119 </span>                :            : 
+<span class="lineNum">    1120 </span>                :            : /* Set rc-&gt;target and rc-&gt;name to 'target' and 'name', respectively.  If 'name'
+<a name="1121"><span class="lineNum">    1121 </span>                :            :  * is null, 'target' is used. */</a>
+<span class="lineNum">    1122 </span>                :            : static void
+<span class="lineNum">    1123 </span>                :<span class="lineCov">       1900 : rconn_set_target__(struct rconn *rc, const char *target, const char *name)</span>
+<span class="lineNum">    1124 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">    1125 </span>                :            : {
+<span class="lineNum">    1126 </span>                :<span class="lineCov">       1900 :     free(rc-&gt;name);</span>
+<span class="lineNum">    1127 </span>        [<span class="branchCov" title="Branch 0 was taken 1900 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       1900 :     rc-&gt;name = xstrdup(name ? name : target);</span>
+<span class="lineNum">    1128 </span>                :<span class="lineCov">       1900 :     free(rc-&gt;target);</span>
+<span class="lineNum">    1129 </span>                :<span class="lineCov">       1900 :     rc-&gt;target = xstrdup(target);</span>
+<span class="lineNum">    1130 </span>                :<span class="lineCov">       1900 : }</span>
+<span class="lineNum">    1131 </span>                :            : 
+<span class="lineNum">    1132 </span>                :            : /* Tries to send a packet from 'rc''s send buffer.  Returns 0 if successful,
+<a name="1133"><span class="lineNum">    1133 </span>                :            :  * otherwise a positive errno value. */</a>
+<span class="lineNum">    1134 </span>                :            : static int
+<span class="lineNum">    1135 </span>                :<span class="lineCov">      15303 : try_send(struct rconn *rc)</span>
+<span class="lineNum">    1136 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">    1137 </span>                :            : {
+<span class="lineNum">    1138 </span>                :<span class="lineCov">      15303 :     struct ofpbuf *msg = ofpbuf_from_list(rc-&gt;txq.next);</span>
+<span class="lineNum">    1139 </span>                :<span class="lineCov">      15303 :     unsigned int n_bytes = ofpbuf_size(msg);</span>
+<span class="lineNum">    1140 </span>                :<span class="lineCov">      15303 :     struct rconn_packet_counter *counter = msg-&gt;frame;</span>
+<span class="lineNum">    1141 </span>                :            :     int retval;
+<span class="lineNum">    1142 </span>                :            : 
+<span class="lineNum">    1143 </span>                :            :     /* Eagerly remove 'msg' from the txq.  We can't remove it from the list
+<span class="lineNum">    1144 </span>                :            :      * after sending, if sending is successful, because it is then owned by the
+<span class="lineNum">    1145 </span>                :            :      * vconn, which might have freed it already. */
+<span class="lineNum">    1146 </span>                :<span class="lineCov">      15303 :     list_remove(&amp;msg-&gt;list_node);</span>
+<span class="lineNum">    1147 </span>                :<span class="lineCov">      15303 :     ofpbuf_set_frame(msg, NULL);</span>
+<span class="lineNum">    1148 </span>                :            : 
+<span class="lineNum">    1149 </span>                :<span class="lineCov">      15303 :     retval = vconn_send(rc-&gt;vconn, msg);</span>
+<span class="lineNum">    1150 </span>        [<span class="branchCov" title="Branch 0 was taken 1822 times"> + </span><span class="branchCov" title="Branch 1 was taken 13481 times"> + </span>]:<span class="lineCov">      15303 :     if (retval) {</span>
+<span class="lineNum">    1151 </span>                :<span class="lineCov">       1822 :         ofpbuf_set_frame(msg, counter);</span>
+<span class="lineNum">    1152 </span>                :<span class="lineCov">       1822 :         list_push_front(&amp;rc-&gt;txq, &amp;msg-&gt;list_node);</span>
+<span class="lineNum">    1153 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1822 times"> + </span>]:<span class="lineCov">       1822 :         if (retval != EAGAIN) {</span>
+<span class="lineNum">    1154 </span>                :<span class="lineNoCov">          0 :             report_error(rc, retval);</span>
+<span class="lineNum">    1155 </span>                :<span class="lineNoCov">          0 :             disconnect(rc, retval);</span>
+<span class="lineNum">    1156 </span>                :            :         }
+<span class="lineNum">    1157 </span>                :<span class="lineCov">       1822 :         return retval;</span>
+<span class="lineNum">    1158 </span>                :            :     }
+<span class="lineNum">    1159 </span>                :<span class="lineCov">      13481 :     COVERAGE_INC(rconn_sent);</span>
+<span class="lineNum">    1160 </span>                :<span class="lineCov">      13481 :     rc-&gt;packets_sent++;</span>
+<span class="lineNum">    1161 </span>        [<span class="branchCov" title="Branch 0 was taken 13456 times"> + </span><span class="branchCov" title="Branch 1 was taken 25 times"> + </span>]:<span class="lineCov">      13481 :     if (counter) {</span>
+<span class="lineNum">    1162 </span>                :<span class="lineCov">      13456 :         rconn_packet_counter_dec(counter, n_bytes);</span>
+<span class="lineNum">    1163 </span>                :            :     }
+<span class="lineNum">    1164 </span>                :<span class="lineCov">      15303 :     return 0;</span>
+<span class="lineNum">    1165 </span>                :            : }
+<span class="lineNum">    1166 </span>                :            : 
+<span class="lineNum">    1167 </span>                :            : /* Reports that 'error' caused 'rc' to disconnect.  'error' may be a positive
+<span class="lineNum">    1168 </span>                :            :  * errno value, or it may be EOF to indicate that the connection was closed
+<a name="1169"><span class="lineNum">    1169 </span>                :            :  * normally. */</a>
+<span class="lineNum">    1170 </span>                :            : static void
+<span class="lineNum">    1171 </span>                :<span class="lineCov">       1899 : report_error(struct rconn *rc, int error)</span>
+<span class="lineNum">    1172 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">    1173 </span>                :            : {
+<span class="lineNum">    1174 </span>        [<span class="branchCov" title="Branch 0 was taken 1899 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       1899 :     if (error == EOF) {</span>
+<span class="lineNum">    1175 </span>                :            :         /* If 'rc' isn't reliable, then we don't really expect this connection
+<span class="lineNum">    1176 </span>                :            :          * to last forever anyway (probably it's a connection that we received
+<span class="lineNum">    1177 </span>                :            :          * via accept()), so use DBG level to avoid cluttering the logs. */
+<span class="lineNum">    1178 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1899 times"> + </span>]:<span class="lineCov">       1899 :         enum vlog_level level = rc-&gt;reliable ? VLL_INFO : VLL_DBG;</span>
+<span class="lineNum">    1179 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1899 times"> + </span>]:<span class="lineCov">       1899 :         VLOG(level, &quot;%s: connection closed by peer&quot;, rc-&gt;name);</span>
+<span class="lineNum">    1180 </span>                :            :     } else {
+<span class="lineNum">    1181 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN(&quot;%s: connection dropped (%s)&quot;,</span>
+<span class="lineNum">    1182 </span>                :            :                   rc-&gt;name, ovs_strerror(error));
+<span class="lineNum">    1183 </span>                :            :     }
+<span class="lineNum">    1184 </span>                :<span class="lineCov">       1899 : }</span>
+<span class="lineNum">    1185 </span>                :            : 
+<span class="lineNum">    1186 </span>                :            : /* Disconnects 'rc' and records 'error' as the error that caused 'rc''s last
+<span class="lineNum">    1187 </span>                :            :  * disconnection:
+<span class="lineNum">    1188 </span>                :            :  *
+<span class="lineNum">    1189 </span>                :            :  *   - 0 means that this disconnection is due to a request by 'rc''s client,
+<span class="lineNum">    1190 </span>                :            :  *     not due to any kind of network error.
+<span class="lineNum">    1191 </span>                :            :  *
+<span class="lineNum">    1192 </span>                :            :  *   - EOF means that the connection was closed in the normal way by the peer.
+<span class="lineNum">    1193 </span>                :            :  *
+<span class="lineNum">    1194 </span>                :            :  *   - A positive integer is an errno value that represents the error.
+<a name="1195"><span class="lineNum">    1195 </span>                :            :  */</a>
+<span class="lineNum">    1196 </span>                :            : static void
+<span class="lineNum">    1197 </span>                :<span class="lineCov">       1899 : disconnect(struct rconn *rc, int error)</span>
+<span class="lineNum">    1198 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">    1199 </span>                :            : {
+<span class="lineNum">    1200 </span>                :<span class="lineCov">       1899 :     rc-&gt;last_error = error;</span>
+<span class="lineNum">    1201 </span>        [<span class="branchCov" title="Branch 0 was taken 1899 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       1899 :     if (rc-&gt;vconn) {</span>
+<span class="lineNum">    1202 </span>                :<span class="lineCov">       1899 :         vconn_close(rc-&gt;vconn);</span>
+<span class="lineNum">    1203 </span>                :<span class="lineCov">       1899 :         rc-&gt;vconn = NULL;</span>
+<span class="lineNum">    1204 </span>                :            :     }
+<span class="lineNum">    1205 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1899 times"> + </span>]:<span class="lineCov">       1899 :     if (rc-&gt;reliable) {</span>
+<span class="lineNum">    1206 </span>                :<span class="lineNoCov">          0 :         time_t now = time_now();</span>
+<span class="lineNum">    1207 </span>                :            : 
+<span class="lineNum">    1208 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (rc-&gt;state &amp; (S_CONNECTING | S_ACTIVE | S_IDLE)) {</span>
+<span class="lineNum">    1209 </span>                :<span class="lineNoCov">          0 :             rc-&gt;last_disconnected = now;</span>
+<span class="lineNum">    1210 </span>                :<span class="lineNoCov">          0 :             flush_queue(rc);</span>
+<span class="lineNum">    1211 </span>                :            :         }
+<span class="lineNum">    1212 </span>                :            : 
+<span class="lineNum">    1213 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (now &gt;= rc-&gt;backoff_deadline) {</span>
+<span class="lineNum">    1214 </span>                :<span class="lineNoCov">          0 :             rc-&gt;backoff = 1;</span>
+<span class="lineNum">    1215 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         } else if (rc-&gt;backoff &lt; rc-&gt;max_backoff / 2) {</span>
+<span class="lineNum">    1216 </span>                :<span class="lineNoCov">          0 :             rc-&gt;backoff = MAX(1, 2 * rc-&gt;backoff);</span>
+<span class="lineNum">    1217 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_INFO(&quot;%s: waiting %d seconds before reconnect&quot;,</span>
+<span class="lineNum">    1218 </span>                :            :                       rc-&gt;name, rc-&gt;backoff);
+<span class="lineNum">    1219 </span>                :            :         } else {
+<span class="lineNum">    1220 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (rconn_logging_connection_attempts__(rc)) {</span>
+<span class="lineNum">    1221 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_INFO(&quot;%s: continuing to retry connections in the &quot;</span>
+<span class="lineNum">    1222 </span>                :            :                           &quot;background but suppressing further logging&quot;,
+<span class="lineNum">    1223 </span>                :            :                           rc-&gt;name);
+<span class="lineNum">    1224 </span>                :            :             }
+<span class="lineNum">    1225 </span>                :<span class="lineNoCov">          0 :             rc-&gt;backoff = rc-&gt;max_backoff;</span>
+<span class="lineNum">    1226 </span>                :            :         }
+<span class="lineNum">    1227 </span>                :<span class="lineNoCov">          0 :         rc-&gt;backoff_deadline = now + rc-&gt;backoff;</span>
+<span class="lineNum">    1228 </span>                :<span class="lineNoCov">          0 :         state_transition(rc, S_BACKOFF);</span>
+<span class="lineNum">    1229 </span>                :            :     } else {
+<span class="lineNum">    1230 </span>                :<span class="lineCov">       1899 :         rc-&gt;last_disconnected = time_now();</span>
+<span class="lineNum">    1231 </span>                :<span class="lineCov">       1899 :         state_transition(rc, S_DISCONNECTED);</span>
+<span class="lineNum">    1232 </span>                :            :     }
+<span class="lineNum">    1233 </span>                :<span class="lineCov">       1899 : }</span>
+<span class="lineNum">    1234 </span>                :            : 
+<span class="lineNum">    1235 </span>                :            : /* Drops all the packets from 'rc''s send queue and decrements their queue
+<a name="1236"><span class="lineNum">    1236 </span>                :            :  * counts. */</a>
+<span class="lineNum">    1237 </span>                :            : static void
+<span class="lineNum">    1238 </span>                :<span class="lineCov">       1899 : flush_queue(struct rconn *rc)</span>
+<span class="lineNum">    1239 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">    1240 </span>                :            : {
+<span class="lineNum">    1241 </span>        [<span class="branchCov" title="Branch 1 was taken 1899 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">       1899 :     if (list_is_empty(&amp;rc-&gt;txq)) {</span>
+<span class="lineNum">    1242 </span>                :<span class="lineCov">       1899 :         return;</span>
+<span class="lineNum">    1243 </span>                :            :     }
+<span class="lineNum">    1244 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     while (!list_is_empty(&amp;rc-&gt;txq)) {</span>
+<span class="lineNum">    1245 </span>                :<span class="lineNoCov">          0 :         struct ofpbuf *b = ofpbuf_from_list(list_pop_front(&amp;rc-&gt;txq));</span>
+<span class="lineNum">    1246 </span>                :<span class="lineNoCov">          0 :         struct rconn_packet_counter *counter = b-&gt;frame;</span>
+<span class="lineNum">    1247 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (counter) {</span>
+<span class="lineNum">    1248 </span>                :<span class="lineNoCov">          0 :             rconn_packet_counter_dec(counter, ofpbuf_size(b));</span>
+<span class="lineNum">    1249 </span>                :            :         }
+<span class="lineNum">    1250 </span>                :<span class="lineNoCov">          0 :         COVERAGE_INC(rconn_discarded);</span>
+<span class="lineNum">    1251 </span>                :<span class="lineNoCov">          0 :         ofpbuf_delete(b);</span>
+<span class="lineNum">    1252 </span>                :            :     }
+<span class="lineNum">    1253 </span>                :<span class="lineNoCov">          0 :     poll_immediate_wake();</span>
+<span class="lineNum">    1254 </span>                :            : }
+<a name="1255"><span class="lineNum">    1255 </span>                :            : </a>
+<span class="lineNum">    1256 </span>                :            : static unsigned int
+<span class="lineNum">    1257 </span>                :<span class="lineCov">       1899 : elapsed_in_this_state(const struct rconn *rc)</span>
+<span class="lineNum">    1258 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">    1259 </span>                :            : {
+<span class="lineNum">    1260 </span>                :<span class="lineCov">       1899 :     return time_now() - rc-&gt;state_entered;</span>
+<span class="lineNum">    1261 </span>                :            : }
+<a name="1262"><span class="lineNum">    1262 </span>                :            : </a>
+<span class="lineNum">    1263 </span>                :            : static unsigned int
+<span class="lineNum">    1264 </span>                :<span class="lineCov">      24401 : timeout(const struct rconn *rc)</span>
+<span class="lineNum">    1265 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">    1266 </span>                :            : {
+<span class="lineNum">    1267 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 24401 times"> + </span> :<span class="lineCov">      24401 :     switch (rc-&gt;state) {</span>
+<span class="lineNum">         </span>      <span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchNoCov" title="Branch 6 was not taken"> - </span>]
+<span class="lineNum">    1268 </span>                :            : #define STATE(NAME, VALUE) case S_##NAME: return timeout_##NAME(rc);
+<span class="lineNum">    1269 </span>                :<span class="lineCov">      24401 :         STATES</span>
+<span class="lineNum">    1270 </span>                :            : #undef STATE
+<span class="lineNum">    1271 </span>                :            :     default:
+<span class="lineNum">    1272 </span>                :<span class="lineCov">      24401 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">    1273 </span>                :            :     }
+<span class="lineNum">    1274 </span>                :            : }
+<a name="1275"><span class="lineNum">    1275 </span>                :            : </a>
+<span class="lineNum">    1276 </span>                :            : static bool
+<span class="lineNum">    1277 </span>                :<span class="lineCov">      12220 : timed_out(const struct rconn *rc)</span>
+<span class="lineNum">    1278 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">    1279 </span>                :            : {
+<span class="lineNum">    1280 </span>                :<span class="lineCov">      12220 :     return time_now() &gt;= sat_add(rc-&gt;state_entered, timeout(rc));</span>
+<span class="lineNum">    1281 </span>                :            : }
+<a name="1282"><span class="lineNum">    1282 </span>                :            : </a>
+<span class="lineNum">    1283 </span>                :            : static void
+<span class="lineNum">    1284 </span>                :<span class="lineCov">       3799 : state_transition(struct rconn *rc, enum state state)</span>
+<span class="lineNum">    1285 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">    1286 </span>                :            : {
+<span class="lineNum">    1287 </span>                :<span class="lineCov">       3799 :     rc-&gt;seqno += (rc-&gt;state == S_ACTIVE) != (state == S_ACTIVE);</span>
+<span class="lineNum">    1288 </span>[<span class="branchCov" title="Branch 1 was taken 1900 times"> + </span><span class="branchCov" title="Branch 2 was taken 1899 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 1900 times"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span>]:<span class="lineCov">       3799 :     if (is_connected_state(state) &amp;&amp; !is_connected_state(rc-&gt;state)) {</span>
+<span class="lineNum">    1289 </span>                :<span class="lineCov">       1900 :         rc-&gt;probably_admitted = false;</span>
+<span class="lineNum">    1290 </span>                :            :     }
+<span class="lineNum">    1291 </span>        [<span class="branchCov" title="Branch 1 was taken 1899 times"> + </span><span class="branchCov" title="Branch 2 was taken 1900 times"> + </span>]:<span class="lineCov">       3799 :     if (rconn_is_connected(rc)) {</span>
+<span class="lineNum">    1292 </span>                :<span class="lineCov">       1899 :         rc-&gt;total_time_connected += elapsed_in_this_state(rc);</span>
+<span class="lineNum">    1293 </span>                :            :     }
+<span class="lineNum">    1294 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3799 times"> + </span>]:<span class="lineCov">       3799 :     VLOG_DBG(&quot;%s: entering %s&quot;, rc-&gt;name, state_name(state));</span>
+<span class="lineNum">    1295 </span>                :<span class="lineCov">       3799 :     rc-&gt;state = state;</span>
+<span class="lineNum">    1296 </span>                :<span class="lineCov">       3799 :     rc-&gt;state_entered = time_now();</span>
+<span class="lineNum">    1297 </span>                :<span class="lineCov">       3799 : }</span>
+<a name="1298"><span class="lineNum">    1298 </span>                :            : </a>
+<span class="lineNum">    1299 </span>                :            : static void
+<span class="lineNum">    1300 </span>                :<span class="lineNoCov">          0 : close_monitor(struct rconn *rc, size_t idx, int retval)</span>
+<span class="lineNum">    1301 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">    1302 </span>                :            : {
+<span class="lineNum">    1303 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     VLOG_DBG(&quot;%s: closing monitor connection to %s: %s&quot;,</span>
+<span class="lineNum">    1304 </span>                :            :              rconn_get_name(rc), vconn_get_name(rc-&gt;monitors[idx]),
+<span class="lineNum">    1305 </span>                :            :              ovs_retval_to_string(retval));
+<span class="lineNum">    1306 </span>                :<span class="lineNoCov">          0 :     rc-&gt;monitors[idx] = rc-&gt;monitors[--rc-&gt;n_monitors];</span>
+<span class="lineNum">    1307 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="1308"><span class="lineNum">    1308 </span>                :            : </a>
+<span class="lineNum">    1309 </span>                :            : static void
+<span class="lineNum">    1310 </span>                :<span class="lineCov">      33924 : copy_to_monitor(struct rconn *rc, const struct ofpbuf *b)</span>
+<span class="lineNum">    1311 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">    1312 </span>                :            : {
+<span class="lineNum">    1313 </span>                :<span class="lineCov">      33924 :     struct ofpbuf *clone = NULL;</span>
+<span class="lineNum">    1314 </span>                :            :     int retval;
+<span class="lineNum">    1315 </span>                :            :     size_t i;
+<span class="lineNum">    1316 </span>                :            : 
+<span class="lineNum">    1317 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 33924 times"> + </span>]:<span class="lineCov">      33924 :     for (i = 0; i &lt; rc-&gt;n_monitors; ) {</span>
+<span class="lineNum">    1318 </span>                :<span class="lineNoCov">          0 :         struct vconn *vconn = rc-&gt;monitors[i];</span>
+<span class="lineNum">    1319 </span>                :            : 
+<span class="lineNum">    1320 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!clone) {</span>
+<span class="lineNum">    1321 </span>                :<span class="lineNoCov">          0 :             clone = ofpbuf_clone(b);</span>
+<span class="lineNum">    1322 </span>                :            :         }
+<span class="lineNum">    1323 </span>                :<span class="lineNoCov">          0 :         retval = vconn_send(vconn, clone);</span>
+<span class="lineNum">    1324 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!retval) {</span>
+<span class="lineNum">    1325 </span>                :<span class="lineNoCov">          0 :             clone = NULL;</span>
+<span class="lineNum">    1326 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         } else if (retval != EAGAIN) {</span>
+<span class="lineNum">    1327 </span>                :<span class="lineNoCov">          0 :             close_monitor(rc, i, retval);</span>
+<span class="lineNum">    1328 </span>                :<span class="lineNoCov">          0 :             continue;</span>
+<span class="lineNum">    1329 </span>                :            :         }
+<span class="lineNum">    1330 </span>                :<span class="lineNoCov">          0 :         i++;</span>
+<span class="lineNum">    1331 </span>                :            :     }
+<span class="lineNum">    1332 </span>                :<span class="lineCov">      33924 :     ofpbuf_delete(clone);</span>
+<span class="lineNum">    1333 </span>                :<span class="lineCov">      33924 : }</span>
+<a name="1334"><span class="lineNum">    1334 </span>                :            : </a>
+<span class="lineNum">    1335 </span>                :            : static bool
+<span class="lineNum">    1336 </span>                :<span class="lineCov">      34540 : is_connected_state(enum state state)</span>
+<span class="lineNum">    1337 </span>                :            : {
+<span class="lineNum">    1338 </span>                :<span class="lineCov">      34540 :     return (state &amp; (S_ACTIVE | S_IDLE)) != 0;</span>
+<span class="lineNum">    1339 </span>                :            : }
+<span class="lineNum">    1340 </span>                :            : 
+<span class="lineNum">    1341 </span>                :            : /* When a switch initially connects to a controller, the controller may spend a
+<span class="lineNum">    1342 </span>                :            :  * little time examining the switch, looking at, for example, its datapath ID,
+<span class="lineNum">    1343 </span>                :            :  * before it decides whether it is willing to control that switch.  At that
+<span class="lineNum">    1344 </span>                :            :  * point, it either disconnects or starts controlling the switch.
+<span class="lineNum">    1345 </span>                :            :  *
+<span class="lineNum">    1346 </span>                :            :  * This function returns a guess to its caller about whether 'b' is OpenFlow
+<span class="lineNum">    1347 </span>                :            :  * message that indicates that the controller has decided to control the
+<span class="lineNum">    1348 </span>                :            :  * switch.  It returns false if the message is one that a controller typically
+<span class="lineNum">    1349 </span>                :            :  * uses to determine whether a switch is admissible, true if the message is one
+<span class="lineNum">    1350 </span>                :            :  * that would typically be used only after the controller has admitted the
+<a name="1351"><span class="lineNum">    1351 </span>                :            :  * switch. */</a>
+<span class="lineNum">    1352 </span>                :            : static bool
+<span class="lineNum">    1353 </span>                :<span class="lineCov">       2089 : is_admitted_msg(const struct ofpbuf *b)</span>
+<span class="lineNum">    1354 </span>                :            : {
+<span class="lineNum">    1355 </span>                :            :     enum ofptype type;
+<span class="lineNum">    1356 </span>                :            :     enum ofperr error;
+<span class="lineNum">    1357 </span>                :            : 
+<span class="lineNum">    1358 </span>                :<span class="lineCov">       2089 :     error = ofptype_decode(&amp;type, ofpbuf_data(b));</span>
+<span class="lineNum">    1359 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2089 times"> + </span>]:<span class="lineCov">       2089 :     if (error) {</span>
+<span class="lineNum">    1360 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">    1361 </span>                :            :     }
+<span class="lineNum">    1362 </span>                :            : 
+<span class="lineNum">    1363 </span>        [<span class="branchCov" title="Branch 0 was taken 284 times"> + </span><span class="branchCov" title="Branch 1 was taken 1805 times"> + </span>]:<span class="lineCov">       2089 :     switch (type) {</span>
+<span class="lineNum">    1364 </span>                :            :     case OFPTYPE_HELLO:
+<span class="lineNum">    1365 </span>                :            :     case OFPTYPE_ERROR:
+<span class="lineNum">    1366 </span>                :            :     case OFPTYPE_ECHO_REQUEST:
+<span class="lineNum">    1367 </span>                :            :     case OFPTYPE_ECHO_REPLY:
+<span class="lineNum">    1368 </span>                :            :     case OFPTYPE_FEATURES_REQUEST:
+<span class="lineNum">    1369 </span>                :            :     case OFPTYPE_FEATURES_REPLY:
+<span class="lineNum">    1370 </span>                :            :     case OFPTYPE_GET_CONFIG_REQUEST:
+<span class="lineNum">    1371 </span>                :            :     case OFPTYPE_GET_CONFIG_REPLY:
+<span class="lineNum">    1372 </span>                :            :     case OFPTYPE_SET_CONFIG:
+<span class="lineNum">    1373 </span>                :            :     case OFPTYPE_QUEUE_GET_CONFIG_REQUEST:
+<span class="lineNum">    1374 </span>                :            :     case OFPTYPE_QUEUE_GET_CONFIG_REPLY:
+<span class="lineNum">    1375 </span>                :            :     case OFPTYPE_GET_ASYNC_REQUEST:
+<span class="lineNum">    1376 </span>                :            :     case OFPTYPE_GET_ASYNC_REPLY:
+<span class="lineNum">    1377 </span>                :            :     case OFPTYPE_GROUP_STATS_REQUEST:
+<span class="lineNum">    1378 </span>                :            :     case OFPTYPE_GROUP_STATS_REPLY:
+<span class="lineNum">    1379 </span>                :            :     case OFPTYPE_GROUP_DESC_STATS_REQUEST:
+<span class="lineNum">    1380 </span>                :            :     case OFPTYPE_GROUP_DESC_STATS_REPLY:
+<span class="lineNum">    1381 </span>                :            :     case OFPTYPE_GROUP_FEATURES_STATS_REQUEST:
+<span class="lineNum">    1382 </span>                :            :     case OFPTYPE_GROUP_FEATURES_STATS_REPLY:
+<span class="lineNum">    1383 </span>                :            :     case OFPTYPE_TABLE_FEATURES_STATS_REQUEST:
+<span class="lineNum">    1384 </span>                :            :     case OFPTYPE_TABLE_FEATURES_STATS_REPLY:
+<span class="lineNum">    1385 </span>                :            :     case OFPTYPE_BUNDLE_CONTROL:
+<span class="lineNum">    1386 </span>                :            :     case OFPTYPE_BUNDLE_ADD_MESSAGE:
+<span class="lineNum">    1387 </span>                :<span class="lineCov">        284 :         return false;</span>
+<span class="lineNum">    1388 </span>                :            : 
+<span class="lineNum">    1389 </span>                :            :     case OFPTYPE_PACKET_IN:
+<span class="lineNum">    1390 </span>                :            :     case OFPTYPE_FLOW_REMOVED:
+<span class="lineNum">    1391 </span>                :            :     case OFPTYPE_PORT_STATUS:
+<span class="lineNum">    1392 </span>                :            :     case OFPTYPE_PACKET_OUT:
+<span class="lineNum">    1393 </span>                :            :     case OFPTYPE_FLOW_MOD:
+<span class="lineNum">    1394 </span>                :            :     case OFPTYPE_GROUP_MOD:
+<span class="lineNum">    1395 </span>                :            :     case OFPTYPE_PORT_MOD:
+<span class="lineNum">    1396 </span>                :            :     case OFPTYPE_TABLE_MOD:
+<span class="lineNum">    1397 </span>                :            :     case OFPTYPE_METER_MOD:
+<span class="lineNum">    1398 </span>                :            :     case OFPTYPE_BARRIER_REQUEST:
+<span class="lineNum">    1399 </span>                :            :     case OFPTYPE_BARRIER_REPLY:
+<span class="lineNum">    1400 </span>                :            :     case OFPTYPE_DESC_STATS_REQUEST:
+<span class="lineNum">    1401 </span>                :            :     case OFPTYPE_DESC_STATS_REPLY:
+<span class="lineNum">    1402 </span>                :            :     case OFPTYPE_FLOW_STATS_REQUEST:
+<span class="lineNum">    1403 </span>                :            :     case OFPTYPE_FLOW_STATS_REPLY:
+<span class="lineNum">    1404 </span>                :            :     case OFPTYPE_AGGREGATE_STATS_REQUEST:
+<span class="lineNum">    1405 </span>                :            :     case OFPTYPE_AGGREGATE_STATS_REPLY:
+<span class="lineNum">    1406 </span>                :            :     case OFPTYPE_TABLE_STATS_REQUEST:
+<span class="lineNum">    1407 </span>                :            :     case OFPTYPE_TABLE_STATS_REPLY:
+<span class="lineNum">    1408 </span>                :            :     case OFPTYPE_PORT_STATS_REQUEST:
+<span class="lineNum">    1409 </span>                :            :     case OFPTYPE_PORT_STATS_REPLY:
+<span class="lineNum">    1410 </span>                :            :     case OFPTYPE_QUEUE_STATS_REQUEST:
+<span class="lineNum">    1411 </span>                :            :     case OFPTYPE_QUEUE_STATS_REPLY:
+<span class="lineNum">    1412 </span>                :            :     case OFPTYPE_PORT_DESC_STATS_REQUEST:
+<span class="lineNum">    1413 </span>                :            :     case OFPTYPE_PORT_DESC_STATS_REPLY:
+<span class="lineNum">    1414 </span>                :            :     case OFPTYPE_METER_STATS_REQUEST:
+<span class="lineNum">    1415 </span>                :            :     case OFPTYPE_METER_STATS_REPLY:
+<span class="lineNum">    1416 </span>                :            :     case OFPTYPE_METER_CONFIG_STATS_REQUEST:
+<span class="lineNum">    1417 </span>                :            :     case OFPTYPE_METER_CONFIG_STATS_REPLY:
+<span class="lineNum">    1418 </span>                :            :     case OFPTYPE_METER_FEATURES_STATS_REQUEST:
+<span class="lineNum">    1419 </span>                :            :     case OFPTYPE_METER_FEATURES_STATS_REPLY:
+<span class="lineNum">    1420 </span>                :            :     case OFPTYPE_ROLE_REQUEST:
+<span class="lineNum">    1421 </span>                :            :     case OFPTYPE_ROLE_REPLY:
+<span class="lineNum">    1422 </span>                :            :     case OFPTYPE_ROLE_STATUS:
+<span class="lineNum">    1423 </span>                :            :     case OFPTYPE_SET_FLOW_FORMAT:
+<span class="lineNum">    1424 </span>                :            :     case OFPTYPE_FLOW_MOD_TABLE_ID:
+<span class="lineNum">    1425 </span>                :            :     case OFPTYPE_SET_PACKET_IN_FORMAT:
+<span class="lineNum">    1426 </span>                :            :     case OFPTYPE_FLOW_AGE:
+<span class="lineNum">    1427 </span>                :            :     case OFPTYPE_SET_ASYNC_CONFIG:
+<span class="lineNum">    1428 </span>                :            :     case OFPTYPE_SET_CONTROLLER_ID:
+<span class="lineNum">    1429 </span>                :            :     case OFPTYPE_FLOW_MONITOR_STATS_REQUEST:
+<span class="lineNum">    1430 </span>                :            :     case OFPTYPE_FLOW_MONITOR_STATS_REPLY:
+<span class="lineNum">    1431 </span>                :            :     case OFPTYPE_FLOW_MONITOR_CANCEL:
+<span class="lineNum">    1432 </span>                :            :     case OFPTYPE_FLOW_MONITOR_PAUSED:
+<span class="lineNum">    1433 </span>                :            :     case OFPTYPE_FLOW_MONITOR_RESUMED:
+<span class="lineNum">    1434 </span>                :            :     default:
+<span class="lineNum">    1435 </span>                :<span class="lineCov">       2089 :         return true;</span>
+<span class="lineNum">    1436 </span>                :            :     }
+<span class="lineNum">    1437 </span>                :            : }
+<span class="lineNum">    1438 </span>                :            : 
+<span class="lineNum">    1439 </span>                :            : /* Returns true if 'rc' is currently logging information about connection
+<span class="lineNum">    1440 </span>                :            :  * attempts, false if logging should be suppressed because 'rc' hasn't
+<a name="1441"><span class="lineNum">    1441 </span>                :            :  * successuflly connected in too long. */</a>
+<span class="lineNum">    1442 </span>                :            : static bool
+<span class="lineNum">    1443 </span>                :<span class="lineNoCov">          0 : rconn_logging_connection_attempts__(const struct rconn *rc)</span>
+<span class="lineNum">    1444 </span>                :            :     OVS_REQUIRES(rc-&gt;mutex)
+<span class="lineNum">    1445 </span>                :            : {
+<span class="lineNum">    1446 </span>                :<span class="lineNoCov">          0 :     return rc-&gt;backoff &lt; rc-&gt;max_backoff;</span>
+<span class="lineNum">    1447 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

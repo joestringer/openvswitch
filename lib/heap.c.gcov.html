@@ -1,0 +1,301 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/heap.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - heap.c<span style="font-size: 80%;"> (source / <a href="heap.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">79</td>
+            <td class="headerCovTableEntry">87</td>
+            <td class="headerCovTableEntryHi">90.8 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">13</td>
+            <td class="headerCovTableEntry">15</td>
+            <td class="headerCovTableEntryMed">86.7 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">27</td>
+            <td class="headerCovTableEntry">28</td>
+            <td class="headerCovTableEntryHi">96.4 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2012 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;heap.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      21 </span>                :            : 
+<span class="lineNum">      22 </span>                :            : static void put_node(struct heap *, struct heap_node *, size_t i);
+<span class="lineNum">      23 </span>                :            : static void swap_nodes(struct heap *, size_t i, size_t j);
+<span class="lineNum">      24 </span>                :            : static bool float_up(struct heap *, size_t i);
+<span class="lineNum">      25 </span>                :            : static void float_down(struct heap *, size_t i);
+<span class="lineNum">      26 </span>                :            : static void float_up_or_down(struct heap *, size_t i);
+<span class="lineNum">      27 </span>                :            : 
+<a name="28"><span class="lineNum">      28 </span>                :            : /* Initializes 'heap' as an empty heap. */</a>
+<span class="lineNum">      29 </span>                :            : void
+<span class="lineNum">      30 </span>                :<span class="lineCov">      77831 : heap_init(struct heap *heap)</span>
+<span class="lineNum">      31 </span>                :            : {
+<span class="lineNum">      32 </span>                :<span class="lineCov">      77831 :     heap-&gt;array = NULL;</span>
+<span class="lineNum">      33 </span>                :<span class="lineCov">      77831 :     heap-&gt;n = 0;</span>
+<span class="lineNum">      34 </span>                :<span class="lineCov">      77831 :     heap-&gt;allocated = 0;</span>
+<span class="lineNum">      35 </span>                :<span class="lineCov">      77831 : }</span>
+<span class="lineNum">      36 </span>                :            : 
+<span class="lineNum">      37 </span>                :            : /* Frees memory owned internally by 'heap'.  The caller is responsible for
+<a name="38"><span class="lineNum">      38 </span>                :            :  * freeing 'heap' itself, if necessary. */</a>
+<span class="lineNum">      39 </span>                :            : void
+<span class="lineNum">      40 </span>                :<span class="lineCov">      77825 : heap_destroy(struct heap *heap)</span>
+<span class="lineNum">      41 </span>                :            : {
+<span class="lineNum">      42 </span>        [<span class="branchCov" title="Branch 0 was taken 77825 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      77825 :     if (heap) {</span>
+<span class="lineNum">      43 </span>                :<span class="lineCov">      77825 :         free(heap-&gt;array);</span>
+<span class="lineNum">      44 </span>                :            :     }
+<span class="lineNum">      45 </span>                :<span class="lineCov">      77825 : }</span>
+<span class="lineNum">      46 </span>                :            : 
+<span class="lineNum">      47 </span>                :            : /* Removes all of the elements from 'heap', without freeing any allocated
+<a name="48"><span class="lineNum">      48 </span>                :            :  * memory. */</a>
+<span class="lineNum">      49 </span>                :            : void
+<span class="lineNum">      50 </span>                :<span class="lineNoCov">          0 : heap_clear(struct heap *heap)</span>
+<span class="lineNum">      51 </span>                :            : {
+<span class="lineNum">      52 </span>                :<span class="lineNoCov">          0 :     heap-&gt;n = 0;</span>
+<span class="lineNum">      53 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      54 </span>                :            : 
+<a name="55"><span class="lineNum">      55 </span>                :            : /* Exchanges the contents of 'a' and 'b'. */</a>
+<span class="lineNum">      56 </span>                :            : void
+<span class="lineNum">      57 </span>                :<span class="lineNoCov">          0 : heap_swap(struct heap *a, struct heap *b)</span>
+<span class="lineNum">      58 </span>                :            : {
+<span class="lineNum">      59 </span>                :<span class="lineNoCov">          0 :     struct heap tmp = *a;</span>
+<span class="lineNum">      60 </span>                :<span class="lineNoCov">          0 :     *a = *b;</span>
+<span class="lineNum">      61 </span>                :<span class="lineNoCov">          0 :     *b = tmp;</span>
+<span class="lineNum">      62 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      63 </span>                :            : 
+<span class="lineNum">      64 </span>                :            : /* Inserts 'node' into 'heap' with the specified 'priority'.
+<span class="lineNum">      65 </span>                :            :  *
+<a name="66"><span class="lineNum">      66 </span>                :            :  * This takes time O(lg n). */</a>
+<span class="lineNum">      67 </span>                :            : void
+<span class="lineNum">      68 </span>                :<span class="lineCov">     473695 : heap_insert(struct heap *heap, struct heap_node *node, uint64_t priority)</span>
+<span class="lineNum">      69 </span>                :            : {
+<span class="lineNum">      70 </span>                :<span class="lineCov">     473695 :     heap_raw_insert(heap, node, priority);</span>
+<span class="lineNum">      71 </span>                :<span class="lineCov">     473695 :     float_up(heap, node-&gt;idx);</span>
+<span class="lineNum">      72 </span>                :<span class="lineCov">     473695 : }</span>
+<span class="lineNum">      73 </span>                :            : 
+<span class="lineNum">      74 </span>                :            : /* Removes 'node' from 'heap'.
+<span class="lineNum">      75 </span>                :            :  *
+<a name="76"><span class="lineNum">      76 </span>                :            :  * This takes time O(lg n). */</a>
+<span class="lineNum">      77 </span>                :            : void
+<span class="lineNum">      78 </span>                :<span class="lineCov">     473689 : heap_remove(struct heap *heap, struct heap_node *node)</span>
+<span class="lineNum">      79 </span>                :            : {
+<span class="lineNum">      80 </span>                :<span class="lineCov">     473689 :     size_t i = node-&gt;idx;</span>
+<span class="lineNum">      81 </span>                :            : 
+<span class="lineNum">      82 </span>                :<span class="lineCov">     473689 :     heap_raw_remove(heap, node);</span>
+<span class="lineNum">      83 </span>        [<span class="branchCov" title="Branch 0 was taken 295766 times"> + </span><span class="branchCov" title="Branch 1 was taken 177923 times"> + </span>]:<span class="lineCov">     473689 :     if (i &lt;= heap-&gt;n) {</span>
+<span class="lineNum">      84 </span>                :<span class="lineCov">     295766 :         float_up_or_down(heap, i);</span>
+<span class="lineNum">      85 </span>                :            :     }
+<span class="lineNum">      86 </span>                :<span class="lineCov">     473689 : }</span>
+<span class="lineNum">      87 </span>                :            : 
+<span class="lineNum">      88 </span>                :            : /* Changes the priority of 'node' (which must be in 'heap') to 'priority'.
+<span class="lineNum">      89 </span>                :            :  *
+<a name="90"><span class="lineNum">      90 </span>                :            :  * This takes time O(lg n). */</a>
+<span class="lineNum">      91 </span>                :            : void
+<span class="lineNum">      92 </span>                :<span class="lineCov">       2995 : heap_change(struct heap *heap, struct heap_node *node, uint64_t priority)</span>
+<span class="lineNum">      93 </span>                :            : {
+<span class="lineNum">      94 </span>                :<span class="lineCov">       2995 :     heap_raw_change(node, priority);</span>
+<span class="lineNum">      95 </span>                :<span class="lineCov">       2995 :     float_up_or_down(heap, node-&gt;idx);</span>
+<span class="lineNum">      96 </span>                :<span class="lineCov">       2995 : }</span>
+<span class="lineNum">      97 </span>                :            : 
+<span class="lineNum">      98 </span>                :            : /* Inserts 'node' into 'heap' with the specified 'priority', without
+<span class="lineNum">      99 </span>                :            :  * maintaining the heap invariant.
+<span class="lineNum">     100 </span>                :            :  *
+<span class="lineNum">     101 </span>                :            :  * After this call, heap_max() will no longer necessarily return the maximum
+<span class="lineNum">     102 </span>                :            :  * value in the heap, and HEAP_FOR_EACH will no longer necessarily iterate in
+<span class="lineNum">     103 </span>                :            :  * heap level order, until the next call to heap_rebuild(heap).
+<span class="lineNum">     104 </span>                :            :  *
+<a name="105"><span class="lineNum">     105 </span>                :            :  * This takes time O(1). */</a>
+<span class="lineNum">     106 </span>                :            : void
+<span class="lineNum">     107 </span>                :<span class="lineCov">     524975 : heap_raw_insert(struct heap *heap, struct heap_node *node, uint64_t priority)</span>
+<span class="lineNum">     108 </span>                :            : {
+<span class="lineNum">     109 </span>        [<span class="branchCov" title="Branch 0 was taken 312315 times"> + </span><span class="branchCov" title="Branch 1 was taken 212660 times"> + </span>]:<span class="lineCov">     524975 :     if (heap-&gt;n &gt;= heap-&gt;allocated) {</span>
+<span class="lineNum">     110 </span>        [<span class="branchCov" title="Branch 0 was taken 234470 times"> + </span><span class="branchCov" title="Branch 1 was taken 77845 times"> + </span>]:<span class="lineCov">     312315 :         heap-&gt;allocated = heap-&gt;n == 0 ? 1 : 2 * heap-&gt;n;</span>
+<span class="lineNum">     111 </span>                :<span class="lineCov">     312315 :         heap-&gt;array = xrealloc(heap-&gt;array,</span>
+<span class="lineNum">     112 </span>                :<span class="lineCov">     312315 :                                (heap-&gt;allocated + 1) * sizeof *heap-&gt;array);</span>
+<span class="lineNum">     113 </span>                :            :     }
+<span class="lineNum">     114 </span>                :            : 
+<span class="lineNum">     115 </span>                :<span class="lineCov">     524975 :     put_node(heap, node, ++heap-&gt;n);</span>
+<span class="lineNum">     116 </span>                :<span class="lineCov">     524975 :     node-&gt;priority = priority;</span>
+<span class="lineNum">     117 </span>                :<span class="lineCov">     524975 : }</span>
+<span class="lineNum">     118 </span>                :            : 
+<span class="lineNum">     119 </span>                :            : /* Removes 'node' from 'heap', without maintaining the heap invariant.
+<span class="lineNum">     120 </span>                :            :  *
+<span class="lineNum">     121 </span>                :            :  * After this call, heap_max() will no longer necessarily return the maximum
+<span class="lineNum">     122 </span>                :            :  * value in the heap, and HEAP_FOR_EACH will no longer necessarily iterate in
+<span class="lineNum">     123 </span>                :            :  * heap level order, until the next call to heap_rebuild(heap).
+<span class="lineNum">     124 </span>                :            :  *
+<a name="125"><span class="lineNum">     125 </span>                :            :  * This takes time O(1). */</a>
+<span class="lineNum">     126 </span>                :            : void
+<span class="lineNum">     127 </span>                :<span class="lineCov">     524969 : heap_raw_remove(struct heap *heap, struct heap_node *node)</span>
+<span class="lineNum">     128 </span>                :            : {
+<span class="lineNum">     129 </span>                :<span class="lineCov">     524969 :     size_t i = node-&gt;idx;</span>
+<span class="lineNum">     130 </span>        [<span class="branchCov" title="Branch 0 was taken 331161 times"> + </span><span class="branchCov" title="Branch 1 was taken 193808 times"> + </span>]:<span class="lineCov">     524969 :     if (i &lt; heap-&gt;n) {</span>
+<span class="lineNum">     131 </span>                :<span class="lineCov">     331161 :         put_node(heap, heap-&gt;array[heap-&gt;n], i);</span>
+<span class="lineNum">     132 </span>                :            :     }
+<span class="lineNum">     133 </span>                :<span class="lineCov">     524969 :     heap-&gt;n--;</span>
+<span class="lineNum">     134 </span>                :<span class="lineCov">     524969 : }</span>
+<span class="lineNum">     135 </span>                :            : 
+<span class="lineNum">     136 </span>                :            : /* Rebuilds 'heap' to restore the heap invariant following a series of one or
+<span class="lineNum">     137 </span>                :            :  * more calls to heap_raw_*() functions.  (Otherwise this function need not be
+<span class="lineNum">     138 </span>                :            :  * called.)
+<span class="lineNum">     139 </span>                :            :  *
+<a name="140"><span class="lineNum">     140 </span>                :            :  * This takes time O(n) in the current size of the heap. */</a>
+<span class="lineNum">     141 </span>                :            : void
+<span class="lineNum">     142 </span>                :<span class="lineCov">      42324 : heap_rebuild(struct heap *heap)</span>
+<span class="lineNum">     143 </span>                :            : {
+<span class="lineNum">     144 </span>                :            :     size_t i;
+<span class="lineNum">     145 </span>                :            : 
+<span class="lineNum">     146 </span>        [<span class="branchCov" title="Branch 0 was taken 63488 times"> + </span><span class="branchCov" title="Branch 1 was taken 42324 times"> + </span>]:<span class="lineCov">     105812 :     for (i = heap-&gt;n / 2; i &gt;= 1; i--) {</span>
+<span class="lineNum">     147 </span>                :<span class="lineCov">      63488 :         float_down(heap, i);</span>
+<span class="lineNum">     148 </span>                :            :     }
+<span class="lineNum">     149 </span>                :<span class="lineCov">      42324 : }</span>
+<a name="150"><span class="lineNum">     150 </span>                :            : </a>
+<span class="lineNum">     151 </span>                :            : static void
+<span class="lineNum">     152 </span>                :<span class="lineCov">    1549818 : put_node(struct heap *heap, struct heap_node *node, size_t i)</span>
+<span class="lineNum">     153 </span>                :            : {
+<span class="lineNum">     154 </span>                :<span class="lineCov">    1549818 :     heap-&gt;array[i] = node;</span>
+<span class="lineNum">     155 </span>                :<span class="lineCov">    1549818 :     node-&gt;idx = i;</span>
+<span class="lineNum">     156 </span>                :<span class="lineCov">    1549818 : }</span>
+<a name="157"><span class="lineNum">     157 </span>                :            : </a>
+<span class="lineNum">     158 </span>                :            : static void
+<span class="lineNum">     159 </span>                :<span class="lineCov">     346841 : swap_nodes(struct heap *heap, size_t i, size_t j)</span>
+<span class="lineNum">     160 </span>                :            : {
+<span class="lineNum">     161 </span>                :<span class="lineCov">     346841 :     struct heap_node *old_i = heap-&gt;array[i];</span>
+<span class="lineNum">     162 </span>                :<span class="lineCov">     346841 :     struct heap_node *old_j = heap-&gt;array[j];</span>
+<span class="lineNum">     163 </span>                :            : 
+<span class="lineNum">     164 </span>                :<span class="lineCov">     346841 :     put_node(heap, old_j, i);</span>
+<span class="lineNum">     165 </span>                :<span class="lineCov">     346841 :     put_node(heap, old_i, j);</span>
+<span class="lineNum">     166 </span>                :<span class="lineCov">     346841 : }</span>
+<a name="167"><span class="lineNum">     167 </span>                :            : </a>
+<span class="lineNum">     168 </span>                :            : static bool
+<span class="lineNum">     169 </span>                :<span class="lineCov">     772456 : float_up(struct heap *heap, size_t i)</span>
+<span class="lineNum">     170 </span>                :            : {
+<span class="lineNum">     171 </span>                :<span class="lineCov">     772456 :     bool moved = false;</span>
+<span class="lineNum">     172 </span>                :            :     size_t parent;
+<span class="lineNum">     173 </span>                :            : 
+<span class="lineNum">     174 </span>        [<span class="branchCov" title="Branch 0 was taken 712480 times"> + </span><span class="branchCov" title="Branch 1 was taken 290350 times"> + </span>]:<span class="lineCov">    1002830 :     for (; i &gt; 1; i = parent) {</span>
+<span class="lineNum">     175 </span>                :<span class="lineCov">     712480 :         parent = heap_parent__(i);</span>
+<span class="lineNum">     176 </span>        [<span class="branchCov" title="Branch 0 was taken 482106 times"> + </span><span class="branchCov" title="Branch 1 was taken 230374 times"> + </span>]:<span class="lineCov">     712480 :         if (heap-&gt;array[parent]-&gt;priority &gt;= heap-&gt;array[i]-&gt;priority) {</span>
+<span class="lineNum">     177 </span>                :<span class="lineCov">     482106 :             break;</span>
+<span class="lineNum">     178 </span>                :            :         }
+<span class="lineNum">     179 </span>                :<span class="lineCov">     230374 :         swap_nodes(heap, parent, i);</span>
+<span class="lineNum">     180 </span>                :<span class="lineCov">     230374 :         moved = true;</span>
+<span class="lineNum">     181 </span>                :            :     }
+<span class="lineNum">     182 </span>                :<span class="lineCov">     772456 :     return moved;</span>
+<span class="lineNum">     183 </span>                :            : }
+<a name="184"><span class="lineNum">     184 </span>                :            : </a>
+<span class="lineNum">     185 </span>                :            : static void
+<span class="lineNum">     186 </span>                :<span class="lineCov">     357279 : float_down(struct heap *heap, size_t i)</span>
+<span class="lineNum">     187 </span>                :            : {
+<span class="lineNum">     188 </span>        [<span class="branchCov" title="Branch 1 was taken 220583 times"> + </span><span class="branchCov" title="Branch 2 was taken 253163 times"> + </span>]:<span class="lineCov">     473746 :     while (!heap_is_leaf__(heap, i)) {</span>
+<span class="lineNum">     189 </span>                :<span class="lineCov">     220583 :         size_t left = heap_left__(i);</span>
+<span class="lineNum">     190 </span>                :<span class="lineCov">     220583 :         size_t right = heap_right__(i);</span>
+<span class="lineNum">     191 </span>                :<span class="lineCov">     220583 :         size_t max = i;</span>
+<span class="lineNum">     192 </span>                :            : 
+<span class="lineNum">     193 </span>        [<span class="branchCov" title="Branch 0 was taken 100908 times"> + </span><span class="branchCov" title="Branch 1 was taken 119675 times"> + </span>]:<span class="lineCov">     220583 :         if (heap-&gt;array[left]-&gt;priority &gt; heap-&gt;array[max]-&gt;priority) {</span>
+<span class="lineNum">     194 </span>                :<span class="lineCov">     100908 :             max = left;</span>
+<span class="lineNum">     195 </span>                :            :         }
+<span class="lineNum">     196 </span>        [<span class="branchCov" title="Branch 0 was taken 143520 times"> + </span><span class="branchCov" title="Branch 1 was taken 77063 times"> + </span>]:<span class="lineCov">     220583 :         if (right &lt;= heap-&gt;n</span>
+<span class="lineNum">     197 </span>        [<span class="branchCov" title="Branch 0 was taken 45584 times"> + </span><span class="branchCov" title="Branch 1 was taken 97936 times"> + </span>]:<span class="lineCov">     143520 :             &amp;&amp; heap-&gt;array[right]-&gt;priority &gt; heap-&gt;array[max]-&gt;priority) {</span>
+<span class="lineNum">     198 </span>                :<span class="lineCov">      45584 :             max = right;</span>
+<span class="lineNum">     199 </span>                :            :         }
+<span class="lineNum">     200 </span>        [<span class="branchCov" title="Branch 0 was taken 104116 times"> + </span><span class="branchCov" title="Branch 1 was taken 116467 times"> + </span>]:<span class="lineCov">     220583 :         if (max == i) {</span>
+<span class="lineNum">     201 </span>                :<span class="lineCov">     104116 :             break;</span>
+<span class="lineNum">     202 </span>                :            :         }
+<span class="lineNum">     203 </span>                :            : 
+<span class="lineNum">     204 </span>                :<span class="lineCov">     116467 :         swap_nodes(heap, max, i);</span>
+<span class="lineNum">     205 </span>                :<span class="lineCov">     116467 :         i = max;</span>
+<span class="lineNum">     206 </span>                :            :     }
+<span class="lineNum">     207 </span>                :<span class="lineCov">     357279 : }</span>
+<a name="208"><span class="lineNum">     208 </span>                :            : </a>
+<span class="lineNum">     209 </span>                :            : static void
+<span class="lineNum">     210 </span>                :<span class="lineCov">     298761 : float_up_or_down(struct heap *heap, size_t i)</span>
+<span class="lineNum">     211 </span>                :            : {
+<span class="lineNum">     212 </span>        [<span class="branchCov" title="Branch 1 was taken 293791 times"> + </span><span class="branchCov" title="Branch 2 was taken 4970 times"> + </span>]:<span class="lineCov">     298761 :     if (!float_up(heap, i)) {</span>
+<span class="lineNum">     213 </span>                :<span class="lineCov">     293791 :         float_down(heap, i);</span>
+<span class="lineNum">     214 </span>                :            :     }
+<span class="lineNum">     215 </span>                :<span class="lineCov">     298761 : }</span>
+<span class="lineNum">     216 </span>                :            : 
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

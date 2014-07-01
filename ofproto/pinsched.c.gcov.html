@@ -1,0 +1,394 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ofproto/pinsched.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">ofproto</a> - pinsched.c<span style="font-size: 80%;"> (source / <a href="pinsched.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">15</td>
+            <td class="headerCovTableEntry">121</td>
+            <td class="headerCovTableEntryLo">12.4 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntry">16</td>
+            <td class="headerCovTableEntryLo">25.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntry">58</td>
+            <td class="headerCovTableEntryLo">6.9 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2008, 2009, 2010, 2011, 2012, 2013 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;pinsched.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &lt;sys/types.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;arpa/inet.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;stdint.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &quot;flow.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;hmap.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;openflow/openflow.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;random.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;rconn.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;sat-math.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;token-bucket.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;vconn.h&quot;
+<span class="lineNum">      36 </span>                :            : 
+<span class="lineNum">      37 </span>                :            : struct pinqueue {
+<span class="lineNum">      38 </span>                :            :     struct hmap_node node;      /* In struct pinsched's 'queues' hmap. */
+<span class="lineNum">      39 </span>                :            :     ofp_port_t port_no;           /* Port number. */
+<span class="lineNum">      40 </span>                :            :     struct list packets;        /* Contains &quot;struct ofpbuf&quot;s. */
+<span class="lineNum">      41 </span>                :            :     int n;                      /* Number of packets in 'packets'. */
+<span class="lineNum">      42 </span>                :            : };
+<span class="lineNum">      43 </span>                :            : 
+<span class="lineNum">      44 </span>                :            : struct pinsched {
+<span class="lineNum">      45 </span>                :            :     struct token_bucket token_bucket;
+<span class="lineNum">      46 </span>                :            : 
+<span class="lineNum">      47 </span>                :            :     /* One queue per physical port. */
+<span class="lineNum">      48 </span>                :            :     struct hmap queues;         /* Contains &quot;struct pinqueue&quot;s. */
+<span class="lineNum">      49 </span>                :            :     int n_queued;               /* Sum over queues[*].n. */
+<span class="lineNum">      50 </span>                :            :     struct pinqueue *next_txq;  /* Next pinqueue check in round-robin. */
+<span class="lineNum">      51 </span>                :            : 
+<span class="lineNum">      52 </span>                :            :     /* Transmission queue. */
+<span class="lineNum">      53 </span>                :            :     int n_txq;                  /* No. of packets waiting in rconn for tx. */
+<span class="lineNum">      54 </span>                :            : 
+<span class="lineNum">      55 </span>                :            :     /* Statistics reporting. */
+<span class="lineNum">      56 </span>                :            :     unsigned long long n_normal;        /* # txed w/o rate limit queuing. */
+<span class="lineNum">      57 </span>                :            :     unsigned long long n_limited;       /* # queued for rate limiting. */
+<span class="lineNum">      58 </span>                :            :     unsigned long long n_queue_dropped; /* # dropped due to queue overflow. */
+<span class="lineNum">      59 </span>                :            : };
+<a name="60"><span class="lineNum">      60 </span>                :            : </a>
+<span class="lineNum">      61 </span>                :            : static void
+<span class="lineNum">      62 </span>                :<span class="lineNoCov">          0 : advance_txq(struct pinsched *ps)</span>
+<span class="lineNum">      63 </span>                :            : {
+<span class="lineNum">      64 </span>                :            :     struct hmap_node *next;
+<span class="lineNum">      65 </span>                :            : 
+<span class="lineNum">      66 </span>                :<span class="lineNoCov">          0 :     next = (ps-&gt;next_txq</span>
+<span class="lineNum">      67 </span>                :<span class="lineNoCov">          0 :             ? hmap_next(&amp;ps-&gt;queues, &amp;ps-&gt;next_txq-&gt;node)</span>
+<span class="lineNum">      68 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             : hmap_first(&amp;ps-&gt;queues));</span>
+<span class="lineNum">      69 </span>                :<span class="lineNoCov">          0 :     ps-&gt;next_txq = next ? CONTAINER_OF(next, struct pinqueue, node) : NULL;</span>
+<span class="lineNum">      70 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="71"><span class="lineNum">      71 </span>                :            : </a>
+<span class="lineNum">      72 </span>                :            : static struct ofpbuf *
+<span class="lineNum">      73 </span>                :<span class="lineNoCov">          0 : dequeue_packet(struct pinsched *ps, struct pinqueue *q)</span>
+<span class="lineNum">      74 </span>                :            : {
+<span class="lineNum">      75 </span>                :<span class="lineNoCov">          0 :     struct ofpbuf *packet = ofpbuf_from_list(list_pop_front(&amp;q-&gt;packets));</span>
+<span class="lineNum">      76 </span>                :<span class="lineNoCov">          0 :     q-&gt;n--;</span>
+<span class="lineNum">      77 </span>                :<span class="lineNoCov">          0 :     ps-&gt;n_queued--;</span>
+<span class="lineNum">      78 </span>                :<span class="lineNoCov">          0 :     return packet;</span>
+<span class="lineNum">      79 </span>                :            : }
+<a name="80"><span class="lineNum">      80 </span>                :            : </a>
+<span class="lineNum">      81 </span>                :            : static void
+<span class="lineNum">      82 </span>                :<span class="lineNoCov">          0 : adjust_limits(int *rate_limit, int *burst_limit)</span>
+<span class="lineNum">      83 </span>                :            : {
+<span class="lineNum">      84 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (*rate_limit &lt;= 0) {</span>
+<span class="lineNum">      85 </span>                :<span class="lineNoCov">          0 :         *rate_limit = 1000;</span>
+<span class="lineNum">      86 </span>                :            :     }
+<span class="lineNum">      87 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (*burst_limit &lt;= 0) {</span>
+<span class="lineNum">      88 </span>                :<span class="lineNoCov">          0 :         *burst_limit = *rate_limit / 4;</span>
+<span class="lineNum">      89 </span>                :            :     }
+<span class="lineNum">      90 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (*burst_limit &lt; 1) {</span>
+<span class="lineNum">      91 </span>                :<span class="lineNoCov">          0 :         *burst_limit = 1;</span>
+<span class="lineNum">      92 </span>                :            :     }
+<span class="lineNum">      93 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      94 </span>                :            : 
+<span class="lineNum">      95 </span>                :            : /* Destroys 'q' and removes it from 'ps''s set of queues.
+<a name="96"><span class="lineNum">      96 </span>                :            :  * (The caller must ensure that 'q' is empty.) */</a>
+<span class="lineNum">      97 </span>                :            : static void
+<span class="lineNum">      98 </span>                :<span class="lineNoCov">          0 : pinqueue_destroy(struct pinsched *ps, struct pinqueue *q)</span>
+<span class="lineNum">      99 </span>                :            : {
+<span class="lineNum">     100 </span>                :<span class="lineNoCov">          0 :     hmap_remove(&amp;ps-&gt;queues, &amp;q-&gt;node);</span>
+<span class="lineNum">     101 </span>                :<span class="lineNoCov">          0 :     free(q);</span>
+<span class="lineNum">     102 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="103"><span class="lineNum">     103 </span>                :            : </a>
+<span class="lineNum">     104 </span>                :            : static struct pinqueue *
+<span class="lineNum">     105 </span>                :<span class="lineNoCov">          0 : pinqueue_get(struct pinsched *ps, ofp_port_t port_no)</span>
+<span class="lineNum">     106 </span>                :            : {
+<span class="lineNum">     107 </span>                :<span class="lineNoCov">          0 :     uint32_t hash = hash_ofp_port(port_no);</span>
+<span class="lineNum">     108 </span>                :            :     struct pinqueue *q;
+<span class="lineNum">     109 </span>                :            : 
+<span class="lineNum">     110 </span>        [<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     HMAP_FOR_EACH_IN_BUCKET (q, node, hash, &amp;ps-&gt;queues) {</span>
+<span class="lineNum">     111 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (port_no == q-&gt;port_no) {</span>
+<span class="lineNum">     112 </span>                :<span class="lineNoCov">          0 :             return q;</span>
+<span class="lineNum">     113 </span>                :            :         }
+<span class="lineNum">     114 </span>                :            :     }
+<span class="lineNum">     115 </span>                :            : 
+<span class="lineNum">     116 </span>                :<span class="lineNoCov">          0 :     q = xmalloc(sizeof *q);</span>
+<span class="lineNum">     117 </span>                :<span class="lineNoCov">          0 :     hmap_insert(&amp;ps-&gt;queues, &amp;q-&gt;node, hash);</span>
+<span class="lineNum">     118 </span>                :<span class="lineNoCov">          0 :     q-&gt;port_no = port_no;</span>
+<span class="lineNum">     119 </span>                :<span class="lineNoCov">          0 :     list_init(&amp;q-&gt;packets);</span>
+<span class="lineNum">     120 </span>                :<span class="lineNoCov">          0 :     q-&gt;n = 0;</span>
+<span class="lineNum">     121 </span>                :<span class="lineNoCov">          0 :     return q;</span>
+<span class="lineNum">     122 </span>                :            : }
+<span class="lineNum">     123 </span>                :            : 
+<a name="124"><span class="lineNum">     124 </span>                :            : /* Drop a packet from the longest queue in 'ps'. */</a>
+<span class="lineNum">     125 </span>                :            : static void
+<span class="lineNum">     126 </span>                :<span class="lineNoCov">          0 : drop_packet(struct pinsched *ps)</span>
+<span class="lineNum">     127 </span>                :            : {
+<span class="lineNum">     128 </span>                :            :     struct pinqueue *longest;   /* Queue currently selected as longest. */
+<span class="lineNum">     129 </span>                :<span class="lineNoCov">          0 :     int n_longest = 0;          /* # of queues of same length as 'longest'. */</span>
+<span class="lineNum">     130 </span>                :            :     struct pinqueue *q;
+<span class="lineNum">     131 </span>                :            : 
+<span class="lineNum">     132 </span>                :<span class="lineNoCov">          0 :     ps-&gt;n_queue_dropped++;</span>
+<span class="lineNum">     133 </span>                :            : 
+<span class="lineNum">     134 </span>                :<span class="lineNoCov">          0 :     longest = NULL;</span>
+<span class="lineNum">     135 </span>        [<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     HMAP_FOR_EACH (q, node, &amp;ps-&gt;queues) {</span>
+<span class="lineNum">     136 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!longest || longest-&gt;n &lt; q-&gt;n) {</span>
+<span class="lineNum">     137 </span>                :<span class="lineNoCov">          0 :             longest = q;</span>
+<span class="lineNum">     138 </span>                :<span class="lineNoCov">          0 :             n_longest = 1;</span>
+<span class="lineNum">     139 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         } else if (longest-&gt;n == q-&gt;n) {</span>
+<span class="lineNum">     140 </span>                :<span class="lineNoCov">          0 :             n_longest++;</span>
+<span class="lineNum">     141 </span>                :            : 
+<span class="lineNum">     142 </span>                :            :             /* Randomly select one of the longest queues, with a uniform
+<span class="lineNum">     143 </span>                :            :              * distribution (Knuth algorithm 3.4.2R). */
+<span class="lineNum">     144 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (!random_range(n_longest)) {</span>
+<span class="lineNum">     145 </span>                :<span class="lineNoCov">          0 :                 longest = q;</span>
+<span class="lineNum">     146 </span>                :            :             }
+<span class="lineNum">     147 </span>                :            :         }
+<span class="lineNum">     148 </span>                :            :     }
+<span class="lineNum">     149 </span>                :            : 
+<span class="lineNum">     150 </span>                :            :     /* FIXME: do we want to pop the tail instead? */
+<span class="lineNum">     151 </span>                :<span class="lineNoCov">          0 :     ofpbuf_delete(dequeue_packet(ps, longest));</span>
+<span class="lineNum">     152 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (longest-&gt;n == 0) {</span>
+<span class="lineNum">     153 </span>                :<span class="lineNoCov">          0 :         pinqueue_destroy(ps, longest);</span>
+<span class="lineNum">     154 </span>                :            :     }
+<span class="lineNum">     155 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     156 </span>                :            : 
+<a name="157"><span class="lineNum">     157 </span>                :            : /* Remove and return the next packet to transmit (in round-robin order). */</a>
+<span class="lineNum">     158 </span>                :            : static struct ofpbuf *
+<span class="lineNum">     159 </span>                :<span class="lineNoCov">          0 : get_tx_packet(struct pinsched *ps)</span>
+<span class="lineNum">     160 </span>                :            : {
+<span class="lineNum">     161 </span>                :            :     struct ofpbuf *packet;
+<span class="lineNum">     162 </span>                :            :     struct pinqueue *q;
+<span class="lineNum">     163 </span>                :            : 
+<span class="lineNum">     164 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!ps-&gt;next_txq) {</span>
+<span class="lineNum">     165 </span>                :<span class="lineNoCov">          0 :         advance_txq(ps);</span>
+<span class="lineNum">     166 </span>                :            :     }
+<span class="lineNum">     167 </span>                :            : 
+<span class="lineNum">     168 </span>                :<span class="lineNoCov">          0 :     q = ps-&gt;next_txq;</span>
+<span class="lineNum">     169 </span>                :<span class="lineNoCov">          0 :     packet = dequeue_packet(ps, q);</span>
+<span class="lineNum">     170 </span>                :<span class="lineNoCov">          0 :     advance_txq(ps);</span>
+<span class="lineNum">     171 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (q-&gt;n == 0) {</span>
+<span class="lineNum">     172 </span>                :<span class="lineNoCov">          0 :         pinqueue_destroy(ps, q);</span>
+<span class="lineNum">     173 </span>                :            :     }
+<span class="lineNum">     174 </span>                :            : 
+<span class="lineNum">     175 </span>                :<span class="lineNoCov">          0 :     return packet;</span>
+<span class="lineNum">     176 </span>                :            : }
+<span class="lineNum">     177 </span>                :            : 
+<span class="lineNum">     178 </span>                :            : /* Attempts to remove enough tokens from 'ps' to transmit a packet.  Returns
+<span class="lineNum">     179 </span>                :            :  * true if successful, false otherwise.  (In the latter case no tokens are
+<a name="180"><span class="lineNum">     180 </span>                :            :  * removed.) */</a>
+<span class="lineNum">     181 </span>                :            : static bool
+<span class="lineNum">     182 </span>                :<span class="lineNoCov">          0 : get_token(struct pinsched *ps)</span>
+<span class="lineNum">     183 </span>                :            : {
+<span class="lineNum">     184 </span>                :<span class="lineNoCov">          0 :     return token_bucket_withdraw(&amp;ps-&gt;token_bucket, 1000);</span>
+<span class="lineNum">     185 </span>                :            : }
+<a name="186"><span class="lineNum">     186 </span>                :            : </a>
+<span class="lineNum">     187 </span>                :            : void
+<span class="lineNum">     188 </span>                :<span class="lineCov">        270 : pinsched_send(struct pinsched *ps, ofp_port_t port_no,</span>
+<span class="lineNum">     189 </span>                :            :               struct ofpbuf *packet, struct list *txq)
+<span class="lineNum">     190 </span>                :            : {
+<span class="lineNum">     191 </span>                :<span class="lineCov">        270 :     list_init(txq);</span>
+<span class="lineNum">     192 </span>        [<span class="branchCov" title="Branch 0 was taken 270 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        270 :     if (!ps) {</span>
+<span class="lineNum">     193 </span>                :<span class="lineCov">        270 :         list_push_back(txq, &amp;packet-&gt;list_node);</span>
+<span class="lineNum">     194 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :     } else if (!ps-&gt;n_queued &amp;&amp; get_token(ps)) {</span>
+<span class="lineNum">     195 </span>                :            :         /* In the common case where we are not constrained by the rate limit,
+<span class="lineNum">     196 </span>                :            :          * let the packet take the normal path. */
+<span class="lineNum">     197 </span>                :<span class="lineNoCov">          0 :         ps-&gt;n_normal++;</span>
+<span class="lineNum">     198 </span>                :<span class="lineNoCov">          0 :         list_push_back(txq, &amp;packet-&gt;list_node);</span>
+<span class="lineNum">     199 </span>                :            :     } else {
+<span class="lineNum">     200 </span>                :            :         /* Otherwise queue it up for the periodic callback to drain out. */
+<span class="lineNum">     201 </span>                :            :         struct pinqueue *q;
+<span class="lineNum">     202 </span>                :            : 
+<span class="lineNum">     203 </span>                :            :         /* We might be called with a buffer obtained from dpif_recv() that has
+<span class="lineNum">     204 </span>                :            :          * much more allocated space than actual content most of the time.
+<span class="lineNum">     205 </span>                :            :          * Since we're going to store the packet for some time, free up that
+<span class="lineNum">     206 </span>                :            :          * otherwise wasted space. */
+<span class="lineNum">     207 </span>                :<span class="lineNoCov">          0 :         ofpbuf_trim(packet);</span>
+<span class="lineNum">     208 </span>                :            : 
+<span class="lineNum">     209 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (ps-&gt;n_queued * 1000 &gt;= ps-&gt;token_bucket.burst) {</span>
+<span class="lineNum">     210 </span>                :<span class="lineNoCov">          0 :             drop_packet(ps);</span>
+<span class="lineNum">     211 </span>                :            :         }
+<span class="lineNum">     212 </span>                :<span class="lineNoCov">          0 :         q = pinqueue_get(ps, port_no);</span>
+<span class="lineNum">     213 </span>                :<span class="lineNoCov">          0 :         list_push_back(&amp;q-&gt;packets, &amp;packet-&gt;list_node);</span>
+<span class="lineNum">     214 </span>                :<span class="lineNoCov">          0 :         q-&gt;n++;</span>
+<span class="lineNum">     215 </span>                :<span class="lineNoCov">          0 :         ps-&gt;n_queued++;</span>
+<span class="lineNum">     216 </span>                :<span class="lineNoCov">          0 :         ps-&gt;n_limited++;</span>
+<span class="lineNum">     217 </span>                :            :     }
+<span class="lineNum">     218 </span>                :<span class="lineCov">        270 : }</span>
+<a name="219"><span class="lineNum">     219 </span>                :            : </a>
+<span class="lineNum">     220 </span>                :            : void
+<span class="lineNum">     221 </span>                :<span class="lineCov">      24440 : pinsched_run(struct pinsched *ps, struct list *txq)</span>
+<span class="lineNum">     222 </span>                :            : {
+<span class="lineNum">     223 </span>                :<span class="lineCov">      24440 :     list_init(txq);</span>
+<span class="lineNum">     224 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 24440 times"> + </span>]:<span class="lineCov">      24440 :     if (ps) {</span>
+<span class="lineNum">     225 </span>                :            :         int i;
+<span class="lineNum">     226 </span>                :            : 
+<span class="lineNum">     227 </span>                :            :         /* Drain some packets out of the bucket if possible, but limit the
+<span class="lineNum">     228 </span>                :            :          * number of iterations to allow other code to get work done too. */
+<span class="lineNum">     229 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :         for (i = 0; ps-&gt;n_queued &amp;&amp; get_token(ps) &amp;&amp; i &lt; 50; i++) {</span>
+<span class="lineNum">         </span>        [<span class="branchNoExec" title="Branch 5 was not executed"> # </span><span class="branchNoExec" title="Branch 6 was not executed"> # </span>]
+<span class="lineNum">     230 </span>                :<span class="lineNoCov">          0 :             struct ofpbuf *packet = get_tx_packet(ps);</span>
+<span class="lineNum">     231 </span>                :<span class="lineNoCov">          0 :             list_push_back(txq, &amp;packet-&gt;list_node);</span>
+<span class="lineNum">     232 </span>                :            :         }
+<span class="lineNum">     233 </span>                :            :     }
+<span class="lineNum">     234 </span>                :<span class="lineCov">      24440 : }</span>
+<a name="235"><span class="lineNum">     235 </span>                :            : </a>
+<span class="lineNum">     236 </span>                :            : void
+<span class="lineNum">     237 </span>                :<span class="lineCov">      24362 : pinsched_wait(struct pinsched *ps)</span>
+<span class="lineNum">     238 </span>                :            : {
+<span class="lineNum">     239 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 24362 times"> + </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">      24362 :     if (ps &amp;&amp; ps-&gt;n_queued) {</span>
+<span class="lineNum">     240 </span>                :<span class="lineNoCov">          0 :         token_bucket_wait(&amp;ps-&gt;token_bucket, 1000);</span>
+<span class="lineNum">     241 </span>                :            :     }
+<span class="lineNum">     242 </span>                :<span class="lineCov">      24362 : }</span>
+<span class="lineNum">     243 </span>                :            : 
+<a name="244"><span class="lineNum">     244 </span>                :            : /* Creates and returns a scheduler for sending packet-in messages. */</a>
+<span class="lineNum">     245 </span>                :            : struct pinsched *
+<span class="lineNum">     246 </span>                :<span class="lineNoCov">          0 : pinsched_create(int rate_limit, int burst_limit)</span>
+<span class="lineNum">     247 </span>                :            : {
+<span class="lineNum">     248 </span>                :            :     struct pinsched *ps;
+<span class="lineNum">     249 </span>                :            : 
+<span class="lineNum">     250 </span>                :<span class="lineNoCov">          0 :     ps = xzalloc(sizeof *ps);</span>
+<span class="lineNum">     251 </span>                :            : 
+<span class="lineNum">     252 </span>                :<span class="lineNoCov">          0 :     adjust_limits(&amp;rate_limit, &amp;burst_limit);</span>
+<span class="lineNum">     253 </span>                :<span class="lineNoCov">          0 :     token_bucket_init(&amp;ps-&gt;token_bucket,</span>
+<span class="lineNum">     254 </span>                :            :                       rate_limit, sat_mul(burst_limit, 1000));
+<span class="lineNum">     255 </span>                :            : 
+<span class="lineNum">     256 </span>                :<span class="lineNoCov">          0 :     hmap_init(&amp;ps-&gt;queues);</span>
+<span class="lineNum">     257 </span>                :<span class="lineNoCov">          0 :     ps-&gt;n_queued = 0;</span>
+<span class="lineNum">     258 </span>                :<span class="lineNoCov">          0 :     ps-&gt;next_txq = NULL;</span>
+<span class="lineNum">     259 </span>                :<span class="lineNoCov">          0 :     ps-&gt;n_txq = 0;</span>
+<span class="lineNum">     260 </span>                :<span class="lineNoCov">          0 :     ps-&gt;n_normal = 0;</span>
+<span class="lineNum">     261 </span>                :<span class="lineNoCov">          0 :     ps-&gt;n_limited = 0;</span>
+<span class="lineNum">     262 </span>                :<span class="lineNoCov">          0 :     ps-&gt;n_queue_dropped = 0;</span>
+<span class="lineNum">     263 </span>                :            : 
+<span class="lineNum">     264 </span>                :<span class="lineNoCov">          0 :     return ps;</span>
+<span class="lineNum">     265 </span>                :            : }
+<a name="266"><span class="lineNum">     266 </span>                :            : </a>
+<span class="lineNum">     267 </span>                :            : void
+<span class="lineNum">     268 </span>                :<span class="lineCov">       3800 : pinsched_destroy(struct pinsched *ps)</span>
+<span class="lineNum">     269 </span>                :            : {
+<span class="lineNum">     270 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3800 times"> + </span>]:<span class="lineCov">       3800 :     if (ps) {</span>
+<span class="lineNum">     271 </span>                :            :         struct pinqueue *q, *next;
+<span class="lineNum">     272 </span>                :            : 
+<span class="lineNum">     273 </span>[<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>][<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]:<span class="lineNoCov">          0 :         HMAP_FOR_EACH_SAFE (q, next, node, &amp;ps-&gt;queues) {</span>
+<span class="lineNum">     274 </span>                :<span class="lineNoCov">          0 :             hmap_remove(&amp;ps-&gt;queues, &amp;q-&gt;node);</span>
+<span class="lineNum">     275 </span>                :<span class="lineNoCov">          0 :             ofpbuf_list_delete(&amp;q-&gt;packets);</span>
+<span class="lineNum">     276 </span>                :<span class="lineNoCov">          0 :             free(q);</span>
+<span class="lineNum">     277 </span>                :            :         }
+<span class="lineNum">     278 </span>                :<span class="lineNoCov">          0 :         hmap_destroy(&amp;ps-&gt;queues);</span>
+<span class="lineNum">     279 </span>                :<span class="lineNoCov">          0 :         free(ps);</span>
+<span class="lineNum">     280 </span>                :            :     }
+<span class="lineNum">     281 </span>                :<span class="lineCov">       3800 : }</span>
+<a name="282"><span class="lineNum">     282 </span>                :            : </a>
+<span class="lineNum">     283 </span>                :            : void
+<span class="lineNum">     284 </span>                :<span class="lineNoCov">          0 : pinsched_get_limits(const struct pinsched *ps,</span>
+<span class="lineNum">     285 </span>                :            :                     int *rate_limit, int *burst_limit)
+<span class="lineNum">     286 </span>                :            : {
+<span class="lineNum">     287 </span>                :<span class="lineNoCov">          0 :     *rate_limit = ps-&gt;token_bucket.rate;</span>
+<span class="lineNum">     288 </span>                :<span class="lineNoCov">          0 :     *burst_limit = ps-&gt;token_bucket.burst / 1000;</span>
+<span class="lineNum">     289 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="290"><span class="lineNum">     290 </span>                :            : </a>
+<span class="lineNum">     291 </span>                :            : void
+<span class="lineNum">     292 </span>                :<span class="lineNoCov">          0 : pinsched_set_limits(struct pinsched *ps, int rate_limit, int burst_limit)</span>
+<span class="lineNum">     293 </span>                :            : {
+<span class="lineNum">     294 </span>                :<span class="lineNoCov">          0 :     adjust_limits(&amp;rate_limit, &amp;burst_limit);</span>
+<span class="lineNum">     295 </span>                :<span class="lineNoCov">          0 :     token_bucket_set(&amp;ps-&gt;token_bucket,</span>
+<span class="lineNum">     296 </span>                :            :                      rate_limit, sat_mul(burst_limit, 1000));
+<span class="lineNum">     297 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     while (ps-&gt;n_queued &gt; burst_limit) {</span>
+<span class="lineNum">     298 </span>                :<span class="lineNoCov">          0 :         drop_packet(ps);</span>
+<span class="lineNum">     299 </span>                :            :     }
+<span class="lineNum">     300 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     301 </span>                :            : 
+<span class="lineNum">     302 </span>                :            : /* Returns the number of packets scheduled to be sent eventually by 'ps'.
+<a name="303"><span class="lineNum">     303 </span>                :            :  * Returns 0 if 'ps' is null. */</a>
+<span class="lineNum">     304 </span>                :            : unsigned int
+<span class="lineNum">     305 </span>                :<span class="lineNoCov">          0 : pinsched_count_txqlen(const struct pinsched *ps)</span>
+<span class="lineNum">     306 </span>                :            : {
+<span class="lineNum">     307 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     return ps ? ps-&gt;n_txq : 0;</span>
+<span class="lineNum">     308 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,618 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ovsdb/mutation.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">ovsdb</a> - mutation.c<span style="font-size: 80%;"> (source / <a href="mutation.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">202</td>
+            <td class="headerCovTableEntry">210</td>
+            <td class="headerCovTableEntryHi">96.2 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">24</td>
+            <td class="headerCovTableEntry">24</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">121</td>
+            <td class="headerCovTableEntry">143</td>
+            <td class="headerCovTableEntryMed">84.6 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (c) 2009, 2010, 2011, 2012 Nicira, Inc.</a>
+<span class="lineNum">       2 </span>                :            :  *
+<span class="lineNum">       3 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       4 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       5 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       6 </span>                :            :  *
+<span class="lineNum">       7 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       8 </span>                :            :  *
+<span class="lineNum">       9 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      10 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      11 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      12 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      13 </span>                :            :  * limitations under the License.
+<span class="lineNum">      14 </span>                :            :  */
+<span class="lineNum">      15 </span>                :            : 
+<span class="lineNum">      16 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      17 </span>                :            : 
+<span class="lineNum">      18 </span>                :            : #include &quot;mutation.h&quot;
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &lt;float.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;limits.h&gt;
+<span class="lineNum">      22 </span>                :            : 
+<span class="lineNum">      23 </span>                :            : #include &quot;column.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;ovsdb-error.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;json.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;row.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;table.h&quot;
+<a name="28"><span class="lineNum">      28 </span>                :            : </a>
+<span class="lineNum">      29 </span>                :            : struct ovsdb_error *
+<span class="lineNum">      30 </span>                :<span class="lineCov">       1089 : ovsdb_mutator_from_string(const char *name, enum ovsdb_mutator *mutator)</span>
+<span class="lineNum">      31 </span>                :            : {
+<span class="lineNum">      32 </span>                :            : #define OVSDB_MUTATOR(ENUM, NAME)               \
+<span class="lineNum">      33 </span>                :            :     if (!strcmp(name, NAME)) {                  \
+<span class="lineNum">      34 </span>                :            :         *mutator = ENUM;                        \
+<span class="lineNum">      35 </span>                :            :         return NULL;                            \
+<span class="lineNum">      36 </span>                :            :     }
+<span class="lineNum">      37 </span>[<span class="branchCov" title="Branch 0 was taken 961 times"> + </span><span class="branchCov" title="Branch 1 was taken 128 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 16 times"> + </span><span class="branchCov" title="Branch 3 was taken 112 times"> + </span>]:<span class="lineCov">       1089 :     OVSDB_MUTATORS;</span>
+<span class="lineNum">         </span>[<span class="branchCov" title="Branch 4 was taken 22 times"> + </span><span class="branchCov" title="Branch 5 was taken 90 times"> + </span>][<span class="branchCov" title="Branch 6 was taken 18 times"> + </span><span class="branchCov" title="Branch 7 was taken 72 times"> + </span>]
+<span class="lineNum">         </span>[<span class="branchCov" title="Branch 8 was taken 8 times"> + </span><span class="branchCov" title="Branch 9 was taken 64 times"> + </span>][<span class="branchCov" title="Branch 10 was taken 27 times"> + </span><span class="branchCov" title="Branch 11 was taken 37 times"> + </span>]
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 12 was taken 36 times"> + </span><span class="branchCov" title="Branch 13 was taken 1 time"> + </span>]
+<span class="lineNum">      38 </span>                :            : #undef OVSDB_MUTATOR
+<span class="lineNum">      39 </span>                :            : 
+<span class="lineNum">      40 </span>                :<span class="lineCov">       1089 :     return ovsdb_syntax_error(NULL, &quot;unknown mutator&quot;,</span>
+<span class="lineNum">      41 </span>                :            :                               &quot;No mutator named %s.&quot;, name);
+<span class="lineNum">      42 </span>                :            : }
+<a name="43"><span class="lineNum">      43 </span>                :            : </a>
+<span class="lineNum">      44 </span>                :            : const char *
+<span class="lineNum">      45 </span>                :<span class="lineCov">         81 : ovsdb_mutator_to_string(enum ovsdb_mutator mutator)</span>
+<span class="lineNum">      46 </span>                :            : {
+<span class="lineNum">      47 </span>  [<span class="branchCov" title="Branch 0 was taken 14 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span><span class="branchCov" title="Branch 2 was taken 15 times"> + </span><span class="branchCov" title="Branch 3 was taken 12 times"> + </span> :<span class="lineCov">         81 :     switch (mutator) {</span>
+<span class="lineNum">         </span>   <span class="branchCov" title="Branch 4 was taken 6 times"> + </span><span class="branchCov" title="Branch 5 was taken 10 times"> + </span><span class="branchCov" title="Branch 6 was taken 10 times"> + </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span>]
+<span class="lineNum">      48 </span>                :            : #define OVSDB_MUTATOR(ENUM, NAME) case ENUM: return NAME;
+<span class="lineNum">      49 </span>                :<span class="lineCov">         81 :         OVSDB_MUTATORS;</span>
+<span class="lineNum">      50 </span>                :            : #undef OVSDB_MUTATOR
+<span class="lineNum">      51 </span>                :            :     }
+<span class="lineNum">      52 </span>                :            : 
+<span class="lineNum">      53 </span>                :<span class="lineCov">         81 :     return NULL;</span>
+<span class="lineNum">      54 </span>                :            : }
+<a name="55"><span class="lineNum">      55 </span>                :            : </a>
+<span class="lineNum">      56 </span>                :            : static WARN_UNUSED_RESULT struct ovsdb_error *
+<span class="lineNum">      57 </span>                :<span class="lineCov">         25 : type_mismatch(const struct ovsdb_mutation *m, const struct json *json)</span>
+<span class="lineNum">      58 </span>                :            : {
+<span class="lineNum">      59 </span>                :            :     struct ovsdb_error *error;
+<span class="lineNum">      60 </span>                :            :     char *s;
+<span class="lineNum">      61 </span>                :            : 
+<span class="lineNum">      62 </span>                :<span class="lineCov">         25 :     s = ovsdb_type_to_english(&amp;m-&gt;column-&gt;type);</span>
+<span class="lineNum">      63 </span>                :<span class="lineCov">         25 :     error = ovsdb_syntax_error(</span>
+<span class="lineNum">      64 </span>                :            :         json, NULL, &quot;Type mismatch: \&quot;%s\&quot; operator may not be &quot;
+<span class="lineNum">      65 </span>                :            :         &quot;applied to column %s of type %s.&quot;,
+<span class="lineNum">      66 </span>                :<span class="lineCov">         25 :         ovsdb_mutator_to_string(m-&gt;mutator), m-&gt;column-&gt;name, s);</span>
+<span class="lineNum">      67 </span>                :<span class="lineCov">         25 :     free(s);</span>
+<span class="lineNum">      68 </span>                :            : 
+<span class="lineNum">      69 </span>                :<span class="lineCov">         25 :     return error;</span>
+<span class="lineNum">      70 </span>                :            : }
+<a name="71"><span class="lineNum">      71 </span>                :            : </a>
+<span class="lineNum">      72 </span>                :            : static WARN_UNUSED_RESULT struct ovsdb_error *
+<span class="lineNum">      73 </span>                :<span class="lineCov">       1102 : ovsdb_mutation_from_json(const struct ovsdb_table_schema *ts,</span>
+<span class="lineNum">      74 </span>                :            :                          const struct json *json,
+<span class="lineNum">      75 </span>                :            :                          struct ovsdb_symbol_table *symtab,
+<span class="lineNum">      76 </span>                :            :                          struct ovsdb_mutation *m)
+<span class="lineNum">      77 </span>                :            : {
+<span class="lineNum">      78 </span>                :            :     const struct json_array *array;
+<span class="lineNum">      79 </span>                :            :     struct ovsdb_error *error;
+<span class="lineNum">      80 </span>                :            :     const char *mutator_name;
+<span class="lineNum">      81 </span>                :            :     const char *column_name;
+<span class="lineNum">      82 </span>                :            : 
+<span class="lineNum">      83 </span>        [<span class="branchCov" title="Branch 0 was taken 1102 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       1102 :     if (json-&gt;type != JSON_ARRAY</span>
+<span class="lineNum">      84 </span>        [<span class="branchCov" title="Branch 0 was taken 1102 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       1102 :         || json-&gt;u.array.n != 3</span>
+<span class="lineNum">      85 </span>        [<span class="branchCov" title="Branch 0 was taken 1102 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       1102 :         || json-&gt;u.array.elems[0]-&gt;type != JSON_STRING</span>
+<span class="lineNum">      86 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1102 times"> + </span>]:<span class="lineCov">       1102 :         || json-&gt;u.array.elems[1]-&gt;type != JSON_STRING) {</span>
+<span class="lineNum">      87 </span>                :<span class="lineNoCov">          0 :         return ovsdb_syntax_error(json, NULL, &quot;Parse error in mutation.&quot;);</span>
+<span class="lineNum">      88 </span>                :            :     }
+<span class="lineNum">      89 </span>                :<span class="lineCov">       1102 :     array = json_array(json);</span>
+<span class="lineNum">      90 </span>                :            : 
+<span class="lineNum">      91 </span>                :<span class="lineCov">       1102 :     column_name = json_string(array-&gt;elems[0]);</span>
+<span class="lineNum">      92 </span>                :<span class="lineCov">       1102 :     m-&gt;column = ovsdb_table_schema_get_column(ts, column_name);</span>
+<span class="lineNum">      93 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1102 times"> + </span>]:<span class="lineCov">       1102 :     if (!m-&gt;column) {</span>
+<span class="lineNum">      94 </span>                :<span class="lineNoCov">          0 :         return ovsdb_syntax_error(json, &quot;unknown column&quot;,</span>
+<span class="lineNum">      95 </span>                :            :                                   &quot;No column %s in table %s.&quot;,
+<span class="lineNum">      96 </span>                :            :                                   column_name, ts-&gt;name);
+<span class="lineNum">      97 </span>                :            :     }
+<span class="lineNum">      98 </span>        [<span class="branchCov" title="Branch 0 was taken 13 times"> + </span><span class="branchCov" title="Branch 1 was taken 1089 times"> + </span>]:<span class="lineCov">       1102 :     if (!m-&gt;column-&gt;mutable) {</span>
+<span class="lineNum">      99 </span>                :<span class="lineCov">         13 :         return ovsdb_syntax_error(json, &quot;constraint violation&quot;,</span>
+<span class="lineNum">     100 </span>                :            :                                   &quot;Cannot mutate immutable column %s in &quot;
+<span class="lineNum">     101 </span>                :            :                                   &quot;table %s.&quot;, column_name, ts-&gt;name);
+<span class="lineNum">     102 </span>                :            :     }
+<span class="lineNum">     103 </span>                :            : 
+<span class="lineNum">     104 </span>                :<span class="lineCov">       1089 :     ovsdb_type_clone(&amp;m-&gt;type, &amp;m-&gt;column-&gt;type);</span>
+<span class="lineNum">     105 </span>                :            : 
+<span class="lineNum">     106 </span>                :<span class="lineCov">       1089 :     mutator_name = json_string(array-&gt;elems[1]);</span>
+<span class="lineNum">     107 </span>                :<span class="lineCov">       1089 :     error = ovsdb_mutator_from_string(mutator_name, &amp;m-&gt;mutator);</span>
+<span class="lineNum">     108 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 1088 times"> + </span>]:<span class="lineCov">       1089 :     if (error) {</span>
+<span class="lineNum">     109 </span>                :<span class="lineCov">          1 :         goto exit;</span>
+<span class="lineNum">     110 </span>                :            :     }
+<span class="lineNum">     111 </span>                :            : 
+<span class="lineNum">     112 </span>                :            :     /* Type-check and relax restrictions on 'type' if appropriate.  */
+<span class="lineNum">     113 </span>     [<span class="branchCov" title="Branch 0 was taken 1025 times"> + </span><span class="branchCov" title="Branch 1 was taken 63 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">       1088 :     switch (m-&gt;mutator) {</span>
+<span class="lineNum">     114 </span>                :            :     case OVSDB_M_ADD:
+<span class="lineNum">     115 </span>                :            :     case OVSDB_M_SUB:
+<span class="lineNum">     116 </span>                :            :     case OVSDB_M_MUL:
+<span class="lineNum">     117 </span>                :            :     case OVSDB_M_DIV:
+<span class="lineNum">     118 </span>                :            :     case OVSDB_M_MOD:
+<span class="lineNum">     119 </span>[<span class="branchCov" title="Branch 1 was taken 19 times"> + </span><span class="branchCov" title="Branch 2 was taken 1006 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 19 times"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span>]:<span class="lineCov">       1025 :         if ((!ovsdb_type_is_scalar(&amp;m-&gt;type) &amp;&amp; !ovsdb_type_is_set(&amp;m-&gt;type))</span>
+<span class="lineNum">     120 </span>        [<span class="branchCov" title="Branch 0 was taken 42 times"> + </span><span class="branchCov" title="Branch 1 was taken 983 times"> + </span>]:<span class="lineCov">       1025 :             || (m-&gt;type.key.type != OVSDB_TYPE_INTEGER</span>
+<span class="lineNum">     121 </span>        [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>]:<span class="lineCov">         42 :                 &amp;&amp; m-&gt;type.key.type != OVSDB_TYPE_REAL)</span>
+<span class="lineNum">     122 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 1005 times"> + </span>]:<span class="lineCov">       1011 :             || (m-&gt;mutator == OVSDB_M_MOD</span>
+<span class="lineNum">     123 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 5 times"> + </span>]:<span class="lineCov">          6 :                 &amp;&amp; m-&gt;type.key.type == OVSDB_TYPE_REAL)) {</span>
+<span class="lineNum">     124 </span>                :<span class="lineCov">         15 :             return type_mismatch(m, json);</span>
+<span class="lineNum">     125 </span>                :            :         }
+<span class="lineNum">     126 </span>                :<span class="lineCov">       1010 :         ovsdb_base_type_clear_constraints(&amp;m-&gt;type.key);</span>
+<span class="lineNum">     127 </span>                :<span class="lineCov">       1010 :         m-&gt;type.n_min = m-&gt;type.n_max = 1;</span>
+<span class="lineNum">     128 </span>                :<span class="lineCov">       1010 :         error = ovsdb_datum_from_json(&amp;m-&gt;arg, &amp;m-&gt;type, array-&gt;elems[2],</span>
+<span class="lineNum">     129 </span>                :            :                                       symtab);
+<span class="lineNum">     130 </span>                :<span class="lineCov">       1010 :         break;</span>
+<span class="lineNum">     131 </span>                :            : 
+<span class="lineNum">     132 </span>                :            :     case OVSDB_M_INSERT:
+<span class="lineNum">     133 </span>                :            :     case OVSDB_M_DELETE:
+<span class="lineNum">     134 </span>[<span class="branchCov" title="Branch 1 was taken 16 times"> + </span><span class="branchCov" title="Branch 2 was taken 47 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 10 times"> + </span><span class="branchCov" title="Branch 5 was taken 6 times"> + </span>]:<span class="lineCov">         63 :         if (!ovsdb_type_is_set(&amp;m-&gt;type) &amp;&amp; !ovsdb_type_is_map(&amp;m-&gt;type)) {</span>
+<span class="lineNum">     135 </span>                :<span class="lineCov">         10 :             return type_mismatch(m, json);</span>
+<span class="lineNum">     136 </span>                :            :         }
+<span class="lineNum">     137 </span>                :<span class="lineCov">         53 :         m-&gt;type.n_min = 0;</span>
+<span class="lineNum">     138 </span>        [<span class="branchCov" title="Branch 0 was taken 31 times"> + </span><span class="branchCov" title="Branch 1 was taken 22 times"> + </span>]:<span class="lineCov">         53 :         if (m-&gt;mutator == OVSDB_M_DELETE) {</span>
+<span class="lineNum">     139 </span>                :<span class="lineCov">         31 :             m-&gt;type.n_max = UINT_MAX;</span>
+<span class="lineNum">     140 </span>                :            :         }
+<span class="lineNum">     141 </span>                :<span class="lineCov">         53 :         error = ovsdb_datum_from_json(&amp;m-&gt;arg, &amp;m-&gt;type, array-&gt;elems[2],</span>
+<span class="lineNum">     142 </span>                :            :                                       symtab);
+<span class="lineNum">     143 </span>[<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 51 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span>]:<span class="lineCov">         53 :         if (error &amp;&amp; ovsdb_type_is_map(&amp;m-&gt;type)</span>
+<span class="lineNum">     144 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :             &amp;&amp; m-&gt;mutator == OVSDB_M_DELETE) {</span>
+<span class="lineNum">     145 </span>                :<span class="lineCov">          2 :             ovsdb_error_destroy(error);</span>
+<span class="lineNum">     146 </span>                :<span class="lineCov">          2 :             m-&gt;type.value.type = OVSDB_TYPE_VOID;</span>
+<span class="lineNum">     147 </span>                :<span class="lineCov">          2 :             error = ovsdb_datum_from_json(&amp;m-&gt;arg, &amp;m-&gt;type, array-&gt;elems[2],</span>
+<span class="lineNum">     148 </span>                :            :                                           symtab);
+<span class="lineNum">     149 </span>                :            :         }
+<span class="lineNum">     150 </span>                :<span class="lineCov">         53 :         break;</span>
+<span class="lineNum">     151 </span>                :            : 
+<span class="lineNum">     152 </span>                :            :     default:
+<span class="lineNum">     153 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     154 </span>                :            :     }
+<span class="lineNum">     155 </span>                :            : 
+<span class="lineNum">     156 </span>                :            : exit:
+<span class="lineNum">     157 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 1063 times"> + </span>]:<span class="lineCov">       1064 :     if (error) {</span>
+<span class="lineNum">     158 </span>                :<span class="lineCov">          1 :         ovsdb_type_destroy(&amp;m-&gt;type);</span>
+<span class="lineNum">     159 </span>                :            :     }
+<span class="lineNum">     160 </span>                :<span class="lineCov">       1102 :     return error;</span>
+<span class="lineNum">     161 </span>                :            : }
+<a name="162"><span class="lineNum">     162 </span>                :            : </a>
+<span class="lineNum">     163 </span>                :            : static void
+<span class="lineNum">     164 </span>                :<span class="lineCov">       1063 : ovsdb_mutation_free(struct ovsdb_mutation *m)</span>
+<span class="lineNum">     165 </span>                :            : {
+<span class="lineNum">     166 </span>                :<span class="lineCov">       1063 :     ovsdb_datum_destroy(&amp;m-&gt;arg, &amp;m-&gt;type);</span>
+<span class="lineNum">     167 </span>                :<span class="lineCov">       1063 :     ovsdb_type_destroy(&amp;m-&gt;type);</span>
+<span class="lineNum">     168 </span>                :<span class="lineCov">       1063 : }</span>
+<a name="169"><span class="lineNum">     169 </span>                :            : </a>
+<span class="lineNum">     170 </span>                :            : struct ovsdb_error *
+<span class="lineNum">     171 </span>                :<span class="lineCov">       1104 : ovsdb_mutation_set_from_json(const struct ovsdb_table_schema *ts,</span>
+<span class="lineNum">     172 </span>                :            :                              const struct json *json,
+<span class="lineNum">     173 </span>                :            :                              struct ovsdb_symbol_table *symtab,
+<span class="lineNum">     174 </span>                :            :                              struct ovsdb_mutation_set *set)
+<span class="lineNum">     175 </span>                :            : {
+<span class="lineNum">     176 </span>                :<span class="lineCov">       1104 :     const struct json_array *array = json_array(json);</span>
+<span class="lineNum">     177 </span>                :            :     size_t i;
+<span class="lineNum">     178 </span>                :            : 
+<span class="lineNum">     179 </span>                :<span class="lineCov">       1104 :     set-&gt;mutations = xmalloc(array-&gt;n * sizeof *set-&gt;mutations);</span>
+<span class="lineNum">     180 </span>                :<span class="lineCov">       1104 :     set-&gt;n_mutations = 0;</span>
+<span class="lineNum">     181 </span>        [<span class="branchCov" title="Branch 0 was taken 1102 times"> + </span><span class="branchCov" title="Branch 1 was taken 1065 times"> + </span>]:<span class="lineCov">       2167 :     for (i = 0; i &lt; array-&gt;n; i++) {</span>
+<span class="lineNum">     182 </span>                :            :         struct ovsdb_error *error;
+<span class="lineNum">     183 </span>                :<span class="lineCov">       1102 :         error = ovsdb_mutation_from_json(ts, array-&gt;elems[i], symtab,</span>
+<span class="lineNum">     184 </span>                :<span class="lineCov">       1102 :                                          &amp;set-&gt;mutations[i]);</span>
+<span class="lineNum">     185 </span>        [<span class="branchCov" title="Branch 0 was taken 39 times"> + </span><span class="branchCov" title="Branch 1 was taken 1063 times"> + </span>]:<span class="lineCov">       1102 :         if (error) {</span>
+<span class="lineNum">     186 </span>                :<span class="lineCov">         39 :             ovsdb_mutation_set_destroy(set);</span>
+<span class="lineNum">     187 </span>                :<span class="lineCov">         39 :             set-&gt;mutations = NULL;</span>
+<span class="lineNum">     188 </span>                :<span class="lineCov">         39 :             set-&gt;n_mutations = 0;</span>
+<span class="lineNum">     189 </span>                :<span class="lineCov">         39 :             return error;</span>
+<span class="lineNum">     190 </span>                :            :         }
+<span class="lineNum">     191 </span>                :<span class="lineCov">       1063 :         set-&gt;n_mutations++;</span>
+<span class="lineNum">     192 </span>                :            :     }
+<span class="lineNum">     193 </span>                :            : 
+<span class="lineNum">     194 </span>                :<span class="lineCov">       1104 :     return NULL;</span>
+<span class="lineNum">     195 </span>                :            : }
+<a name="196"><span class="lineNum">     196 </span>                :            : </a>
+<span class="lineNum">     197 </span>                :            : static struct json *
+<span class="lineNum">     198 </span>                :<span class="lineCov">         28 : ovsdb_mutation_to_json(const struct ovsdb_mutation *m)</span>
+<span class="lineNum">     199 </span>                :            : {
+<span class="lineNum">     200 </span>                :<span class="lineCov">         28 :     return json_array_create_3(</span>
+<span class="lineNum">     201 </span>                :<span class="lineCov">         28 :         json_string_create(m-&gt;column-&gt;name),</span>
+<span class="lineNum">     202 </span>                :            :         json_string_create(ovsdb_mutator_to_string(m-&gt;mutator)),
+<span class="lineNum">     203 </span>                :            :         ovsdb_datum_to_json(&amp;m-&gt;arg, &amp;m-&gt;type));
+<span class="lineNum">     204 </span>                :            : }
+<a name="205"><span class="lineNum">     205 </span>                :            : </a>
+<span class="lineNum">     206 </span>                :            : struct json *
+<span class="lineNum">     207 </span>                :<span class="lineCov">         29 : ovsdb_mutation_set_to_json(const struct ovsdb_mutation_set *set)</span>
+<span class="lineNum">     208 </span>                :            : {
+<span class="lineNum">     209 </span>                :            :     struct json **mutations;
+<span class="lineNum">     210 </span>                :            :     size_t i;
+<span class="lineNum">     211 </span>                :            : 
+<span class="lineNum">     212 </span>                :<span class="lineCov">         29 :     mutations = xmalloc(set-&gt;n_mutations * sizeof *mutations);</span>
+<span class="lineNum">     213 </span>        [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchCov" title="Branch 1 was taken 29 times"> + </span>]:<span class="lineCov">         57 :     for (i = 0; i &lt; set-&gt;n_mutations; i++) {</span>
+<span class="lineNum">     214 </span>                :<span class="lineCov">         28 :         mutations[i] = ovsdb_mutation_to_json(&amp;set-&gt;mutations[i]);</span>
+<span class="lineNum">     215 </span>                :            :     }
+<span class="lineNum">     216 </span>                :<span class="lineCov">         29 :     return json_array_create(mutations, set-&gt;n_mutations);</span>
+<span class="lineNum">     217 </span>                :            : }
+<a name="218"><span class="lineNum">     218 </span>                :            : </a>
+<span class="lineNum">     219 </span>                :            : void
+<span class="lineNum">     220 </span>                :<span class="lineCov">       1143 : ovsdb_mutation_set_destroy(struct ovsdb_mutation_set *set)</span>
+<span class="lineNum">     221 </span>                :            : {
+<span class="lineNum">     222 </span>                :            :     size_t i;
+<span class="lineNum">     223 </span>                :            : 
+<span class="lineNum">     224 </span>        [<span class="branchCov" title="Branch 0 was taken 1063 times"> + </span><span class="branchCov" title="Branch 1 was taken 1143 times"> + </span>]:<span class="lineCov">       2206 :     for (i = 0; i &lt; set-&gt;n_mutations; i++) {</span>
+<span class="lineNum">     225 </span>                :<span class="lineCov">       1063 :         ovsdb_mutation_free(&amp;set-&gt;mutations[i]);</span>
+<span class="lineNum">     226 </span>                :            :     }
+<span class="lineNum">     227 </span>                :<span class="lineCov">       1143 :     free(set-&gt;mutations);</span>
+<span class="lineNum">     228 </span>                :<span class="lineCov">       1143 : }</span>
+<span class="lineNum">     229 </span>                :            : 
+<span class="lineNum">     230 </span>                :            : enum ovsdb_mutation_scalar_error {
+<span class="lineNum">     231 </span>                :            :     ME_OK,
+<span class="lineNum">     232 </span>                :            :     ME_DOM,
+<span class="lineNum">     233 </span>                :            :     ME_RANGE
+<span class="lineNum">     234 </span>                :            : };
+<span class="lineNum">     235 </span>                :            : 
+<span class="lineNum">     236 </span>                :            : struct ovsdb_scalar_mutation {
+<span class="lineNum">     237 </span>                :            :     int (*mutate_integer)(int64_t *x, int64_t y);
+<span class="lineNum">     238 </span>                :            :     int (*mutate_real)(double *x, double y);
+<span class="lineNum">     239 </span>                :            :     enum ovsdb_mutator mutator;
+<span class="lineNum">     240 </span>                :            : };
+<span class="lineNum">     241 </span>                :            : 
+<span class="lineNum">     242 </span>                :            : static const struct ovsdb_scalar_mutation add_mutation;
+<span class="lineNum">     243 </span>                :            : static const struct ovsdb_scalar_mutation sub_mutation;
+<span class="lineNum">     244 </span>                :            : static const struct ovsdb_scalar_mutation mul_mutation;
+<span class="lineNum">     245 </span>                :            : static const struct ovsdb_scalar_mutation div_mutation;
+<span class="lineNum">     246 </span>                :            : static const struct ovsdb_scalar_mutation mod_mutation;
+<a name="247"><span class="lineNum">     247 </span>                :            : </a>
+<span class="lineNum">     248 </span>                :            : static struct ovsdb_error *
+<span class="lineNum">     249 </span>                :<span class="lineCov">         33 : ovsdb_mutation_scalar_error(enum ovsdb_mutation_scalar_error error,</span>
+<span class="lineNum">     250 </span>                :            :                             enum ovsdb_mutator mutator)
+<span class="lineNum">     251 </span>                :            : {
+<span class="lineNum">     252 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 10 times"> + </span><span class="branchCov" title="Branch 2 was taken 23 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         33 :     switch (error) {</span>
+<span class="lineNum">     253 </span>                :            :     case ME_OK:
+<span class="lineNum">     254 </span>                :<span class="lineNoCov">          0 :         return OVSDB_BUG(&quot;unexpected success&quot;);</span>
+<span class="lineNum">     255 </span>                :            : 
+<span class="lineNum">     256 </span>                :            :     case ME_DOM:
+<span class="lineNum">     257 </span>                :<span class="lineCov">         10 :         return ovsdb_error(&quot;domain error&quot;, &quot;Division by zero.&quot;);</span>
+<span class="lineNum">     258 </span>                :            : 
+<span class="lineNum">     259 </span>                :            :     case ME_RANGE:
+<span class="lineNum">     260 </span>                :<span class="lineCov">         23 :         return ovsdb_error(&quot;range error&quot;,</span>
+<span class="lineNum">     261 </span>                :            :                            &quot;Result of \&quot;%s\&quot; operation is out of range.&quot;,
+<span class="lineNum">     262 </span>                :            :                            ovsdb_mutator_to_string(mutator));
+<span class="lineNum">     263 </span>                :            : 
+<span class="lineNum">     264 </span>                :            :     default:
+<span class="lineNum">     265 </span>                :<span class="lineCov">         33 :         return OVSDB_BUG(&quot;unexpected error&quot;);</span>
+<span class="lineNum">     266 </span>                :            :     }
+<span class="lineNum">     267 </span>                :            : }
+<a name="268"><span class="lineNum">     268 </span>                :            : </a>
+<span class="lineNum">     269 </span>                :            : static int
+<span class="lineNum">     270 </span>                :<span class="lineCov">         69 : check_real_range(double x)</span>
+<span class="lineNum">     271 </span>                :            : {
+<span class="lineNum">     272 </span>[<span class="branchCov" title="Branch 0 was taken 66 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 63 times"> + </span><span class="branchCov" title="Branch 3 was taken 3 times"> + </span>]:<span class="lineCov">         69 :     return x &gt;= -DBL_MAX &amp;&amp; x &lt;= DBL_MAX ? 0 : ME_RANGE;</span>
+<span class="lineNum">     273 </span>                :            : }
+<a name="274"><span class="lineNum">     274 </span>                :            : </a>
+<span class="lineNum">     275 </span>                :            : static struct ovsdb_error *
+<span class="lineNum">     276 </span>                :<span class="lineCov">       1118 : mutate_scalar(const struct ovsdb_type *dst_type, struct ovsdb_datum *dst,</span>
+<span class="lineNum">     277 </span>                :            :               const union ovsdb_atom *arg,
+<span class="lineNum">     278 </span>                :            :               const struct ovsdb_scalar_mutation *mutation)
+<span class="lineNum">     279 </span>                :            : {
+<span class="lineNum">     280 </span>                :<span class="lineCov">       1118 :     const struct ovsdb_base_type *base = &amp;dst_type-&gt;key;</span>
+<span class="lineNum">     281 </span>                :            :     struct ovsdb_error *error;
+<span class="lineNum">     282 </span>                :            :     unsigned int i;
+<span class="lineNum">     283 </span>                :            : 
+<span class="lineNum">     284 </span>        [<span class="branchCov" title="Branch 0 was taken 1056 times"> + </span><span class="branchCov" title="Branch 1 was taken 62 times"> + </span>]:<span class="lineCov">       1118 :     if (base-&gt;type == OVSDB_TYPE_INTEGER) {</span>
+<span class="lineNum">     285 </span>                :<span class="lineCov">       1056 :         int64_t y = arg-&gt;integer;</span>
+<span class="lineNum">     286 </span>        [<span class="branchCov" title="Branch 0 was taken 1066 times"> + </span><span class="branchCov" title="Branch 1 was taken 1032 times"> + </span>]:<span class="lineCov">       2098 :         for (i = 0; i &lt; dst-&gt;n; i++) {</span>
+<span class="lineNum">     287 </span>                :            :             enum ovsdb_mutation_scalar_error me;
+<span class="lineNum">     288 </span>                :            : 
+<span class="lineNum">     289 </span>                :<span class="lineCov">       1066 :             me = (mutation-&gt;mutate_integer)(&amp;dst-&gt;keys[i].integer, y);</span>
+<span class="lineNum">     290 </span>        [<span class="branchCov" title="Branch 0 was taken 24 times"> + </span><span class="branchCov" title="Branch 1 was taken 1042 times"> + </span>]:<span class="lineCov">       1066 :             if (me != ME_OK) {</span>
+<span class="lineNum">     291 </span>                :<span class="lineCov">         24 :                 return ovsdb_mutation_scalar_error(me, mutation-&gt;mutator);</span>
+<span class="lineNum">     292 </span>                :            :             }
+<span class="lineNum">     293 </span>                :            :         }
+<span class="lineNum">     294 </span>        [<span class="branchCov" title="Branch 0 was taken 62 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         62 :     } else if (base-&gt;type == OVSDB_TYPE_REAL) {</span>
+<span class="lineNum">     295 </span>                :<span class="lineCov">         62 :         double y = arg-&gt;real;</span>
+<span class="lineNum">     296 </span>        [<span class="branchCov" title="Branch 0 was taken 72 times"> + </span><span class="branchCov" title="Branch 1 was taken 53 times"> + </span>]:<span class="lineCov">        125 :         for (i = 0; i &lt; dst-&gt;n; i++) {</span>
+<span class="lineNum">     297 </span>                :<span class="lineCov">         72 :             double *x = &amp;dst-&gt;keys[i].real;</span>
+<span class="lineNum">     298 </span>                :            :             enum ovsdb_mutation_scalar_error me;
+<span class="lineNum">     299 </span>                :            : 
+<span class="lineNum">     300 </span>                :<span class="lineCov">         72 :             me = (mutation-&gt;mutate_real)(x, y);</span>
+<span class="lineNum">     301 </span>        [<span class="branchCov" title="Branch 0 was taken 69 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">         72 :             if (me == ME_OK) {</span>
+<span class="lineNum">     302 </span>                :<span class="lineCov">         69 :                 me = check_real_range(*x);</span>
+<span class="lineNum">     303 </span>                :            :             }
+<span class="lineNum">     304 </span>        [<span class="branchCov" title="Branch 0 was taken 9 times"> + </span><span class="branchCov" title="Branch 1 was taken 63 times"> + </span>]:<span class="lineCov">         72 :             if (me != ME_OK) {</span>
+<span class="lineNum">     305 </span>                :<span class="lineCov">          9 :                 return ovsdb_mutation_scalar_error(me, mutation-&gt;mutator);</span>
+<span class="lineNum">     306 </span>                :            :             }
+<span class="lineNum">     307 </span>                :            :         }
+<span class="lineNum">     308 </span>                :            :     } else {
+<span class="lineNum">     309 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     310 </span>                :            :     }
+<span class="lineNum">     311 </span>                :            : 
+<span class="lineNum">     312 </span>        [<span class="branchCov" title="Branch 0 was taken 1105 times"> + </span><span class="branchCov" title="Branch 1 was taken 1075 times"> + </span>]:<span class="lineCov">       2180 :     for (i = 0; i &lt; dst-&gt;n; i++) {</span>
+<span class="lineNum">     313 </span>                :<span class="lineCov">       1105 :         error = ovsdb_atom_check_constraints(&amp;dst-&gt;keys[i], base);</span>
+<span class="lineNum">     314 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchCov" title="Branch 1 was taken 1095 times"> + </span>]:<span class="lineCov">       1105 :         if (error) {</span>
+<span class="lineNum">     315 </span>                :<span class="lineCov">         10 :             return error;</span>
+<span class="lineNum">     316 </span>                :            :         }
+<span class="lineNum">     317 </span>                :            :     }
+<span class="lineNum">     318 </span>                :            : 
+<span class="lineNum">     319 </span>                :<span class="lineCov">       1075 :     error = ovsdb_datum_sort(dst, dst_type-&gt;key.type);</span>
+<span class="lineNum">     320 </span>        [<span class="branchCov" title="Branch 0 was taken 5 times"> + </span><span class="branchCov" title="Branch 1 was taken 1070 times"> + </span>]:<span class="lineCov">       1075 :     if (error) {</span>
+<span class="lineNum">     321 </span>                :<span class="lineCov">          5 :         ovsdb_error_destroy(error);</span>
+<span class="lineNum">     322 </span>                :<span class="lineCov">          5 :         return ovsdb_error(&quot;constraint violation&quot;,</span>
+<span class="lineNum">     323 </span>                :            :                            &quot;Result of \&quot;%s\&quot; operation contains duplicates.&quot;,
+<span class="lineNum">     324 </span>                :            :                            ovsdb_mutator_to_string(mutation-&gt;mutator));
+<span class="lineNum">     325 </span>                :            :     }
+<span class="lineNum">     326 </span>                :<span class="lineCov">       1118 :     return NULL;</span>
+<span class="lineNum">     327 </span>                :            : }
+<a name="328"><span class="lineNum">     328 </span>                :            : </a>
+<span class="lineNum">     329 </span>                :            : static struct ovsdb_error *
+<span class="lineNum">     330 </span>                :<span class="lineCov">        149 : ovsdb_mutation_check_count(struct ovsdb_datum *dst,</span>
+<span class="lineNum">     331 </span>                :            :                            const struct ovsdb_type *dst_type)
+<span class="lineNum">     332 </span>                :            : {
+<span class="lineNum">     333 </span>        [<span class="branchCov" title="Branch 1 was taken 10 times"> + </span><span class="branchCov" title="Branch 2 was taken 139 times"> + </span>]:<span class="lineCov">        149 :     if (!ovsdb_datum_conforms_to_type(dst, dst_type)) {</span>
+<span class="lineNum">     334 </span>                :<span class="lineCov">         10 :         char *s = ovsdb_type_to_english(dst_type);</span>
+<span class="lineNum">     335 </span>                :<span class="lineCov">         10 :         struct ovsdb_error *e = ovsdb_error(</span>
+<span class="lineNum">     336 </span>                :            :             &quot;constraint violation&quot;,
+<span class="lineNum">     337 </span>                :            :             &quot;Attempted to store %u elements in %s.&quot;, dst-&gt;n, s);
+<span class="lineNum">     338 </span>                :<span class="lineCov">         10 :         free(s);</span>
+<span class="lineNum">     339 </span>                :<span class="lineCov">         10 :         return e;</span>
+<span class="lineNum">     340 </span>                :            :     }
+<span class="lineNum">     341 </span>                :<span class="lineCov">        149 :     return NULL;</span>
+<span class="lineNum">     342 </span>                :            : }
+<a name="343"><span class="lineNum">     343 </span>                :            : </a>
+<span class="lineNum">     344 </span>                :            : struct ovsdb_error *
+<span class="lineNum">     345 </span>                :<span class="lineCov">       1270 : ovsdb_mutation_set_execute(struct ovsdb_row *row,</span>
+<span class="lineNum">     346 </span>                :            :                            const struct ovsdb_mutation_set *set)
+<span class="lineNum">     347 </span>                :            : {
+<span class="lineNum">     348 </span>                :            :     size_t i;
+<span class="lineNum">     349 </span>                :            : 
+<span class="lineNum">     350 </span>        [<span class="branchCov" title="Branch 0 was taken 1267 times"> + </span><span class="branchCov" title="Branch 1 was taken 1212 times"> + </span>]:<span class="lineCov">       2479 :     for (i = 0; i &lt; set-&gt;n_mutations; i++) {</span>
+<span class="lineNum">     351 </span>                :<span class="lineCov">       1267 :         const struct ovsdb_mutation *m = &amp;set-&gt;mutations[i];</span>
+<span class="lineNum">     352 </span>                :<span class="lineCov">       1267 :         struct ovsdb_datum *dst = &amp;row-&gt;fields[m-&gt;column-&gt;index];</span>
+<span class="lineNum">     353 </span>                :<span class="lineCov">       1267 :         const struct ovsdb_type *dst_type = &amp;m-&gt;column-&gt;type;</span>
+<span class="lineNum">     354 </span>                :<span class="lineCov">       1267 :         const struct ovsdb_datum *arg = &amp;set-&gt;mutations[i].arg;</span>
+<span class="lineNum">     355 </span>                :<span class="lineCov">       1267 :         const struct ovsdb_type *arg_type = &amp;m-&gt;type;</span>
+<span class="lineNum">     356 </span>                :            :         struct ovsdb_error *error;
+<span class="lineNum">     357 </span>                :            : 
+<span class="lineNum">     358 </span>  [<span class="branchCov" title="Branch 0 was taken 982 times"> + </span><span class="branchCov" title="Branch 1 was taken 37 times"> + </span><span class="branchCov" title="Branch 2 was taken 46 times"> + </span><span class="branchCov" title="Branch 3 was taken 43 times"> + </span> :<span class="lineCov">       1267 :         switch (m-&gt;mutator) {</span>
+<span class="lineNum">         </span>   <span class="branchCov" title="Branch 4 was taken 10 times"> + </span><span class="branchCov" title="Branch 5 was taken 66 times"> + </span><span class="branchCov" title="Branch 6 was taken 83 times"> + </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span>]
+<span class="lineNum">     359 </span>                :            :         case OVSDB_M_ADD:
+<span class="lineNum">     360 </span>                :<span class="lineCov">        982 :             error = mutate_scalar(dst_type, dst, &amp;arg-&gt;keys[0], &amp;add_mutation);</span>
+<span class="lineNum">     361 </span>                :<span class="lineCov">        982 :             break;</span>
+<span class="lineNum">     362 </span>                :            : 
+<span class="lineNum">     363 </span>                :            :         case OVSDB_M_SUB:
+<span class="lineNum">     364 </span>                :<span class="lineCov">         37 :             error = mutate_scalar(dst_type, dst, &amp;arg-&gt;keys[0], &amp;sub_mutation);</span>
+<span class="lineNum">     365 </span>                :<span class="lineCov">         37 :             break;</span>
+<span class="lineNum">     366 </span>                :            : 
+<span class="lineNum">     367 </span>                :            :         case OVSDB_M_MUL:
+<span class="lineNum">     368 </span>                :<span class="lineCov">         46 :             error = mutate_scalar(dst_type, dst, &amp;arg-&gt;keys[0], &amp;mul_mutation);</span>
+<span class="lineNum">     369 </span>                :<span class="lineCov">         46 :             break;</span>
+<span class="lineNum">     370 </span>                :            : 
+<span class="lineNum">     371 </span>                :            :         case OVSDB_M_DIV:
+<span class="lineNum">     372 </span>                :<span class="lineCov">         43 :             error = mutate_scalar(dst_type, dst, &amp;arg-&gt;keys[0], &amp;div_mutation);</span>
+<span class="lineNum">     373 </span>                :<span class="lineCov">         43 :             break;</span>
+<span class="lineNum">     374 </span>                :            : 
+<span class="lineNum">     375 </span>                :            :         case OVSDB_M_MOD:
+<span class="lineNum">     376 </span>                :<span class="lineCov">         10 :             error = mutate_scalar(dst_type, dst, &amp;arg-&gt;keys[0], &amp;mod_mutation);</span>
+<span class="lineNum">     377 </span>                :<span class="lineCov">         10 :             break;</span>
+<span class="lineNum">     378 </span>                :            : 
+<span class="lineNum">     379 </span>                :            :         case OVSDB_M_INSERT:
+<span class="lineNum">     380 </span>                :<span class="lineCov">         66 :             ovsdb_datum_union(dst, arg, dst_type, false);</span>
+<span class="lineNum">     381 </span>                :<span class="lineCov">         66 :             error = ovsdb_mutation_check_count(dst, dst_type);</span>
+<span class="lineNum">     382 </span>                :<span class="lineCov">         66 :             break;</span>
+<span class="lineNum">     383 </span>                :            : 
+<span class="lineNum">     384 </span>                :            :         case OVSDB_M_DELETE:
+<span class="lineNum">     385 </span>                :<span class="lineCov">         83 :             ovsdb_datum_subtract(dst, dst_type, arg, arg_type);</span>
+<span class="lineNum">     386 </span>                :<span class="lineCov">         83 :             error = ovsdb_mutation_check_count(dst, dst_type);</span>
+<span class="lineNum">     387 </span>                :<span class="lineCov">         83 :             break;</span>
+<span class="lineNum">     388 </span>                :            : 
+<span class="lineNum">     389 </span>                :            :         default:
+<span class="lineNum">     390 </span>                :<span class="lineNoCov">          0 :             OVS_NOT_REACHED();</span>
+<span class="lineNum">     391 </span>                :            :         }
+<span class="lineNum">     392 </span>        [<span class="branchCov" title="Branch 0 was taken 58 times"> + </span><span class="branchCov" title="Branch 1 was taken 1209 times"> + </span>]:<span class="lineCov">       1267 :         if (error) {</span>
+<span class="lineNum">     393 </span>                :<span class="lineCov">         58 :             return error;</span>
+<span class="lineNum">     394 </span>                :            :         }
+<span class="lineNum">     395 </span>                :            :     }
+<span class="lineNum">     396 </span>                :            : 
+<span class="lineNum">     397 </span>                :<span class="lineCov">       1270 :     return NULL;</span>
+<span class="lineNum">     398 </span>                :            : }
+<a name="399"><span class="lineNum">     399 </span>                :            : </a>
+<span class="lineNum">     400 </span>                :            : static int
+<span class="lineNum">     401 </span>                :<span class="lineCov">        971 : add_int(int64_t *x, int64_t y)</span>
+<span class="lineNum">     402 </span>                :            : {
+<span class="lineNum">     403 </span>                :            :     /* Check for overflow.  See _Hacker's Delight_ pp. 27. */
+<span class="lineNum">     404 </span>                :<span class="lineCov">        971 :     int64_t z = ~(*x ^ y) &amp; INT64_MIN;</span>
+<span class="lineNum">     405 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 965 times"> + </span>]:<span class="lineCov">        971 :     if ((~(*x ^ y) &amp; ~(((*x ^ z) + y) ^ y)) &gt;&gt; 63) {</span>
+<span class="lineNum">     406 </span>                :<span class="lineCov">          6 :         return ME_RANGE;</span>
+<span class="lineNum">     407 </span>                :            :     } else {
+<span class="lineNum">     408 </span>                :<span class="lineCov">        965 :         *x += y;</span>
+<span class="lineNum">     409 </span>                :<span class="lineCov">        971 :         return 0;</span>
+<span class="lineNum">     410 </span>                :            :     }
+<span class="lineNum">     411 </span>                :            : }
+<a name="412"><span class="lineNum">     412 </span>                :            : </a>
+<span class="lineNum">     413 </span>                :            : static int
+<span class="lineNum">     414 </span>                :<span class="lineCov">         26 : sub_int(int64_t *x, int64_t y)</span>
+<span class="lineNum">     415 </span>                :            : {
+<span class="lineNum">     416 </span>                :            :     /* Check for overflow.  See _Hacker's Delight_ pp. 27. */
+<span class="lineNum">     417 </span>                :<span class="lineCov">         26 :     int64_t z = (*x ^ y) &amp; INT64_MIN;</span>
+<span class="lineNum">     418 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 20 times"> + </span>]:<span class="lineCov">         26 :     if (((*x ^ y) &amp; (((*x ^ z) - y) ^ y)) &gt;&gt; 63) {</span>
+<span class="lineNum">     419 </span>                :<span class="lineCov">          6 :         return ME_RANGE;</span>
+<span class="lineNum">     420 </span>                :            :     } else {
+<span class="lineNum">     421 </span>                :<span class="lineCov">         20 :         *x -= y;</span>
+<span class="lineNum">     422 </span>                :<span class="lineCov">         26 :         return 0;</span>
+<span class="lineNum">     423 </span>                :            :     }
+<span class="lineNum">     424 </span>                :            : }
+<a name="425"><span class="lineNum">     425 </span>                :            : </a>
+<span class="lineNum">     426 </span>                :            : static int
+<span class="lineNum">     427 </span>                :<span class="lineCov">         31 : mul_int(int64_t *x, int64_t y)</span>
+<span class="lineNum">     428 </span>                :            : {
+<span class="lineNum">     429 </span>                :            :     /* Check for overflow.  See _Hacker's Delight_ pp. 30. */
+<span class="lineNum">     430 </span>[<span class="branchCov" title="Branch 0 was taken 22 times"> + </span><span class="branchCov" title="Branch 1 was taken 9 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 22 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         31 :     if (*x &gt; 0</span>
+<span class="lineNum">         </span>[<span class="branchCov" title="Branch 4 was taken 9 times"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span>][<span class="branchCov" title="Branch 6 was taken 4 times"> + </span><span class="branchCov" title="Branch 7 was taken 27 times"> + </span>]
+<span class="lineNum">     431 </span>                :            :         ? (y &gt; 0
+<span class="lineNum">     432 </span>                :<span class="lineCov">         22 :            ? *x &gt;= INT64_MAX / y</span>
+<span class="lineNum">     433 </span>                :<span class="lineNoCov">          0 :            : y  &lt; INT64_MIN / *x)</span>
+<span class="lineNum">     434 </span>                :            :         : (y &gt; 0
+<span class="lineNum">     435 </span>                :<span class="lineCov">          9 :            ? *x &lt; INT64_MIN / y</span>
+<span class="lineNum">     436 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :            : *x != 0 &amp;&amp; y &lt; INT64_MAX / y)) {</span>
+<span class="lineNum">     437 </span>                :<span class="lineCov">          4 :         return ME_RANGE;</span>
+<span class="lineNum">     438 </span>                :            :     } else {
+<span class="lineNum">     439 </span>                :<span class="lineCov">         27 :         *x *= y;</span>
+<span class="lineNum">     440 </span>                :<span class="lineCov">         31 :         return 0;</span>
+<span class="lineNum">     441 </span>                :            :     }
+<span class="lineNum">     442 </span>                :            : }
+<a name="443"><span class="lineNum">     443 </span>                :            : </a>
+<span class="lineNum">     444 </span>                :            : static int
+<span class="lineNum">     445 </span>                :<span class="lineCov">         38 : check_int_div(int64_t x, int64_t y)</span>
+<span class="lineNum">     446 </span>                :            : {
+<span class="lineNum">     447 </span>                :            :     /* Check for overflow.  See _Hacker's Delight_ pp. 32. */
+<span class="lineNum">     448 </span>        [<span class="branchCov" title="Branch 0 was taken 7 times"> + </span><span class="branchCov" title="Branch 1 was taken 31 times"> + </span>]:<span class="lineCov">         38 :     if (!y) {</span>
+<span class="lineNum">     449 </span>                :<span class="lineCov">          7 :         return ME_DOM;</span>
+<span class="lineNum">     450 </span>[<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 30 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         31 :     } else if (x == INT64_MIN &amp;&amp; y == -1) {</span>
+<span class="lineNum">     451 </span>                :<span class="lineCov">          1 :         return ME_RANGE;</span>
+<span class="lineNum">     452 </span>                :            :     } else {
+<span class="lineNum">     453 </span>                :<span class="lineCov">         38 :         return 0;</span>
+<span class="lineNum">     454 </span>                :            :     }
+<span class="lineNum">     455 </span>                :            : }
+<a name="456"><span class="lineNum">     456 </span>                :            : </a>
+<span class="lineNum">     457 </span>                :            : static int
+<span class="lineNum">     458 </span>                :<span class="lineCov">         26 : div_int(int64_t *x, int64_t y)</span>
+<span class="lineNum">     459 </span>                :            : {
+<span class="lineNum">     460 </span>                :<span class="lineCov">         26 :     int error = check_int_div(*x, y);</span>
+<span class="lineNum">     461 </span>        [<span class="branchCov" title="Branch 0 was taken 18 times"> + </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>]:<span class="lineCov">         26 :     if (!error) {</span>
+<span class="lineNum">     462 </span>                :<span class="lineCov">         18 :         *x /= y;</span>
+<span class="lineNum">     463 </span>                :            :     }
+<span class="lineNum">     464 </span>                :<span class="lineCov">         26 :     return error;</span>
+<span class="lineNum">     465 </span>                :            : }
+<a name="466"><span class="lineNum">     466 </span>                :            : </a>
+<span class="lineNum">     467 </span>                :            : static int
+<span class="lineNum">     468 </span>                :<span class="lineCov">         12 : mod_int(int64_t *x, int64_t y)</span>
+<span class="lineNum">     469 </span>                :            : {
+<span class="lineNum">     470 </span>                :<span class="lineCov">         12 :     int error = check_int_div(*x, y);</span>
+<span class="lineNum">     471 </span>        [<span class="branchCov" title="Branch 0 was taken 12 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         12 :     if (!error) {</span>
+<span class="lineNum">     472 </span>                :<span class="lineCov">         12 :         *x %= y;</span>
+<span class="lineNum">     473 </span>                :            :     }
+<span class="lineNum">     474 </span>                :<span class="lineCov">         12 :     return error;</span>
+<span class="lineNum">     475 </span>                :            : }
+<a name="476"><span class="lineNum">     476 </span>                :            : </a>
+<span class="lineNum">     477 </span>                :            : static int
+<span class="lineNum">     478 </span>                :<span class="lineCov">         15 : add_double(double *x, double y)</span>
+<span class="lineNum">     479 </span>                :            : {
+<span class="lineNum">     480 </span>                :<span class="lineCov">         15 :     *x += y;</span>
+<span class="lineNum">     481 </span>                :<span class="lineCov">         15 :     return 0;</span>
+<span class="lineNum">     482 </span>                :            : }
+<a name="483"><span class="lineNum">     483 </span>                :            : </a>
+<span class="lineNum">     484 </span>                :            : static int
+<span class="lineNum">     485 </span>                :<span class="lineCov">         15 : sub_double(double *x, double y)</span>
+<span class="lineNum">     486 </span>                :            : {
+<span class="lineNum">     487 </span>                :<span class="lineCov">         15 :     *x -= y;</span>
+<span class="lineNum">     488 </span>                :<span class="lineCov">         15 :     return 0;</span>
+<span class="lineNum">     489 </span>                :            : }
+<a name="490"><span class="lineNum">     490 </span>                :            : </a>
+<span class="lineNum">     491 </span>                :            : static int
+<span class="lineNum">     492 </span>                :<span class="lineCov">         21 : mul_double(double *x, double y)</span>
+<span class="lineNum">     493 </span>                :            : {
+<span class="lineNum">     494 </span>                :<span class="lineCov">         21 :     *x *= y;</span>
+<span class="lineNum">     495 </span>                :<span class="lineCov">         21 :     return 0;</span>
+<span class="lineNum">     496 </span>                :            : }
+<a name="497"><span class="lineNum">     497 </span>                :            : </a>
+<span class="lineNum">     498 </span>                :            : static int
+<span class="lineNum">     499 </span>                :<span class="lineCov">         21 : div_double(double *x, double y)</span>
+<span class="lineNum">     500 </span>                :            : {
+<span class="lineNum">     501 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 18 times"> + </span>]:<span class="lineCov">         21 :     if (y == 0) {</span>
+<span class="lineNum">     502 </span>                :<span class="lineCov">          3 :         return ME_DOM;</span>
+<span class="lineNum">     503 </span>                :            :     } else {
+<span class="lineNum">     504 </span>                :<span class="lineCov">         18 :         *x /= y;</span>
+<span class="lineNum">     505 </span>                :<span class="lineCov">         21 :         return 0;</span>
+<span class="lineNum">     506 </span>                :            :     }
+<span class="lineNum">     507 </span>                :            : }
+<span class="lineNum">     508 </span>                :            : 
+<span class="lineNum">     509 </span>                :            : static const struct ovsdb_scalar_mutation add_mutation = {
+<span class="lineNum">     510 </span>                :            :     add_int, add_double, OVSDB_M_ADD
+<span class="lineNum">     511 </span>                :            : };
+<span class="lineNum">     512 </span>                :            : 
+<span class="lineNum">     513 </span>                :            : static const struct ovsdb_scalar_mutation sub_mutation = {
+<span class="lineNum">     514 </span>                :            :     sub_int, sub_double, OVSDB_M_SUB
+<span class="lineNum">     515 </span>                :            : };
+<span class="lineNum">     516 </span>                :            : 
+<span class="lineNum">     517 </span>                :            : static const struct ovsdb_scalar_mutation mul_mutation = {
+<span class="lineNum">     518 </span>                :            :     mul_int, mul_double, OVSDB_M_MUL
+<span class="lineNum">     519 </span>                :            : };
+<span class="lineNum">     520 </span>                :            : 
+<span class="lineNum">     521 </span>                :            : static const struct ovsdb_scalar_mutation div_mutation = {
+<span class="lineNum">     522 </span>                :            :     div_int, div_double, OVSDB_M_DIV
+<span class="lineNum">     523 </span>                :            : };
+<span class="lineNum">     524 </span>                :            : 
+<span class="lineNum">     525 </span>                :            : static const struct ovsdb_scalar_mutation mod_mutation = {
+<span class="lineNum">     526 </span>                :            :     mod_int, NULL, OVSDB_M_MOD
+<span class="lineNum">     527 </span>                :            : };
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

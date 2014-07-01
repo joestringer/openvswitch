@@ -1,0 +1,302 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/netlink-notifier.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - netlink-notifier.c<span style="font-size: 80%;"> (source / <a href="netlink-notifier.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">54</td>
+            <td class="headerCovTableEntry">73</td>
+            <td class="headerCovTableEntryLo">74.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">11</td>
+            <td class="headerCovTableEntry">13</td>
+            <td class="headerCovTableEntryMed">84.6 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">13</td>
+            <td class="headerCovTableEntry">40</td>
+            <td class="headerCovTableEntryLo">32.5 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2009, 2010, 2011, 2012, 2013 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &quot;netlink-notifier.h&quot;
+<span class="lineNum">      20 </span>                :            : 
+<span class="lineNum">      21 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;poll.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      24 </span>                :            : 
+<span class="lineNum">      25 </span>                :            : #include &quot;coverage.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;netlink.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;netlink-socket.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;ofpbuf.h&quot;
+<a name="29"><span class="lineNum">      29 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      30 </span>                :            : 
+<a name="31"><span class="lineNum">      31 </span>                :<span class="lineCov">       7479 : VLOG_DEFINE_THIS_MODULE(netlink_notifier);</span></a>
+<span class="lineNum">      32 </span>                :            : 
+<span class="lineNum">      33 </span>                :<span class="lineCov">      26466 : COVERAGE_DEFINE(nln_changed);</span>
+<span class="lineNum">      34 </span>                :            : 
+<span class="lineNum">      35 </span>                :            : static void nln_report(struct nln *nln, void *change);
+<span class="lineNum">      36 </span>                :            : 
+<span class="lineNum">      37 </span>                :            : struct nln {
+<span class="lineNum">      38 </span>                :            :     struct nl_sock *notify_sock; /* Netlink socket. */
+<span class="lineNum">      39 </span>                :            :     struct list all_notifiers;   /* All nln notifiers. */
+<span class="lineNum">      40 </span>                :            :     bool has_run;                /* Guard for run and wait functions. */
+<span class="lineNum">      41 </span>                :            : 
+<span class="lineNum">      42 </span>                :            :     /* Passed in by nln_create(). */
+<span class="lineNum">      43 </span>                :            :     int multicast_group;         /* Multicast group we listen on. */
+<span class="lineNum">      44 </span>                :            :     int protocol;                /* Protocol passed to nl_sock_create(). */
+<span class="lineNum">      45 </span>                :            :     nln_parse_func *parse;       /* Message parsing function. */
+<span class="lineNum">      46 </span>                :            :     void *change;                /* Change passed to parse. */
+<span class="lineNum">      47 </span>                :            : };
+<span class="lineNum">      48 </span>                :            : 
+<span class="lineNum">      49 </span>                :            : struct nln_notifier {
+<span class="lineNum">      50 </span>                :            :     struct nln *nln;             /* Parent nln. */
+<span class="lineNum">      51 </span>                :            : 
+<span class="lineNum">      52 </span>                :            :     struct list node;
+<span class="lineNum">      53 </span>                :            :     nln_notify_func *cb;
+<span class="lineNum">      54 </span>                :            :     void *aux;
+<span class="lineNum">      55 </span>                :            : };
+<span class="lineNum">      56 </span>                :            : 
+<span class="lineNum">      57 </span>                :            : /* Creates an nln handle which may be used to manage change notifications.  The
+<span class="lineNum">      58 </span>                :            :  * created handle will listen for netlink messages on 'multicast_group' using
+<span class="lineNum">      59 </span>                :            :  * netlink protocol 'protocol' (e.g. NETLINK_ROUTE, NETLINK_GENERIC, ...).
+<span class="lineNum">      60 </span>                :            :  * Incoming messages will be parsed with 'parse' which will be passed 'change'
+<a name="61"><span class="lineNum">      61 </span>                :            :  * as an argument. */</a>
+<span class="lineNum">      62 </span>                :            : struct nln *
+<span class="lineNum">      63 </span>                :<span class="lineCov">         68 : nln_create(int protocol, int multicast_group, nln_parse_func *parse,</span>
+<span class="lineNum">      64 </span>                :            :            void *change)
+<span class="lineNum">      65 </span>                :            : {
+<span class="lineNum">      66 </span>                :            :     struct nln *nln;
+<span class="lineNum">      67 </span>                :            : 
+<span class="lineNum">      68 </span>                :<span class="lineCov">         68 :     nln = xzalloc(sizeof *nln);</span>
+<span class="lineNum">      69 </span>                :<span class="lineCov">         68 :     nln-&gt;notify_sock = NULL;</span>
+<span class="lineNum">      70 </span>                :<span class="lineCov">         68 :     nln-&gt;protocol = protocol;</span>
+<span class="lineNum">      71 </span>                :<span class="lineCov">         68 :     nln-&gt;multicast_group = multicast_group;</span>
+<span class="lineNum">      72 </span>                :<span class="lineCov">         68 :     nln-&gt;parse = parse;</span>
+<span class="lineNum">      73 </span>                :<span class="lineCov">         68 :     nln-&gt;change = change;</span>
+<span class="lineNum">      74 </span>                :<span class="lineCov">         68 :     nln-&gt;has_run = false;</span>
+<span class="lineNum">      75 </span>                :            : 
+<span class="lineNum">      76 </span>                :<span class="lineCov">         68 :     list_init(&amp;nln-&gt;all_notifiers);</span>
+<span class="lineNum">      77 </span>                :<span class="lineCov">         68 :     return nln;</span>
+<span class="lineNum">      78 </span>                :            : }
+<span class="lineNum">      79 </span>                :            : 
+<span class="lineNum">      80 </span>                :            : /* Destroys 'nln' by freeing any memory it has reserved and closing any sockets
+<span class="lineNum">      81 </span>                :            :  * it has opened.
+<span class="lineNum">      82 </span>                :            :  *
+<span class="lineNum">      83 </span>                :            :  * The caller is responsible for destroying any notifiers created by this
+<a name="84"><span class="lineNum">      84 </span>                :            :  * 'nln' before destroying 'nln'. */</a>
+<span class="lineNum">      85 </span>                :            : void
+<span class="lineNum">      86 </span>                :<span class="lineCov">         15 : nln_destroy(struct nln *nln)</span>
+<span class="lineNum">      87 </span>                :            : {
+<span class="lineNum">      88 </span>        [<span class="branchCov" title="Branch 0 was taken 15 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         15 :     if (nln) {</span>
+<span class="lineNum">      89 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 15 times"> + </span>]:<span class="lineCov">         15 :         ovs_assert(list_is_empty(&amp;nln-&gt;all_notifiers));</span>
+<span class="lineNum">      90 </span>                :<span class="lineCov">         15 :         nl_sock_destroy(nln-&gt;notify_sock);</span>
+<span class="lineNum">      91 </span>                :<span class="lineCov">         15 :         free(nln);</span>
+<span class="lineNum">      92 </span>                :            :     }
+<span class="lineNum">      93 </span>                :<span class="lineCov">         15 : }</span>
+<span class="lineNum">      94 </span>                :            : 
+<span class="lineNum">      95 </span>                :            : /* Registers 'cb' to be called with auxiliary data 'aux' with change
+<span class="lineNum">      96 </span>                :            :  * notifications.  The notifier is stored in 'notifier', which the caller must
+<span class="lineNum">      97 </span>                :            :  * not modify or free.
+<span class="lineNum">      98 </span>                :            :  *
+<span class="lineNum">      99 </span>                :            :  * This is probably not the function you want.  You should probably be using
+<span class="lineNum">     100 </span>                :            :  * message specific notifiers like rtnetlink_link_notifier_register().
+<span class="lineNum">     101 </span>                :            :  *
+<a name="102"><span class="lineNum">     102 </span>                :            :  * Returns an initialized nln_notifier if successful, otherwise NULL. */</a>
+<span class="lineNum">     103 </span>                :            : struct nln_notifier *
+<span class="lineNum">     104 </span>                :<span class="lineCov">         68 : nln_notifier_create(struct nln *nln, nln_notify_func *cb, void *aux)</span>
+<span class="lineNum">     105 </span>                :            : {
+<span class="lineNum">     106 </span>                :            :     struct nln_notifier *notifier;
+<span class="lineNum">     107 </span>                :            : 
+<span class="lineNum">     108 </span>        [<span class="branchCov" title="Branch 0 was taken 68 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         68 :     if (!nln-&gt;notify_sock) {</span>
+<span class="lineNum">     109 </span>                :            :         struct nl_sock *sock;
+<span class="lineNum">     110 </span>                :            :         int error;
+<span class="lineNum">     111 </span>                :            : 
+<span class="lineNum">     112 </span>                :<span class="lineCov">         68 :         error = nl_sock_create(nln-&gt;protocol, &amp;sock);</span>
+<span class="lineNum">     113 </span>        [<span class="branchCov" title="Branch 0 was taken 68 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         68 :         if (!error) {</span>
+<span class="lineNum">     114 </span>                :<span class="lineCov">         68 :             error = nl_sock_join_mcgroup(sock, nln-&gt;multicast_group);</span>
+<span class="lineNum">     115 </span>                :            :         }
+<span class="lineNum">     116 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 68 times"> + </span>]:<span class="lineCov">         68 :         if (error) {</span>
+<span class="lineNum">     117 </span>                :<span class="lineNoCov">          0 :             nl_sock_destroy(sock);</span>
+<span class="lineNum">     118 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN(&quot;could not create netlink socket: %s&quot;,</span>
+<span class="lineNum">     119 </span>                :            :                       ovs_strerror(error));
+<span class="lineNum">     120 </span>                :<span class="lineNoCov">          0 :             return NULL;</span>
+<span class="lineNum">     121 </span>                :            :         }
+<span class="lineNum">     122 </span>                :<span class="lineCov">         68 :         nln-&gt;notify_sock = sock;</span>
+<span class="lineNum">     123 </span>                :            :     } else {
+<span class="lineNum">     124 </span>                :            :         /* Catch up on notification work so that the new notifier won't
+<span class="lineNum">     125 </span>                :            :          * receive any stale notifications. */
+<span class="lineNum">     126 </span>                :<span class="lineNoCov">          0 :         nln_run(nln);</span>
+<span class="lineNum">     127 </span>                :            :     }
+<span class="lineNum">     128 </span>                :            : 
+<span class="lineNum">     129 </span>                :<span class="lineCov">         68 :     notifier = xmalloc(sizeof *notifier);</span>
+<span class="lineNum">     130 </span>                :<span class="lineCov">         68 :     list_push_back(&amp;nln-&gt;all_notifiers, &amp;notifier-&gt;node);</span>
+<span class="lineNum">     131 </span>                :<span class="lineCov">         68 :     notifier-&gt;cb = cb;</span>
+<span class="lineNum">     132 </span>                :<span class="lineCov">         68 :     notifier-&gt;aux = aux;</span>
+<span class="lineNum">     133 </span>                :<span class="lineCov">         68 :     notifier-&gt;nln = nln;</span>
+<span class="lineNum">     134 </span>                :<span class="lineCov">         68 :     return notifier;</span>
+<span class="lineNum">     135 </span>                :            : }
+<span class="lineNum">     136 </span>                :            : 
+<span class="lineNum">     137 </span>                :            : /* Destroys 'notifier', which must have previously been created with
+<a name="138"><span class="lineNum">     138 </span>                :            :  * nln_notifier_register(). */</a>
+<span class="lineNum">     139 </span>                :            : void
+<span class="lineNum">     140 </span>                :<span class="lineCov">         30 : nln_notifier_destroy(struct nln_notifier *notifier)</span>
+<span class="lineNum">     141 </span>                :            : {
+<span class="lineNum">     142 </span>        [<span class="branchCov" title="Branch 0 was taken 30 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         30 :     if (notifier) {</span>
+<span class="lineNum">     143 </span>                :<span class="lineCov">         30 :         struct nln *nln = notifier-&gt;nln;</span>
+<span class="lineNum">     144 </span>                :            : 
+<span class="lineNum">     145 </span>                :<span class="lineCov">         30 :         list_remove(&amp;notifier-&gt;node);</span>
+<span class="lineNum">     146 </span>        [<span class="branchCov" title="Branch 1 was taken 30 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">         30 :         if (list_is_empty(&amp;nln-&gt;all_notifiers)) {</span>
+<span class="lineNum">     147 </span>                :<span class="lineCov">         30 :             nl_sock_destroy(nln-&gt;notify_sock);</span>
+<span class="lineNum">     148 </span>                :<span class="lineCov">         30 :             nln-&gt;notify_sock = NULL;</span>
+<span class="lineNum">     149 </span>                :            :         }
+<span class="lineNum">     150 </span>                :<span class="lineCov">         30 :         free(notifier);</span>
+<span class="lineNum">     151 </span>                :            :     }
+<span class="lineNum">     152 </span>                :<span class="lineCov">         30 : }</span>
+<span class="lineNum">     153 </span>                :            : 
+<span class="lineNum">     154 </span>                :            : /* Calls all of the registered notifiers, passing along any as-yet-unreported
+<a name="155"><span class="lineNum">     155 </span>                :            :  * change events. */</a>
+<span class="lineNum">     156 </span>                :            : void
+<span class="lineNum">     157 </span>                :<span class="lineCov">     155654 : nln_run(struct nln *nln)</span>
+<span class="lineNum">     158 </span>                :            : {
+<span class="lineNum">     159 </span>                :            :     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     160 </span>                :            : 
+<span class="lineNum">     161 </span>[<span class="branchCov" title="Branch 0 was taken 155654 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 136236 times"> + </span><span class="branchCov" title="Branch 3 was taken 19418 times"> + </span>]:<span class="lineCov">     155654 :     if (!nln-&gt;notify_sock || nln-&gt;has_run) {</span>
+<span class="lineNum">     162 </span>                :<span class="lineCov">     136236 :         return;</span>
+<span class="lineNum">     163 </span>                :            :     }
+<span class="lineNum">     164 </span>                :            : 
+<span class="lineNum">     165 </span>                :<span class="lineCov">      19418 :     nln-&gt;has_run = true;</span>
+<span class="lineNum">     166 </span>                :            :     for (;;) {
+<span class="lineNum">     167 </span>                :            :         uint64_t buf_stub[4096 / 8];
+<span class="lineNum">     168 </span>                :            :         struct ofpbuf buf;
+<span class="lineNum">     169 </span>                :            :         int error;
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>                :<span class="lineCov">      19418 :         ofpbuf_use_stub(&amp;buf, buf_stub, sizeof buf_stub);</span>
+<span class="lineNum">     172 </span>                :<span class="lineCov">      19418 :         error = nl_sock_recv(nln-&gt;notify_sock, &amp;buf, false);</span>
+<span class="lineNum">     173 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 19418 times"> + </span>]:<span class="lineCov">      19418 :         if (!error) {</span>
+<span class="lineNum">     174 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (nln-&gt;parse(&amp;buf, nln-&gt;change)) {</span>
+<span class="lineNum">     175 </span>                :<span class="lineNoCov">          0 :                 nln_report(nln, nln-&gt;change);</span>
+<span class="lineNum">     176 </span>                :            :             } else {
+<span class="lineNum">     177 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_WARN_RL(&amp;rl, &quot;received bad netlink message&quot;);</span>
+<span class="lineNum">     178 </span>                :<span class="lineNoCov">          0 :                 nln_report(nln, NULL);</span>
+<span class="lineNum">     179 </span>                :            :             }
+<span class="lineNum">     180 </span>                :<span class="lineNoCov">          0 :             ofpbuf_uninit(&amp;buf);</span>
+<span class="lineNum">     181 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 19418 times"> + </span>]:<span class="lineCov">      19418 :         } else if (error == EAGAIN) {</span>
+<span class="lineNum">     182 </span>                :            :             return;
+<span class="lineNum">     183 </span>                :            :         } else {
+<span class="lineNum">     184 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (error == ENOBUFS) {</span>
+<span class="lineNum">     185 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_WARN_RL(&amp;rl, &quot;netlink receive buffer overflowed&quot;);</span>
+<span class="lineNum">     186 </span>                :            :             } else {
+<span class="lineNum">     187 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_WARN_RL(&amp;rl, &quot;error reading netlink socket: %s&quot;,</span>
+<span class="lineNum">     188 </span>                :            :                              ovs_strerror(error));
+<span class="lineNum">     189 </span>                :            :             }
+<span class="lineNum">     190 </span>                :<span class="lineNoCov">          0 :             nln_report(nln, NULL);</span>
+<span class="lineNum">     191 </span>                :            :         }
+<span class="lineNum">     192 </span>                :<span class="lineCov">     155654 :     }</span>
+<span class="lineNum">     193 </span>                :            : }
+<span class="lineNum">     194 </span>                :            : 
+<a name="195"><span class="lineNum">     195 </span>                :            : /* Causes poll_block() to wake up when change notifications are ready. */</a>
+<span class="lineNum">     196 </span>                :            : void
+<span class="lineNum">     197 </span>                :<span class="lineCov">     155344 : nln_wait(struct nln *nln)</span>
+<span class="lineNum">     198 </span>                :            : {
+<span class="lineNum">     199 </span>                :<span class="lineCov">     155344 :     nln-&gt;has_run = false;</span>
+<span class="lineNum">     200 </span>        [<span class="branchCov" title="Branch 0 was taken 155344 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">     155344 :     if (nln-&gt;notify_sock) {</span>
+<span class="lineNum">     201 </span>                :<span class="lineCov">     155344 :         nl_sock_wait(nln-&gt;notify_sock, POLLIN);</span>
+<span class="lineNum">     202 </span>                :            :     }
+<span class="lineNum">     203 </span>                :<span class="lineCov">     155344 : }</span>
+<a name="204"><span class="lineNum">     204 </span>                :            : </a>
+<span class="lineNum">     205 </span>                :            : static void
+<span class="lineNum">     206 </span>                :<span class="lineNoCov">          0 : nln_report(struct nln *nln, void *change)</span>
+<span class="lineNum">     207 </span>                :            : {
+<span class="lineNum">     208 </span>                :            :     struct nln_notifier *notifier;
+<span class="lineNum">     209 </span>                :            : 
+<span class="lineNum">     210 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (change) {</span>
+<span class="lineNum">     211 </span>                :<span class="lineNoCov">          0 :         COVERAGE_INC(nln_changed);</span>
+<span class="lineNum">     212 </span>                :            :     }
+<span class="lineNum">     213 </span>                :            : 
+<span class="lineNum">     214 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     LIST_FOR_EACH (notifier, node, &amp;nln-&gt;all_notifiers) {</span>
+<span class="lineNum">     215 </span>                :<span class="lineNoCov">          0 :         notifier-&gt;cb(change, notifier-&gt;aux);</span>
+<span class="lineNum">     216 </span>                :            :     }
+<span class="lineNum">     217 </span>                :<span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

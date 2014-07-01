@@ -1,0 +1,728 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/ovs-thread.h</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - ovs-thread.h<span style="font-size: 80%;"> (source / <a href="ovs-thread.h.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">8</td>
+            <td class="headerCovTableEntry">8</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">5</td>
+            <td class="headerCovTableEntry">5</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #ifndef OVS_THREAD_H
+<span class="lineNum">      18 </span>                :            : #define OVS_THREAD_H 1
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &lt;pthread.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;stddef.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;sys/types.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &quot;ovs-atomic.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      25 </span>                :            : 
+<span class="lineNum">      26 </span>                :            : struct seq;
+<span class="lineNum">      27 </span>                :            : 
+<span class="lineNum">      28 </span>                :            : /* Mutex. */
+<span class="lineNum">      29 </span>                :            : struct OVS_LOCKABLE ovs_mutex {
+<span class="lineNum">      30 </span>                :            :     pthread_mutex_t lock;
+<span class="lineNum">      31 </span>                :            :     const char *where;          /* NULL if and only if uninitialized. */
+<span class="lineNum">      32 </span>                :            : };
+<span class="lineNum">      33 </span>                :            : 
+<span class="lineNum">      34 </span>                :            : /* Poll-block()-able barrier similar to pthread_barrier_t. */
+<span class="lineNum">      35 </span>                :            : struct ovs_barrier {
+<span class="lineNum">      36 </span>                :            :     uint32_t size;            /* Number of threads to wait. */
+<span class="lineNum">      37 </span>                :            :     atomic_uint32_t count;    /* Number of threads already hit the barrier. */
+<span class="lineNum">      38 </span>                :            :     struct seq *seq;
+<span class="lineNum">      39 </span>                :            : };
+<span class="lineNum">      40 </span>                :            : 
+<span class="lineNum">      41 </span>                :            : /* &quot;struct ovs_mutex&quot; initializer. */
+<span class="lineNum">      42 </span>                :            : #ifdef PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP
+<span class="lineNum">      43 </span>                :            : #define OVS_MUTEX_INITIALIZER { PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP, \
+<span class="lineNum">      44 </span>                :            :                                 &quot;&lt;unlocked&gt;&quot; }
+<span class="lineNum">      45 </span>                :            : #else
+<span class="lineNum">      46 </span>                :            : #define OVS_MUTEX_INITIALIZER { PTHREAD_MUTEX_INITIALIZER, &quot;&lt;unlocked&gt;&quot; }
+<span class="lineNum">      47 </span>                :            : #endif
+<span class="lineNum">      48 </span>                :            : 
+<span class="lineNum">      49 </span>                :            : #ifdef PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP
+<span class="lineNum">      50 </span>                :            : #define OVS_ADAPTIVE_MUTEX_INITIALIZER                  \
+<span class="lineNum">      51 </span>                :            :     { PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP, &quot;&lt;unlocked&gt;&quot; }
+<span class="lineNum">      52 </span>                :            : #else
+<span class="lineNum">      53 </span>                :            : #define OVS_ADAPTIVE_MUTEX_INITIALIZER OVS_MUTEX_INITIALIZER
+<span class="lineNum">      54 </span>                :            : #endif
+<span class="lineNum">      55 </span>                :            : 
+<span class="lineNum">      56 </span>                :            : /* ovs_mutex functions analogous to pthread_mutex_*() functions.
+<span class="lineNum">      57 </span>                :            :  *
+<span class="lineNum">      58 </span>                :            :  * Most of these functions abort the process with an error message on any
+<span class="lineNum">      59 </span>                :            :  * error.  ovs_mutex_trylock() is an exception: it passes through a 0 or EBUSY
+<span class="lineNum">      60 </span>                :            :  * return value to the caller and aborts on any other error. */
+<span class="lineNum">      61 </span>                :            : void ovs_mutex_init(const struct ovs_mutex *);
+<span class="lineNum">      62 </span>                :            : void ovs_mutex_init_recursive(const struct ovs_mutex *);
+<span class="lineNum">      63 </span>                :            : void ovs_mutex_init_adaptive(const struct ovs_mutex *);
+<span class="lineNum">      64 </span>                :            : void ovs_mutex_destroy(const struct ovs_mutex *);
+<span class="lineNum">      65 </span>                :            : void ovs_mutex_unlock(const struct ovs_mutex *mutex) OVS_RELEASES(mutex);
+<span class="lineNum">      66 </span>                :            : void ovs_mutex_lock_at(const struct ovs_mutex *mutex, const char *where)
+<span class="lineNum">      67 </span>                :            :     OVS_ACQUIRES(mutex);
+<span class="lineNum">      68 </span>                :            : #define ovs_mutex_lock(mutex) \
+<span class="lineNum">      69 </span>                :            :         ovs_mutex_lock_at(mutex, SOURCE_LOCATOR)
+<span class="lineNum">      70 </span>                :            : 
+<span class="lineNum">      71 </span>                :            : int ovs_mutex_trylock_at(const struct ovs_mutex *mutex, const char *where)
+<span class="lineNum">      72 </span>                :            :     OVS_TRY_LOCK(0, mutex);
+<span class="lineNum">      73 </span>                :            : #define ovs_mutex_trylock(mutex) \
+<span class="lineNum">      74 </span>                :            :         ovs_mutex_trylock_at(mutex, SOURCE_LOCATOR)
+<span class="lineNum">      75 </span>                :            : 
+<span class="lineNum">      76 </span>                :            : void ovs_mutex_cond_wait(pthread_cond_t *, const struct ovs_mutex *);
+<span class="lineNum">      77 </span>                :            : 
+<span class="lineNum">      78 </span>                :            : /* Wrappers for pthread_mutex_*() that abort the process on any error.
+<span class="lineNum">      79 </span>                :            :  * This is still needed when ovs-atomic-pthreads.h is used. */
+<span class="lineNum">      80 </span>                :            : void xpthread_mutex_lock(pthread_mutex_t *mutex);
+<span class="lineNum">      81 </span>                :            : void xpthread_mutex_unlock(pthread_mutex_t *mutex);
+<span class="lineNum">      82 </span>                :            : 
+<span class="lineNum">      83 </span>                :            : /* Wrappers for pthread_mutexattr_*() that abort the process on any error. */
+<span class="lineNum">      84 </span>                :            : void xpthread_mutexattr_init(pthread_mutexattr_t *);
+<span class="lineNum">      85 </span>                :            : void xpthread_mutexattr_destroy(pthread_mutexattr_t *);
+<span class="lineNum">      86 </span>                :            : void xpthread_mutexattr_settype(pthread_mutexattr_t *, int type);
+<span class="lineNum">      87 </span>                :            : void xpthread_mutexattr_gettype(pthread_mutexattr_t *, int *typep);
+<span class="lineNum">      88 </span>                :            : 
+<span class="lineNum">      89 </span>                :            : /* Read-write lock.
+<span class="lineNum">      90 </span>                :            :  *
+<span class="lineNum">      91 </span>                :            :  * An ovs_rwlock does not support recursive readers, because POSIX allows
+<span class="lineNum">      92 </span>                :            :  * taking the reader lock recursively to deadlock when a thread is waiting on
+<span class="lineNum">      93 </span>                :            :  * the write-lock.  (NetBSD does deadlock.)  glibc rwlocks in their default
+<span class="lineNum">      94 </span>                :            :  * configuration do not deadlock, but ovs_rwlock_init() initializes rwlocks as
+<span class="lineNum">      95 </span>                :            :  * non-recursive (which will deadlock) for two reasons:
+<span class="lineNum">      96 </span>                :            :  *
+<span class="lineNum">      97 </span>                :            :  *     - glibc only provides fairness to writers in this mode.
+<span class="lineNum">      98 </span>                :            :  *
+<span class="lineNum">      99 </span>                :            :  *     - It's better to find bugs in the primary Open vSwitch target rather
+<span class="lineNum">     100 </span>                :            :  *       than exposing them only to porters. */
+<span class="lineNum">     101 </span>                :            : struct OVS_LOCKABLE ovs_rwlock {
+<span class="lineNum">     102 </span>                :            :     pthread_rwlock_t lock;
+<span class="lineNum">     103 </span>                :            :     const char *where;          /* NULL if and only if uninitialized. */
+<span class="lineNum">     104 </span>                :            : };
+<span class="lineNum">     105 </span>                :            : 
+<span class="lineNum">     106 </span>                :            : /* Initializer. */
+<span class="lineNum">     107 </span>                :            : #ifdef PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP
+<span class="lineNum">     108 </span>                :            : #define OVS_RWLOCK_INITIALIZER \
+<span class="lineNum">     109 </span>                :            :         { PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP, &quot;&lt;unlocked&gt;&quot; }
+<span class="lineNum">     110 </span>                :            : #else
+<span class="lineNum">     111 </span>                :            : #define OVS_RWLOCK_INITIALIZER { PTHREAD_RWLOCK_INITIALIZER, &quot;&lt;unlocked&gt;&quot; }
+<span class="lineNum">     112 </span>                :            : #endif
+<span class="lineNum">     113 </span>                :            : 
+<span class="lineNum">     114 </span>                :            : /* ovs_rwlock functions analogous to pthread_rwlock_*() functions.
+<span class="lineNum">     115 </span>                :            :  *
+<span class="lineNum">     116 </span>                :            :  * Most of these functions abort the process with an error message on any
+<span class="lineNum">     117 </span>                :            :  * error.  The &quot;trylock&quot; functions are exception: they pass through a 0 or
+<span class="lineNum">     118 </span>                :            :  * EBUSY return value to the caller and abort on any other error. */
+<span class="lineNum">     119 </span>                :            : void ovs_rwlock_init(const struct ovs_rwlock *);
+<span class="lineNum">     120 </span>                :            : void ovs_rwlock_destroy(const struct ovs_rwlock *);
+<span class="lineNum">     121 </span>                :            : void ovs_rwlock_unlock(const struct ovs_rwlock *rwlock) OVS_RELEASES(rwlock);
+<span class="lineNum">     122 </span>                :            : 
+<span class="lineNum">     123 </span>                :            : /* Wrappers for pthread_rwlockattr_*() that abort the process on any error. */
+<span class="lineNum">     124 </span>                :            : void xpthread_rwlockattr_init(pthread_rwlockattr_t *);
+<span class="lineNum">     125 </span>                :            : void xpthread_rwlockattr_destroy(pthread_rwlockattr_t *);
+<span class="lineNum">     126 </span>                :            : #ifdef PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP
+<span class="lineNum">     127 </span>                :            : void xpthread_rwlockattr_setkind_np(pthread_rwlockattr_t *, int kind);
+<span class="lineNum">     128 </span>                :            : #endif
+<span class="lineNum">     129 </span>                :            : 
+<span class="lineNum">     130 </span>                :            : void ovs_rwlock_wrlock_at(const struct ovs_rwlock *rwlock, const char *where)
+<span class="lineNum">     131 </span>                :            :     OVS_ACQ_WRLOCK(rwlock);
+<span class="lineNum">     132 </span>                :            : #define ovs_rwlock_wrlock(rwlock) \
+<span class="lineNum">     133 </span>                :            :         ovs_rwlock_wrlock_at(rwlock, SOURCE_LOCATOR)
+<span class="lineNum">     134 </span>                :            : 
+<span class="lineNum">     135 </span>                :            : int ovs_rwlock_trywrlock_at(const struct ovs_rwlock *rwlock, const char *where)
+<span class="lineNum">     136 </span>                :            :     OVS_TRY_WRLOCK(0, rwlock);
+<span class="lineNum">     137 </span>                :            : #define ovs_rwlock_trywrlock(rwlock) \
+<span class="lineNum">     138 </span>                :            :     ovs_rwlock_trywrlock_at(rwlock, SOURCE_LOCATOR)
+<span class="lineNum">     139 </span>                :            : 
+<span class="lineNum">     140 </span>                :            : void ovs_rwlock_rdlock_at(const struct ovs_rwlock *rwlock, const char *where)
+<span class="lineNum">     141 </span>                :            :     OVS_ACQ_RDLOCK(rwlock);
+<span class="lineNum">     142 </span>                :            : #define ovs_rwlock_rdlock(rwlock) \
+<span class="lineNum">     143 </span>                :            :         ovs_rwlock_rdlock_at(rwlock, SOURCE_LOCATOR)
+<span class="lineNum">     144 </span>                :            : 
+<span class="lineNum">     145 </span>                :            : int ovs_rwlock_tryrdlock_at(const struct ovs_rwlock *rwlock, const char *where)
+<span class="lineNum">     146 </span>                :            :     OVS_TRY_RDLOCK(0, rwlock);
+<span class="lineNum">     147 </span>                :            : #define ovs_rwlock_tryrdlock(rwlock) \
+<span class="lineNum">     148 </span>                :            :         ovs_rwlock_tryrdlock_at(rwlock, SOURCE_LOCATOR)
+<span class="lineNum">     149 </span>                :            : 
+<span class="lineNum">     150 </span>                :            : /* ovs_barrier functions analogous to pthread_barrier_*() functions. */
+<span class="lineNum">     151 </span>                :            : void ovs_barrier_init(struct ovs_barrier *, uint32_t count);
+<span class="lineNum">     152 </span>                :            : void ovs_barrier_destroy(struct ovs_barrier *);
+<span class="lineNum">     153 </span>                :            : void ovs_barrier_block(struct ovs_barrier *);
+<span class="lineNum">     154 </span>                :            : 
+<span class="lineNum">     155 </span>                :            : /* Wrappers for xpthread_cond_*() that abort the process on any error.
+<span class="lineNum">     156 </span>                :            :  *
+<span class="lineNum">     157 </span>                :            :  * Use ovs_mutex_cond_wait() to wait for a condition. */
+<span class="lineNum">     158 </span>                :            : void xpthread_cond_init(pthread_cond_t *, pthread_condattr_t *);
+<span class="lineNum">     159 </span>                :            : void xpthread_cond_destroy(pthread_cond_t *);
+<span class="lineNum">     160 </span>                :            : void xpthread_cond_signal(pthread_cond_t *);
+<span class="lineNum">     161 </span>                :            : void xpthread_cond_broadcast(pthread_cond_t *);
+<span class="lineNum">     162 </span>                :            : 
+<span class="lineNum">     163 </span>                :            : void xpthread_key_create(pthread_key_t *, void (*destructor)(void *));
+<span class="lineNum">     164 </span>                :            : void xpthread_key_delete(pthread_key_t);
+<span class="lineNum">     165 </span>                :            : void xpthread_setspecific(pthread_key_t, const void *);
+<span class="lineNum">     166 </span>                :            : 
+<span class="lineNum">     167 </span>                :            : #ifndef _WIN32
+<span class="lineNum">     168 </span>                :            : void xpthread_sigmask(int, const sigset_t *, sigset_t *);
+<span class="lineNum">     169 </span>                :            : #endif
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>                :            : pthread_t ovs_thread_create(const char *name, void *(*)(void *), void *);
+<span class="lineNum">     172 </span>                :            : void xpthread_join(pthread_t, void **);
+<span class="lineNum">     173 </span>                :            : 
+<span class="lineNum">     174 </span>                :            : /* Per-thread data.
+<span class="lineNum">     175 </span>                :            :  *
+<span class="lineNum">     176 </span>                :            :  *
+<span class="lineNum">     177 </span>                :            :  * Standard Forms
+<span class="lineNum">     178 </span>                :            :  * ==============
+<span class="lineNum">     179 </span>                :            :  *
+<span class="lineNum">     180 </span>                :            :  * Multiple forms of standard per-thread data exist, each with its own pluses
+<span class="lineNum">     181 </span>                :            :  * and minuses.  In general, if one of these forms is appropriate, then it's a
+<span class="lineNum">     182 </span>                :            :  * good idea to use it:
+<span class="lineNum">     183 </span>                :            :  *
+<span class="lineNum">     184 </span>                :            :  *     - POSIX per-thread data via pthread_key_t is portable to any pthreads
+<span class="lineNum">     185 </span>                :            :  *       implementation, and allows a destructor function to be defined.  It
+<span class="lineNum">     186 </span>                :            :  *       only (directly) supports per-thread pointers, which are always
+<span class="lineNum">     187 </span>                :            :  *       initialized to NULL.  It requires once-only allocation of a
+<span class="lineNum">     188 </span>                :            :  *       pthread_key_t value.  It is relatively slow.  Typically few
+<span class="lineNum">     189 </span>                :            :  *       &quot;pthread_key_t&quot;s are available (POSIX requires only at least 128,
+<span class="lineNum">     190 </span>                :            :  *       glibc supplies only 1024).
+<span class="lineNum">     191 </span>                :            :  *
+<span class="lineNum">     192 </span>                :            :  *     - The thread_local feature newly defined in C11 &lt;threads.h&gt; works with
+<span class="lineNum">     193 </span>                :            :  *       any data type and initializer, and it is fast.  thread_local does not
+<span class="lineNum">     194 </span>                :            :  *       require once-only initialization like pthread_key_t.  C11 does not
+<span class="lineNum">     195 </span>                :            :  *       define what happens if one attempts to access a thread_local object
+<span class="lineNum">     196 </span>                :            :  *       from a thread other than the one to which that object belongs.  There
+<span class="lineNum">     197 </span>                :            :  *       is no provision to call a user-specified destructor when a thread
+<span class="lineNum">     198 </span>                :            :  *       ends.  Typical implementations allow for an arbitrary amount of
+<span class="lineNum">     199 </span>                :            :  *       thread_local storage, but statically allocated only.
+<span class="lineNum">     200 </span>                :            :  *
+<span class="lineNum">     201 </span>                :            :  *     - The __thread keyword is a GCC extension similar to thread_local but
+<span class="lineNum">     202 </span>                :            :  *       with a longer history.  __thread is not portable to every GCC version
+<span class="lineNum">     203 </span>                :            :  *       or environment.  __thread does not restrict the use of a thread-local
+<span class="lineNum">     204 </span>                :            :  *       object outside its own thread.
+<span class="lineNum">     205 </span>                :            :  *
+<span class="lineNum">     206 </span>                :            :  * Here's a handy summary:
+<span class="lineNum">     207 </span>                :            :  *
+<span class="lineNum">     208 </span>                :            :  *                     pthread_key_t     thread_local       __thread
+<span class="lineNum">     209 </span>                :            :  *                     -------------     ------------     -------------
+<span class="lineNum">     210 </span>                :            :  * portability             high               low             medium
+<span class="lineNum">     211 </span>                :            :  * speed                    low              high               high
+<span class="lineNum">     212 </span>                :            :  * supports destructors?    yes                no                 no
+<span class="lineNum">     213 </span>                :            :  * needs key allocation?    yes                no                 no
+<span class="lineNum">     214 </span>                :            :  * arbitrary initializer?    no               yes                yes
+<span class="lineNum">     215 </span>                :            :  * cross-thread access?     yes                no                yes
+<span class="lineNum">     216 </span>                :            :  * amount available?        few            arbitrary         arbitrary
+<span class="lineNum">     217 </span>                :            :  * dynamically allocated?   yes                no                 no
+<span class="lineNum">     218 </span>                :            :  *
+<span class="lineNum">     219 </span>                :            :  *
+<span class="lineNum">     220 </span>                :            :  * Extensions
+<span class="lineNum">     221 </span>                :            :  * ==========
+<span class="lineNum">     222 </span>                :            :  *
+<span class="lineNum">     223 </span>                :            :  * OVS provides some extensions and wrappers:
+<span class="lineNum">     224 </span>                :            :  *
+<span class="lineNum">     225 </span>                :            :  *     - In a situation where the performance of thread_local or __thread is
+<span class="lineNum">     226 </span>                :            :  *       desirable, but portability is required, DEFINE_STATIC_PER_THREAD_DATA
+<span class="lineNum">     227 </span>                :            :  *       and DECLARE_EXTERN_PER_THREAD_DATA/DEFINE_EXTERN_PER_THREAD_DATA may
+<span class="lineNum">     228 </span>                :            :  *       be appropriate (see below).
+<span class="lineNum">     229 </span>                :            :  *
+<span class="lineNum">     230 </span>                :            :  *     - DEFINE_PER_THREAD_MALLOCED_DATA can be convenient for simple
+<span class="lineNum">     231 </span>                :            :  *       per-thread malloc()'d buffers.
+<span class="lineNum">     232 </span>                :            :  *
+<span class="lineNum">     233 </span>                :            :  *     - struct ovs_tsd provides an alternative to pthread_key_t that isn't
+<span class="lineNum">     234 </span>                :            :  *       limited to a small number of keys.
+<span class="lineNum">     235 </span>                :            :  */
+<span class="lineNum">     236 </span>                :            : 
+<span class="lineNum">     237 </span>                :            : /* For static data, use this macro in a source file:
+<span class="lineNum">     238 </span>                :            :  *
+<span class="lineNum">     239 </span>                :            :  *    DEFINE_STATIC_PER_THREAD_DATA(TYPE, NAME, INITIALIZER).
+<span class="lineNum">     240 </span>                :            :  *
+<span class="lineNum">     241 </span>                :            :  * For global data, &quot;declare&quot; the data in the header and &quot;define&quot; it in
+<span class="lineNum">     242 </span>                :            :  * the source file, with:
+<span class="lineNum">     243 </span>                :            :  *
+<span class="lineNum">     244 </span>                :            :  *    DECLARE_EXTERN_PER_THREAD_DATA(TYPE, NAME).
+<span class="lineNum">     245 </span>                :            :  *    DEFINE_EXTERN_PER_THREAD_DATA(NAME, INITIALIZER).
+<span class="lineNum">     246 </span>                :            :  *
+<span class="lineNum">     247 </span>                :            :  * One should prefer to use POSIX per-thread data, via pthread_key_t, when its
+<span class="lineNum">     248 </span>                :            :  * performance is acceptable, because of its portability (see the table above).
+<span class="lineNum">     249 </span>                :            :  * This macro is an alternatives that takes advantage of thread_local (and
+<span class="lineNum">     250 </span>                :            :  * __thread), for its performance, when it is available, and falls back to
+<span class="lineNum">     251 </span>                :            :  * POSIX per-thread data otherwise.
+<span class="lineNum">     252 </span>                :            :  *
+<span class="lineNum">     253 </span>                :            :  * Defines per-thread variable NAME with the given TYPE, initialized to
+<span class="lineNum">     254 </span>                :            :  * INITIALIZER (which must be valid as an initializer for a variable with
+<span class="lineNum">     255 </span>                :            :  * static lifetime).
+<span class="lineNum">     256 </span>                :            :  *
+<span class="lineNum">     257 </span>                :            :  * The public interface to the variable is:
+<span class="lineNum">     258 </span>                :            :  *
+<span class="lineNum">     259 </span>                :            :  *    TYPE *NAME_get(void)
+<span class="lineNum">     260 </span>                :            :  *    TYPE *NAME_get_unsafe(void)
+<span class="lineNum">     261 </span>                :            :  *
+<span class="lineNum">     262 </span>                :            :  *       Returns the address of this thread's instance of NAME.
+<span class="lineNum">     263 </span>                :            :  *
+<span class="lineNum">     264 </span>                :            :  *       Use NAME_get() in a context where this might be the first use of the
+<span class="lineNum">     265 </span>                :            :  *       per-thread variable in the program.  Use NAME_get_unsafe(), which
+<span class="lineNum">     266 </span>                :            :  *       avoids a conditional test and is thus slightly faster, in a context
+<span class="lineNum">     267 </span>                :            :  *       where one knows that NAME_get() has already been called previously.
+<span class="lineNum">     268 </span>                :            :  *
+<span class="lineNum">     269 </span>                :            :  * There is no &quot;NAME_set()&quot; (or &quot;NAME_set_unsafe()&quot;) function.  To set the
+<span class="lineNum">     270 </span>                :            :  * value of the per-thread variable, dereference the pointer returned by
+<span class="lineNum">     271 </span>                :            :  * TYPE_get() or TYPE_get_unsafe(), e.g. *TYPE_get() = 0.
+<span class="lineNum">     272 </span>                :            :  */
+<span class="lineNum">     273 </span>                :            : #if HAVE_THREAD_LOCAL || HAVE___THREAD
+<span class="lineNum">     274 </span>                :            : 
+<span class="lineNum">     275 </span>                :            : #if HAVE_THREAD_LOCAL
+<span class="lineNum">     276 </span>                :            : #include &lt;threads.h&gt;
+<span class="lineNum">     277 </span>                :            : #elif HAVE___THREAD
+<span class="lineNum">     278 </span>                :            : #define thread_local __thread
+<span class="lineNum">     279 </span>                :            : #else
+<span class="lineNum">     280 </span>                :            : #error
+<span class="lineNum">     281 </span>                :            : #endif
+<span class="lineNum">     282 </span>                :            : 
+<span class="lineNum">     283 </span>                :            : #define DEFINE_STATIC_PER_THREAD_DATA(TYPE, NAME, ...)                  \
+<span class="lineNum">     284 </span>                :            :     typedef TYPE NAME##_type;                                           \
+<span class="lineNum">     285 </span>                :            :                                                                         \
+<span class="lineNum">     286 </span>                :            :     static NAME##_type *                                                \
+<span class="lineNum">     287 </span>                :            :     NAME##_get_unsafe(void)                                             \
+<span class="lineNum">     288 </span>                :            :     {                                                                   \
+<span class="lineNum">     289 </span>                :            :         static thread_local NAME##_type var = __VA_ARGS__;              \
+<span class="lineNum">     290 </span>                :            :         return &amp;var;                                                    \
+<span class="lineNum">     291 </span>                :            :     }                                                                   \
+<span class="lineNum">     292 </span>                :            :                                                                         \
+<span class="lineNum">     293 </span>                :            :     static NAME##_type *                                                \
+<span class="lineNum">     294 </span>                :            :     NAME##_get(void)                                                    \
+<span class="lineNum">     295 </span>                :            :     {                                                                   \
+<span class="lineNum">     296 </span>                :            :         return NAME##_get_unsafe();                                     \
+<span class="lineNum">     297 </span>                :            :     }
+<span class="lineNum">     298 </span>                :            : #define DECLARE_EXTERN_PER_THREAD_DATA(TYPE, NAME)                      \
+<span class="lineNum">     299 </span>                :            :     typedef TYPE NAME##_type;                                           \
+<span class="lineNum">     300 </span>                :            :     extern thread_local NAME##_type NAME##_var;                         \
+<span class="lineNum">     301 </span>                :            :                                                                         \
+<span class="lineNum">     302 </span>                :            :     static inline NAME##_type *                                         \
+<span class="lineNum">     303 </span>                :            :     NAME##_get_unsafe(void)                                             \
+<span class="lineNum">     304 </span>                :            :     {                                                                   \
+<span class="lineNum">     305 </span>                :            :         return &amp;NAME##_var;                                             \
+<span class="lineNum">     306 </span>                :            :     }                                                                   \
+<span class="lineNum">     307 </span>                :            :                                                                         \
+<span class="lineNum">     308 </span>                :            :     static inline NAME##_type *                                         \
+<span class="lineNum">     309 </span>                :            :     NAME##_get(void)                                                    \
+<span class="lineNum">     310 </span>                :            :     {                                                                   \
+<span class="lineNum">     311 </span>                :            :         return NAME##_get_unsafe();                                     \
+<span class="lineNum">     312 </span>                :            :     }
+<span class="lineNum">     313 </span>                :            : #define DEFINE_EXTERN_PER_THREAD_DATA(NAME, ...)         \
+<span class="lineNum">     314 </span>                :            :     thread_local NAME##_type NAME##_var = __VA_ARGS__;
+<span class="lineNum">     315 </span>                :            : #else  /* no C implementation support for thread-local storage  */
+<span class="lineNum">     316 </span>                :            : #define DEFINE_STATIC_PER_THREAD_DATA(TYPE, NAME, ...)                  \
+<span class="lineNum">     317 </span>                :            :     typedef TYPE NAME##_type;                                           \
+<span class="lineNum">     318 </span>                :            :     static pthread_key_t NAME##_key;                                    \
+<span class="lineNum">     319 </span>                :            :                                                                         \
+<span class="lineNum">     320 </span>                :            :     static NAME##_type *                                                \
+<span class="lineNum">     321 </span>                :            :     NAME##_get_unsafe(void)                                             \
+<span class="lineNum">     322 </span>                :            :     {                                                                   \
+<span class="lineNum">     323 </span>                :            :         return pthread_getspecific(NAME##_key);                         \
+<span class="lineNum">     324 </span>                :            :     }                                                                   \
+<span class="lineNum">     325 </span>                :            :                                                                         \
+<span class="lineNum">     326 </span>                :            :     static void                                                         \
+<span class="lineNum">     327 </span>                :            :     NAME##_once_init(void)                                              \
+<span class="lineNum">     328 </span>                :            :     {                                                                   \
+<span class="lineNum">     329 </span>                :            :         if (pthread_key_create(&amp;NAME##_key, free)) {                    \
+<span class="lineNum">     330 </span>                :            :             abort();                                                    \
+<span class="lineNum">     331 </span>                :            :         }                                                               \
+<span class="lineNum">     332 </span>                :            :     }                                                                   \
+<span class="lineNum">     333 </span>                :            :                                                                         \
+<span class="lineNum">     334 </span>                :            :     static NAME##_type *                                                \
+<span class="lineNum">     335 </span>                :            :     NAME##_get(void)                                                    \
+<span class="lineNum">     336 </span>                :            :     {                                                                   \
+<span class="lineNum">     337 </span>                :            :         static pthread_once_t once = PTHREAD_ONCE_INIT;                 \
+<span class="lineNum">     338 </span>                :            :         NAME##_type *value;                                             \
+<span class="lineNum">     339 </span>                :            :                                                                         \
+<span class="lineNum">     340 </span>                :            :         pthread_once(&amp;once, NAME##_once_init);                          \
+<span class="lineNum">     341 </span>                :            :         value = NAME##_get_unsafe();                                    \
+<span class="lineNum">     342 </span>                :            :         if (!value) {                                                   \
+<span class="lineNum">     343 </span>                :            :             static const NAME##_type initial_value = __VA_ARGS__;       \
+<span class="lineNum">     344 </span>                :            :                                                                         \
+<span class="lineNum">     345 </span>                :            :             value = malloc(sizeof *value);                              \
+<span class="lineNum">     346 </span>                :            :             if (value == NULL) {                                        \
+<span class="lineNum">     347 </span>                :            :                 out_of_memory();                                        \
+<span class="lineNum">     348 </span>                :            :             }                                                           \
+<span class="lineNum">     349 </span>                :            :             *value = initial_value;                                     \
+<span class="lineNum">     350 </span>                :            :             xpthread_setspecific(NAME##_key, value);                    \
+<span class="lineNum">     351 </span>                :            :         }                                                               \
+<span class="lineNum">     352 </span>                :            :         return value;                                                   \
+<span class="lineNum">     353 </span>                :            :     }
+<span class="lineNum">     354 </span>                :            : #define DECLARE_EXTERN_PER_THREAD_DATA(TYPE, NAME)                      \
+<span class="lineNum">     355 </span>                :            :     typedef TYPE NAME##_type;                                           \
+<span class="lineNum">     356 </span>                :            :     static pthread_key_t NAME##_key;                                    \
+<span class="lineNum">     357 </span>                :            :                                                                         \
+<span class="lineNum">     358 </span>                :            :     static inline NAME##_type *                                         \
+<span class="lineNum">     359 </span>                :            :     NAME##_get_unsafe(void)                                             \
+<span class="lineNum">     360 </span>                :            :     {                                                                   \
+<span class="lineNum">     361 </span>                :            :         return pthread_getspecific(NAME##_key);                         \
+<span class="lineNum">     362 </span>                :            :     }                                                                   \
+<span class="lineNum">     363 </span>                :            :                                                                         \
+<span class="lineNum">     364 </span>                :            :     NAME##_type *NAME##_get(void);
+<span class="lineNum">     365 </span>                :            : #define DEFINE_EXTERN_PER_THREAD_DATA(NAME, ...)                        \
+<span class="lineNum">     366 </span>                :            :     static void                                                         \
+<span class="lineNum">     367 </span>                :            :     NAME##_once_init(void)                                              \
+<span class="lineNum">     368 </span>                :            :     {                                                                   \
+<span class="lineNum">     369 </span>                :            :         if (pthread_key_create(&amp;NAME##_key, free)) {                    \
+<span class="lineNum">     370 </span>                :            :             abort();                                                    \
+<span class="lineNum">     371 </span>                :            :         }                                                               \
+<span class="lineNum">     372 </span>                :            :     }                                                                   \
+<span class="lineNum">     373 </span>                :            :                                                                         \
+<span class="lineNum">     374 </span>                :            :     NAME##_type *                                                       \
+<span class="lineNum">     375 </span>                :            :     NAME##_get(void)                                                    \
+<span class="lineNum">     376 </span>                :            :     {                                                                   \
+<span class="lineNum">     377 </span>                :            :         static pthread_once_t once = PTHREAD_ONCE_INIT;                 \
+<span class="lineNum">     378 </span>                :            :         NAME##_type *value;                                             \
+<span class="lineNum">     379 </span>                :            :                                                                         \
+<span class="lineNum">     380 </span>                :            :         pthread_once(&amp;once, NAME##_once_init);                          \
+<span class="lineNum">     381 </span>                :            :         value = NAME##_get_unsafe();                                    \
+<span class="lineNum">     382 </span>                :            :         if (!value) {                                                   \
+<span class="lineNum">     383 </span>                :            :             static const NAME##_type initial_value = __VA_ARGS__;       \
+<span class="lineNum">     384 </span>                :            :                                                                         \
+<span class="lineNum">     385 </span>                :            :             value = malloc(sizeof *value);                              \
+<span class="lineNum">     386 </span>                :            :             if (value == NULL) {                                        \
+<span class="lineNum">     387 </span>                :            :                 out_of_memory();                                        \
+<span class="lineNum">     388 </span>                :            :             }                                                           \
+<span class="lineNum">     389 </span>                :            :             *value = initial_value;                                     \
+<span class="lineNum">     390 </span>                :            :             xpthread_setspecific(NAME##_key, value);                    \
+<span class="lineNum">     391 </span>                :            :         }                                                               \
+<span class="lineNum">     392 </span>                :            :         return value;                                                   \
+<span class="lineNum">     393 </span>                :            :     }
+<span class="lineNum">     394 </span>                :            : #endif
+<span class="lineNum">     395 </span>                :            : 
+<span class="lineNum">     396 </span>                :            : /* DEFINE_PER_THREAD_MALLOCED_DATA(TYPE, NAME).
+<span class="lineNum">     397 </span>                :            :  *
+<span class="lineNum">     398 </span>                :            :  * This is a simple wrapper around POSIX per-thread data primitives.  It
+<span class="lineNum">     399 </span>                :            :  * defines per-thread variable NAME with the given TYPE, which must be a
+<span class="lineNum">     400 </span>                :            :  * pointer type.  In each thread, the per-thread variable is initialized to
+<span class="lineNum">     401 </span>                :            :  * NULL.  When a thread terminates, the variable is freed with free().
+<span class="lineNum">     402 </span>                :            :  *
+<span class="lineNum">     403 </span>                :            :  * The public interface to the variable is:
+<span class="lineNum">     404 </span>                :            :  *
+<span class="lineNum">     405 </span>                :            :  *    TYPE NAME_get(void)
+<span class="lineNum">     406 </span>                :            :  *    TYPE NAME_get_unsafe(void)
+<span class="lineNum">     407 </span>                :            :  *
+<span class="lineNum">     408 </span>                :            :  *       Returns the value of per-thread variable NAME in this thread.
+<span class="lineNum">     409 </span>                :            :  *
+<span class="lineNum">     410 </span>                :            :  *       Use NAME_get() in a context where this might be the first use of the
+<span class="lineNum">     411 </span>                :            :  *       per-thread variable in the program.  Use NAME_get_unsafe(), which
+<span class="lineNum">     412 </span>                :            :  *       avoids a conditional test and is thus slightly faster, in a context
+<span class="lineNum">     413 </span>                :            :  *       where one knows that NAME_get() has already been called previously.
+<span class="lineNum">     414 </span>                :            :  *
+<span class="lineNum">     415 </span>                :            :  *    TYPE NAME_set(TYPE new_value)
+<span class="lineNum">     416 </span>                :            :  *    TYPE NAME_set_unsafe(TYPE new_value)
+<span class="lineNum">     417 </span>                :            :  *
+<span class="lineNum">     418 </span>                :            :  *       Sets the value of per-thread variable NAME to 'new_value' in this
+<span class="lineNum">     419 </span>                :            :  *       thread, and returns its previous value.
+<span class="lineNum">     420 </span>                :            :  *
+<span class="lineNum">     421 </span>                :            :  *       Use NAME_set() in a context where this might be the first use of the
+<span class="lineNum">     422 </span>                :            :  *       per-thread variable in the program.  Use NAME_set_unsafe(), which
+<span class="lineNum">     423 </span>                :            :  *       avoids a conditional test and is thus slightly faster, in a context
+<span class="lineNum">     424 </span>                :            :  *       where one knows that NAME_set() has already been called previously.
+<span class="lineNum">     425 </span>                :            :  */
+<span class="lineNum">     426 </span>                :            : #define DEFINE_PER_THREAD_MALLOCED_DATA(TYPE, NAME)     \
+<span class="lineNum">     427 </span>                :            :     static pthread_key_t NAME##_key;                    \
+<span class="lineNum">     428 </span>                :            :                                                         \
+<span class="lineNum">     429 </span>                :            :     static void                                         \
+<span class="lineNum">     430 </span>                :            :     NAME##_once_init(void)                              \
+<span class="lineNum">     431 </span>                :            :     {                                                   \
+<span class="lineNum">     432 </span>                :            :         if (pthread_key_create(&amp;NAME##_key, free)) {    \
+<span class="lineNum">     433 </span>                :            :             abort();                                    \
+<span class="lineNum">     434 </span>                :            :         }                                               \
+<span class="lineNum">     435 </span>                :            :     }                                                   \
+<span class="lineNum">     436 </span>                :            :                                                         \
+<span class="lineNum">     437 </span>                :            :     static void                                         \
+<span class="lineNum">     438 </span>                :            :     NAME##_init(void)                                   \
+<span class="lineNum">     439 </span>                :            :     {                                                   \
+<span class="lineNum">     440 </span>                :            :         static pthread_once_t once = PTHREAD_ONCE_INIT; \
+<span class="lineNum">     441 </span>                :            :         pthread_once(&amp;once, NAME##_once_init);          \
+<span class="lineNum">     442 </span>                :            :     }                                                   \
+<span class="lineNum">     443 </span>                :            :                                                         \
+<span class="lineNum">     444 </span>                :            :     static TYPE                                         \
+<span class="lineNum">     445 </span>                :            :     NAME##_get_unsafe(void)                             \
+<span class="lineNum">     446 </span>                :            :     {                                                   \
+<span class="lineNum">     447 </span>                :            :         return pthread_getspecific(NAME##_key);         \
+<span class="lineNum">     448 </span>                :            :     }                                                   \
+<span class="lineNum">     449 </span>                :            :                                                         \
+<span class="lineNum">     450 </span>                :            :     static OVS_UNUSED TYPE                              \
+<span class="lineNum">     451 </span>                :            :     NAME##_get(void)                                    \
+<span class="lineNum">     452 </span>                :            :     {                                                   \
+<span class="lineNum">     453 </span>                :            :         NAME##_init();                                  \
+<span class="lineNum">     454 </span>                :            :         return NAME##_get_unsafe();                     \
+<span class="lineNum">     455 </span>                :            :     }                                                   \
+<span class="lineNum">     456 </span>                :            :                                                         \
+<span class="lineNum">     457 </span>                :            :     static TYPE                                         \
+<span class="lineNum">     458 </span>                :            :     NAME##_set_unsafe(TYPE value)                       \
+<span class="lineNum">     459 </span>                :            :     {                                                   \
+<span class="lineNum">     460 </span>                :            :         TYPE old_value = NAME##_get_unsafe();           \
+<span class="lineNum">     461 </span>                :            :         xpthread_setspecific(NAME##_key, value);        \
+<span class="lineNum">     462 </span>                :            :         return old_value;                               \
+<span class="lineNum">     463 </span>                :            :     }                                                   \
+<span class="lineNum">     464 </span>                :            :                                                         \
+<span class="lineNum">     465 </span>                :            :     static OVS_UNUSED TYPE                              \
+<span class="lineNum">     466 </span>                :            :     NAME##_set(TYPE value)                              \
+<span class="lineNum">     467 </span>                :            :     {                                                   \
+<span class="lineNum">     468 </span>                :            :         NAME##_init();                                  \
+<span class="lineNum">     469 </span>                :            :         return NAME##_set_unsafe(value);                \
+<span class="lineNum">     470 </span>                :            :     }
+<span class="lineNum">     471 </span>                :            : 
+<span class="lineNum">     472 </span>                :            : /* Dynamically allocated thread-specific data with lots of slots.
+<span class="lineNum">     473 </span>                :            :  *
+<span class="lineNum">     474 </span>                :            :  * pthread_key_t can provide as few as 128 pieces of thread-specific data (even
+<span class="lineNum">     475 </span>                :            :  * glibc is limited to 1,024).  Thus, one must be careful to allocate only a
+<span class="lineNum">     476 </span>                :            :  * few keys globally.  One cannot, for example, allocate a key for every
+<span class="lineNum">     477 </span>                :            :  * instance of a data structure if there might be an arbitrary number of those
+<span class="lineNum">     478 </span>                :            :  * data structures.
+<span class="lineNum">     479 </span>                :            :  *
+<span class="lineNum">     480 </span>                :            :  * This API is similar to the pthread one (simply search and replace pthread_
+<span class="lineNum">     481 </span>                :            :  * by ovsthread_) but it a much larger limit that can be raised if necessary
+<span class="lineNum">     482 </span>                :            :  * (by recompiling).  Thus, one may more freely use this form of
+<span class="lineNum">     483 </span>                :            :  * thread-specific data.
+<span class="lineNum">     484 </span>                :            :  *
+<span class="lineNum">     485 </span>                :            :  * ovsthread_key_t also differs from pthread_key_t in the following ways:
+<span class="lineNum">     486 </span>                :            :  *
+<span class="lineNum">     487 </span>                :            :  *    - Destructors must not access thread-specific data (via ovsthread_key).
+<span class="lineNum">     488 </span>                :            :  *
+<span class="lineNum">     489 </span>                :            :  *    - The pthread_key_t API allows concurrently exiting threads to start
+<span class="lineNum">     490 </span>                :            :  *      executing the destructor after pthread_key_delete() returns.  The
+<span class="lineNum">     491 </span>                :            :  *      ovsthread_key_t API guarantees that, when ovsthread_key_delete()
+<span class="lineNum">     492 </span>                :            :  *      returns, all destructors have returned and no new ones will start
+<span class="lineNum">     493 </span>                :            :  *      execution.
+<span class="lineNum">     494 </span>                :            :  */
+<span class="lineNum">     495 </span>                :            : typedef struct ovsthread_key *ovsthread_key_t;
+<span class="lineNum">     496 </span>                :            : 
+<span class="lineNum">     497 </span>                :            : void ovsthread_key_create(ovsthread_key_t *, void (*destructor)(void *));
+<span class="lineNum">     498 </span>                :            : void ovsthread_key_delete(ovsthread_key_t);
+<span class="lineNum">     499 </span>                :            : 
+<span class="lineNum">     500 </span>                :            : void ovsthread_setspecific(ovsthread_key_t, const void *);
+<span class="lineNum">     501 </span>                :            : void *ovsthread_getspecific(ovsthread_key_t);
+<span class="lineNum">     502 </span>                :            : 
+<span class="lineNum">     503 </span>                :            : /* Convenient once-only execution.
+<span class="lineNum">     504 </span>                :            :  *
+<span class="lineNum">     505 </span>                :            :  *
+<span class="lineNum">     506 </span>                :            :  * Problem
+<span class="lineNum">     507 </span>                :            :  * =======
+<span class="lineNum">     508 </span>                :            :  *
+<span class="lineNum">     509 </span>                :            :  * POSIX provides pthread_once_t and pthread_once() as primitives for running a
+<span class="lineNum">     510 </span>                :            :  * set of code only once per process execution.  They are used like this:
+<span class="lineNum">     511 </span>                :            :  *
+<span class="lineNum">     512 </span>                :            :  *     static void run_once(void) { ...initialization... }
+<span class="lineNum">     513 </span>                :            :  *     static pthread_once_t once = PTHREAD_ONCE_INIT;
+<span class="lineNum">     514 </span>                :            :  * ...
+<span class="lineNum">     515 </span>                :            :  *     pthread_once(&amp;once, run_once);
+<span class="lineNum">     516 </span>                :            :  *
+<span class="lineNum">     517 </span>                :            :  * pthread_once() does not allow passing any parameters to the initialization
+<span class="lineNum">     518 </span>                :            :  * function, which is often inconvenient, because it means that the function
+<span class="lineNum">     519 </span>                :            :  * can only access data declared at file scope.
+<span class="lineNum">     520 </span>                :            :  *
+<span class="lineNum">     521 </span>                :            :  *
+<span class="lineNum">     522 </span>                :            :  * Solution
+<span class="lineNum">     523 </span>                :            :  * ========
+<span class="lineNum">     524 </span>                :            :  *
+<span class="lineNum">     525 </span>                :            :  * Use ovsthread_once, like this, instead:
+<span class="lineNum">     526 </span>                :            :  *
+<span class="lineNum">     527 </span>                :            :  *     static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
+<span class="lineNum">     528 </span>                :            :  *
+<span class="lineNum">     529 </span>                :            :  *     if (ovsthread_once_start(&amp;once)) {
+<span class="lineNum">     530 </span>                :            :  *         ...initialization...
+<span class="lineNum">     531 </span>                :            :  *         ovsthread_once_done(&amp;once);
+<span class="lineNum">     532 </span>                :            :  *     }
+<span class="lineNum">     533 </span>                :            :  */
+<span class="lineNum">     534 </span>                :            : 
+<span class="lineNum">     535 </span>                :            : struct ovsthread_once {
+<span class="lineNum">     536 </span>                :            :     atomic_bool done;
+<span class="lineNum">     537 </span>                :            :     struct ovs_mutex mutex;
+<span class="lineNum">     538 </span>                :            : };
+<span class="lineNum">     539 </span>                :            : 
+<span class="lineNum">     540 </span>                :            : #define OVSTHREAD_ONCE_INITIALIZER              \
+<span class="lineNum">     541 </span>                :            :     {                                           \
+<span class="lineNum">     542 </span>                :            :         ATOMIC_VAR_INIT(false),                 \
+<span class="lineNum">     543 </span>                :            :         OVS_MUTEX_INITIALIZER,                  \
+<span class="lineNum">     544 </span>                :            :     }
+<span class="lineNum">     545 </span>                :            : 
+<span class="lineNum">     546 </span>                :            : static inline bool ovsthread_once_start(struct ovsthread_once *once)
+<span class="lineNum">     547 </span>                :            :     OVS_TRY_LOCK(true, once-&gt;mutex);
+<span class="lineNum">     548 </span>                :            : void ovsthread_once_done(struct ovsthread_once *once)
+<span class="lineNum">     549 </span>                :            :     OVS_RELEASES(once-&gt;mutex);
+<span class="lineNum">     550 </span>                :            : 
+<span class="lineNum">     551 </span>                :            : bool ovsthread_once_start__(struct ovsthread_once *once)
+<span class="lineNum">     552 </span>                :            :     OVS_TRY_LOCK(false, once-&gt;mutex);
+<a name="553"><span class="lineNum">     553 </span>                :            : </a>
+<span class="lineNum">     554 </span>                :            : static inline bool
+<span class="lineNum">     555 </span>                :<span class="lineCov">    3113585 : ovsthread_once_is_done__(struct ovsthread_once *once)</span>
+<span class="lineNum">     556 </span>                :            : {
+<span class="lineNum">     557 </span>                :            :     bool done;
+<span class="lineNum">     558 </span>                :            : 
+<span class="lineNum">     559 </span>                :<span class="lineCov">    3113585 :     atomic_read_explicit(&amp;once-&gt;done, &amp;done, memory_order_relaxed);</span>
+<span class="lineNum">     560 </span>                :<span class="lineCov">    3113585 :     return done;</span>
+<span class="lineNum">     561 </span>                :            : }
+<span class="lineNum">     562 </span>                :            : 
+<span class="lineNum">     563 </span>                :            : /* Returns true if this is the first call to ovsthread_once_start() for
+<span class="lineNum">     564 </span>                :            :  * 'once'.  In this case, the caller should perform whatever initialization
+<span class="lineNum">     565 </span>                :            :  * actions it needs to do, then call ovsthread_once_done() for 'once'.
+<span class="lineNum">     566 </span>                :            :  *
+<span class="lineNum">     567 </span>                :            :  * Returns false if this is not the first call to ovsthread_once_start() for
+<span class="lineNum">     568 </span>                :            :  * 'once'.  In this case, the call will not return until after
+<a name="569"><span class="lineNum">     569 </span>                :            :  * ovsthread_once_done() has been called. */</a>
+<span class="lineNum">     570 </span>                :            : static inline bool
+<span class="lineNum">     571 </span>                :<span class="lineCov">    3053004 : ovsthread_once_start(struct ovsthread_once *once)</span>
+<span class="lineNum">     572 </span>                :            : {
+<span class="lineNum">     573 </span>[<span class="branchCov" title="Branch 1 was taken 60577 times"> + </span><span class="branchCov" title="Branch 2 was taken 2992448 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 60365 times"> + </span><span class="branchCov" title="Branch 5 was taken 218 times"> + </span>]:<span class="lineCov">    3053004 :     return OVS_UNLIKELY(!ovsthread_once_is_done__(once)</span>
+<span class="lineNum">     574 </span>                :            :                         &amp;&amp; !ovsthread_once_start__(once));
+<span class="lineNum">     575 </span>                :            : }
+<span class="lineNum">     576 </span>                :            : 
+<span class="lineNum">     577 </span>                :            : /* Thread ID.
+<span class="lineNum">     578 </span>                :            :  *
+<span class="lineNum">     579 </span>                :            :  * pthread_t isn't so nice for some purposes.  Its size and representation are
+<span class="lineNum">     580 </span>                :            :  * implementation dependent, which means that there is no way to hash it.
+<span class="lineNum">     581 </span>                :            :  * This thread ID avoids the problem.
+<a name="582"><span class="lineNum">     582 </span>                :            :  */</a>
+<span class="lineNum">     583 </span>                :            : 
+<span class="lineNum">     584 </span>                :<span class="lineCov">     967175 : DECLARE_EXTERN_PER_THREAD_DATA(unsigned int, ovsthread_id);</span>
+<span class="lineNum">     585 </span>                :            : 
+<span class="lineNum">     586 </span>                :            : /* Returns a per-thread identifier unique within the lifetime of the
+<a name="587"><span class="lineNum">     587 </span>                :            :  * process. */</a>
+<span class="lineNum">     588 </span>                :            : static inline unsigned int
+<span class="lineNum">     589 </span>                :<span class="lineCov">     479926 : ovsthread_id_self(void)</span>
+<span class="lineNum">     590 </span>                :            : {
+<span class="lineNum">     591 </span>                :<span class="lineCov">     479926 :     return *ovsthread_id_get();</span>
+<span class="lineNum">     592 </span>                :            : }
+<span class="lineNum">     593 </span>                :            : 
+<span class="lineNum">     594 </span>                :            : /* Simulated global counter.
+<span class="lineNum">     595 </span>                :            :  *
+<span class="lineNum">     596 </span>                :            :  * Incrementing such a counter is meant to be cheaper than incrementing a
+<span class="lineNum">     597 </span>                :            :  * global counter protected by a lock.  It is probably more expensive than
+<span class="lineNum">     598 </span>                :            :  * incrementing a truly thread-local variable, but such a variable has no
+<span class="lineNum">     599 </span>                :            :  * straightforward way to get the sum.
+<span class="lineNum">     600 </span>                :            :  *
+<span class="lineNum">     601 </span>                :            :  *
+<span class="lineNum">     602 </span>                :            :  * Thread-safety
+<span class="lineNum">     603 </span>                :            :  * =============
+<span class="lineNum">     604 </span>                :            :  *
+<span class="lineNum">     605 </span>                :            :  * Fully thread-safe. */
+<span class="lineNum">     606 </span>                :            : 
+<span class="lineNum">     607 </span>                :            : struct ovsthread_stats {
+<span class="lineNum">     608 </span>                :            :     struct ovs_mutex mutex;
+<span class="lineNum">     609 </span>                :            :     void *volatile buckets[16];
+<span class="lineNum">     610 </span>                :            : };
+<span class="lineNum">     611 </span>                :            : 
+<span class="lineNum">     612 </span>                :            : void ovsthread_stats_init(struct ovsthread_stats *);
+<span class="lineNum">     613 </span>                :            : void ovsthread_stats_destroy(struct ovsthread_stats *);
+<span class="lineNum">     614 </span>                :            : 
+<span class="lineNum">     615 </span>                :            : void *ovsthread_stats_bucket_get(struct ovsthread_stats *,
+<span class="lineNum">     616 </span>                :            :                                  void *(*new_bucket)(void));
+<span class="lineNum">     617 </span>                :            : 
+<span class="lineNum">     618 </span>                :            : #define OVSTHREAD_STATS_FOR_EACH_BUCKET(BUCKET, IDX, STATS)             \
+<span class="lineNum">     619 </span>                :            :     for ((IDX) = ovs_thread_stats_next_bucket(STATS, 0);                \
+<span class="lineNum">     620 </span>                :            :          ((IDX) &lt; ARRAY_SIZE((STATS)-&gt;buckets)                          \
+<span class="lineNum">     621 </span>                :            :           ? ((BUCKET) = (STATS)-&gt;buckets[IDX], true)                    \
+<span class="lineNum">     622 </span>                :            :           : false);                                                     \
+<span class="lineNum">     623 </span>                :            :          (IDX) = ovs_thread_stats_next_bucket(STATS, (IDX) + 1))
+<span class="lineNum">     624 </span>                :            : size_t ovs_thread_stats_next_bucket(const struct ovsthread_stats *, size_t);
+<span class="lineNum">     625 </span>                :            : 
+<span class="lineNum">     626 </span>                :            : bool single_threaded(void);
+<span class="lineNum">     627 </span>                :            : 
+<span class="lineNum">     628 </span>                :            : void assert_single_threaded_at(const char *where);
+<span class="lineNum">     629 </span>                :            : #define assert_single_threaded() assert_single_threaded_at(SOURCE_LOCATOR)
+<span class="lineNum">     630 </span>                :            : 
+<span class="lineNum">     631 </span>                :            : #ifndef _WIN32
+<span class="lineNum">     632 </span>                :            : pid_t xfork_at(const char *where);
+<span class="lineNum">     633 </span>                :            : #define xfork() xfork_at(SOURCE_LOCATOR)
+<span class="lineNum">     634 </span>                :            : #endif
+<span class="lineNum">     635 </span>                :            : 
+<span class="lineNum">     636 </span>                :            : void forbid_forking(const char *reason);
+<span class="lineNum">     637 </span>                :            : bool may_fork(void);
+<span class="lineNum">     638 </span>                :            : 
+<span class="lineNum">     639 </span>                :            : /* Useful functions related to threading. */
+<span class="lineNum">     640 </span>                :            : 
+<span class="lineNum">     641 </span>                :            : int count_cpu_cores(void);
+<span class="lineNum">     642 </span>                :            : 
+<span class="lineNum">     643 </span>                :            : #endif /* ovs-thread.h */
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

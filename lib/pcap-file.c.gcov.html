@@ -1,0 +1,444 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/pcap-file.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - pcap-file.c<span style="font-size: 80%;"> (source / <a href="pcap-file.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">52</td>
+            <td class="headerCovTableEntry">140</td>
+            <td class="headerCovTableEntryLo">37.1 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">6</td>
+            <td class="headerCovTableEntry">12</td>
+            <td class="headerCovTableEntryLo">50.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">24</td>
+            <td class="headerCovTableEntry">92</td>
+            <td class="headerCovTableEntryLo">26.1 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2009, 2010, 2012, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;pcap-file.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &lt;inttypes.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;sys/stat.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &quot;byte-order.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;compiler.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;flow.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;hmap.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;packets.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;unaligned.h&quot;
+<a name="32"><span class="lineNum">      32 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      33 </span>                :            : 
+<span class="lineNum">      34 </span>                :<span class="lineCov">       4763 : VLOG_DEFINE_THIS_MODULE(pcap);</span>
+<span class="lineNum">      35 </span>                :            : 
+<span class="lineNum">      36 </span>                :            : struct pcap_hdr {
+<span class="lineNum">      37 </span>                :            :     uint32_t magic_number;   /* magic number */
+<span class="lineNum">      38 </span>                :            :     uint16_t version_major;  /* major version number */
+<span class="lineNum">      39 </span>                :            :     uint16_t version_minor;  /* minor version number */
+<span class="lineNum">      40 </span>                :            :     int32_t thiszone;        /* GMT to local correction */
+<span class="lineNum">      41 </span>                :            :     uint32_t sigfigs;        /* accuracy of timestamps */
+<span class="lineNum">      42 </span>                :            :     uint32_t snaplen;        /* max length of captured packets */
+<span class="lineNum">      43 </span>                :            :     uint32_t network;        /* data link type */
+<span class="lineNum">      44 </span>                :            : };
+<span class="lineNum">      45 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct pcap_hdr) == 24);
+<span class="lineNum">      46 </span>                :            : 
+<span class="lineNum">      47 </span>                :            : struct pcaprec_hdr {
+<span class="lineNum">      48 </span>                :            :     uint32_t ts_sec;         /* timestamp seconds */
+<span class="lineNum">      49 </span>                :            :     uint32_t ts_usec;        /* timestamp microseconds */
+<span class="lineNum">      50 </span>                :            :     uint32_t incl_len;       /* number of octets of packet saved in file */
+<span class="lineNum">      51 </span>                :            :     uint32_t orig_len;       /* actual length of packet */
+<span class="lineNum">      52 </span>                :            : };
+<span class="lineNum">      53 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct pcaprec_hdr) == 16);
+<a name="54"><span class="lineNum">      54 </span>                :            : </a>
+<span class="lineNum">      55 </span>                :            : FILE *
+<span class="lineNum">      56 </span>                :<span class="lineCov">          2 : ovs_pcap_open(const char *file_name, const char *mode)</span>
+<span class="lineNum">      57 </span>                :            : {
+<span class="lineNum">      58 </span>                :            :     struct stat s;
+<span class="lineNum">      59 </span>                :            :     FILE *file;
+<span class="lineNum">      60 </span>                :            :     int error;
+<span class="lineNum">      61 </span>                :            : 
+<span class="lineNum">      62 </span>[<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 1 time"> + </span>]:<span class="lineCov">          2 :     ovs_assert(!strcmp(mode, &quot;rb&quot;) ||</span>
+<span class="lineNum">         </span>[<span class="branchCov" title="Branch 4 was taken 1 time"> + </span><span class="branchCov" title="Branch 5 was taken 1 time"> + </span>][<span class="branchNoCov" title="Branch 6 was not taken"> - </span><span class="branchCov" title="Branch 7 was taken 1 time"> + </span>]
+<span class="lineNum">      63 </span>                :            :                !strcmp(mode, &quot;wb&quot;) ||
+<span class="lineNum">      64 </span>                :            :                !strcmp(mode, &quot;ab&quot;));
+<span class="lineNum">      65 </span>                :            : 
+<span class="lineNum">      66 </span>                :<span class="lineCov">          2 :     file = fopen(file_name, mode);</span>
+<span class="lineNum">      67 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :     if (file == NULL) {</span>
+<span class="lineNum">      68 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN(&quot;%s: failed to open pcap file for %s (%s)&quot;, file_name,</span>
+<span class="lineNum">         </span>        [<span class="branchNoExec" title="Branch 6 was not executed"> # </span><span class="branchNoExec" title="Branch 7 was not executed"> # </span>]
+<span class="lineNum">      69 </span>                :            :                   (mode[0] == 'r' ? &quot;reading&quot;
+<span class="lineNum">      70 </span>                :            :                    : mode[0] == 'w' ? &quot;writing&quot;
+<span class="lineNum">      71 </span>                :            :                    : &quot;appending&quot;),
+<span class="lineNum">      72 </span>                :            :                   ovs_strerror(errno));
+<span class="lineNum">      73 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">      74 </span>                :            :     }
+<span class="lineNum">      75 </span>                :            : 
+<span class="lineNum">      76 </span>  [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">          2 :     switch (mode[0]) {</span>
+<span class="lineNum">      77 </span>                :            :     case 'r':
+<span class="lineNum">      78 </span>                :<span class="lineCov">          1 :         error = ovs_pcap_read_header(file);</span>
+<span class="lineNum">      79 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :         if (error) {</span>
+<span class="lineNum">      80 </span>                :<span class="lineNoCov">          0 :             errno = error;</span>
+<span class="lineNum">      81 </span>                :<span class="lineNoCov">          0 :             fclose(file);</span>
+<span class="lineNum">      82 </span>                :<span class="lineNoCov">          0 :             return NULL;</span>
+<span class="lineNum">      83 </span>                :            :         }
+<span class="lineNum">      84 </span>                :<span class="lineCov">          1 :         break;</span>
+<span class="lineNum">      85 </span>                :            : 
+<span class="lineNum">      86 </span>                :            :     case 'w':
+<span class="lineNum">      87 </span>                :<span class="lineNoCov">          0 :         ovs_pcap_write_header(file);</span>
+<span class="lineNum">      88 </span>                :<span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">      89 </span>                :            : 
+<span class="lineNum">      90 </span>                :            :     case 'a':
+<span class="lineNum">      91 </span>[<span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>][<span class="branchCov" title="Branch 4 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span>]:<span class="lineCov">          1 :         if (!fstat(fileno(file), &amp;s) &amp;&amp; !s.st_size) {</span>
+<span class="lineNum">      92 </span>                :<span class="lineCov">          1 :             ovs_pcap_write_header(file);</span>
+<span class="lineNum">      93 </span>                :            :         }
+<span class="lineNum">      94 </span>                :<span class="lineCov">          1 :         break;</span>
+<span class="lineNum">      95 </span>                :            : 
+<span class="lineNum">      96 </span>                :            :     default:
+<span class="lineNum">      97 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">      98 </span>                :            :     }
+<span class="lineNum">      99 </span>                :<span class="lineCov">          2 :     return file;</span>
+<span class="lineNum">     100 </span>                :            : }
+<a name="101"><span class="lineNum">     101 </span>                :            : </a>
+<span class="lineNum">     102 </span>                :            : int
+<span class="lineNum">     103 </span>                :<span class="lineCov">          2 : ovs_pcap_read_header(FILE *file)</span>
+<span class="lineNum">     104 </span>                :            : {
+<span class="lineNum">     105 </span>                :            :     struct pcap_hdr ph;
+<span class="lineNum">     106 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 2 times"> + </span>]:<span class="lineCov">          2 :     if (fread(&amp;ph, sizeof ph, 1, file) != 1) {</span>
+<span class="lineNum">     107 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         int error = ferror(file) ? errno : EOF;</span>
+<span class="lineNum">     108 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN(&quot;failed to read pcap header: %s&quot;, ovs_retval_to_string(error));</span>
+<span class="lineNum">     109 </span>                :<span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     110 </span>                :            :     }
+<span class="lineNum">     111 </span>[<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 1 time"> + </span>]:<span class="lineCov">          2 :     if (ph.magic_number != 0xa1b2c3d4 &amp;&amp; ph.magic_number != 0xd4c3b2a1) {</span>
+<span class="lineNum">     112 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN(&quot;bad magic 0x%08&quot;PRIx32&quot; reading pcap file &quot;</span>
+<span class="lineNum">     113 </span>                :            :                   &quot;(expected 0xa1b2c3d4 or 0xd4c3b2a1)&quot;, ph.magic_number);
+<span class="lineNum">     114 </span>                :<span class="lineNoCov">          0 :         return EPROTO;</span>
+<span class="lineNum">     115 </span>                :            :     }
+<span class="lineNum">     116 </span>                :<span class="lineCov">          2 :     return 0;</span>
+<span class="lineNum">     117 </span>                :            : }
+<a name="118"><span class="lineNum">     118 </span>                :            : </a>
+<span class="lineNum">     119 </span>                :            : void
+<span class="lineNum">     120 </span>                :<span class="lineCov">          1 : ovs_pcap_write_header(FILE *file)</span>
+<span class="lineNum">     121 </span>                :            : {
+<span class="lineNum">     122 </span>                :            :     /* The pcap reader is responsible for figuring out endianness based on the
+<span class="lineNum">     123 </span>                :            :      * magic number, so the lack of htonX calls here is intentional. */
+<span class="lineNum">     124 </span>                :            :     struct pcap_hdr ph;
+<span class="lineNum">     125 </span>                :<span class="lineCov">          1 :     ph.magic_number = 0xa1b2c3d4;</span>
+<span class="lineNum">     126 </span>                :<span class="lineCov">          1 :     ph.version_major = 2;</span>
+<span class="lineNum">     127 </span>                :<span class="lineCov">          1 :     ph.version_minor = 4;</span>
+<span class="lineNum">     128 </span>                :<span class="lineCov">          1 :     ph.thiszone = 0;</span>
+<span class="lineNum">     129 </span>                :<span class="lineCov">          1 :     ph.sigfigs = 0;</span>
+<span class="lineNum">     130 </span>                :<span class="lineCov">          1 :     ph.snaplen = 1518;</span>
+<span class="lineNum">     131 </span>                :<span class="lineCov">          1 :     ph.network = 1;             /* Ethernet */</span>
+<span class="lineNum">     132 </span>                :<span class="lineCov">          1 :     ignore(fwrite(&amp;ph, sizeof ph, 1, file));</span>
+<span class="lineNum">     133 </span>                :<span class="lineCov">          1 : }</span>
+<a name="134"><span class="lineNum">     134 </span>                :            : </a>
+<span class="lineNum">     135 </span>                :            : int
+<span class="lineNum">     136 </span>                :<span class="lineCov">        257 : ovs_pcap_read(FILE *file, struct ofpbuf **bufp, long long int *when)</span>
+<span class="lineNum">     137 </span>                :            : {
+<span class="lineNum">     138 </span>                :            :     struct pcaprec_hdr prh;
+<span class="lineNum">     139 </span>                :            :     struct ofpbuf *buf;
+<span class="lineNum">     140 </span>                :            :     void *data;
+<span class="lineNum">     141 </span>                :            :     size_t len;
+<span class="lineNum">     142 </span>                :            :     bool swap;
+<span class="lineNum">     143 </span>                :            : 
+<span class="lineNum">     144 </span>                :<span class="lineCov">        257 :     *bufp = NULL;</span>
+<span class="lineNum">     145 </span>                :            : 
+<span class="lineNum">     146 </span>                :            :     /* Read header. */
+<span class="lineNum">     147 </span>        [<span class="branchCov" title="Branch 1 was taken 1 time"> + </span><span class="branchCov" title="Branch 2 was taken 256 times"> + </span>]:<span class="lineCov">        257 :     if (fread(&amp;prh, sizeof prh, 1, file) != 1) {</span>
+<span class="lineNum">     148 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">          1 :         if (ferror(file)) {</span>
+<span class="lineNum">     149 </span>                :<span class="lineNoCov">          0 :             int error = errno;</span>
+<span class="lineNum">     150 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN(&quot;failed to read pcap record header: %s&quot;,</span>
+<span class="lineNum">     151 </span>                :            :                       ovs_retval_to_string(error));
+<span class="lineNum">     152 </span>                :<span class="lineNoCov">          0 :             return error;</span>
+<span class="lineNum">     153 </span>                :            :         } else {
+<span class="lineNum">     154 </span>                :<span class="lineCov">          1 :             return EOF;</span>
+<span class="lineNum">     155 </span>                :            :         }
+<span class="lineNum">     156 </span>                :            :     }
+<span class="lineNum">     157 </span>                :            : 
+<span class="lineNum">     158 </span>                :            :     /* Calculate length. */
+<span class="lineNum">     159 </span>                :<span class="lineCov">        256 :     len = prh.incl_len;</span>
+<span class="lineNum">     160 </span>                :<span class="lineCov">        256 :     swap = len &gt; 0xffff;</span>
+<span class="lineNum">     161 </span>        [<span class="branchCov" title="Branch 0 was taken 247 times"> + </span><span class="branchCov" title="Branch 1 was taken 9 times"> + </span>]:<span class="lineCov">        256 :     if (swap) {</span>
+<span class="lineNum">     162 </span>                :<span class="lineCov">        247 :         len = uint32_byteswap(len);</span>
+<span class="lineNum">     163 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 247 times"> + </span>]:<span class="lineCov">        247 :         if (len &gt; 0xffff) {</span>
+<span class="lineNum">     164 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN(&quot;bad packet length %&quot;PRIuSIZE&quot; or %&quot;PRIu32</span>
+<span class="lineNum">     165 </span>                :            :                       &quot;reading pcap file&quot;,
+<span class="lineNum">     166 </span>                :            :                       len, uint32_byteswap(len));
+<span class="lineNum">     167 </span>                :<span class="lineNoCov">          0 :             return EPROTO;</span>
+<span class="lineNum">     168 </span>                :            :         }
+<span class="lineNum">     169 </span>                :            :     }
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>                :            :     /* Calculate time. */
+<span class="lineNum">     172 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 256 times"> + </span>]:<span class="lineCov">        256 :     if (when) {</span>
+<span class="lineNum">     173 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         uint32_t ts_sec = swap ? uint32_byteswap(prh.ts_sec) : prh.ts_sec;</span>
+<span class="lineNum">     174 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         uint32_t ts_usec = swap ? uint32_byteswap(prh.ts_usec) : prh.ts_usec;</span>
+<span class="lineNum">     175 </span>                :<span class="lineNoCov">          0 :         *when = ts_sec * 1000LL + ts_usec / 1000;</span>
+<span class="lineNum">     176 </span>                :            :     }
+<span class="lineNum">     177 </span>                :            : 
+<span class="lineNum">     178 </span>                :            :     /* Read packet. */
+<span class="lineNum">     179 </span>                :<span class="lineCov">        256 :     buf = ofpbuf_new(len);</span>
+<span class="lineNum">     180 </span>                :<span class="lineCov">        256 :     data = ofpbuf_put_uninit(buf, len);</span>
+<span class="lineNum">     181 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 256 times"> + </span>]:<span class="lineCov">        256 :     if (fread(data, len, 1, file) != 1) {</span>
+<span class="lineNum">     182 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         int error = ferror(file) ? errno : EOF;</span>
+<span class="lineNum">     183 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN(&quot;failed to read pcap packet: %s&quot;,</span>
+<span class="lineNum">     184 </span>                :            :                   ovs_retval_to_string(error));
+<span class="lineNum">     185 </span>                :<span class="lineNoCov">          0 :         ofpbuf_delete(buf);</span>
+<span class="lineNum">     186 </span>                :<span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     187 </span>                :            :     }
+<span class="lineNum">     188 </span>                :<span class="lineCov">        256 :     *bufp = buf;</span>
+<span class="lineNum">     189 </span>                :<span class="lineCov">        257 :     return 0;</span>
+<span class="lineNum">     190 </span>                :            : }
+<a name="191"><span class="lineNum">     191 </span>                :            : </a>
+<span class="lineNum">     192 </span>                :            : void
+<span class="lineNum">     193 </span>                :<span class="lineCov">          9 : ovs_pcap_write(FILE *file, struct ofpbuf *buf)</span>
+<span class="lineNum">     194 </span>                :            : {
+<span class="lineNum">     195 </span>                :            :     struct pcaprec_hdr prh;
+<span class="lineNum">     196 </span>                :            :     struct timeval tv;
+<span class="lineNum">     197 </span>                :            : 
+<span class="lineNum">     198 </span>                :<span class="lineCov">          9 :     xgettimeofday(&amp;tv);</span>
+<span class="lineNum">     199 </span>                :<span class="lineCov">          9 :     prh.ts_sec = tv.tv_sec;</span>
+<span class="lineNum">     200 </span>                :<span class="lineCov">          9 :     prh.ts_usec = tv.tv_usec;</span>
+<span class="lineNum">     201 </span>                :<span class="lineCov">          9 :     prh.incl_len = ofpbuf_size(buf);</span>
+<span class="lineNum">     202 </span>                :<span class="lineCov">          9 :     prh.orig_len = ofpbuf_size(buf);</span>
+<span class="lineNum">     203 </span>                :<span class="lineCov">          9 :     ignore(fwrite(&amp;prh, sizeof prh, 1, file));</span>
+<span class="lineNum">     204 </span>                :<span class="lineCov">          9 :     ignore(fwrite(ofpbuf_data(buf), ofpbuf_size(buf), 1, file));</span>
+<span class="lineNum">     205 </span>                :<span class="lineCov">          9 : }</span>
+<span class="lineNum">     206 </span>                :            : 
+<span class="lineNum">     207 </span>                :            : struct tcp_key {
+<span class="lineNum">     208 </span>                :            :     ovs_be32 nw_src, nw_dst;
+<span class="lineNum">     209 </span>                :            :     ovs_be16 tp_src, tp_dst;
+<span class="lineNum">     210 </span>                :            : };
+<span class="lineNum">     211 </span>                :            : 
+<span class="lineNum">     212 </span>                :            : struct tcp_stream {
+<span class="lineNum">     213 </span>                :            :     struct hmap_node hmap_node;
+<span class="lineNum">     214 </span>                :            :     struct tcp_key key;
+<span class="lineNum">     215 </span>                :            :     uint32_t seq_no;
+<span class="lineNum">     216 </span>                :            :     struct ofpbuf payload;
+<span class="lineNum">     217 </span>                :            : };
+<span class="lineNum">     218 </span>                :            : 
+<span class="lineNum">     219 </span>                :            : struct tcp_reader {
+<span class="lineNum">     220 </span>                :            :     struct hmap streams;
+<span class="lineNum">     221 </span>                :            : };
+<a name="222"><span class="lineNum">     222 </span>                :            : </a>
+<span class="lineNum">     223 </span>                :            : static void
+<span class="lineNum">     224 </span>                :<span class="lineNoCov">          0 : tcp_stream_destroy(struct tcp_reader *r, struct tcp_stream *stream)</span>
+<span class="lineNum">     225 </span>                :            : {
+<span class="lineNum">     226 </span>                :<span class="lineNoCov">          0 :     hmap_remove(&amp;r-&gt;streams, &amp;stream-&gt;hmap_node);</span>
+<span class="lineNum">     227 </span>                :<span class="lineNoCov">          0 :     ofpbuf_uninit(&amp;stream-&gt;payload);</span>
+<span class="lineNum">     228 </span>                :<span class="lineNoCov">          0 :     free(stream);</span>
+<span class="lineNum">     229 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     230 </span>                :            : 
+<span class="lineNum">     231 </span>                :            : /* Returns a new data structure for extracting TCP stream data from an
+<a name="232"><span class="lineNum">     232 </span>                :            :  * Ethernet packet capture */</a>
+<span class="lineNum">     233 </span>                :            : struct tcp_reader *
+<span class="lineNum">     234 </span>                :<span class="lineNoCov">          0 : tcp_reader_open(void)</span>
+<span class="lineNum">     235 </span>                :            : {
+<span class="lineNum">     236 </span>                :            :     struct tcp_reader *r;
+<span class="lineNum">     237 </span>                :            : 
+<span class="lineNum">     238 </span>                :<span class="lineNoCov">          0 :     r = xmalloc(sizeof *r);</span>
+<span class="lineNum">     239 </span>                :<span class="lineNoCov">          0 :     hmap_init(&amp;r-&gt;streams);</span>
+<span class="lineNum">     240 </span>                :<span class="lineNoCov">          0 :     return r;</span>
+<span class="lineNum">     241 </span>                :            : }
+<span class="lineNum">     242 </span>                :            : 
+<a name="243"><span class="lineNum">     243 </span>                :            : /* Closes and frees 'r'. */</a>
+<span class="lineNum">     244 </span>                :            : void
+<span class="lineNum">     245 </span>                :<span class="lineNoCov">          0 : tcp_reader_close(struct tcp_reader *r)</span>
+<span class="lineNum">     246 </span>                :            : {
+<span class="lineNum">     247 </span>                :            :     struct tcp_stream *stream, *next_stream;
+<span class="lineNum">     248 </span>                :            : 
+<span class="lineNum">     249 </span>[<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>][<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]:<span class="lineNoCov">          0 :     HMAP_FOR_EACH_SAFE (stream, next_stream, hmap_node, &amp;r-&gt;streams) {</span>
+<span class="lineNum">     250 </span>                :<span class="lineNoCov">          0 :         tcp_stream_destroy(r, stream);</span>
+<span class="lineNum">     251 </span>                :            :     }
+<span class="lineNum">     252 </span>                :<span class="lineNoCov">          0 :     hmap_destroy(&amp;r-&gt;streams);</span>
+<span class="lineNum">     253 </span>                :<span class="lineNoCov">          0 :     free(r);</span>
+<span class="lineNum">     254 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="255"><span class="lineNum">     255 </span>                :            : </a>
+<span class="lineNum">     256 </span>                :            : static struct tcp_stream *
+<span class="lineNum">     257 </span>                :<span class="lineNoCov">          0 : tcp_stream_lookup(struct tcp_reader *r,</span>
+<span class="lineNum">     258 </span>                :            :                   const struct tcp_key *key, uint32_t hash)
+<span class="lineNum">     259 </span>                :            : {
+<span class="lineNum">     260 </span>                :            :     struct tcp_stream *stream;
+<span class="lineNum">     261 </span>                :            : 
+<span class="lineNum">     262 </span>        [<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     HMAP_FOR_EACH_WITH_HASH (stream, hmap_node, hash, &amp;r-&gt;streams) {</span>
+<span class="lineNum">     263 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!memcmp(&amp;stream-&gt;key, key, sizeof *key)) {</span>
+<span class="lineNum">     264 </span>                :<span class="lineNoCov">          0 :             return stream;</span>
+<span class="lineNum">     265 </span>                :            :         }
+<span class="lineNum">     266 </span>                :            :     }
+<span class="lineNum">     267 </span>                :<span class="lineNoCov">          0 :     return NULL;</span>
+<span class="lineNum">     268 </span>                :            : }
+<a name="269"><span class="lineNum">     269 </span>                :            : </a>
+<span class="lineNum">     270 </span>                :            : static struct tcp_stream *
+<span class="lineNum">     271 </span>                :<span class="lineNoCov">          0 : tcp_stream_new(struct tcp_reader *r, const struct tcp_key *key, uint32_t hash)</span>
+<span class="lineNum">     272 </span>                :            : {
+<span class="lineNum">     273 </span>                :            :     struct tcp_stream *stream;
+<span class="lineNum">     274 </span>                :            : 
+<span class="lineNum">     275 </span>                :<span class="lineNoCov">          0 :     stream = xmalloc(sizeof *stream);</span>
+<span class="lineNum">     276 </span>                :<span class="lineNoCov">          0 :     hmap_insert(&amp;r-&gt;streams, &amp;stream-&gt;hmap_node, hash);</span>
+<span class="lineNum">     277 </span>                :<span class="lineNoCov">          0 :     memcpy(&amp;stream-&gt;key, key, sizeof *key);</span>
+<span class="lineNum">     278 </span>                :<span class="lineNoCov">          0 :     stream-&gt;seq_no = 0;</span>
+<span class="lineNum">     279 </span>                :<span class="lineNoCov">          0 :     ofpbuf_init(&amp;stream-&gt;payload, 2048);</span>
+<span class="lineNum">     280 </span>                :<span class="lineNoCov">          0 :     return stream;</span>
+<span class="lineNum">     281 </span>                :            : }
+<span class="lineNum">     282 </span>                :            : 
+<span class="lineNum">     283 </span>                :            : /* Processes 'packet' through TCP reader 'r'.  The caller must have already
+<span class="lineNum">     284 </span>                :            :  * extracted the packet's headers into 'flow', using flow_extract().
+<span class="lineNum">     285 </span>                :            :  *
+<span class="lineNum">     286 </span>                :            :  * If 'packet' is a TCP packet, then the reader attempts to reconstruct the
+<span class="lineNum">     287 </span>                :            :  * data stream.  If successful, it returns an ofpbuf that represents the data
+<span class="lineNum">     288 </span>                :            :  * stream so far.  The caller may examine the data in the ofpbuf and pull off
+<span class="lineNum">     289 </span>                :            :  * any data that it has fully processed.  The remaining data that the caller
+<span class="lineNum">     290 </span>                :            :  * does not pull off will be presented again in future calls if more data
+<span class="lineNum">     291 </span>                :            :  * arrives in the stream.
+<span class="lineNum">     292 </span>                :            :  *
+<a name="293"><span class="lineNum">     293 </span>                :            :  * Returns null if 'packet' doesn't add new data to a TCP stream. */</a>
+<span class="lineNum">     294 </span>                :            : struct ofpbuf *
+<span class="lineNum">     295 </span>                :<span class="lineNoCov">          0 : tcp_reader_run(struct tcp_reader *r, const struct flow *flow,</span>
+<span class="lineNum">     296 </span>                :            :                const struct ofpbuf *packet)
+<span class="lineNum">     297 </span>                :            : {
+<span class="lineNum">     298 </span>                :            :     struct tcp_stream *stream;
+<span class="lineNum">     299 </span>                :            :     struct tcp_header *tcp;
+<span class="lineNum">     300 </span>                :            :     struct ofpbuf *payload;
+<span class="lineNum">     301 </span>                :            :     unsigned int l7_length;
+<span class="lineNum">     302 </span>                :            :     struct tcp_key key;
+<span class="lineNum">     303 </span>                :            :     uint32_t hash;
+<span class="lineNum">     304 </span>                :            :     uint32_t seq;
+<span class="lineNum">     305 </span>                :            :     uint8_t flags;
+<span class="lineNum">     306 </span>                :<span class="lineNoCov">          0 :     const char *l7 = ofpbuf_get_tcp_payload(packet);</span>
+<span class="lineNum">     307 </span>                :            : 
+<span class="lineNum">     308 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (flow-&gt;dl_type != htons(ETH_TYPE_IP)</span>
+<span class="lineNum">     309 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         || flow-&gt;nw_proto != IPPROTO_TCP</span>
+<span class="lineNum">     310 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         || !l7) {</span>
+<span class="lineNum">     311 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     312 </span>                :            :     }
+<span class="lineNum">     313 </span>                :<span class="lineNoCov">          0 :     tcp = ofpbuf_l4(packet);</span>
+<span class="lineNum">     314 </span>                :<span class="lineNoCov">          0 :     flags = TCP_FLAGS(tcp-&gt;tcp_ctl);</span>
+<span class="lineNum">     315 </span>                :<span class="lineNoCov">          0 :     l7_length = (char *) ofpbuf_tail(packet) - l7;</span>
+<span class="lineNum">     316 </span>                :<span class="lineNoCov">          0 :     seq = ntohl(get_16aligned_be32(&amp;tcp-&gt;tcp_seq));</span>
+<span class="lineNum">     317 </span>                :            : 
+<span class="lineNum">     318 </span>                :            :     /* Construct key. */
+<span class="lineNum">     319 </span>                :<span class="lineNoCov">          0 :     memset(&amp;key, 0, sizeof key);</span>
+<span class="lineNum">     320 </span>                :<span class="lineNoCov">          0 :     key.nw_src = flow-&gt;nw_src;</span>
+<span class="lineNum">     321 </span>                :<span class="lineNoCov">          0 :     key.nw_dst = flow-&gt;nw_dst;</span>
+<span class="lineNum">     322 </span>                :<span class="lineNoCov">          0 :     key.tp_src = flow-&gt;tp_src;</span>
+<span class="lineNum">     323 </span>                :<span class="lineNoCov">          0 :     key.tp_dst = flow-&gt;tp_dst;</span>
+<span class="lineNum">     324 </span>                :<span class="lineNoCov">          0 :     hash = hash_bytes(&amp;key, sizeof key, 0);</span>
+<span class="lineNum">     325 </span>                :            : 
+<span class="lineNum">     326 </span>                :            :     /* Find existing stream or start a new one for a SYN or if there's data. */
+<span class="lineNum">     327 </span>                :<span class="lineNoCov">          0 :     stream = tcp_stream_lookup(r, &amp;key, hash);</span>
+<span class="lineNum">     328 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!stream) {</span>
+<span class="lineNum">     329 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (flags &amp; TCP_SYN || l7_length) {</span>
+<span class="lineNum">     330 </span>                :<span class="lineNoCov">          0 :             stream = tcp_stream_new(r, &amp;key, hash);</span>
+<span class="lineNum">     331 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             stream-&gt;seq_no = flags &amp; TCP_SYN ? seq + 1 : seq;</span>
+<span class="lineNum">     332 </span>                :            :         } else {
+<span class="lineNum">     333 </span>                :<span class="lineNoCov">          0 :             return NULL;</span>
+<span class="lineNum">     334 </span>                :            :         }
+<span class="lineNum">     335 </span>                :            :     }
+<span class="lineNum">     336 </span>                :            : 
+<span class="lineNum">     337 </span>                :<span class="lineNoCov">          0 :     payload = &amp;stream-&gt;payload;</span>
+<span class="lineNum">     338 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (flags &amp; TCP_SYN || !stream-&gt;seq_no) {</span>
+<span class="lineNum">     339 </span>                :<span class="lineNoCov">          0 :         ofpbuf_clear(payload);</span>
+<span class="lineNum">     340 </span>                :<span class="lineNoCov">          0 :         stream-&gt;seq_no = seq + 1;</span>
+<span class="lineNum">     341 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     342 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     } else if (flags &amp; (TCP_FIN | TCP_RST)) {</span>
+<span class="lineNum">     343 </span>                :<span class="lineNoCov">          0 :         tcp_stream_destroy(r, stream);</span>
+<span class="lineNum">     344 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     345 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     } else if (seq == stream-&gt;seq_no) {</span>
+<span class="lineNum">     346 </span>                :            :         /* Shift all of the existing payload to the very beginning of the
+<span class="lineNum">     347 </span>                :            :          * allocated space, so that we reuse allocated space instead of
+<span class="lineNum">     348 </span>                :            :          * continually expanding it. */
+<span class="lineNum">     349 </span>                :<span class="lineNoCov">          0 :         ofpbuf_shift(payload, (char *) ofpbuf_base(payload) - (char *) ofpbuf_data(payload));</span>
+<span class="lineNum">     350 </span>                :            : 
+<span class="lineNum">     351 </span>                :<span class="lineNoCov">          0 :         ofpbuf_put(payload, l7, l7_length);</span>
+<span class="lineNum">     352 </span>                :<span class="lineNoCov">          0 :         stream-&gt;seq_no += l7_length;</span>
+<span class="lineNum">     353 </span>                :<span class="lineNoCov">          0 :         return payload;</span>
+<span class="lineNum">     354 </span>                :            :     } else {
+<span class="lineNum">     355 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     356 </span>                :            :     }
+<span class="lineNum">     357 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

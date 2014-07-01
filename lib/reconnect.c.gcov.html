@@ -1,0 +1,791 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/reconnect.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - reconnect.c<span style="font-size: 80%;"> (source / <a href="reconnect.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">213</td>
+            <td class="headerCovTableEntry">237</td>
+            <td class="headerCovTableEntryMed">89.9 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">33</td>
+            <td class="headerCovTableEntry">38</td>
+            <td class="headerCovTableEntryMed">86.8 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">121</td>
+            <td class="headerCovTableEntry">169</td>
+            <td class="headerCovTableEntryLo">71.6 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2008, 2009, 2010, 2012, 2013 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;reconnect.h&quot;
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      21 </span>                :            : 
+<span class="lineNum">      22 </span>                :            : #include &quot;poll-loop.h&quot;
+<a name="23"><span class="lineNum">      23 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      24 </span>                :            : 
+<span class="lineNum">      25 </span>                :<span class="lineCov">      15103 : VLOG_DEFINE_THIS_MODULE(reconnect);</span>
+<span class="lineNum">      26 </span>                :            : 
+<span class="lineNum">      27 </span>                :            : #define STATES                                  \
+<span class="lineNum">      28 </span>                :            :     STATE(VOID, 1 &lt;&lt; 0)                         \
+<span class="lineNum">      29 </span>                :            :     STATE(BACKOFF, 1 &lt;&lt; 1)                      \
+<span class="lineNum">      30 </span>                :            :     STATE(CONNECTING, 1 &lt;&lt; 3)          \
+<span class="lineNum">      31 </span>                :            :     STATE(ACTIVE, 1 &lt;&lt; 4)                       \
+<span class="lineNum">      32 </span>                :            :     STATE(IDLE, 1 &lt;&lt; 5)                         \
+<span class="lineNum">      33 </span>                :            :     STATE(RECONNECT, 1 &lt;&lt; 6)                    \
+<span class="lineNum">      34 </span>                :            :     STATE(LISTENING, 1 &lt;&lt; 7)
+<span class="lineNum">      35 </span>                :            : enum state {
+<span class="lineNum">      36 </span>                :            : #define STATE(NAME, VALUE) S_##NAME = VALUE,
+<span class="lineNum">      37 </span>                :            :     STATES
+<span class="lineNum">      38 </span>                :            : #undef STATE
+<span class="lineNum">      39 </span>                :            : };
+<a name="40"><span class="lineNum">      40 </span>                :            : </a>
+<span class="lineNum">      41 </span>                :            : static bool
+<span class="lineNum">      42 </span>                :<span class="lineCov">      64935 : is_connected_state(enum state state)</span>
+<span class="lineNum">      43 </span>                :            : {
+<span class="lineNum">      44 </span>                :<span class="lineCov">      64935 :     return (state &amp; (S_ACTIVE | S_IDLE)) != 0;</span>
+<span class="lineNum">      45 </span>                :            : }
+<span class="lineNum">      46 </span>                :            : 
+<span class="lineNum">      47 </span>                :            : struct reconnect {
+<span class="lineNum">      48 </span>                :            :     /* Configuration. */
+<span class="lineNum">      49 </span>                :            :     char *name;
+<span class="lineNum">      50 </span>                :            :     int min_backoff;
+<span class="lineNum">      51 </span>                :            :     int max_backoff;
+<span class="lineNum">      52 </span>                :            :     int probe_interval;
+<span class="lineNum">      53 </span>                :            :     bool passive;
+<span class="lineNum">      54 </span>                :            :     enum vlog_level info;       /* Used for informational messages. */
+<span class="lineNum">      55 </span>                :            : 
+<span class="lineNum">      56 </span>                :            :     /* State. */
+<span class="lineNum">      57 </span>                :            :     enum state state;
+<span class="lineNum">      58 </span>                :            :     long long int state_entered;
+<span class="lineNum">      59 </span>                :            :     int backoff;
+<span class="lineNum">      60 </span>                :            :     long long int last_activity;
+<span class="lineNum">      61 </span>                :            :     long long int last_connected;
+<span class="lineNum">      62 </span>                :            :     long long int last_disconnected;
+<span class="lineNum">      63 </span>                :            :     unsigned int max_tries;
+<span class="lineNum">      64 </span>                :            : 
+<span class="lineNum">      65 </span>                :            :     /* These values are simply for statistics reporting, not otherwise used
+<span class="lineNum">      66 </span>                :            :      * directly by anything internal. */
+<span class="lineNum">      67 </span>                :            :     long long int creation_time;
+<span class="lineNum">      68 </span>                :            :     unsigned int n_attempted_connections, n_successful_connections;
+<span class="lineNum">      69 </span>                :            :     unsigned int total_connected_duration;
+<span class="lineNum">      70 </span>                :            :     unsigned int seqno;
+<span class="lineNum">      71 </span>                :            : };
+<span class="lineNum">      72 </span>                :            : 
+<span class="lineNum">      73 </span>                :            : static void reconnect_transition__(struct reconnect *, long long int now,
+<span class="lineNum">      74 </span>                :            :                                    enum state state);
+<span class="lineNum">      75 </span>                :            : static long long int reconnect_deadline__(const struct reconnect *);
+<span class="lineNum">      76 </span>                :            : static bool reconnect_may_retry(struct reconnect *);
+<a name="77"><span class="lineNum">      77 </span>                :            : </a>
+<span class="lineNum">      78 </span>                :            : static const char *
+<span class="lineNum">      79 </span>                :<span class="lineCov">        290 : reconnect_state_name__(enum state state)</span>
+<span class="lineNum">      80 </span>                :            : {
+<span class="lineNum">      81 </span>  [<span class="branchCov" title="Branch 0 was taken 21 times"> + </span><span class="branchCov" title="Branch 1 was taken 136 times"> + </span><span class="branchCov" title="Branch 2 was taken 53 times"> + </span><span class="branchCov" title="Branch 3 was taken 48 times"> + </span> :<span class="lineCov">        290 :     switch (state) {</span>
+<span class="lineNum">         </span>   <span class="branchCov" title="Branch 4 was taken 24 times"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchCov" title="Branch 6 was taken 8 times"> + </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span>]
+<span class="lineNum">      82 </span>                :            : #define STATE(NAME, VALUE) case S_##NAME: return #NAME;
+<span class="lineNum">      83 </span>                :<span class="lineCov">        290 :         STATES</span>
+<span class="lineNum">      84 </span>                :            : #undef STATE
+<span class="lineNum">      85 </span>                :            :     }
+<span class="lineNum">      86 </span>                :<span class="lineCov">        290 :     return &quot;***ERROR***&quot;;</span>
+<span class="lineNum">      87 </span>                :            : }
+<span class="lineNum">      88 </span>                :            : 
+<span class="lineNum">      89 </span>                :            : /* Creates and returns a new reconnect FSM with default settings.  The FSM is
+<span class="lineNum">      90 </span>                :            :  * initially disabled.  The caller will likely want to call reconnect_enable()
+<a name="91"><span class="lineNum">      91 </span>                :            :  * and reconnect_set_name() on the returned object. */</a>
+<span class="lineNum">      92 </span>                :            : struct reconnect *
+<span class="lineNum">      93 </span>                :<span class="lineCov">       6752 : reconnect_create(long long int now)</span>
+<span class="lineNum">      94 </span>                :            : {
+<span class="lineNum">      95 </span>                :<span class="lineCov">       6752 :     struct reconnect *fsm = xzalloc(sizeof *fsm);</span>
+<span class="lineNum">      96 </span>                :            : 
+<span class="lineNum">      97 </span>                :<span class="lineCov">       6752 :     fsm-&gt;name = xstrdup(&quot;void&quot;);</span>
+<span class="lineNum">      98 </span>                :<span class="lineCov">       6752 :     fsm-&gt;min_backoff = RECONNECT_DEFAULT_MIN_BACKOFF;</span>
+<span class="lineNum">      99 </span>                :<span class="lineCov">       6752 :     fsm-&gt;max_backoff = RECONNECT_DEFAULT_MAX_BACKOFF;</span>
+<span class="lineNum">     100 </span>                :<span class="lineCov">       6752 :     fsm-&gt;probe_interval = RECONNECT_DEFAULT_PROBE_INTERVAL;</span>
+<span class="lineNum">     101 </span>                :<span class="lineCov">       6752 :     fsm-&gt;passive = false;</span>
+<span class="lineNum">     102 </span>                :<span class="lineCov">       6752 :     fsm-&gt;info = VLL_INFO;</span>
+<span class="lineNum">     103 </span>                :            : 
+<span class="lineNum">     104 </span>                :<span class="lineCov">       6752 :     fsm-&gt;state = S_VOID;</span>
+<span class="lineNum">     105 </span>                :<span class="lineCov">       6752 :     fsm-&gt;state_entered = now;</span>
+<span class="lineNum">     106 </span>                :<span class="lineCov">       6752 :     fsm-&gt;backoff = 0;</span>
+<span class="lineNum">     107 </span>                :<span class="lineCov">       6752 :     fsm-&gt;last_activity = now;</span>
+<span class="lineNum">     108 </span>                :<span class="lineCov">       6752 :     fsm-&gt;last_connected = LLONG_MAX;</span>
+<span class="lineNum">     109 </span>                :<span class="lineCov">       6752 :     fsm-&gt;last_disconnected = LLONG_MAX;</span>
+<span class="lineNum">     110 </span>                :<span class="lineCov">       6752 :     fsm-&gt;max_tries = UINT_MAX;</span>
+<span class="lineNum">     111 </span>                :<span class="lineCov">       6752 :     fsm-&gt;creation_time = now;</span>
+<span class="lineNum">     112 </span>                :            : 
+<span class="lineNum">     113 </span>                :<span class="lineCov">       6752 :     return fsm;</span>
+<span class="lineNum">     114 </span>                :            : }
+<span class="lineNum">     115 </span>                :            : 
+<a name="116"><span class="lineNum">     116 </span>                :            : /* Frees 'fsm'. */</a>
+<span class="lineNum">     117 </span>                :            : void
+<span class="lineNum">     118 </span>                :<span class="lineCov">       6740 : reconnect_destroy(struct reconnect *fsm)</span>
+<span class="lineNum">     119 </span>                :            : {
+<span class="lineNum">     120 </span>        [<span class="branchCov" title="Branch 0 was taken 6740 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       6740 :     if (fsm) {</span>
+<span class="lineNum">     121 </span>                :<span class="lineCov">       6740 :         free(fsm-&gt;name);</span>
+<span class="lineNum">     122 </span>                :<span class="lineCov">       6740 :         free(fsm);</span>
+<span class="lineNum">     123 </span>                :            :     }
+<span class="lineNum">     124 </span>                :<span class="lineCov">       6740 : }</span>
+<span class="lineNum">     125 </span>                :            : 
+<span class="lineNum">     126 </span>                :            : /* If 'quiet' is true, 'fsm' will log informational messages at level VLL_DBG,
+<span class="lineNum">     127 </span>                :            :  * by default keeping them out of log files.  This is appropriate if the
+<span class="lineNum">     128 </span>                :            :  * connection is one that is expected to be short-lived, so that the log
+<span class="lineNum">     129 </span>                :            :  * messages are merely distracting.
+<span class="lineNum">     130 </span>                :            :  *
+<span class="lineNum">     131 </span>                :            :  * If 'quiet' is false, 'fsm' logs informational messages at level VLL_INFO.
+<span class="lineNum">     132 </span>                :            :  * This is the default.
+<span class="lineNum">     133 </span>                :            :  *
+<span class="lineNum">     134 </span>                :            :  * This setting has no effect on the log level of debugging, warning, or error
+<a name="135"><span class="lineNum">     135 </span>                :            :  * messages. */</a>
+<span class="lineNum">     136 </span>                :            : void
+<span class="lineNum">     137 </span>                :<span class="lineCov">       3636 : reconnect_set_quiet(struct reconnect *fsm, bool quiet)</span>
+<span class="lineNum">     138 </span>                :            : {
+<span class="lineNum">     139 </span>        [<span class="branchCov" title="Branch 0 was taken 3636 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       3636 :     fsm-&gt;info = quiet ? VLL_DBG : VLL_INFO;</span>
+<span class="lineNum">     140 </span>                :<span class="lineCov">       3636 : }</span>
+<span class="lineNum">     141 </span>                :            : 
+<a name="142"><span class="lineNum">     142 </span>                :            : /* Returns 'fsm''s name. */</a>
+<span class="lineNum">     143 </span>                :            : const char *
+<span class="lineNum">     144 </span>                :<span class="lineCov">       3091 : reconnect_get_name(const struct reconnect *fsm)</span>
+<span class="lineNum">     145 </span>                :            : {
+<span class="lineNum">     146 </span>                :<span class="lineCov">       3091 :     return fsm-&gt;name;</span>
+<span class="lineNum">     147 </span>                :            : }
+<span class="lineNum">     148 </span>                :            : 
+<span class="lineNum">     149 </span>                :            : /* Sets 'fsm''s name to 'name'.  If 'name' is null, then &quot;void&quot; is used
+<span class="lineNum">     150 </span>                :            :  * instead.
+<span class="lineNum">     151 </span>                :            :  *
+<a name="152"><span class="lineNum">     152 </span>                :            :  * The name set for 'fsm' is used in log messages. */</a>
+<span class="lineNum">     153 </span>                :            : void
+<span class="lineNum">     154 </span>                :<span class="lineCov">       6752 : reconnect_set_name(struct reconnect *fsm, const char *name)</span>
+<span class="lineNum">     155 </span>                :            : {
+<span class="lineNum">     156 </span>                :<span class="lineCov">       6752 :     free(fsm-&gt;name);</span>
+<span class="lineNum">     157 </span>        [<span class="branchCov" title="Branch 0 was taken 6752 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       6752 :     fsm-&gt;name = xstrdup(name ? name : &quot;void&quot;);</span>
+<span class="lineNum">     158 </span>                :<span class="lineCov">       6752 : }</span>
+<span class="lineNum">     159 </span>                :            : 
+<span class="lineNum">     160 </span>                :            : /* Return the minimum number of milliseconds to back off between consecutive
+<a name="161"><span class="lineNum">     161 </span>                :            :  * connection attempts.  The default is RECONNECT_DEFAULT_MIN_BACKOFF. */</a>
+<span class="lineNum">     162 </span>                :            : int
+<span class="lineNum">     163 </span>                :<span class="lineNoCov">          0 : reconnect_get_min_backoff(const struct reconnect *fsm)</span>
+<span class="lineNum">     164 </span>                :            : {
+<span class="lineNum">     165 </span>                :<span class="lineNoCov">          0 :     return fsm-&gt;min_backoff;</span>
+<span class="lineNum">     166 </span>                :            : }
+<span class="lineNum">     167 </span>                :            : 
+<span class="lineNum">     168 </span>                :            : /* Return the maximum number of milliseconds to back off between consecutive
+<a name="169"><span class="lineNum">     169 </span>                :            :  * connection attempts.  The default is RECONNECT_DEFAULT_MAX_BACKOFF. */</a>
+<span class="lineNum">     170 </span>                :            : int
+<span class="lineNum">     171 </span>                :<span class="lineNoCov">          0 : reconnect_get_max_backoff(const struct reconnect *fsm)</span>
+<span class="lineNum">     172 </span>                :            : {
+<span class="lineNum">     173 </span>                :<span class="lineNoCov">          0 :     return fsm-&gt;max_backoff;</span>
+<span class="lineNum">     174 </span>                :            : }
+<span class="lineNum">     175 </span>                :            : 
+<span class="lineNum">     176 </span>                :            : /* Returns the &quot;probe interval&quot; for 'fsm' in milliseconds.  If this is zero, it
+<span class="lineNum">     177 </span>                :            :  * disables the connection keepalive feature.  If it is nonzero, then if the
+<span class="lineNum">     178 </span>                :            :  * interval passes while 'fsm' is connected and without reconnect_activity()
+<span class="lineNum">     179 </span>                :            :  * being called for 'fsm', reconnect_run() returns RECONNECT_PROBE.  If the
+<span class="lineNum">     180 </span>                :            :  * interval passes again without reconnect_activity() being called,
+<a name="181"><span class="lineNum">     181 </span>                :            :  * reconnect_run() returns RECONNECT_DISCONNECT for 'fsm'. */</a>
+<span class="lineNum">     182 </span>                :            : int
+<span class="lineNum">     183 </span>                :<span class="lineNoCov">          0 : reconnect_get_probe_interval(const struct reconnect *fsm)</span>
+<span class="lineNum">     184 </span>                :            : {
+<span class="lineNum">     185 </span>                :<span class="lineNoCov">          0 :     return fsm-&gt;probe_interval;</span>
+<span class="lineNum">     186 </span>                :            : }
+<span class="lineNum">     187 </span>                :            : 
+<span class="lineNum">     188 </span>                :            : /* Limits the maximum number of times that 'fsm' will ask the client to try to
+<span class="lineNum">     189 </span>                :            :  * reconnect to 'max_tries'.  UINT_MAX (the default) means an unlimited number
+<span class="lineNum">     190 </span>                :            :  * of tries.
+<span class="lineNum">     191 </span>                :            :  *
+<span class="lineNum">     192 </span>                :            :  * After the number of tries has expired, the 'fsm' will disable itself
+<a name="193"><span class="lineNum">     193 </span>                :            :  * instead of backing off and retrying. */</a>
+<span class="lineNum">     194 </span>                :            : void
+<span class="lineNum">     195 </span>                :<span class="lineCov">       7431 : reconnect_set_max_tries(struct reconnect *fsm, unsigned int max_tries)</span>
+<span class="lineNum">     196 </span>                :            : {
+<span class="lineNum">     197 </span>                :<span class="lineCov">       7431 :     fsm-&gt;max_tries = max_tries;</span>
+<span class="lineNum">     198 </span>                :<span class="lineCov">       7431 : }</span>
+<span class="lineNum">     199 </span>                :            : 
+<span class="lineNum">     200 </span>                :            : /* Returns the current remaining number of connection attempts, UINT_MAX if
+<a name="201"><span class="lineNum">     201 </span>                :            :  * the number is unlimited.  */</a>
+<span class="lineNum">     202 </span>                :            : unsigned int
+<span class="lineNum">     203 </span>                :<span class="lineCov">       3839 : reconnect_get_max_tries(struct reconnect *fsm)</span>
+<span class="lineNum">     204 </span>                :            : {
+<span class="lineNum">     205 </span>                :<span class="lineCov">       3839 :     return fsm-&gt;max_tries;</span>
+<span class="lineNum">     206 </span>                :            : }
+<span class="lineNum">     207 </span>                :            : 
+<span class="lineNum">     208 </span>                :            : /* Configures the backoff parameters for 'fsm'.  'min_backoff' is the minimum
+<span class="lineNum">     209 </span>                :            :  * number of milliseconds, and 'max_backoff' is the maximum, between connection
+<span class="lineNum">     210 </span>                :            :  * attempts.  The current backoff is also the duration that 'fsm' is willing to
+<span class="lineNum">     211 </span>                :            :  * wait for a given connection to succeed or fail.
+<span class="lineNum">     212 </span>                :            :  *
+<span class="lineNum">     213 </span>                :            :  * 'min_backoff' must be at least 1000, and 'max_backoff' must be greater than
+<span class="lineNum">     214 </span>                :            :  * or equal to 'min_backoff'.
+<span class="lineNum">     215 </span>                :            :  *
+<a name="216"><span class="lineNum">     216 </span>                :            :  * Pass 0 for 'min_backoff' or 'max_backoff' or both to use the defaults. */</a>
+<span class="lineNum">     217 </span>                :            : void
+<span class="lineNum">     218 </span>                :<span class="lineCov">      26058 : reconnect_set_backoff(struct reconnect *fsm, int min_backoff, int max_backoff)</span>
+<span class="lineNum">     219 </span>                :            : {
+<span class="lineNum">     220 </span>                :<span class="lineCov">      26058 :     fsm-&gt;min_backoff = MAX(min_backoff, 1000);</span>
+<span class="lineNum">     221 </span>                :<span class="lineCov">      26058 :     fsm-&gt;max_backoff = (max_backoff</span>
+<span class="lineNum">     222 </span>                :            :                         ? MAX(max_backoff, 1000)
+<span class="lineNum">     223 </span>        [<span class="branchCov" title="Branch 0 was taken 26058 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      26058 :                         : RECONNECT_DEFAULT_MAX_BACKOFF);</span>
+<span class="lineNum">     224 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 26058 times"> + </span>]:<span class="lineCov">      26058 :     if (fsm-&gt;min_backoff &gt; fsm-&gt;max_backoff) {</span>
+<span class="lineNum">     225 </span>                :<span class="lineNoCov">          0 :         fsm-&gt;max_backoff = fsm-&gt;min_backoff;</span>
+<span class="lineNum">     226 </span>                :            :     }
+<span class="lineNum">     227 </span>                :            : 
+<span class="lineNum">     228 </span>[<span class="branchCov" title="Branch 0 was taken 2835 times"> + </span><span class="branchCov" title="Branch 1 was taken 23223 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 2835 times"> + </span>]:<span class="lineCov">      26058 :     if (fsm-&gt;state == S_BACKOFF &amp;&amp; fsm-&gt;backoff &gt; max_backoff) {</span>
+<span class="lineNum">     229 </span>                :<span class="lineNoCov">          0 :         fsm-&gt;backoff = max_backoff;</span>
+<span class="lineNum">     230 </span>                :            :     }
+<span class="lineNum">     231 </span>                :<span class="lineCov">      26058 : }</span>
+<span class="lineNum">     232 </span>                :            : 
+<span class="lineNum">     233 </span>                :            : /* Sets the &quot;probe interval&quot; for 'fsm' to 'probe_interval', in milliseconds.
+<span class="lineNum">     234 </span>                :            :  * If this is zero, it disables the connection keepalive feature.  If it is
+<span class="lineNum">     235 </span>                :            :  * nonzero, then if the interval passes while 'fsm' is connected and without
+<span class="lineNum">     236 </span>                :            :  * reconnect_activity() being called for 'fsm', reconnect_run() returns
+<span class="lineNum">     237 </span>                :            :  * RECONNECT_PROBE.  If the interval passes again without reconnect_activity()
+<span class="lineNum">     238 </span>                :            :  * being called, reconnect_run() returns RECONNECT_DISCONNECT for 'fsm'.
+<span class="lineNum">     239 </span>                :            :  *
+<span class="lineNum">     240 </span>                :            :  * If 'probe_interval' is nonzero, then it will be forced to a value of at
+<a name="241"><span class="lineNum">     241 </span>                :            :  * least 1000 ms. */</a>
+<span class="lineNum">     242 </span>                :            : void
+<span class="lineNum">     243 </span>                :<span class="lineCov">      25363 : reconnect_set_probe_interval(struct reconnect *fsm, int probe_interval)</span>
+<span class="lineNum">     244 </span>                :            : {
+<span class="lineNum">     245 </span>        [<span class="branchCov" title="Branch 0 was taken 1129 times"> + </span><span class="branchCov" title="Branch 1 was taken 24234 times"> + </span>]:<span class="lineCov">      25363 :     fsm-&gt;probe_interval = probe_interval ? MAX(1000, probe_interval) : 0;</span>
+<span class="lineNum">     246 </span>                :<span class="lineCov">      25363 : }</span>
+<span class="lineNum">     247 </span>                :            : 
+<span class="lineNum">     248 </span>                :            : /* Returns true if 'fsm' is in passive mode, false if 'fsm' is in active mode
+<a name="249"><span class="lineNum">     249 </span>                :            :  * (the default). */</a>
+<span class="lineNum">     250 </span>                :            : bool
+<span class="lineNum">     251 </span>                :<span class="lineCov">       3091 : reconnect_is_passive(const struct reconnect *fsm)</span>
+<span class="lineNum">     252 </span>                :            : {
+<span class="lineNum">     253 </span>                :<span class="lineCov">       3091 :     return fsm-&gt;passive;</span>
+<span class="lineNum">     254 </span>                :            : }
+<span class="lineNum">     255 </span>                :            : 
+<span class="lineNum">     256 </span>                :            : /* Configures 'fsm' for active or passive mode.  In active mode (the default),
+<span class="lineNum">     257 </span>                :            :  * the FSM is attempting to connect to a remote host.  In passive mode, the FSM
+<a name="258"><span class="lineNum">     258 </span>                :            :  * is listening for connections from a remote host. */</a>
+<span class="lineNum">     259 </span>                :            : void
+<span class="lineNum">     260 </span>                :<span class="lineCov">          7 : reconnect_set_passive(struct reconnect *fsm, bool passive, long long int now)</span>
+<span class="lineNum">     261 </span>                :            : {
+<span class="lineNum">     262 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">          7 :     if (fsm-&gt;passive != passive) {</span>
+<span class="lineNum">     263 </span>                :<span class="lineCov">          1 :         fsm-&gt;passive = passive;</span>
+<span class="lineNum">     264 </span>                :            : 
+<span class="lineNum">     265 </span>[<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 1 time"> + </span>]:<span class="lineCov">          1 :         if (passive</span>
+<span class="lineNum">     266 </span>                :<span class="lineCov">          1 :             ? fsm-&gt;state &amp; (S_CONNECTING | S_RECONNECT)</span>
+<span class="lineNum">     267 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :             : fsm-&gt;state == S_LISTENING &amp;&amp; reconnect_may_retry(fsm)) {</span>
+<span class="lineNum">     268 </span>                :<span class="lineNoCov">          0 :             reconnect_transition__(fsm, now, S_BACKOFF);</span>
+<span class="lineNum">     269 </span>                :<span class="lineNoCov">          0 :             fsm-&gt;backoff = 0;</span>
+<span class="lineNum">     270 </span>                :            :         }
+<span class="lineNum">     271 </span>                :            :     }
+<span class="lineNum">     272 </span>                :<span class="lineCov">          7 : }</span>
+<span class="lineNum">     273 </span>                :            : 
+<span class="lineNum">     274 </span>                :            : /* Returns true if 'fsm' has been enabled with reconnect_enable().  Calling
+<span class="lineNum">     275 </span>                :            :  * another function that indicates a change in connection state, such as
+<span class="lineNum">     276 </span>                :            :  * reconnect_disconnected() or reconnect_force_reconnect(), will also enable
+<a name="277"><span class="lineNum">     277 </span>                :            :  * a reconnect FSM. */</a>
+<span class="lineNum">     278 </span>                :            : bool
+<span class="lineNum">     279 </span>                :<span class="lineNoCov">          0 : reconnect_is_enabled(const struct reconnect *fsm)</span>
+<span class="lineNum">     280 </span>                :            : {
+<span class="lineNum">     281 </span>                :<span class="lineNoCov">          0 :     return fsm-&gt;state != S_VOID;</span>
+<span class="lineNum">     282 </span>                :            : }
+<span class="lineNum">     283 </span>                :            : 
+<span class="lineNum">     284 </span>                :            : /* If 'fsm' is disabled (the default for newly created FSMs), enables it, so
+<span class="lineNum">     285 </span>                :            :  * that the next call to reconnect_run() for 'fsm' will return
+<span class="lineNum">     286 </span>                :            :  * RECONNECT_CONNECT.
+<span class="lineNum">     287 </span>                :            :  *
+<a name="288"><span class="lineNum">     288 </span>                :            :  * If 'fsm' is not disabled, this function has no effect. */</a>
+<span class="lineNum">     289 </span>                :            : void
+<span class="lineNum">     290 </span>                :<span class="lineCov">       3115 : reconnect_enable(struct reconnect *fsm, long long int now)</span>
+<span class="lineNum">     291 </span>                :            : {
+<span class="lineNum">     292 </span>[<span class="branchCov" title="Branch 0 was taken 3115 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 3 was taken 3114 times"> + </span><span class="branchCov" title="Branch 4 was taken 1 time"> + </span>]:<span class="lineCov">       3115 :     if (fsm-&gt;state == S_VOID &amp;&amp; reconnect_may_retry(fsm)) {</span>
+<span class="lineNum">     293 </span>                :<span class="lineCov">       3114 :         reconnect_transition__(fsm, now, S_BACKOFF);</span>
+<span class="lineNum">     294 </span>                :<span class="lineCov">       3114 :         fsm-&gt;backoff = 0;</span>
+<span class="lineNum">     295 </span>                :            :     }
+<span class="lineNum">     296 </span>                :<span class="lineCov">       3115 : }</span>
+<span class="lineNum">     297 </span>                :            : 
+<span class="lineNum">     298 </span>                :            : /* Disables 'fsm'.  Until 'fsm' is enabled again, reconnect_run() will always
+<a name="299"><span class="lineNum">     299 </span>                :            :  * return 0. */</a>
+<span class="lineNum">     300 </span>                :            : void
+<span class="lineNum">     301 </span>                :<span class="lineNoCov">          0 : reconnect_disable(struct reconnect *fsm, long long int now)</span>
+<span class="lineNum">     302 </span>                :            : {
+<span class="lineNum">     303 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (fsm-&gt;state != S_VOID) {</span>
+<span class="lineNum">     304 </span>                :<span class="lineNoCov">          0 :         reconnect_transition__(fsm, now, S_VOID);</span>
+<span class="lineNum">     305 </span>                :            :     }
+<span class="lineNum">     306 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     307 </span>                :            : 
+<span class="lineNum">     308 </span>                :            : /* If 'fsm' is enabled and currently connected (or attempting to connect),
+<span class="lineNum">     309 </span>                :            :  * forces reconnect_run() for 'fsm' to return RECONNECT_DISCONNECT the next
+<span class="lineNum">     310 </span>                :            :  * time it is called, which should cause the client to drop the connection (or
+<a name="311"><span class="lineNum">     311 </span>                :            :  * attempt), back off, and then reconnect. */</a>
+<span class="lineNum">     312 </span>                :            : void
+<span class="lineNum">     313 </span>                :<span class="lineCov">          1 : reconnect_force_reconnect(struct reconnect *fsm, long long int now)</span>
+<span class="lineNum">     314 </span>                :            : {
+<span class="lineNum">     315 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          1 :     if (fsm-&gt;state &amp; (S_CONNECTING | S_ACTIVE | S_IDLE)) {</span>
+<span class="lineNum">     316 </span>                :<span class="lineCov">          1 :         reconnect_transition__(fsm, now, S_RECONNECT);</span>
+<span class="lineNum">     317 </span>                :            :     }
+<span class="lineNum">     318 </span>                :<span class="lineCov">          1 : }</span>
+<span class="lineNum">     319 </span>                :            : 
+<span class="lineNum">     320 </span>                :            : /* Tell 'fsm' that the connection dropped or that a connection attempt failed.
+<span class="lineNum">     321 </span>                :            :  * 'error' specifies the reason: a positive value represents an errno value,
+<span class="lineNum">     322 </span>                :            :  * EOF indicates that the connection was closed by the peer (e.g. read()
+<span class="lineNum">     323 </span>                :            :  * returned 0), and 0 indicates no specific error.
+<span class="lineNum">     324 </span>                :            :  *
+<a name="325"><span class="lineNum">     325 </span>                :            :  * The FSM will back off, then reconnect. */</a>
+<span class="lineNum">     326 </span>                :            : void
+<span class="lineNum">     327 </span>                :<span class="lineCov">       3572 : reconnect_disconnected(struct reconnect *fsm, long long int now, int error)</span>
+<span class="lineNum">     328 </span>                :            : {
+<span class="lineNum">     329 </span>        [<span class="branchCov" title="Branch 0 was taken 3572 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       3572 :     if (!(fsm-&gt;state &amp; (S_BACKOFF | S_VOID))) {</span>
+<span class="lineNum">     330 </span>                :            :         /* Report what happened. */
+<span class="lineNum">     331 </span>        [<span class="branchCov" title="Branch 0 was taken 3555 times"> + </span><span class="branchCov" title="Branch 1 was taken 17 times"> + </span>]:<span class="lineCov">       3572 :         if (fsm-&gt;state &amp; (S_ACTIVE | S_IDLE)) {</span>
+<span class="lineNum">     332 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3555 times"> + </span>]:<span class="lineCov">       3555 :             if (error &gt; 0) {</span>
+<span class="lineNum">     333 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_WARN(&quot;%s: connection dropped (%s)&quot;,</span>
+<span class="lineNum">     334 </span>                :            :                           fsm-&gt;name, ovs_strerror(error));
+<span class="lineNum">     335 </span>        [<span class="branchCov" title="Branch 0 was taken 3545 times"> + </span><span class="branchCov" title="Branch 1 was taken 10 times"> + </span>]:<span class="lineCov">       3555 :             } else if (error == EOF) {</span>
+<span class="lineNum">     336 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3545 times"> + </span>]:<span class="lineCov">       3545 :                 VLOG(fsm-&gt;info, &quot;%s: connection closed by peer&quot;, fsm-&gt;name);</span>
+<span class="lineNum">     337 </span>                :            :             } else {
+<span class="lineNum">     338 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 10 times"> + </span>]:<span class="lineCov">         10 :                 VLOG(fsm-&gt;info, &quot;%s: connection dropped&quot;, fsm-&gt;name);</span>
+<span class="lineNum">     339 </span>                :            :             }
+<span class="lineNum">     340 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 16 times"> + </span>]:<span class="lineCov">         17 :         } else if (fsm-&gt;state == S_LISTENING) {</span>
+<span class="lineNum">     341 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :             if (error &gt; 0) {</span>
+<span class="lineNum">     342 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_WARN(&quot;%s: error listening for connections (%s)&quot;,</span>
+<span class="lineNum">     343 </span>                :            :                           fsm-&gt;name, ovs_strerror(error));
+<span class="lineNum">     344 </span>                :            :             } else {
+<span class="lineNum">     345 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :                 VLOG(fsm-&gt;info, &quot;%s: error listening for connections&quot;,</span>
+<span class="lineNum">     346 </span>                :            :                      fsm-&gt;name);
+<span class="lineNum">     347 </span>                :            :             }
+<span class="lineNum">     348 </span>                :            :         } else {
+<span class="lineNum">     349 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 16 times"> + </span>]:<span class="lineCov">         16 :             const char *type = fsm-&gt;passive ? &quot;listen&quot; : &quot;connection&quot;;</span>
+<span class="lineNum">     350 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 13 times"> + </span>]:<span class="lineCov">         16 :             if (error &gt; 0) {</span>
+<span class="lineNum">     351 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">          3 :                 VLOG_INFO(&quot;%s: %s attempt failed (%s)&quot;,</span>
+<span class="lineNum">     352 </span>                :            :                           fsm-&gt;name, type, ovs_strerror(error));
+<span class="lineNum">     353 </span>                :            :             } else {
+<span class="lineNum">     354 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 12 times"> + </span>]:<span class="lineCov">         13 :                 VLOG(fsm-&gt;info, &quot;%s: %s attempt timed out&quot;, fsm-&gt;name, type);</span>
+<span class="lineNum">     355 </span>                :            :             }
+<span class="lineNum">     356 </span>                :            :         }
+<span class="lineNum">     357 </span>                :            : 
+<span class="lineNum">     358 </span>        [<span class="branchCov" title="Branch 0 was taken 3555 times"> + </span><span class="branchCov" title="Branch 1 was taken 17 times"> + </span>]:<span class="lineCov">       3572 :         if (fsm-&gt;state &amp; (S_ACTIVE | S_IDLE)) {</span>
+<span class="lineNum">     359 </span>                :<span class="lineCov">       3555 :             fsm-&gt;last_disconnected = now;</span>
+<span class="lineNum">     360 </span>                :            :         }
+<span class="lineNum">     361 </span>                :            :         /* Back off. */
+<span class="lineNum">     362 </span>        [<span class="branchCov" title="Branch 0 was taken 3555 times"> + </span><span class="branchCov" title="Branch 1 was taken 17 times"> + </span>]:<span class="lineCov">       3572 :         if (fsm-&gt;state &amp; (S_ACTIVE | S_IDLE)</span>
+<span class="lineNum">     363 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 3549 times"> + </span>]:<span class="lineCov">       3555 :              &amp;&amp; (fsm-&gt;last_activity - fsm-&gt;last_connected &gt;= fsm-&gt;backoff</span>
+<span class="lineNum">     364 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">          6 :                  || fsm-&gt;passive)) {</span>
+<span class="lineNum">     365 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 3548 times"> + </span>]:<span class="lineCov">       3549 :             fsm-&gt;backoff = fsm-&gt;passive ? 0 : fsm-&gt;min_backoff;</span>
+<span class="lineNum">     366 </span>                :            :         } else {
+<span class="lineNum">     367 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchCov" title="Branch 1 was taken 13 times"> + </span>]:<span class="lineCov">         23 :             if (fsm-&gt;backoff &lt; fsm-&gt;min_backoff) {</span>
+<span class="lineNum">     368 </span>                :<span class="lineCov">         10 :                 fsm-&gt;backoff = fsm-&gt;min_backoff;</span>
+<span class="lineNum">     369 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 10 times"> + </span>]:<span class="lineCov">         13 :             } else if (fsm-&gt;backoff &gt;= fsm-&gt;max_backoff / 2) {</span>
+<span class="lineNum">     370 </span>                :<span class="lineCov">          3 :                 fsm-&gt;backoff = fsm-&gt;max_backoff;</span>
+<span class="lineNum">     371 </span>                :            :             } else {
+<span class="lineNum">     372 </span>                :<span class="lineCov">         10 :                 fsm-&gt;backoff *= 2;</span>
+<span class="lineNum">     373 </span>                :            :             }
+<span class="lineNum">     374 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 22 times"> + </span>]:<span class="lineCov">         23 :             if (fsm-&gt;passive) {</span>
+<span class="lineNum">     375 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :                 VLOG(fsm-&gt;info, &quot;%s: waiting %.3g seconds before trying to &quot;</span>
+<span class="lineNum">     376 </span>                :            :                           &quot;listen again&quot;, fsm-&gt;name, fsm-&gt;backoff / 1000.0);
+<span class="lineNum">     377 </span>                :            :             } else {
+<span class="lineNum">     378 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 21 times"> + </span>]:<span class="lineCov">         22 :                 VLOG(fsm-&gt;info, &quot;%s: waiting %.3g seconds before reconnect&quot;,</span>
+<span class="lineNum">     379 </span>                :            :                           fsm-&gt;name, fsm-&gt;backoff / 1000.0);
+<span class="lineNum">     380 </span>                :            :             }
+<span class="lineNum">     381 </span>                :            :         }
+<span class="lineNum">     382 </span>                :            : 
+<span class="lineNum">     383 </span>        [<span class="branchCov" title="Branch 0 was taken 26 times"> + </span><span class="branchCov" title="Branch 1 was taken 3546 times"> + </span>]:<span class="lineCov">       3572 :         reconnect_transition__(fsm, now,</span>
+<span class="lineNum">     384 </span>                :<span class="lineCov">       3572 :                                reconnect_may_retry(fsm) ? S_BACKOFF : S_VOID);</span>
+<span class="lineNum">     385 </span>                :            :     }
+<span class="lineNum">     386 </span>                :<span class="lineCov">       3572 : }</span>
+<span class="lineNum">     387 </span>                :            : 
+<span class="lineNum">     388 </span>                :            : /* Tell 'fsm' that a connection or listening attempt is in progress.
+<span class="lineNum">     389 </span>                :            :  *
+<span class="lineNum">     390 </span>                :            :  * The FSM will start a timer, after which the connection or listening attempt
+<span class="lineNum">     391 </span>                :            :  * will be aborted (by returning RECONNECT_DISCONNECT from
+<a name="392"><span class="lineNum">     392 </span>                :            :  * reconnect_run()).  */</a>
+<span class="lineNum">     393 </span>                :            : void
+<span class="lineNum">     394 </span>                :<span class="lineCov">       9863 : reconnect_connecting(struct reconnect *fsm, long long int now)</span>
+<span class="lineNum">     395 </span>                :            : {
+<span class="lineNum">     396 </span>        [<span class="branchCov" title="Branch 0 was taken 6757 times"> + </span><span class="branchCov" title="Branch 1 was taken 3106 times"> + </span>]:<span class="lineCov">       9863 :     if (fsm-&gt;state != S_CONNECTING) {</span>
+<span class="lineNum">     397 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 6756 times"> + </span>]:<span class="lineCov">       6757 :         if (fsm-&gt;passive) {</span>
+<span class="lineNum">     398 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :             VLOG(fsm-&gt;info, &quot;%s: listening...&quot;, fsm-&gt;name);</span>
+<span class="lineNum">     399 </span>                :            :         } else {
+<span class="lineNum">     400 </span>        [<span class="branchCov" title="Branch 0 was taken 276 times"> + </span><span class="branchCov" title="Branch 1 was taken 6480 times"> + </span>]:<span class="lineCov">       6756 :             VLOG(fsm-&gt;info, &quot;%s: connecting...&quot;, fsm-&gt;name);</span>
+<span class="lineNum">     401 </span>                :            :         }
+<span class="lineNum">     402 </span>                :<span class="lineCov">       6757 :         reconnect_transition__(fsm, now, S_CONNECTING);</span>
+<span class="lineNum">     403 </span>                :            :     }
+<span class="lineNum">     404 </span>                :<span class="lineCov">       9863 : }</span>
+<span class="lineNum">     405 </span>                :            : 
+<span class="lineNum">     406 </span>                :            : /* Tell 'fsm' that the client is listening for connection attempts.  This state
+<span class="lineNum">     407 </span>                :            :  * last indefinitely until the client reports some change.
+<span class="lineNum">     408 </span>                :            :  *
+<span class="lineNum">     409 </span>                :            :  * The natural progression from this state is for the client to report that a
+<span class="lineNum">     410 </span>                :            :  * connection has been accepted or is in progress of being accepted, by calling
+<span class="lineNum">     411 </span>                :            :  * reconnect_connecting() or reconnect_connected().
+<span class="lineNum">     412 </span>                :            :  *
+<span class="lineNum">     413 </span>                :            :  * The client may also report that listening failed (e.g. accept() returned an
+<span class="lineNum">     414 </span>                :            :  * unexpected error such as ENOMEM) by calling reconnect_listen_error(), in
+<span class="lineNum">     415 </span>                :            :  * which case the FSM will back off and eventually return RECONNECT_CONNECT
+<a name="416"><span class="lineNum">     416 </span>                :            :  * from reconnect_run() to tell the client to try listening again. */</a>
+<span class="lineNum">     417 </span>                :            : void
+<span class="lineNum">     418 </span>                :<span class="lineCov">          3 : reconnect_listening(struct reconnect *fsm, long long int now)</span>
+<span class="lineNum">     419 </span>                :            : {
+<span class="lineNum">     420 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          3 :     if (fsm-&gt;state != S_LISTENING) {</span>
+<span class="lineNum">     421 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">          3 :         VLOG(fsm-&gt;info, &quot;%s: listening...&quot;, fsm-&gt;name);</span>
+<span class="lineNum">     422 </span>                :<span class="lineCov">          3 :         reconnect_transition__(fsm, now, S_LISTENING);</span>
+<span class="lineNum">     423 </span>                :            :     }
+<span class="lineNum">     424 </span>                :<span class="lineCov">          3 : }</span>
+<span class="lineNum">     425 </span>                :            : 
+<span class="lineNum">     426 </span>                :            : /* Tell 'fsm' that the client's attempt to accept a connection failed
+<span class="lineNum">     427 </span>                :            :  * (e.g. accept() returned an unexpected error such as ENOMEM).
+<span class="lineNum">     428 </span>                :            :  *
+<span class="lineNum">     429 </span>                :            :  * If the FSM is currently listening (reconnect_listening() was called), it
+<span class="lineNum">     430 </span>                :            :  * will back off and eventually return RECONNECT_CONNECT from reconnect_run()
+<span class="lineNum">     431 </span>                :            :  * to tell the client to try listening again.  If there is an active
+<a name="432"><span class="lineNum">     432 </span>                :            :  * connection, this will be delayed until that connection drops. */</a>
+<span class="lineNum">     433 </span>                :            : void
+<span class="lineNum">     434 </span>                :<span class="lineCov">          1 : reconnect_listen_error(struct reconnect *fsm, long long int now, int error)</span>
+<span class="lineNum">     435 </span>                :            : {
+<span class="lineNum">     436 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          1 :     if (fsm-&gt;state == S_LISTENING) {</span>
+<span class="lineNum">     437 </span>                :<span class="lineCov">          1 :         reconnect_disconnected(fsm, now, error);</span>
+<span class="lineNum">     438 </span>                :            :     }
+<span class="lineNum">     439 </span>                :<span class="lineCov">          1 : }</span>
+<span class="lineNum">     440 </span>                :            : 
+<span class="lineNum">     441 </span>                :            : /* Tell 'fsm' that the connection was successful.
+<span class="lineNum">     442 </span>                :            :  *
+<span class="lineNum">     443 </span>                :            :  * The FSM will start the probe interval timer, which is reset by
+<span class="lineNum">     444 </span>                :            :  * reconnect_activity().  If the timer expires, a probe will be sent (by
+<span class="lineNum">     445 </span>                :            :  * returning RECONNECT_PROBE from reconnect_run()).  If the timer expires
+<span class="lineNum">     446 </span>                :            :  * again without being reset, the connection will be aborted (by returning
+<a name="447"><span class="lineNum">     447 </span>                :            :  * RECONNECT_DISCONNECT from reconnect_run()). */</a>
+<span class="lineNum">     448 </span>                :            : void
+<span class="lineNum">     449 </span>                :<span class="lineCov">       6742 : reconnect_connected(struct reconnect *fsm, long long int now)</span>
+<span class="lineNum">     450 </span>                :            : {
+<span class="lineNum">     451 </span>        [<span class="branchCov" title="Branch 1 was taken 6742 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">       6742 :     if (!is_connected_state(fsm-&gt;state)) {</span>
+<span class="lineNum">     452 </span>                :<span class="lineCov">       6742 :         reconnect_connecting(fsm, now);</span>
+<span class="lineNum">     453 </span>                :            : 
+<span class="lineNum">     454 </span>        [<span class="branchCov" title="Branch 0 was taken 276 times"> + </span><span class="branchCov" title="Branch 1 was taken 6466 times"> + </span>]:<span class="lineCov">       6742 :         VLOG(fsm-&gt;info, &quot;%s: connected&quot;, fsm-&gt;name);</span>
+<span class="lineNum">     455 </span>                :<span class="lineCov">       6742 :         reconnect_transition__(fsm, now, S_ACTIVE);</span>
+<span class="lineNum">     456 </span>                :<span class="lineCov">       6742 :         fsm-&gt;last_connected = now;</span>
+<span class="lineNum">     457 </span>                :            :     }
+<span class="lineNum">     458 </span>                :<span class="lineCov">       6742 : }</span>
+<span class="lineNum">     459 </span>                :            : 
+<span class="lineNum">     460 </span>                :            : /* Tell 'fsm' that the connection attempt failed.
+<span class="lineNum">     461 </span>                :            :  *
+<a name="462"><span class="lineNum">     462 </span>                :            :  * The FSM will back off and attempt to reconnect. */</a>
+<span class="lineNum">     463 </span>                :            : void
+<span class="lineNum">     464 </span>                :<span class="lineCov">         15 : reconnect_connect_failed(struct reconnect *fsm, long long int now, int error)</span>
+<span class="lineNum">     465 </span>                :            : {
+<span class="lineNum">     466 </span>                :<span class="lineCov">         15 :     reconnect_connecting(fsm, now);</span>
+<span class="lineNum">     467 </span>                :<span class="lineCov">         15 :     reconnect_disconnected(fsm, now, error);</span>
+<span class="lineNum">     468 </span>                :<span class="lineCov">         15 : }</span>
+<span class="lineNum">     469 </span>                :            : 
+<span class="lineNum">     470 </span>                :            : /* Tell 'fsm' that some activity has occurred on the connection.  This resets
+<a name="471"><span class="lineNum">     471 </span>                :            :  * the probe interval timer, so that the connection is known not to be idle. */</a>
+<span class="lineNum">     472 </span>                :            : void
+<span class="lineNum">     473 </span>                :<span class="lineCov">      16426 : reconnect_activity(struct reconnect *fsm, long long int now)</span>
+<span class="lineNum">     474 </span>                :            : {
+<span class="lineNum">     475 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 16426 times"> + </span>]:<span class="lineCov">      16426 :     if (fsm-&gt;state != S_ACTIVE) {</span>
+<span class="lineNum">     476 </span>                :<span class="lineNoCov">          0 :         reconnect_transition__(fsm, now, S_ACTIVE);</span>
+<span class="lineNum">     477 </span>                :            :     }
+<span class="lineNum">     478 </span>                :<span class="lineCov">      16426 :     fsm-&gt;last_activity = now;</span>
+<span class="lineNum">     479 </span>                :<span class="lineCov">      16426 : }</span>
+<a name="480"><span class="lineNum">     480 </span>                :            : </a>
+<span class="lineNum">     481 </span>                :            : static void
+<span class="lineNum">     482 </span>                :<span class="lineCov">      20196 : reconnect_transition__(struct reconnect *fsm, long long int now,</span>
+<span class="lineNum">     483 </span>                :            :                        enum state state)
+<span class="lineNum">     484 </span>                :            : {
+<span class="lineNum">     485 </span>        [<span class="branchCov" title="Branch 0 was taken 6757 times"> + </span><span class="branchCov" title="Branch 1 was taken 13439 times"> + </span>]:<span class="lineCov">      20196 :     if (fsm-&gt;state == S_CONNECTING) {</span>
+<span class="lineNum">     486 </span>                :<span class="lineCov">       6757 :         fsm-&gt;n_attempted_connections++;</span>
+<span class="lineNum">     487 </span>        [<span class="branchCov" title="Branch 0 was taken 6742 times"> + </span><span class="branchCov" title="Branch 1 was taken 15 times"> + </span>]:<span class="lineCov">       6757 :         if (state == S_ACTIVE) {</span>
+<span class="lineNum">     488 </span>                :<span class="lineCov">       6742 :             fsm-&gt;n_successful_connections++;</span>
+<span class="lineNum">     489 </span>                :            :         }
+<span class="lineNum">     490 </span>                :            :     }
+<span class="lineNum">     491 </span>        [<span class="branchCov" title="Branch 2 was taken 10298 times"> + </span><span class="branchCov" title="Branch 3 was taken 9898 times"> + </span>]:<span class="lineCov">      20196 :     if (is_connected_state(fsm-&gt;state) != is_connected_state(state)) {</span>
+<span class="lineNum">     492 </span>        [<span class="branchCov" title="Branch 1 was taken 3556 times"> + </span><span class="branchCov" title="Branch 2 was taken 6742 times"> + </span>]:<span class="lineCov">      10298 :         if (is_connected_state(fsm-&gt;state)) {</span>
+<span class="lineNum">     493 </span>                :<span class="lineCov">       3556 :             fsm-&gt;total_connected_duration += now - fsm-&gt;last_connected;</span>
+<span class="lineNum">     494 </span>                :            :         }
+<span class="lineNum">     495 </span>                :<span class="lineCov">      10298 :         fsm-&gt;seqno++;</span>
+<span class="lineNum">     496 </span>                :            :     }
+<span class="lineNum">     497 </span>                :            : 
+<span class="lineNum">     498 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 20196 times"> + </span>]:<span class="lineCov">      20196 :     VLOG_DBG(&quot;%s: entering %s&quot;, fsm-&gt;name, reconnect_state_name__(state));</span>
+<span class="lineNum">     499 </span>                :<span class="lineCov">      20196 :     fsm-&gt;state = state;</span>
+<span class="lineNum">     500 </span>                :<span class="lineCov">      20196 :     fsm-&gt;state_entered = now;</span>
+<span class="lineNum">     501 </span>                :<span class="lineCov">      20196 : }</span>
+<a name="502"><span class="lineNum">     502 </span>                :            : </a>
+<span class="lineNum">     503 </span>                :            : static long long int
+<span class="lineNum">     504 </span>                :<span class="lineCov">     133334 : reconnect_deadline__(const struct reconnect *fsm)</span>
+<span class="lineNum">     505 </span>                :            : {
+<span class="lineNum">     506 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 133334 times"> + </span>]:<span class="lineCov">     133334 :     ovs_assert(fsm-&gt;state_entered != LLONG_MIN);</span>
+<span class="lineNum">     507 </span>  [<span class="branchCov" title="Branch 0 was taken 3551 times"> + </span><span class="branchCov" title="Branch 1 was taken 3150 times"> + </span><span class="branchCov" title="Branch 2 was taken 3122 times"> + </span><span class="branchCov" title="Branch 3 was taken 123496 times"> + </span> :<span class="lineCov">     133334 :     switch (fsm-&gt;state) {</span>
+<span class="lineNum">         </span>      <span class="branchCov" title="Branch 4 was taken 14 times"> + </span><span class="branchCov" title="Branch 5 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 6 was not taken"> - </span>]
+<span class="lineNum">     508 </span>                :            :     case S_VOID:
+<span class="lineNum">     509 </span>                :            :     case S_LISTENING:
+<span class="lineNum">     510 </span>                :<span class="lineCov">       3551 :         return LLONG_MAX;</span>
+<span class="lineNum">     511 </span>                :            : 
+<span class="lineNum">     512 </span>                :            :     case S_BACKOFF:
+<span class="lineNum">     513 </span>                :<span class="lineCov">       3150 :         return fsm-&gt;state_entered + fsm-&gt;backoff;</span>
+<span class="lineNum">     514 </span>                :            : 
+<span class="lineNum">     515 </span>                :            :     case S_CONNECTING:
+<span class="lineNum">     516 </span>                :<span class="lineCov">       3122 :         return fsm-&gt;state_entered + MAX(1000, fsm-&gt;backoff);</span>
+<span class="lineNum">     517 </span>                :            : 
+<span class="lineNum">     518 </span>                :            :     case S_ACTIVE:
+<span class="lineNum">     519 </span>        [<span class="branchCov" title="Branch 0 was taken 9018 times"> + </span><span class="branchCov" title="Branch 1 was taken 114478 times"> + </span>]:<span class="lineCov">     123496 :         if (fsm-&gt;probe_interval) {</span>
+<span class="lineNum">     520 </span>                :<span class="lineCov">       9018 :             long long int base = MAX(fsm-&gt;last_activity, fsm-&gt;state_entered);</span>
+<span class="lineNum">     521 </span>                :<span class="lineCov">       9018 :             return base + fsm-&gt;probe_interval;</span>
+<span class="lineNum">     522 </span>                :            :         }
+<span class="lineNum">     523 </span>                :<span class="lineCov">     114478 :         return LLONG_MAX;</span>
+<span class="lineNum">     524 </span>                :            : 
+<span class="lineNum">     525 </span>                :            :     case S_IDLE:
+<span class="lineNum">     526 </span>        [<span class="branchCov" title="Branch 0 was taken 14 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         14 :         if (fsm-&gt;probe_interval) {</span>
+<span class="lineNum">     527 </span>                :<span class="lineCov">         14 :             return fsm-&gt;state_entered + fsm-&gt;probe_interval;</span>
+<span class="lineNum">     528 </span>                :            :         }
+<span class="lineNum">     529 </span>                :<span class="lineNoCov">          0 :         return LLONG_MAX;</span>
+<span class="lineNum">     530 </span>                :            : 
+<span class="lineNum">     531 </span>                :            :     case S_RECONNECT:
+<span class="lineNum">     532 </span>                :<span class="lineCov">          1 :         return fsm-&gt;state_entered;</span>
+<span class="lineNum">     533 </span>                :            :     }
+<span class="lineNum">     534 </span>                :            : 
+<span class="lineNum">     535 </span>                :<span class="lineCov">     133334 :     OVS_NOT_REACHED();</span>
+<span class="lineNum">     536 </span>                :            : }
+<span class="lineNum">     537 </span>                :            : 
+<span class="lineNum">     538 </span>                :            : /* Assesses whether any action should be taken on 'fsm'.  The return value is
+<span class="lineNum">     539 </span>                :            :  * one of:
+<span class="lineNum">     540 </span>                :            :  *
+<span class="lineNum">     541 </span>                :            :  *     - 0: The client need not take any action.
+<span class="lineNum">     542 </span>                :            :  *
+<span class="lineNum">     543 </span>                :            :  *     - Active client, RECONNECT_CONNECT: The client should start a connection
+<span class="lineNum">     544 </span>                :            :  *       attempt and indicate this by calling reconnect_connecting().  If the
+<span class="lineNum">     545 </span>                :            :  *       connection attempt has definitely succeeded, it should call
+<span class="lineNum">     546 </span>                :            :  *       reconnect_connected().  If the connection attempt has definitely
+<span class="lineNum">     547 </span>                :            :  *       failed, it should call reconnect_connect_failed().
+<span class="lineNum">     548 </span>                :            :  *
+<span class="lineNum">     549 </span>                :            :  *       The FSM is smart enough to back off correctly after successful
+<span class="lineNum">     550 </span>                :            :  *       connections that quickly abort, so it is OK to call
+<span class="lineNum">     551 </span>                :            :  *       reconnect_connected() after a low-level successful connection
+<span class="lineNum">     552 </span>                :            :  *       (e.g. connect()) even if the connection might soon abort due to a
+<span class="lineNum">     553 </span>                :            :  *       failure at a high-level (e.g. SSL negotiation failure).
+<span class="lineNum">     554 </span>                :            :  *
+<span class="lineNum">     555 </span>                :            :  *     - Passive client, RECONNECT_CONNECT: The client should try to listen for
+<span class="lineNum">     556 </span>                :            :  *       a connection, if it is not already listening.  It should call
+<span class="lineNum">     557 </span>                :            :  *       reconnect_listening() if successful, otherwise reconnect_connecting()
+<span class="lineNum">     558 </span>                :            :  *       or reconnected_connect_failed() if the attempt is in progress or
+<span class="lineNum">     559 </span>                :            :  *       definitely failed, respectively.
+<span class="lineNum">     560 </span>                :            :  *
+<span class="lineNum">     561 </span>                :            :  *       A listening passive client should constantly attempt to accept a new
+<span class="lineNum">     562 </span>                :            :  *       connection and report an accepted connection with
+<span class="lineNum">     563 </span>                :            :  *       reconnect_connected().
+<span class="lineNum">     564 </span>                :            :  *
+<span class="lineNum">     565 </span>                :            :  *     - RECONNECT_DISCONNECT: The client should abort the current connection
+<span class="lineNum">     566 </span>                :            :  *       or connection attempt or listen attempt and call
+<span class="lineNum">     567 </span>                :            :  *       reconnect_disconnected() or reconnect_connect_failed() to indicate it.
+<span class="lineNum">     568 </span>                :            :  *
+<span class="lineNum">     569 </span>                :            :  *     - RECONNECT_PROBE: The client should send some kind of request to the
+<span class="lineNum">     570 </span>                :            :  *       peer that will elicit a response, to ensure that the connection is
+<span class="lineNum">     571 </span>                :            :  *       indeed in working order.  (This will only be returned if the &quot;probe
+<span class="lineNum">     572 </span>                :            :  *       interval&quot; is nonzero--see reconnect_set_probe_interval()).
+<a name="573"><span class="lineNum">     573 </span>                :            :  */</a>
+<span class="lineNum">     574 </span>                :            : enum reconnect_action
+<span class="lineNum">     575 </span>                :<span class="lineCov">      72092 : reconnect_run(struct reconnect *fsm, long long int now)</span>
+<span class="lineNum">     576 </span>                :            : {
+<span class="lineNum">     577 </span>        [<span class="branchCov" title="Branch 1 was taken 3149 times"> + </span><span class="branchCov" title="Branch 2 was taken 68943 times"> + </span>]:<span class="lineCov">      72092 :     if (now &gt;= reconnect_deadline__(fsm)) {</span>
+<span class="lineNum">     578 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3122 times"> + </span><span class="branchCov" title="Branch 2 was taken 12 times"> + </span><span class="branchCov" title="Branch 3 was taken 7 times"> + </span> :<span class="lineCov">       3149 :         switch (fsm-&gt;state) {</span>
+<span class="lineNum">         </span>   <span class="branchCov" title="Branch 4 was taken 7 times"> + </span><span class="branchCov" title="Branch 5 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 6 was not taken"> - </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span>]
+<span class="lineNum">     579 </span>                :            :         case S_VOID:
+<span class="lineNum">     580 </span>                :<span class="lineNoCov">          0 :             return 0;</span>
+<span class="lineNum">     581 </span>                :            : 
+<span class="lineNum">     582 </span>                :            :         case S_BACKOFF:
+<span class="lineNum">     583 </span>                :<span class="lineCov">       3122 :             return RECONNECT_CONNECT;</span>
+<span class="lineNum">     584 </span>                :            : 
+<span class="lineNum">     585 </span>                :            :         case S_CONNECTING:
+<span class="lineNum">     586 </span>                :<span class="lineCov">         12 :             return RECONNECT_DISCONNECT;</span>
+<span class="lineNum">     587 </span>                :            : 
+<span class="lineNum">     588 </span>                :            :         case S_ACTIVE:
+<span class="lineNum">     589 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 7 times"> + </span>]:<span class="lineCov">          7 :             VLOG_DBG(&quot;%s: idle %lld ms, sending inactivity probe&quot;, fsm-&gt;name,</span>
+<span class="lineNum">     590 </span>                :            :                      now - MAX(fsm-&gt;last_activity, fsm-&gt;state_entered));
+<span class="lineNum">     591 </span>                :<span class="lineCov">          7 :             reconnect_transition__(fsm, now, S_IDLE);</span>
+<span class="lineNum">     592 </span>                :<span class="lineCov">          7 :             return RECONNECT_PROBE;</span>
+<span class="lineNum">     593 </span>                :            : 
+<span class="lineNum">     594 </span>                :            :         case S_IDLE:
+<span class="lineNum">     595 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 7 times"> + </span>]:<span class="lineCov">          7 :             VLOG_ERR(&quot;%s: no response to inactivity probe after %.3g &quot;</span>
+<span class="lineNum">     596 </span>                :            :                      &quot;seconds, disconnecting&quot;,
+<span class="lineNum">     597 </span>                :            :                      fsm-&gt;name, (now - fsm-&gt;state_entered) / 1000.0);
+<span class="lineNum">     598 </span>                :<span class="lineCov">          7 :             return RECONNECT_DISCONNECT;</span>
+<span class="lineNum">     599 </span>                :            : 
+<span class="lineNum">     600 </span>                :            :         case S_RECONNECT:
+<span class="lineNum">     601 </span>                :<span class="lineCov">          1 :             return RECONNECT_DISCONNECT;</span>
+<span class="lineNum">     602 </span>                :            : 
+<span class="lineNum">     603 </span>                :            :         case S_LISTENING:
+<span class="lineNum">     604 </span>                :<span class="lineNoCov">          0 :             return 0;</span>
+<span class="lineNum">     605 </span>                :            :         }
+<span class="lineNum">     606 </span>                :            : 
+<span class="lineNum">     607 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     608 </span>                :            :     } else {
+<span class="lineNum">     609 </span>                :<span class="lineCov">      72092 :         return 0;</span>
+<span class="lineNum">     610 </span>                :            :     }
+<span class="lineNum">     611 </span>                :            : }
+<span class="lineNum">     612 </span>                :            : 
+<span class="lineNum">     613 </span>                :            : /* Causes the next call to poll_block() to wake up when reconnect_run() should
+<a name="614"><span class="lineNum">     614 </span>                :            :  * be called on 'fsm'. */</a>
+<span class="lineNum">     615 </span>                :            : void
+<span class="lineNum">     616 </span>                :<span class="lineCov">      61191 : reconnect_wait(struct reconnect *fsm, long long int now)</span>
+<span class="lineNum">     617 </span>                :            : {
+<span class="lineNum">     618 </span>                :<span class="lineCov">      61191 :     int timeout = reconnect_timeout(fsm, now);</span>
+<span class="lineNum">     619 </span>        [<span class="branchCov" title="Branch 0 was taken 7590 times"> + </span><span class="branchCov" title="Branch 1 was taken 53601 times"> + </span>]:<span class="lineCov">      61191 :     if (timeout &gt;= 0) {</span>
+<span class="lineNum">     620 </span>                :<span class="lineCov">       7590 :         poll_timer_wait(timeout);</span>
+<span class="lineNum">     621 </span>                :            :     }
+<span class="lineNum">     622 </span>                :<span class="lineCov">      61191 : }</span>
+<span class="lineNum">     623 </span>                :            : 
+<span class="lineNum">     624 </span>                :            : /* Returns the number of milliseconds after which reconnect_run() should be
+<span class="lineNum">     625 </span>                :            :  * called on 'fsm' if nothing else notable happens in the meantime, or a
+<a name="626"><span class="lineNum">     626 </span>                :            :  * negative number if this is currently unnecessary. */</a>
+<span class="lineNum">     627 </span>                :            : int
+<span class="lineNum">     628 </span>                :<span class="lineCov">      61242 : reconnect_timeout(struct reconnect *fsm, long long int now)</span>
+<span class="lineNum">     629 </span>                :            : {
+<span class="lineNum">     630 </span>                :<span class="lineCov">      61242 :     long long int deadline = reconnect_deadline__(fsm);</span>
+<span class="lineNum">     631 </span>        [<span class="branchCov" title="Branch 0 was taken 7638 times"> + </span><span class="branchCov" title="Branch 1 was taken 53604 times"> + </span>]:<span class="lineCov">      61242 :     if (deadline != LLONG_MAX) {</span>
+<span class="lineNum">     632 </span>                :<span class="lineCov">       7638 :         long long int remaining = deadline - now;</span>
+<span class="lineNum">     633 </span>[<span class="branchCov" title="Branch 0 was taken 7636 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 7636 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">       7638 :         return MAX(0, MIN(INT_MAX, remaining));</span>
+<span class="lineNum">     634 </span>                :            :     }
+<span class="lineNum">     635 </span>                :<span class="lineCov">      61242 :     return -1;</span>
+<span class="lineNum">     636 </span>                :            : }
+<span class="lineNum">     637 </span>                :            : 
+<span class="lineNum">     638 </span>                :            : /* Returns true if 'fsm' is currently believed to be connected, that is, if
+<span class="lineNum">     639 </span>                :            :  * reconnect_connected() was called more recently than any call to
+<span class="lineNum">     640 </span>                :            :  * reconnect_connect_failed() or reconnect_disconnected() or
+<a name="641"><span class="lineNum">     641 </span>                :            :  * reconnect_disable(), and false otherwise.  */</a>
+<span class="lineNum">     642 </span>                :            : bool
+<span class="lineNum">     643 </span>                :<span class="lineCov">       7213 : reconnect_is_connected(const struct reconnect *fsm)</span>
+<span class="lineNum">     644 </span>                :            : {
+<span class="lineNum">     645 </span>                :<span class="lineCov">       7213 :     return is_connected_state(fsm-&gt;state);</span>
+<span class="lineNum">     646 </span>                :            : }
+<span class="lineNum">     647 </span>                :            : 
+<span class="lineNum">     648 </span>                :            : /* Returns the number of milliseconds since 'fsm' last successfully connected
+<span class="lineNum">     649 </span>                :            :  * to its peer (even if it has since disconnected). Returns UINT_MAX if never
+<a name="650"><span class="lineNum">     650 </span>                :            :  * connected. */</a>
+<span class="lineNum">     651 </span>                :            : unsigned int
+<span class="lineNum">     652 </span>                :<span class="lineCov">        362 : reconnect_get_last_connect_elapsed(const struct reconnect *fsm,</span>
+<span class="lineNum">     653 </span>                :            :                                    long long int now)
+<span class="lineNum">     654 </span>                :            : {
+<span class="lineNum">     655 </span>        [<span class="branchCov" title="Branch 0 was taken 182 times"> + </span><span class="branchCov" title="Branch 1 was taken 180 times"> + </span>]:<span class="lineCov">        362 :     return fsm-&gt;last_connected == LLONG_MAX ? UINT_MAX</span>
+<span class="lineNum">     656 </span>                :<span class="lineCov">        182 :         : now - fsm-&gt;last_connected;</span>
+<span class="lineNum">     657 </span>                :            : }
+<span class="lineNum">     658 </span>                :            : 
+<span class="lineNum">     659 </span>                :            : /* Returns the number of milliseconds since 'fsm' last disconnected
+<span class="lineNum">     660 </span>                :            :  * from its peer (even if it has since reconnected). Returns UINT_MAX if never
+<a name="661"><span class="lineNum">     661 </span>                :            :  * disconnected. */</a>
+<span class="lineNum">     662 </span>                :            : unsigned int
+<span class="lineNum">     663 </span>                :<span class="lineCov">        290 : reconnect_get_last_disconnect_elapsed(const struct reconnect *fsm,</span>
+<span class="lineNum">     664 </span>                :            :                                       long long int now)
+<span class="lineNum">     665 </span>                :            : {
+<span class="lineNum">     666 </span>        [<span class="branchCov" title="Branch 0 was taken 48 times"> + </span><span class="branchCov" title="Branch 1 was taken 242 times"> + </span>]:<span class="lineCov">        290 :     return fsm-&gt;last_disconnected == LLONG_MAX ? UINT_MAX</span>
+<span class="lineNum">     667 </span>                :<span class="lineCov">         48 :         : now - fsm-&gt;last_disconnected;</span>
+<span class="lineNum">     668 </span>                :            : }
+<span class="lineNum">     669 </span>                :            : 
+<a name="670"><span class="lineNum">     670 </span>                :            : /* Copies various statistics for 'fsm' into '*stats'. */</a>
+<span class="lineNum">     671 </span>                :            : void
+<span class="lineNum">     672 </span>                :<span class="lineCov">        290 : reconnect_get_stats(const struct reconnect *fsm, long long int now,</span>
+<span class="lineNum">     673 </span>                :            :                     struct reconnect_stats *stats)
+<span class="lineNum">     674 </span>                :            : {
+<span class="lineNum">     675 </span>                :<span class="lineCov">        290 :     stats-&gt;creation_time = fsm-&gt;creation_time;</span>
+<span class="lineNum">     676 </span>                :<span class="lineCov">        290 :     stats-&gt;last_activity = fsm-&gt;last_activity;</span>
+<span class="lineNum">     677 </span>                :<span class="lineCov">        290 :     stats-&gt;last_connected = fsm-&gt;last_connected;</span>
+<span class="lineNum">     678 </span>                :<span class="lineCov">        290 :     stats-&gt;last_disconnected = fsm-&gt;last_disconnected;</span>
+<span class="lineNum">     679 </span>                :<span class="lineCov">        290 :     stats-&gt;backoff = fsm-&gt;backoff;</span>
+<span class="lineNum">     680 </span>                :<span class="lineCov">        290 :     stats-&gt;seqno = fsm-&gt;seqno;</span>
+<span class="lineNum">     681 </span>                :<span class="lineCov">        290 :     stats-&gt;is_connected = reconnect_is_connected(fsm);</span>
+<span class="lineNum">     682 </span>                :            :     stats-&gt;msec_since_connect
+<span class="lineNum">     683 </span>                :<span class="lineCov">        290 :         = reconnect_get_last_connect_elapsed(fsm, now);</span>
+<span class="lineNum">     684 </span>                :            :     stats-&gt;msec_since_disconnect
+<span class="lineNum">     685 </span>                :<span class="lineCov">        290 :         = reconnect_get_last_disconnect_elapsed(fsm, now);</span>
+<span class="lineNum">     686 </span>                :<span class="lineCov">        580 :     stats-&gt;total_connected_duration = fsm-&gt;total_connected_duration</span>
+<span class="lineNum">     687 </span>                :<span class="lineCov">        290 :         + (is_connected_state(fsm-&gt;state)</span>
+<span class="lineNum">     688 </span>        [<span class="branchCov" title="Branch 0 was taken 72 times"> + </span><span class="branchCov" title="Branch 1 was taken 218 times"> + </span>]:<span class="lineCov">        290 :            ? reconnect_get_last_connect_elapsed(fsm, now) : 0);</span>
+<span class="lineNum">     689 </span>                :<span class="lineCov">        290 :     stats-&gt;n_attempted_connections = fsm-&gt;n_attempted_connections;</span>
+<span class="lineNum">     690 </span>                :<span class="lineCov">        290 :     stats-&gt;n_successful_connections = fsm-&gt;n_successful_connections;</span>
+<span class="lineNum">     691 </span>                :<span class="lineCov">        290 :     stats-&gt;state = reconnect_state_name__(fsm-&gt;state);</span>
+<span class="lineNum">     692 </span>                :<span class="lineCov">        290 :     stats-&gt;state_elapsed = now - fsm-&gt;state_entered;</span>
+<span class="lineNum">     693 </span>                :<span class="lineCov">        290 : }</span>
+<a name="694"><span class="lineNum">     694 </span>                :            : </a>
+<span class="lineNum">     695 </span>                :            : static bool
+<span class="lineNum">     696 </span>                :<span class="lineCov">       6687 : reconnect_may_retry(struct reconnect *fsm)</span>
+<span class="lineNum">     697 </span>                :            : {
+<span class="lineNum">     698 </span>                :<span class="lineCov">       6687 :     bool may_retry = fsm-&gt;max_tries &gt; 0;</span>
+<span class="lineNum">     699 </span>[<span class="branchCov" title="Branch 0 was taken 3140 times"> + </span><span class="branchCov" title="Branch 1 was taken 3547 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 2 times"> + </span><span class="branchCov" title="Branch 3 was taken 3138 times"> + </span>]:<span class="lineCov">       6687 :     if (may_retry &amp;&amp; fsm-&gt;max_tries != UINT_MAX) {</span>
+<span class="lineNum">     700 </span>                :<span class="lineCov">          2 :         fsm-&gt;max_tries--;</span>
+<span class="lineNum">     701 </span>                :            :     }
+<span class="lineNum">     702 </span>                :<span class="lineCov">       6687 :     return may_retry;</span>
+<span class="lineNum">     703 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

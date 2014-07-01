@@ -1,0 +1,1548 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ofproto/ofproto-dpif-ipfix.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">ofproto</a> - ofproto-dpif-ipfix.c<span style="font-size: 80%;"> (source / <a href="ofproto-dpif-ipfix.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">8</td>
+            <td class="headerCovTableEntry">541</td>
+            <td class="headerCovTableEntryLo">1.5 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">3</td>
+            <td class="headerCovTableEntry">49</td>
+            <td class="headerCovTableEntryLo">6.1 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">2</td>
+            <td class="headerCovTableEntry">209</td>
+            <td class="headerCovTableEntryLo">1.0 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2012, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;ofproto-dpif-ipfix.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &lt;sys/time.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &quot;byte-order.h&quot;
+<span class="lineNum">      21 </span>                :            : #include &quot;collectors.h&quot;
+<span class="lineNum">      22 </span>                :            : #include &quot;flow.h&quot;
+<span class="lineNum">      23 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;hmap.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;list.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;ofproto.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;packets.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;sset.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;util.h&quot;
+<a name="34"><span class="lineNum">      34 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      35 </span>                :            : 
+<span class="lineNum">      36 </span>                :<span class="lineCov">        525 : VLOG_DEFINE_THIS_MODULE(ipfix);</span>
+<span class="lineNum">      37 </span>                :            : 
+<span class="lineNum">      38 </span>                :            : static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">      39 </span>                :            : static struct ovs_mutex mutex = OVS_MUTEX_INITIALIZER;
+<span class="lineNum">      40 </span>                :            : 
+<span class="lineNum">      41 </span>                :            : /* Cf. IETF RFC 5101 Section 10.3.4. */
+<span class="lineNum">      42 </span>                :            : #define IPFIX_DEFAULT_COLLECTOR_PORT 4739
+<span class="lineNum">      43 </span>                :            : 
+<span class="lineNum">      44 </span>                :            : struct dpif_ipfix_exporter {
+<span class="lineNum">      45 </span>                :            :     struct collectors *collectors;
+<span class="lineNum">      46 </span>                :            :     uint32_t seq_number;
+<span class="lineNum">      47 </span>                :            :     time_t last_template_set_time;
+<span class="lineNum">      48 </span>                :            :     struct hmap cache_flow_key_map;  /* ipfix_flow_cache_entry. */
+<span class="lineNum">      49 </span>                :            :     struct list cache_flow_start_timestamp_list;  /* ipfix_flow_cache_entry. */
+<span class="lineNum">      50 </span>                :            :     uint32_t cache_active_timeout;  /* In seconds. */
+<span class="lineNum">      51 </span>                :            :     uint32_t cache_max_flows;
+<span class="lineNum">      52 </span>                :            : };
+<span class="lineNum">      53 </span>                :            : 
+<span class="lineNum">      54 </span>                :            : struct dpif_ipfix_bridge_exporter {
+<span class="lineNum">      55 </span>                :            :     struct dpif_ipfix_exporter exporter;
+<span class="lineNum">      56 </span>                :            :     struct ofproto_ipfix_bridge_exporter_options *options;
+<span class="lineNum">      57 </span>                :            :     uint32_t probability;
+<span class="lineNum">      58 </span>                :            : };
+<span class="lineNum">      59 </span>                :            : 
+<span class="lineNum">      60 </span>                :            : struct dpif_ipfix_flow_exporter {
+<span class="lineNum">      61 </span>                :            :     struct dpif_ipfix_exporter exporter;
+<span class="lineNum">      62 </span>                :            :     struct ofproto_ipfix_flow_exporter_options *options;
+<span class="lineNum">      63 </span>                :            : };
+<span class="lineNum">      64 </span>                :            : 
+<span class="lineNum">      65 </span>                :            : struct dpif_ipfix_flow_exporter_map_node {
+<span class="lineNum">      66 </span>                :            :     struct hmap_node node;
+<span class="lineNum">      67 </span>                :            :     struct dpif_ipfix_flow_exporter exporter;
+<span class="lineNum">      68 </span>                :            : };
+<span class="lineNum">      69 </span>                :            : 
+<span class="lineNum">      70 </span>                :            : struct dpif_ipfix {
+<span class="lineNum">      71 </span>                :            :     struct dpif_ipfix_bridge_exporter bridge_exporter;
+<span class="lineNum">      72 </span>                :            :     struct hmap flow_exporter_map;  /* dpif_ipfix_flow_exporter_map_node. */
+<span class="lineNum">      73 </span>                :            :     struct ovs_refcount ref_cnt;
+<span class="lineNum">      74 </span>                :            : };
+<span class="lineNum">      75 </span>                :            : 
+<span class="lineNum">      76 </span>                :            : #define IPFIX_VERSION 0x000a
+<span class="lineNum">      77 </span>                :            : 
+<span class="lineNum">      78 </span>                :            : /* When using UDP, IPFIX Template Records must be re-sent regularly.
+<span class="lineNum">      79 </span>                :            :  * The standard default interval is 10 minutes (600 seconds).
+<span class="lineNum">      80 </span>                :            :  * Cf. IETF RFC 5101 Section 10.3.6. */
+<span class="lineNum">      81 </span>                :            : #define IPFIX_TEMPLATE_INTERVAL 600
+<span class="lineNum">      82 </span>                :            : 
+<span class="lineNum">      83 </span>                :            : /* Cf. IETF RFC 5101 Section 3.1. */
+<span class="lineNum">      84 </span>                :            : OVS_PACKED(
+<span class="lineNum">      85 </span>                :            : struct ipfix_header {
+<span class="lineNum">      86 </span>                :            :     ovs_be16 version;  /* IPFIX_VERSION. */
+<span class="lineNum">      87 </span>                :            :     ovs_be16 length;  /* Length in bytes including this header. */
+<span class="lineNum">      88 </span>                :            :     ovs_be32 export_time;  /* Seconds since the epoch. */
+<span class="lineNum">      89 </span>                :            :     ovs_be32 seq_number;  /* Message sequence number. */
+<span class="lineNum">      90 </span>                :            :     ovs_be32 obs_domain_id;  /* Observation Domain ID. */
+<span class="lineNum">      91 </span>                :            : });
+<span class="lineNum">      92 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ipfix_header) == 16);
+<span class="lineNum">      93 </span>                :            : 
+<span class="lineNum">      94 </span>                :            : #define IPFIX_SET_ID_TEMPLATE 2
+<span class="lineNum">      95 </span>                :            : #define IPFIX_SET_ID_OPTION_TEMPLATE 3
+<span class="lineNum">      96 </span>                :            : 
+<span class="lineNum">      97 </span>                :            : /* Cf. IETF RFC 5101 Section 3.3.2. */
+<span class="lineNum">      98 </span>                :            : OVS_PACKED(
+<span class="lineNum">      99 </span>                :            : struct ipfix_set_header {
+<span class="lineNum">     100 </span>                :            :     ovs_be16 set_id;  /* IPFIX_SET_ID_* or valid template ID for Data Sets. */
+<span class="lineNum">     101 </span>                :            :     ovs_be16 length;  /* Length of the set in bytes including header. */
+<span class="lineNum">     102 </span>                :            : });
+<span class="lineNum">     103 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ipfix_set_header) == 4);
+<span class="lineNum">     104 </span>                :            : 
+<span class="lineNum">     105 </span>                :            : /* Alternatives for templates at each layer.  A template is defined by
+<span class="lineNum">     106 </span>                :            :  * a combination of one value for each layer. */
+<span class="lineNum">     107 </span>                :            : enum ipfix_proto_l2 {
+<span class="lineNum">     108 </span>                :            :     IPFIX_PROTO_L2_ETH = 0,  /* No VLAN. */
+<span class="lineNum">     109 </span>                :            :     IPFIX_PROTO_L2_VLAN,
+<span class="lineNum">     110 </span>                :            :     NUM_IPFIX_PROTO_L2
+<span class="lineNum">     111 </span>                :            : };
+<span class="lineNum">     112 </span>                :            : enum ipfix_proto_l3 {
+<span class="lineNum">     113 </span>                :            :     IPFIX_PROTO_L3_UNKNOWN = 0,
+<span class="lineNum">     114 </span>                :            :     IPFIX_PROTO_L3_IPV4,
+<span class="lineNum">     115 </span>                :            :     IPFIX_PROTO_L3_IPV6,
+<span class="lineNum">     116 </span>                :            :     NUM_IPFIX_PROTO_L3
+<span class="lineNum">     117 </span>                :            : };
+<span class="lineNum">     118 </span>                :            : enum ipfix_proto_l4 {
+<span class="lineNum">     119 </span>                :            :     IPFIX_PROTO_L4_UNKNOWN = 0,
+<span class="lineNum">     120 </span>                :            :     IPFIX_PROTO_L4_TCP_UDP_SCTP,
+<span class="lineNum">     121 </span>                :            :     IPFIX_PROTO_L4_ICMP,
+<span class="lineNum">     122 </span>                :            :     NUM_IPFIX_PROTO_L4
+<span class="lineNum">     123 </span>                :            : };
+<span class="lineNum">     124 </span>                :            : 
+<span class="lineNum">     125 </span>                :            : /* Any Template ID &gt; 255 is usable for Template Records. */
+<span class="lineNum">     126 </span>                :            : #define IPFIX_TEMPLATE_ID_MIN 256
+<span class="lineNum">     127 </span>                :            : 
+<span class="lineNum">     128 </span>                :            : /* Cf. IETF RFC 5101 Section 3.4.1. */
+<span class="lineNum">     129 </span>                :            : OVS_PACKED(
+<span class="lineNum">     130 </span>                :            : struct ipfix_template_record_header {
+<span class="lineNum">     131 </span>                :            :     ovs_be16 template_id;
+<span class="lineNum">     132 </span>                :            :     ovs_be16 field_count;
+<span class="lineNum">     133 </span>                :            : });
+<span class="lineNum">     134 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ipfix_template_record_header) == 4);
+<span class="lineNum">     135 </span>                :            : 
+<span class="lineNum">     136 </span>                :            : enum ipfix_entity_id {
+<span class="lineNum">     137 </span>                :            : #define IPFIX_ENTITY(ENUM, ID, SIZE, NAME)  IPFIX_ENTITY_ID_##ENUM = ID,
+<span class="lineNum">     138 </span>                :            : #include &quot;ofproto/ipfix-entities.def&quot;
+<span class="lineNum">     139 </span>                :            : };
+<span class="lineNum">     140 </span>                :            : 
+<span class="lineNum">     141 </span>                :            : enum ipfix_entity_size {
+<span class="lineNum">     142 </span>                :            : #define IPFIX_ENTITY(ENUM, ID, SIZE, NAME)  IPFIX_ENTITY_SIZE_##ENUM = SIZE,
+<span class="lineNum">     143 </span>                :            : #include &quot;ofproto/ipfix-entities.def&quot;
+<span class="lineNum">     144 </span>                :            : };
+<span class="lineNum">     145 </span>                :            : 
+<span class="lineNum">     146 </span>                :            : OVS_PACKED(
+<span class="lineNum">     147 </span>                :            : struct ipfix_template_field_specifier {
+<span class="lineNum">     148 </span>                :            :     ovs_be16 element_id;  /* IPFIX_ENTITY_ID_*. */
+<span class="lineNum">     149 </span>                :            :     ovs_be16 field_length;  /* Length of the field's value, in bytes. */
+<span class="lineNum">     150 </span>                :            :     /* No Enterprise ID, since only standard element IDs are specified. */
+<span class="lineNum">     151 </span>                :            : });
+<span class="lineNum">     152 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ipfix_template_field_specifier) == 4);
+<span class="lineNum">     153 </span>                :            : 
+<span class="lineNum">     154 </span>                :            : /* Part of data record flow key for common metadata and Ethernet entities. */
+<span class="lineNum">     155 </span>                :            : OVS_PACKED(
+<span class="lineNum">     156 </span>                :            : struct ipfix_data_record_flow_key_common {
+<span class="lineNum">     157 </span>                :            :     ovs_be32 observation_point_id;  /* OBSERVATION_POINT_ID */
+<span class="lineNum">     158 </span>                :            :     uint8_t source_mac_address[6];  /* SOURCE_MAC_ADDRESS */
+<span class="lineNum">     159 </span>                :            :     uint8_t destination_mac_address[6];  /* DESTINATION_MAC_ADDRESS */
+<span class="lineNum">     160 </span>                :            :     ovs_be16 ethernet_type;  /* ETHERNET_TYPE */
+<span class="lineNum">     161 </span>                :            :     uint8_t ethernet_header_length;  /* ETHERNET_HEADER_LENGTH */
+<span class="lineNum">     162 </span>                :            : });
+<span class="lineNum">     163 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ipfix_data_record_flow_key_common) == 19);
+<span class="lineNum">     164 </span>                :            : 
+<span class="lineNum">     165 </span>                :            : /* Part of data record flow key for VLAN entities. */
+<span class="lineNum">     166 </span>                :            : OVS_PACKED(
+<span class="lineNum">     167 </span>                :            : struct ipfix_data_record_flow_key_vlan {
+<span class="lineNum">     168 </span>                :            :     ovs_be16 vlan_id;  /* VLAN_ID */
+<span class="lineNum">     169 </span>                :            :     ovs_be16 dot1q_vlan_id;  /* DOT1Q_VLAN_ID */
+<span class="lineNum">     170 </span>                :            :     uint8_t dot1q_priority;  /* DOT1Q_PRIORITY */
+<span class="lineNum">     171 </span>                :            : });
+<span class="lineNum">     172 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ipfix_data_record_flow_key_vlan) == 5);
+<span class="lineNum">     173 </span>                :            : 
+<span class="lineNum">     174 </span>                :            : /* Part of data record flow key for IP entities. */
+<span class="lineNum">     175 </span>                :            : /* XXX: Replace IP_TTL with MINIMUM_TTL and MAXIMUM_TTL? */
+<span class="lineNum">     176 </span>                :            : OVS_PACKED(
+<span class="lineNum">     177 </span>                :            : struct ipfix_data_record_flow_key_ip {
+<span class="lineNum">     178 </span>                :            :     uint8_t ip_version;  /* IP_VERSION */
+<span class="lineNum">     179 </span>                :            :     uint8_t ip_ttl;  /* IP_TTL */
+<span class="lineNum">     180 </span>                :            :     uint8_t protocol_identifier;  /* PROTOCOL_IDENTIFIER */
+<span class="lineNum">     181 </span>                :            :     uint8_t ip_diff_serv_code_point;  /* IP_DIFF_SERV_CODE_POINT */
+<span class="lineNum">     182 </span>                :            :     uint8_t ip_precedence;  /* IP_PRECEDENCE */
+<span class="lineNum">     183 </span>                :            :     uint8_t ip_class_of_service;  /* IP_CLASS_OF_SERVICE */
+<span class="lineNum">     184 </span>                :            : });
+<span class="lineNum">     185 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ipfix_data_record_flow_key_ip) == 6);
+<span class="lineNum">     186 </span>                :            : 
+<span class="lineNum">     187 </span>                :            : /* Part of data record flow key for IPv4 entities. */
+<span class="lineNum">     188 </span>                :            : OVS_PACKED(
+<span class="lineNum">     189 </span>                :            : struct ipfix_data_record_flow_key_ipv4 {
+<span class="lineNum">     190 </span>                :            :     ovs_be32 source_ipv4_address;  /* SOURCE_IPV4_ADDRESS */
+<span class="lineNum">     191 </span>                :            :     ovs_be32 destination_ipv4_address;  /* DESTINATION_IPV4_ADDRESS */
+<span class="lineNum">     192 </span>                :            : });
+<span class="lineNum">     193 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ipfix_data_record_flow_key_ipv4) == 8);
+<span class="lineNum">     194 </span>                :            : 
+<span class="lineNum">     195 </span>                :            : /* Part of data record flow key for IPv6 entities. */
+<span class="lineNum">     196 </span>                :            : OVS_PACKED(
+<span class="lineNum">     197 </span>                :            : struct ipfix_data_record_flow_key_ipv6 {
+<span class="lineNum">     198 </span>                :            :     uint8_t source_ipv6_address[16];  /* SOURCE_IPV6_ADDRESS */
+<span class="lineNum">     199 </span>                :            :     uint8_t destination_ipv6_address[16];  /* DESTINATION_IPV6_ADDRESS */
+<span class="lineNum">     200 </span>                :            :     ovs_be32 flow_label_ipv6;  /* FLOW_LABEL_IPV6 */
+<span class="lineNum">     201 </span>                :            : });
+<span class="lineNum">     202 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ipfix_data_record_flow_key_ipv6) == 36);
+<span class="lineNum">     203 </span>                :            : 
+<span class="lineNum">     204 </span>                :            : /* Part of data record flow key for TCP/UDP/SCTP entities. */
+<span class="lineNum">     205 </span>                :            : OVS_PACKED(
+<span class="lineNum">     206 </span>                :            : struct ipfix_data_record_flow_key_transport {
+<span class="lineNum">     207 </span>                :            :     ovs_be16 source_transport_port;  /* SOURCE_TRANSPORT_PORT */
+<span class="lineNum">     208 </span>                :            :     ovs_be16 destination_transport_port;  /* DESTINATION_TRANSPORT_PORT */
+<span class="lineNum">     209 </span>                :            : });
+<span class="lineNum">     210 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ipfix_data_record_flow_key_transport) == 4);
+<span class="lineNum">     211 </span>                :            : 
+<span class="lineNum">     212 </span>                :            : /* Part of data record flow key for ICMP entities. */
+<span class="lineNum">     213 </span>                :            : OVS_PACKED(
+<span class="lineNum">     214 </span>                :            : struct ipfix_data_record_flow_key_icmp {
+<span class="lineNum">     215 </span>                :            :     uint8_t icmp_type;  /* ICMP_TYPE_IPV4 / ICMP_TYPE_IPV6 */
+<span class="lineNum">     216 </span>                :            :     uint8_t icmp_code;  /* ICMP_CODE_IPV4 / ICMP_CODE_IPV6 */
+<span class="lineNum">     217 </span>                :            : });
+<span class="lineNum">     218 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ipfix_data_record_flow_key_icmp) == 2);
+<span class="lineNum">     219 </span>                :            : 
+<span class="lineNum">     220 </span>                :            : /* Cf. IETF RFC 5102 Section 5.11.3. */
+<span class="lineNum">     221 </span>                :            : enum ipfix_flow_end_reason {
+<span class="lineNum">     222 </span>                :            :     IDLE_TIMEOUT = 0x01,
+<span class="lineNum">     223 </span>                :            :     ACTIVE_TIMEOUT = 0x02,
+<span class="lineNum">     224 </span>                :            :     END_OF_FLOW_DETECTED = 0x03,
+<span class="lineNum">     225 </span>                :            :     FORCED_END = 0x04,
+<span class="lineNum">     226 </span>                :            :     LACK_OF_RESOURCES = 0x05
+<span class="lineNum">     227 </span>                :            : };
+<span class="lineNum">     228 </span>                :            : 
+<span class="lineNum">     229 </span>                :            : /* Part of data record for common aggregated elements. */
+<span class="lineNum">     230 </span>                :            : OVS_PACKED(
+<span class="lineNum">     231 </span>                :            : struct ipfix_data_record_aggregated_common {
+<span class="lineNum">     232 </span>                :            :     ovs_be32 flow_start_delta_microseconds; /* FLOW_START_DELTA_MICROSECONDS */
+<span class="lineNum">     233 </span>                :            :     ovs_be32 flow_end_delta_microseconds; /* FLOW_END_DELTA_MICROSECONDS */
+<span class="lineNum">     234 </span>                :            :     ovs_be64 packet_delta_count;  /* PACKET_DELTA_COUNT */
+<span class="lineNum">     235 </span>                :            :     ovs_be64 layer2_octet_delta_count;  /* LAYER2_OCTET_DELTA_COUNT */
+<span class="lineNum">     236 </span>                :            :     uint8_t flow_end_reason;  /* FLOW_END_REASON */
+<span class="lineNum">     237 </span>                :            : });
+<span class="lineNum">     238 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ipfix_data_record_aggregated_common) == 25);
+<span class="lineNum">     239 </span>                :            : 
+<span class="lineNum">     240 </span>                :            : /* Part of data record for IP aggregated elements. */
+<span class="lineNum">     241 </span>                :            : OVS_PACKED(
+<span class="lineNum">     242 </span>                :            : struct ipfix_data_record_aggregated_ip {
+<span class="lineNum">     243 </span>                :            :     ovs_be64 octet_delta_count;  /* OCTET_DELTA_COUNT */
+<span class="lineNum">     244 </span>                :            :     ovs_be64 octet_delta_sum_of_squares;  /* OCTET_DELTA_SUM_OF_SQUARES */
+<span class="lineNum">     245 </span>                :            :     ovs_be64 minimum_ip_total_length;  /* MINIMUM_IP_TOTAL_LENGTH */
+<span class="lineNum">     246 </span>                :            :     ovs_be64 maximum_ip_total_length;  /* MAXIMUM_IP_TOTAL_LENGTH */
+<span class="lineNum">     247 </span>                :            : });
+<span class="lineNum">     248 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ipfix_data_record_aggregated_ip) == 32);
+<span class="lineNum">     249 </span>                :            : 
+<span class="lineNum">     250 </span>                :            : #define MAX_FLOW_KEY_LEN                                        \
+<span class="lineNum">     251 </span>                :            :     (sizeof(struct ipfix_data_record_flow_key_common)           \
+<span class="lineNum">     252 </span>                :            :      + sizeof(struct ipfix_data_record_flow_key_vlan)           \
+<span class="lineNum">     253 </span>                :            :      + sizeof(struct ipfix_data_record_flow_key_ip)             \
+<span class="lineNum">     254 </span>                :            :      + MAX(sizeof(struct ipfix_data_record_flow_key_ipv4),      \
+<span class="lineNum">     255 </span>                :            :            sizeof(struct ipfix_data_record_flow_key_ipv6))      \
+<span class="lineNum">     256 </span>                :            :      + MAX(sizeof(struct ipfix_data_record_flow_key_icmp),      \
+<span class="lineNum">     257 </span>                :            :            sizeof(struct ipfix_data_record_flow_key_transport)))
+<span class="lineNum">     258 </span>                :            : 
+<span class="lineNum">     259 </span>                :            : #define MAX_DATA_RECORD_LEN                                 \
+<span class="lineNum">     260 </span>                :            :     (MAX_FLOW_KEY_LEN                                       \
+<span class="lineNum">     261 </span>                :            :      + sizeof(struct ipfix_data_record_aggregated_common)   \
+<span class="lineNum">     262 </span>                :            :      + sizeof(struct ipfix_data_record_aggregated_ip))
+<span class="lineNum">     263 </span>                :            : 
+<span class="lineNum">     264 </span>                :            : /* Max length of a data set.  To simplify the implementation, each
+<span class="lineNum">     265 </span>                :            :  * data record is sent in a separate data set, so each data set
+<span class="lineNum">     266 </span>                :            :  * contains at most one data record. */
+<span class="lineNum">     267 </span>                :            : #define MAX_DATA_SET_LEN             \
+<span class="lineNum">     268 </span>                :            :     (sizeof(struct ipfix_set_header) \
+<span class="lineNum">     269 </span>                :            :      + MAX_DATA_RECORD_LEN)
+<span class="lineNum">     270 </span>                :            : 
+<span class="lineNum">     271 </span>                :            : /* Max length of an IPFIX message. Arbitrarily set to accomodate low
+<span class="lineNum">     272 </span>                :            :  * MTU. */
+<span class="lineNum">     273 </span>                :            : #define MAX_MESSAGE_LEN 1024
+<span class="lineNum">     274 </span>                :            : 
+<span class="lineNum">     275 </span>                :            : /* Cache structures. */
+<span class="lineNum">     276 </span>                :            : 
+<span class="lineNum">     277 </span>                :            : /* Flow key. */
+<span class="lineNum">     278 </span>                :            : struct ipfix_flow_key {
+<span class="lineNum">     279 </span>                :            :     uint32_t obs_domain_id;
+<span class="lineNum">     280 </span>                :            :     uint16_t template_id;
+<span class="lineNum">     281 </span>                :            :     size_t flow_key_msg_part_size;
+<span class="lineNum">     282 </span>                :            :     uint64_t flow_key_msg_part[DIV_ROUND_UP(MAX_FLOW_KEY_LEN, 8)];
+<span class="lineNum">     283 </span>                :            : };
+<span class="lineNum">     284 </span>                :            : 
+<span class="lineNum">     285 </span>                :            : /* Flow cache entry. */
+<span class="lineNum">     286 </span>                :            : struct ipfix_flow_cache_entry {
+<span class="lineNum">     287 </span>                :            :     struct hmap_node flow_key_map_node;
+<span class="lineNum">     288 </span>                :            :     struct list cache_flow_start_timestamp_list_node;
+<span class="lineNum">     289 </span>                :            :     struct ipfix_flow_key flow_key;
+<span class="lineNum">     290 </span>                :            :     /* Common aggregated elements. */
+<span class="lineNum">     291 </span>                :            :     uint64_t flow_start_timestamp_usec;
+<span class="lineNum">     292 </span>                :            :     uint64_t flow_end_timestamp_usec;
+<span class="lineNum">     293 </span>                :            :     uint64_t packet_delta_count;
+<span class="lineNum">     294 </span>                :            :     uint64_t layer2_octet_delta_count;
+<span class="lineNum">     295 </span>                :            :     uint64_t octet_delta_count;
+<span class="lineNum">     296 </span>                :            :     uint64_t octet_delta_sum_of_squares;  /* 0 if not IP. */
+<span class="lineNum">     297 </span>                :            :     uint16_t minimum_ip_total_length;  /* 0 if not IP. */
+<span class="lineNum">     298 </span>                :            :     uint16_t maximum_ip_total_length;  /* 0 if not IP. */
+<span class="lineNum">     299 </span>                :            : };
+<span class="lineNum">     300 </span>                :            : 
+<span class="lineNum">     301 </span>                :            : static void dpif_ipfix_cache_expire(struct dpif_ipfix_exporter *, bool,
+<span class="lineNum">     302 </span>                :            :                                     const uint64_t, const uint32_t);
+<span class="lineNum">     303 </span>                :            : 
+<span class="lineNum">     304 </span>                :            : static void get_export_time_now(uint64_t *, uint32_t *);
+<span class="lineNum">     305 </span>                :            : 
+<span class="lineNum">     306 </span>                :            : static void dpif_ipfix_cache_expire_now(struct dpif_ipfix_exporter *, bool);
+<a name="307"><span class="lineNum">     307 </span>                :            : </a>
+<span class="lineNum">     308 </span>                :            : static bool
+<span class="lineNum">     309 </span>                :<span class="lineNoCov">          0 : ofproto_ipfix_bridge_exporter_options_equal(</span>
+<span class="lineNum">     310 </span>                :            :     const struct ofproto_ipfix_bridge_exporter_options *a,
+<span class="lineNum">     311 </span>                :            :     const struct ofproto_ipfix_bridge_exporter_options *b)
+<span class="lineNum">     312 </span>                :            : {
+<span class="lineNum">     313 </span>                :<span class="lineNoCov">          0 :     return (a-&gt;obs_domain_id == b-&gt;obs_domain_id</span>
+<span class="lineNum">     314 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; a-&gt;obs_point_id == b-&gt;obs_point_id</span>
+<span class="lineNum">     315 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; a-&gt;sampling_rate == b-&gt;sampling_rate</span>
+<span class="lineNum">     316 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; a-&gt;cache_active_timeout == b-&gt;cache_active_timeout</span>
+<span class="lineNum">     317 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; a-&gt;cache_max_flows == b-&gt;cache_max_flows</span>
+<span class="lineNum">     318 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; sset_equals(&amp;a-&gt;targets, &amp;b-&gt;targets));</span>
+<span class="lineNum">     319 </span>                :            : }
+<a name="320"><span class="lineNum">     320 </span>                :            : </a>
+<span class="lineNum">     321 </span>                :            : static struct ofproto_ipfix_bridge_exporter_options *
+<span class="lineNum">     322 </span>                :<span class="lineNoCov">          0 : ofproto_ipfix_bridge_exporter_options_clone(</span>
+<span class="lineNum">     323 </span>                :            :     const struct ofproto_ipfix_bridge_exporter_options *old)
+<span class="lineNum">     324 </span>                :            : {
+<span class="lineNum">     325 </span>                :<span class="lineNoCov">          0 :     struct ofproto_ipfix_bridge_exporter_options *new =</span>
+<span class="lineNum">     326 </span>                :            :         xmemdup(old, sizeof *old);
+<span class="lineNum">     327 </span>                :<span class="lineNoCov">          0 :     sset_clone(&amp;new-&gt;targets, &amp;old-&gt;targets);</span>
+<span class="lineNum">     328 </span>                :<span class="lineNoCov">          0 :     return new;</span>
+<span class="lineNum">     329 </span>                :            : }
+<a name="330"><span class="lineNum">     330 </span>                :            : </a>
+<span class="lineNum">     331 </span>                :            : static void
+<span class="lineNum">     332 </span>                :<span class="lineNoCov">          0 : ofproto_ipfix_bridge_exporter_options_destroy(</span>
+<span class="lineNum">     333 </span>                :            :     struct ofproto_ipfix_bridge_exporter_options *options)
+<span class="lineNum">     334 </span>                :            : {
+<span class="lineNum">     335 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (options) {</span>
+<span class="lineNum">     336 </span>                :<span class="lineNoCov">          0 :         sset_destroy(&amp;options-&gt;targets);</span>
+<span class="lineNum">     337 </span>                :<span class="lineNoCov">          0 :         free(options);</span>
+<span class="lineNum">     338 </span>                :            :     }
+<span class="lineNum">     339 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="340"><span class="lineNum">     340 </span>                :            : </a>
+<span class="lineNum">     341 </span>                :            : static bool
+<span class="lineNum">     342 </span>                :<span class="lineNoCov">          0 : ofproto_ipfix_flow_exporter_options_equal(</span>
+<span class="lineNum">     343 </span>                :            :     const struct ofproto_ipfix_flow_exporter_options *a,
+<span class="lineNum">     344 </span>                :            :     const struct ofproto_ipfix_flow_exporter_options *b)
+<span class="lineNum">     345 </span>                :            : {
+<span class="lineNum">     346 </span>                :<span class="lineNoCov">          0 :     return (a-&gt;collector_set_id == b-&gt;collector_set_id</span>
+<span class="lineNum">     347 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; a-&gt;cache_active_timeout == b-&gt;cache_active_timeout</span>
+<span class="lineNum">     348 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; a-&gt;cache_max_flows == b-&gt;cache_max_flows</span>
+<span class="lineNum">     349 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; sset_equals(&amp;a-&gt;targets, &amp;b-&gt;targets));</span>
+<span class="lineNum">     350 </span>                :            : }
+<a name="351"><span class="lineNum">     351 </span>                :            : </a>
+<span class="lineNum">     352 </span>                :            : static struct ofproto_ipfix_flow_exporter_options *
+<span class="lineNum">     353 </span>                :<span class="lineNoCov">          0 : ofproto_ipfix_flow_exporter_options_clone(</span>
+<span class="lineNum">     354 </span>                :            :     const struct ofproto_ipfix_flow_exporter_options *old)
+<span class="lineNum">     355 </span>                :            : {
+<span class="lineNum">     356 </span>                :<span class="lineNoCov">          0 :     struct ofproto_ipfix_flow_exporter_options *new =</span>
+<span class="lineNum">     357 </span>                :            :         xmemdup(old, sizeof *old);
+<span class="lineNum">     358 </span>                :<span class="lineNoCov">          0 :     sset_clone(&amp;new-&gt;targets, &amp;old-&gt;targets);</span>
+<span class="lineNum">     359 </span>                :<span class="lineNoCov">          0 :     return new;</span>
+<span class="lineNum">     360 </span>                :            : }
+<a name="361"><span class="lineNum">     361 </span>                :            : </a>
+<span class="lineNum">     362 </span>                :            : static void
+<span class="lineNum">     363 </span>                :<span class="lineNoCov">          0 : ofproto_ipfix_flow_exporter_options_destroy(</span>
+<span class="lineNum">     364 </span>                :            :     struct ofproto_ipfix_flow_exporter_options *options)
+<span class="lineNum">     365 </span>                :            : {
+<span class="lineNum">     366 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (options) {</span>
+<span class="lineNum">     367 </span>                :<span class="lineNoCov">          0 :         sset_destroy(&amp;options-&gt;targets);</span>
+<span class="lineNum">     368 </span>                :<span class="lineNoCov">          0 :         free(options);</span>
+<span class="lineNum">     369 </span>                :            :     }
+<span class="lineNum">     370 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="371"><span class="lineNum">     371 </span>                :            : </a>
+<span class="lineNum">     372 </span>                :            : static void
+<span class="lineNum">     373 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_exporter_init(struct dpif_ipfix_exporter *exporter)</span>
+<span class="lineNum">     374 </span>                :            : {
+<span class="lineNum">     375 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;collectors = NULL;</span>
+<span class="lineNum">     376 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;seq_number = 1;</span>
+<span class="lineNum">     377 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;last_template_set_time = TIME_MIN;</span>
+<span class="lineNum">     378 </span>                :<span class="lineNoCov">          0 :     hmap_init(&amp;exporter-&gt;cache_flow_key_map);</span>
+<span class="lineNum">     379 </span>                :<span class="lineNoCov">          0 :     list_init(&amp;exporter-&gt;cache_flow_start_timestamp_list);</span>
+<span class="lineNum">     380 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;cache_active_timeout = 0;</span>
+<span class="lineNum">     381 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;cache_max_flows = 0;</span>
+<span class="lineNum">     382 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="383"><span class="lineNum">     383 </span>                :            : </a>
+<span class="lineNum">     384 </span>                :            : static void
+<span class="lineNum">     385 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_exporter_clear(struct dpif_ipfix_exporter *exporter)</span>
+<span class="lineNum">     386 </span>                :            : {
+<span class="lineNum">     387 </span>                :            :     /* Flush the cache with flow end reason &quot;forced end.&quot; */
+<span class="lineNum">     388 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_cache_expire_now(exporter, true);</span>
+<span class="lineNum">     389 </span>                :            : 
+<span class="lineNum">     390 </span>                :<span class="lineNoCov">          0 :     collectors_destroy(exporter-&gt;collectors);</span>
+<span class="lineNum">     391 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;collectors = NULL;</span>
+<span class="lineNum">     392 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;seq_number = 1;</span>
+<span class="lineNum">     393 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;last_template_set_time = TIME_MIN;</span>
+<span class="lineNum">     394 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;cache_active_timeout = 0;</span>
+<span class="lineNum">     395 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;cache_max_flows = 0;</span>
+<span class="lineNum">     396 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="397"><span class="lineNum">     397 </span>                :            : </a>
+<span class="lineNum">     398 </span>                :            : static void
+<span class="lineNum">     399 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_exporter_destroy(struct dpif_ipfix_exporter *exporter)</span>
+<span class="lineNum">     400 </span>                :            : {
+<span class="lineNum">     401 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_exporter_clear(exporter);</span>
+<span class="lineNum">     402 </span>                :<span class="lineNoCov">          0 :     hmap_destroy(&amp;exporter-&gt;cache_flow_key_map);</span>
+<span class="lineNum">     403 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="404"><span class="lineNum">     404 </span>                :            : </a>
+<span class="lineNum">     405 </span>                :            : static bool
+<span class="lineNum">     406 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_exporter_set_options(struct dpif_ipfix_exporter *exporter,</span>
+<span class="lineNum">     407 </span>                :            :                                 const struct sset *targets,
+<span class="lineNum">     408 </span>                :            :                                 const uint32_t cache_active_timeout,
+<span class="lineNum">     409 </span>                :            :                                 const uint32_t cache_max_flows)
+<span class="lineNum">     410 </span>                :            : {
+<span class="lineNum">     411 </span>                :<span class="lineNoCov">          0 :     collectors_destroy(exporter-&gt;collectors);</span>
+<span class="lineNum">     412 </span>                :<span class="lineNoCov">          0 :     collectors_create(targets, IPFIX_DEFAULT_COLLECTOR_PORT,</span>
+<span class="lineNum">     413 </span>                :            :                       &amp;exporter-&gt;collectors);
+<span class="lineNum">     414 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (exporter-&gt;collectors == NULL) {</span>
+<span class="lineNum">     415 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;no collectors could be initialized, &quot;</span>
+<span class="lineNum">     416 </span>                :            :                      &quot;IPFIX exporter disabled&quot;);
+<span class="lineNum">     417 </span>                :<span class="lineNoCov">          0 :         dpif_ipfix_exporter_clear(exporter);</span>
+<span class="lineNum">     418 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     419 </span>                :            :     }
+<span class="lineNum">     420 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;cache_active_timeout = cache_active_timeout;</span>
+<span class="lineNum">     421 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;cache_max_flows = cache_max_flows;</span>
+<span class="lineNum">     422 </span>                :<span class="lineNoCov">          0 :     return true;</span>
+<span class="lineNum">     423 </span>                :            : }
+<a name="424"><span class="lineNum">     424 </span>                :            : </a>
+<span class="lineNum">     425 </span>                :            : static void
+<span class="lineNum">     426 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_bridge_exporter_init(struct dpif_ipfix_bridge_exporter *exporter)</span>
+<span class="lineNum">     427 </span>                :            : {
+<span class="lineNum">     428 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_exporter_init(&amp;exporter-&gt;exporter);</span>
+<span class="lineNum">     429 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;options = NULL;</span>
+<span class="lineNum">     430 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;probability = 0;</span>
+<span class="lineNum">     431 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="432"><span class="lineNum">     432 </span>                :            : </a>
+<span class="lineNum">     433 </span>                :            : static void
+<span class="lineNum">     434 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_bridge_exporter_clear(struct dpif_ipfix_bridge_exporter *exporter)</span>
+<span class="lineNum">     435 </span>                :            : {
+<span class="lineNum">     436 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_exporter_clear(&amp;exporter-&gt;exporter);</span>
+<span class="lineNum">     437 </span>                :<span class="lineNoCov">          0 :     ofproto_ipfix_bridge_exporter_options_destroy(exporter-&gt;options);</span>
+<span class="lineNum">     438 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;options = NULL;</span>
+<span class="lineNum">     439 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;probability = 0;</span>
+<span class="lineNum">     440 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="441"><span class="lineNum">     441 </span>                :            : </a>
+<span class="lineNum">     442 </span>                :            : static void
+<span class="lineNum">     443 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_bridge_exporter_destroy(struct dpif_ipfix_bridge_exporter *exporter)</span>
+<span class="lineNum">     444 </span>                :            : {
+<span class="lineNum">     445 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_bridge_exporter_clear(exporter);</span>
+<span class="lineNum">     446 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_exporter_destroy(&amp;exporter-&gt;exporter);</span>
+<span class="lineNum">     447 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="448"><span class="lineNum">     448 </span>                :            : </a>
+<span class="lineNum">     449 </span>                :            : static void
+<span class="lineNum">     450 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_bridge_exporter_set_options(</span>
+<span class="lineNum">     451 </span>                :            :     struct dpif_ipfix_bridge_exporter *exporter,
+<span class="lineNum">     452 </span>                :            :     const struct ofproto_ipfix_bridge_exporter_options *options)
+<span class="lineNum">     453 </span>                :            : {
+<span class="lineNum">     454 </span>                :            :     bool options_changed;
+<span class="lineNum">     455 </span>                :            : 
+<span class="lineNum">     456 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!options || sset_is_empty(&amp;options-&gt;targets)) {</span>
+<span class="lineNum">     457 </span>                :            :         /* No point in doing any work if there are no targets. */
+<span class="lineNum">     458 </span>                :<span class="lineNoCov">          0 :         dpif_ipfix_bridge_exporter_clear(exporter);</span>
+<span class="lineNum">     459 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     460 </span>                :            :     }
+<span class="lineNum">     461 </span>                :            : 
+<span class="lineNum">     462 </span>                :<span class="lineNoCov">          0 :     options_changed = (</span>
+<span class="lineNum">     463 </span>                :<span class="lineNoCov">          0 :         !exporter-&gt;options</span>
+<span class="lineNum">     464 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :         || !ofproto_ipfix_bridge_exporter_options_equal(</span>
+<span class="lineNum">     465 </span>                :<span class="lineNoCov">          0 :             options, exporter-&gt;options));</span>
+<span class="lineNum">     466 </span>                :            : 
+<span class="lineNum">     467 </span>                :            :     /* Configure collectors if options have changed or if we're
+<span class="lineNum">     468 </span>                :            :      * shortchanged in collectors (which indicates that opening one or
+<span class="lineNum">     469 </span>                :            :      * more of the configured collectors failed, so that we should
+<span class="lineNum">     470 </span>                :            :      * retry). */
+<span class="lineNum">     471 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (options_changed</span>
+<span class="lineNum">     472 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         || collectors_count(exporter-&gt;exporter.collectors)</span>
+<span class="lineNum">     473 </span>                :<span class="lineNoCov">          0 :             &lt; sset_count(&amp;options-&gt;targets)) {</span>
+<span class="lineNum">     474 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!dpif_ipfix_exporter_set_options(</span>
+<span class="lineNum">     475 </span>                :            :                 &amp;exporter-&gt;exporter, &amp;options-&gt;targets,
+<span class="lineNum">     476 </span>                :            :                 options-&gt;cache_active_timeout, options-&gt;cache_max_flows)) {
+<span class="lineNum">     477 </span>                :<span class="lineNoCov">          0 :             return;</span>
+<span class="lineNum">     478 </span>                :            :         }
+<span class="lineNum">     479 </span>                :            :     }
+<span class="lineNum">     480 </span>                :            : 
+<span class="lineNum">     481 </span>                :            :     /* Avoid reconfiguring if options didn't change. */
+<span class="lineNum">     482 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!options_changed) {</span>
+<span class="lineNum">     483 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     484 </span>                :            :     }
+<span class="lineNum">     485 </span>                :            : 
+<span class="lineNum">     486 </span>                :<span class="lineNoCov">          0 :     ofproto_ipfix_bridge_exporter_options_destroy(exporter-&gt;options);</span>
+<span class="lineNum">     487 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;options = ofproto_ipfix_bridge_exporter_options_clone(options);</span>
+<span class="lineNum">     488 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;probability =</span>
+<span class="lineNum">     489 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         MAX(1, UINT32_MAX / exporter-&gt;options-&gt;sampling_rate);</span>
+<span class="lineNum">     490 </span>                :            : 
+<span class="lineNum">     491 </span>                :            :     /* Run over the cache as some entries might have expired after
+<span class="lineNum">     492 </span>                :            :      * changing the timeouts. */
+<span class="lineNum">     493 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_cache_expire_now(&amp;exporter-&gt;exporter, false);</span>
+<span class="lineNum">     494 </span>                :            : }
+<a name="495"><span class="lineNum">     495 </span>                :            : </a>
+<span class="lineNum">     496 </span>                :            : static struct dpif_ipfix_flow_exporter_map_node*
+<span class="lineNum">     497 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_find_flow_exporter_map_node(</span>
+<span class="lineNum">     498 </span>                :            :     const struct dpif_ipfix *di, const uint32_t collector_set_id)
+<span class="lineNum">     499 </span>                :            :     OVS_REQUIRES(mutex)
+<span class="lineNum">     500 </span>                :            : {
+<span class="lineNum">     501 </span>                :            :     struct dpif_ipfix_flow_exporter_map_node *exporter_node;
+<span class="lineNum">     502 </span>                :            : 
+<span class="lineNum">     503 </span>        [<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :     HMAP_FOR_EACH_WITH_HASH (exporter_node, node,</span>
+<span class="lineNum">     504 </span>                :            :                              hash_int(collector_set_id, 0),
+<span class="lineNum">     505 </span>                :            :                              &amp;di-&gt;flow_exporter_map) {
+<span class="lineNum">     506 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (exporter_node-&gt;exporter.options-&gt;collector_set_id</span>
+<span class="lineNum">     507 </span>                :            :             == collector_set_id) {
+<span class="lineNum">     508 </span>                :<span class="lineNoCov">          0 :             return exporter_node;</span>
+<span class="lineNum">     509 </span>                :            :         }
+<span class="lineNum">     510 </span>                :            :     }
+<span class="lineNum">     511 </span>                :            : 
+<span class="lineNum">     512 </span>                :<span class="lineNoCov">          0 :     return NULL;</span>
+<span class="lineNum">     513 </span>                :            : }
+<a name="514"><span class="lineNum">     514 </span>                :            : </a>
+<span class="lineNum">     515 </span>                :            : static void
+<span class="lineNum">     516 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_flow_exporter_init(struct dpif_ipfix_flow_exporter *exporter)</span>
+<span class="lineNum">     517 </span>                :            : {
+<span class="lineNum">     518 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_exporter_init(&amp;exporter-&gt;exporter);</span>
+<span class="lineNum">     519 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;options = NULL;</span>
+<span class="lineNum">     520 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="521"><span class="lineNum">     521 </span>                :            : </a>
+<span class="lineNum">     522 </span>                :            : static void
+<span class="lineNum">     523 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_flow_exporter_clear(struct dpif_ipfix_flow_exporter *exporter)</span>
+<span class="lineNum">     524 </span>                :            : {
+<span class="lineNum">     525 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_exporter_clear(&amp;exporter-&gt;exporter);</span>
+<span class="lineNum">     526 </span>                :<span class="lineNoCov">          0 :     ofproto_ipfix_flow_exporter_options_destroy(exporter-&gt;options);</span>
+<span class="lineNum">     527 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;options = NULL;</span>
+<span class="lineNum">     528 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="529"><span class="lineNum">     529 </span>                :            : </a>
+<span class="lineNum">     530 </span>                :            : static void
+<span class="lineNum">     531 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_flow_exporter_destroy(struct dpif_ipfix_flow_exporter *exporter)</span>
+<span class="lineNum">     532 </span>                :            : {
+<span class="lineNum">     533 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_flow_exporter_clear(exporter);</span>
+<span class="lineNum">     534 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_exporter_destroy(&amp;exporter-&gt;exporter);</span>
+<span class="lineNum">     535 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="536"><span class="lineNum">     536 </span>                :            : </a>
+<span class="lineNum">     537 </span>                :            : static bool
+<span class="lineNum">     538 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_flow_exporter_set_options(</span>
+<span class="lineNum">     539 </span>                :            :     struct dpif_ipfix_flow_exporter *exporter,
+<span class="lineNum">     540 </span>                :            :     const struct ofproto_ipfix_flow_exporter_options *options)
+<span class="lineNum">     541 </span>                :            : {
+<span class="lineNum">     542 </span>                :            :     bool options_changed;
+<span class="lineNum">     543 </span>                :            : 
+<span class="lineNum">     544 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (sset_is_empty(&amp;options-&gt;targets)) {</span>
+<span class="lineNum">     545 </span>                :            :         /* No point in doing any work if there are no targets. */
+<span class="lineNum">     546 </span>                :<span class="lineNoCov">          0 :         dpif_ipfix_flow_exporter_clear(exporter);</span>
+<span class="lineNum">     547 </span>                :<span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">     548 </span>                :            :     }
+<span class="lineNum">     549 </span>                :            : 
+<span class="lineNum">     550 </span>                :<span class="lineNoCov">          0 :     options_changed = (</span>
+<span class="lineNum">     551 </span>                :<span class="lineNoCov">          0 :         !exporter-&gt;options</span>
+<span class="lineNum">     552 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :         || !ofproto_ipfix_flow_exporter_options_equal(</span>
+<span class="lineNum">     553 </span>                :<span class="lineNoCov">          0 :             options, exporter-&gt;options));</span>
+<span class="lineNum">     554 </span>                :            : 
+<span class="lineNum">     555 </span>                :            :     /* Configure collectors if options have changed or if we're
+<span class="lineNum">     556 </span>                :            :      * shortchanged in collectors (which indicates that opening one or
+<span class="lineNum">     557 </span>                :            :      * more of the configured collectors failed, so that we should
+<span class="lineNum">     558 </span>                :            :      * retry). */
+<span class="lineNum">     559 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (options_changed</span>
+<span class="lineNum">     560 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         || collectors_count(exporter-&gt;exporter.collectors)</span>
+<span class="lineNum">     561 </span>                :<span class="lineNoCov">          0 :             &lt; sset_count(&amp;options-&gt;targets)) {</span>
+<span class="lineNum">     562 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!dpif_ipfix_exporter_set_options(</span>
+<span class="lineNum">     563 </span>                :            :                 &amp;exporter-&gt;exporter, &amp;options-&gt;targets,
+<span class="lineNum">     564 </span>                :            :                 options-&gt;cache_active_timeout, options-&gt;cache_max_flows)) {
+<span class="lineNum">     565 </span>                :<span class="lineNoCov">          0 :             return false;</span>
+<span class="lineNum">     566 </span>                :            :         }
+<span class="lineNum">     567 </span>                :            :     }
+<span class="lineNum">     568 </span>                :            : 
+<span class="lineNum">     569 </span>                :            :     /* Avoid reconfiguring if options didn't change. */
+<span class="lineNum">     570 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!options_changed) {</span>
+<span class="lineNum">     571 </span>                :<span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">     572 </span>                :            :     }
+<span class="lineNum">     573 </span>                :            : 
+<span class="lineNum">     574 </span>                :<span class="lineNoCov">          0 :     ofproto_ipfix_flow_exporter_options_destroy(exporter-&gt;options);</span>
+<span class="lineNum">     575 </span>                :<span class="lineNoCov">          0 :     exporter-&gt;options = ofproto_ipfix_flow_exporter_options_clone(options);</span>
+<span class="lineNum">     576 </span>                :            : 
+<span class="lineNum">     577 </span>                :            :     /* Run over the cache as some entries might have expired after
+<span class="lineNum">     578 </span>                :            :      * changing the timeouts. */
+<span class="lineNum">     579 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_cache_expire_now(&amp;exporter-&gt;exporter, false);</span>
+<span class="lineNum">     580 </span>                :            : 
+<span class="lineNum">     581 </span>                :<span class="lineNoCov">          0 :     return true;</span>
+<span class="lineNum">     582 </span>                :            : }
+<a name="583"><span class="lineNum">     583 </span>                :            : </a>
+<span class="lineNum">     584 </span>                :            : void
+<span class="lineNum">     585 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_set_options(</span>
+<span class="lineNum">     586 </span>                :            :     struct dpif_ipfix *di,
+<span class="lineNum">     587 </span>                :            :     const struct ofproto_ipfix_bridge_exporter_options *bridge_exporter_options,
+<span class="lineNum">     588 </span>                :            :     const struct ofproto_ipfix_flow_exporter_options *flow_exporters_options,
+<span class="lineNum">     589 </span>                :            :     size_t n_flow_exporters_options) OVS_EXCLUDED(mutex)
+<span class="lineNum">     590 </span>                :            : {
+<span class="lineNum">     591 </span>                :            :     int i;
+<span class="lineNum">     592 </span>                :            :     struct ofproto_ipfix_flow_exporter_options *options;
+<span class="lineNum">     593 </span>                :            :     struct dpif_ipfix_flow_exporter_map_node *node, *next;
+<span class="lineNum">     594 </span>                :<span class="lineNoCov">          0 :     size_t n_broken_flow_exporters_options = 0;</span>
+<span class="lineNum">     595 </span>                :            : 
+<span class="lineNum">     596 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     597 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_bridge_exporter_set_options(&amp;di-&gt;bridge_exporter,</span>
+<span class="lineNum">     598 </span>                :            :                                            bridge_exporter_options);
+<span class="lineNum">     599 </span>                :            : 
+<span class="lineNum">     600 </span>                :            :     /* Add new flow exporters and update current flow exporters. */
+<span class="lineNum">     601 </span>                :<span class="lineNoCov">          0 :     options = (struct ofproto_ipfix_flow_exporter_options *)</span>
+<span class="lineNum">     602 </span>                :            :         flow_exporters_options;
+<span class="lineNum">     603 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (i = 0; i &lt; n_flow_exporters_options; i++) {</span>
+<span class="lineNum">     604 </span>                :<span class="lineNoCov">          0 :         node = dpif_ipfix_find_flow_exporter_map_node(</span>
+<span class="lineNum">     605 </span>                :            :             di, options-&gt;collector_set_id);
+<span class="lineNum">     606 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!node) {</span>
+<span class="lineNum">     607 </span>                :<span class="lineNoCov">          0 :             node = xzalloc(sizeof *node);</span>
+<span class="lineNum">     608 </span>                :<span class="lineNoCov">          0 :             dpif_ipfix_flow_exporter_init(&amp;node-&gt;exporter);</span>
+<span class="lineNum">     609 </span>                :<span class="lineNoCov">          0 :             hmap_insert(&amp;di-&gt;flow_exporter_map, &amp;node-&gt;node,</span>
+<span class="lineNum">     610 </span>                :            :                         hash_int(options-&gt;collector_set_id, 0));
+<span class="lineNum">     611 </span>                :            :         }
+<span class="lineNum">     612 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!dpif_ipfix_flow_exporter_set_options(&amp;node-&gt;exporter, options)) {</span>
+<span class="lineNum">     613 </span>                :<span class="lineNoCov">          0 :             n_broken_flow_exporters_options++;</span>
+<span class="lineNum">     614 </span>                :            :         }
+<span class="lineNum">     615 </span>                :<span class="lineNoCov">          0 :         options++;</span>
+<span class="lineNum">     616 </span>                :            :     }
+<span class="lineNum">     617 </span>                :            : 
+<span class="lineNum">     618 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     ovs_assert(hmap_count(&amp;di-&gt;flow_exporter_map) &gt;=</span>
+<span class="lineNum">     619 </span>                :            :                (n_flow_exporters_options - n_broken_flow_exporters_options));
+<span class="lineNum">     620 </span>                :            : 
+<span class="lineNum">     621 </span>                :            :     /* Remove dropped flow exporters, if any needs to be removed. */
+<span class="lineNum">     622 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (hmap_count(&amp;di-&gt;flow_exporter_map) &gt; n_flow_exporters_options) {</span>
+<span class="lineNum">     623 </span>[<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>][<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]:<span class="lineNoCov">          0 :         HMAP_FOR_EACH_SAFE (node, next, node, &amp;di-&gt;flow_exporter_map) {</span>
+<span class="lineNum">     624 </span>                :            :             /* This is slow but doesn't take any extra memory, and
+<span class="lineNum">     625 </span>                :            :              * this table is not supposed to contain many rows anyway. */
+<span class="lineNum">     626 </span>                :<span class="lineNoCov">          0 :             options = (struct ofproto_ipfix_flow_exporter_options *)</span>
+<span class="lineNum">     627 </span>                :            :                 flow_exporters_options;
+<span class="lineNum">     628 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             for (i = 0; i &lt; n_flow_exporters_options; i++) {</span>
+<span class="lineNum">     629 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :               if (node-&gt;exporter.options-&gt;collector_set_id</span>
+<span class="lineNum">     630 </span>                :<span class="lineNoCov">          0 :                   == options-&gt;collector_set_id) {</span>
+<span class="lineNum">     631 </span>                :<span class="lineNoCov">          0 :                   break;</span>
+<span class="lineNum">     632 </span>                :            :               }
+<span class="lineNum">     633 </span>                :<span class="lineNoCov">          0 :               options++;</span>
+<span class="lineNum">     634 </span>                :            :             }
+<span class="lineNum">     635 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (i == n_flow_exporters_options) {  // Not found.</span>
+<span class="lineNum">     636 </span>                :<span class="lineNoCov">          0 :                 hmap_remove(&amp;di-&gt;flow_exporter_map, &amp;node-&gt;node);</span>
+<span class="lineNum">     637 </span>                :<span class="lineNoCov">          0 :                 dpif_ipfix_flow_exporter_destroy(&amp;node-&gt;exporter);</span>
+<span class="lineNum">     638 </span>                :<span class="lineNoCov">          0 :                 free(node);</span>
+<span class="lineNum">     639 </span>                :            :             }
+<span class="lineNum">     640 </span>                :            :         }
+<span class="lineNum">     641 </span>                :            :     }
+<span class="lineNum">     642 </span>                :            : 
+<span class="lineNum">     643 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     ovs_assert(hmap_count(&amp;di-&gt;flow_exporter_map) ==</span>
+<span class="lineNum">     644 </span>                :            :                (n_flow_exporters_options - n_broken_flow_exporters_options));
+<span class="lineNum">     645 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     646 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="647"><span class="lineNum">     647 </span>                :            : </a>
+<span class="lineNum">     648 </span>                :            : struct dpif_ipfix *
+<span class="lineNum">     649 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_create(void)</span>
+<span class="lineNum">     650 </span>                :            : {
+<span class="lineNum">     651 </span>                :            :     struct dpif_ipfix *di;
+<span class="lineNum">     652 </span>                :<span class="lineNoCov">          0 :     di = xzalloc(sizeof *di);</span>
+<span class="lineNum">     653 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_bridge_exporter_init(&amp;di-&gt;bridge_exporter);</span>
+<span class="lineNum">     654 </span>                :<span class="lineNoCov">          0 :     hmap_init(&amp;di-&gt;flow_exporter_map);</span>
+<span class="lineNum">     655 </span>                :<span class="lineNoCov">          0 :     ovs_refcount_init(&amp;di-&gt;ref_cnt);</span>
+<span class="lineNum">     656 </span>                :<span class="lineNoCov">          0 :     return di;</span>
+<span class="lineNum">     657 </span>                :            : }
+<a name="658"><span class="lineNum">     658 </span>                :            : </a>
+<span class="lineNum">     659 </span>                :            : struct dpif_ipfix *
+<span class="lineNum">     660 </span>                :<span class="lineCov">       1164 : dpif_ipfix_ref(const struct dpif_ipfix *di_)</span>
+<span class="lineNum">     661 </span>                :            : {
+<span class="lineNum">     662 </span>                :<span class="lineCov">       1164 :     struct dpif_ipfix *di = CONST_CAST(struct dpif_ipfix *, di_);</span>
+<span class="lineNum">     663 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1164 times"> + </span>]:<span class="lineCov">       1164 :     if (di) {</span>
+<span class="lineNum">     664 </span>                :<span class="lineNoCov">          0 :         ovs_refcount_ref(&amp;di-&gt;ref_cnt);</span>
+<span class="lineNum">     665 </span>                :            :     }
+<span class="lineNum">     666 </span>                :<span class="lineCov">       1164 :     return di;</span>
+<span class="lineNum">     667 </span>                :            : }
+<a name="668"><span class="lineNum">     668 </span>                :            : </a>
+<span class="lineNum">     669 </span>                :            : uint32_t
+<span class="lineNum">     670 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_get_bridge_exporter_probability(const struct dpif_ipfix *di)</span>
+<span class="lineNum">     671 </span>                :            :     OVS_EXCLUDED(mutex)
+<span class="lineNum">     672 </span>                :            : {
+<span class="lineNum">     673 </span>                :            :     uint32_t ret;
+<span class="lineNum">     674 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     675 </span>                :<span class="lineNoCov">          0 :     ret = di-&gt;bridge_exporter.probability;</span>
+<span class="lineNum">     676 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     677 </span>                :<span class="lineNoCov">          0 :     return ret;</span>
+<span class="lineNum">     678 </span>                :            : }
+<a name="679"><span class="lineNum">     679 </span>                :            : </a>
+<span class="lineNum">     680 </span>                :            : static void
+<span class="lineNum">     681 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_clear(struct dpif_ipfix *di) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     682 </span>                :            : {
+<span class="lineNum">     683 </span>                :            :     struct dpif_ipfix_flow_exporter_map_node *exp_node, *exp_next;
+<span class="lineNum">     684 </span>                :            : 
+<span class="lineNum">     685 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_bridge_exporter_clear(&amp;di-&gt;bridge_exporter);</span>
+<span class="lineNum">     686 </span>                :            : 
+<span class="lineNum">     687 </span>[<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>][<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]:<span class="lineNoCov">          0 :     HMAP_FOR_EACH_SAFE (exp_node, exp_next, node, &amp;di-&gt;flow_exporter_map) {</span>
+<span class="lineNum">     688 </span>                :<span class="lineNoCov">          0 :         hmap_remove(&amp;di-&gt;flow_exporter_map, &amp;exp_node-&gt;node);</span>
+<span class="lineNum">     689 </span>                :<span class="lineNoCov">          0 :         dpif_ipfix_flow_exporter_destroy(&amp;exp_node-&gt;exporter);</span>
+<span class="lineNum">     690 </span>                :<span class="lineNoCov">          0 :         free(exp_node);</span>
+<span class="lineNum">     691 </span>                :            :     }
+<span class="lineNum">     692 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="693"><span class="lineNum">     693 </span>                :            : </a>
+<span class="lineNum">     694 </span>                :            : void
+<span class="lineNum">     695 </span>                :<span class="lineCov">       6916 : dpif_ipfix_unref(struct dpif_ipfix *di) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     696 </span>                :            : {
+<span class="lineNum">     697 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 6916 times"> + </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineCov">       6916 :     if (di &amp;&amp; ovs_refcount_unref(&amp;di-&gt;ref_cnt) == 1) {</span>
+<span class="lineNum">     698 </span>                :<span class="lineNoCov">          0 :         ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     699 </span>                :<span class="lineNoCov">          0 :         dpif_ipfix_clear(di);</span>
+<span class="lineNum">     700 </span>                :<span class="lineNoCov">          0 :         dpif_ipfix_bridge_exporter_destroy(&amp;di-&gt;bridge_exporter);</span>
+<span class="lineNum">     701 </span>                :<span class="lineNoCov">          0 :         hmap_destroy(&amp;di-&gt;flow_exporter_map);</span>
+<span class="lineNum">     702 </span>                :<span class="lineNoCov">          0 :         free(di);</span>
+<span class="lineNum">     703 </span>                :<span class="lineNoCov">          0 :         ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     704 </span>                :            :     }
+<span class="lineNum">     705 </span>                :<span class="lineCov">       6916 : }</span>
+<a name="706"><span class="lineNum">     706 </span>                :            : </a>
+<span class="lineNum">     707 </span>                :            : static void
+<span class="lineNum">     708 </span>                :<span class="lineNoCov">          0 : ipfix_init_header(uint32_t export_time_sec, uint32_t seq_number,</span>
+<span class="lineNum">     709 </span>                :            :                   uint32_t obs_domain_id, struct ofpbuf *msg)
+<span class="lineNum">     710 </span>                :            : {
+<span class="lineNum">     711 </span>                :            :     struct ipfix_header *hdr;
+<span class="lineNum">     712 </span>                :            : 
+<span class="lineNum">     713 </span>                :<span class="lineNoCov">          0 :     hdr = ofpbuf_put_zeros(msg, sizeof *hdr);</span>
+<span class="lineNum">     714 </span>                :<span class="lineNoCov">          0 :     hdr-&gt;version = htons(IPFIX_VERSION);</span>
+<span class="lineNum">     715 </span>                :<span class="lineNoCov">          0 :     hdr-&gt;length = htons(sizeof *hdr);  /* Updated in ipfix_send_msg. */</span>
+<span class="lineNum">     716 </span>                :<span class="lineNoCov">          0 :     hdr-&gt;export_time = htonl(export_time_sec);</span>
+<span class="lineNum">     717 </span>                :<span class="lineNoCov">          0 :     hdr-&gt;seq_number = htonl(seq_number);</span>
+<span class="lineNum">     718 </span>                :<span class="lineNoCov">          0 :     hdr-&gt;obs_domain_id = htonl(obs_domain_id);</span>
+<span class="lineNum">     719 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="720"><span class="lineNum">     720 </span>                :            : </a>
+<span class="lineNum">     721 </span>                :            : static void
+<span class="lineNum">     722 </span>                :<span class="lineNoCov">          0 : ipfix_send_msg(const struct collectors *collectors, struct ofpbuf *msg)</span>
+<span class="lineNum">     723 </span>                :            : {
+<span class="lineNum">     724 </span>                :            :     struct ipfix_header *hdr;
+<span class="lineNum">     725 </span>                :            : 
+<span class="lineNum">     726 </span>                :            :     /* Adjust the length in the header. */
+<span class="lineNum">     727 </span>                :<span class="lineNoCov">          0 :     hdr = ofpbuf_data(msg);</span>
+<span class="lineNum">     728 </span>                :<span class="lineNoCov">          0 :     hdr-&gt;length = htons(ofpbuf_size(msg));</span>
+<span class="lineNum">     729 </span>                :            : 
+<span class="lineNum">     730 </span>                :<span class="lineNoCov">          0 :     collectors_send(collectors, ofpbuf_data(msg), ofpbuf_size(msg));</span>
+<span class="lineNum">     731 </span>                :<span class="lineNoCov">          0 :     ofpbuf_set_size(msg, 0);</span>
+<span class="lineNum">     732 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="733"><span class="lineNum">     733 </span>                :            : </a>
+<span class="lineNum">     734 </span>                :            : static uint16_t
+<span class="lineNum">     735 </span>                :<span class="lineNoCov">          0 : ipfix_get_template_id(enum ipfix_proto_l2 l2, enum ipfix_proto_l3 l3,</span>
+<span class="lineNum">     736 </span>                :            :                       enum ipfix_proto_l4 l4)
+<span class="lineNum">     737 </span>                :            : {
+<span class="lineNum">     738 </span>                :            :     uint16_t template_id;
+<span class="lineNum">     739 </span>                :<span class="lineNoCov">          0 :     template_id = l2;</span>
+<span class="lineNum">     740 </span>                :<span class="lineNoCov">          0 :     template_id = template_id * NUM_IPFIX_PROTO_L3 + l3;</span>
+<span class="lineNum">     741 </span>                :<span class="lineNoCov">          0 :     template_id = template_id * NUM_IPFIX_PROTO_L4 + l4;</span>
+<span class="lineNum">     742 </span>                :<span class="lineNoCov">          0 :     return IPFIX_TEMPLATE_ID_MIN + template_id;</span>
+<span class="lineNum">     743 </span>                :            : }
+<a name="744"><span class="lineNum">     744 </span>                :            : </a>
+<span class="lineNum">     745 </span>                :            : static void
+<span class="lineNum">     746 </span>                :<span class="lineNoCov">          0 : ipfix_define_template_entity(enum ipfix_entity_id id,</span>
+<span class="lineNum">     747 </span>                :            :                              enum ipfix_entity_size size, struct ofpbuf *msg)
+<span class="lineNum">     748 </span>                :            : {
+<span class="lineNum">     749 </span>                :            :     struct ipfix_template_field_specifier *field;
+<span class="lineNum">     750 </span>                :            : 
+<span class="lineNum">     751 </span>                :<span class="lineNoCov">          0 :     field = ofpbuf_put_zeros(msg, sizeof *field);</span>
+<span class="lineNum">     752 </span>                :<span class="lineNoCov">          0 :     field-&gt;element_id = htons(id);</span>
+<span class="lineNum">     753 </span>                :<span class="lineNoCov">          0 :     field-&gt;field_length = htons(size);</span>
+<span class="lineNum">     754 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="755"><span class="lineNum">     755 </span>                :            : </a>
+<span class="lineNum">     756 </span>                :            : static uint16_t
+<span class="lineNum">     757 </span>                :<span class="lineNoCov">          0 : ipfix_define_template_fields(enum ipfix_proto_l2 l2, enum ipfix_proto_l3 l3,</span>
+<span class="lineNum">     758 </span>                :            :                              enum ipfix_proto_l4 l4, struct ofpbuf *msg)
+<span class="lineNum">     759 </span>                :            : {
+<span class="lineNum">     760 </span>                :<span class="lineNoCov">          0 :     uint16_t count = 0;</span>
+<span class="lineNum">     761 </span>                :            : 
+<span class="lineNum">     762 </span>                :            : #define DEF(ID) \
+<span class="lineNum">     763 </span>                :            :     { \
+<span class="lineNum">     764 </span>                :            :         ipfix_define_template_entity(IPFIX_ENTITY_ID_##ID, \
+<span class="lineNum">     765 </span>                :            :                                      IPFIX_ENTITY_SIZE_##ID, msg); \
+<span class="lineNum">     766 </span>                :            :         count++; \
+<span class="lineNum">     767 </span>                :            :     }
+<span class="lineNum">     768 </span>                :            : 
+<span class="lineNum">     769 </span>                :            :     /* 1. Flow key. */
+<span class="lineNum">     770 </span>                :            : 
+<span class="lineNum">     771 </span>                :<span class="lineNoCov">          0 :     DEF(OBSERVATION_POINT_ID);</span>
+<span class="lineNum">     772 </span>                :            : 
+<span class="lineNum">     773 </span>                :            :     /* Common Ethernet entities. */
+<span class="lineNum">     774 </span>                :<span class="lineNoCov">          0 :     DEF(SOURCE_MAC_ADDRESS);</span>
+<span class="lineNum">     775 </span>                :<span class="lineNoCov">          0 :     DEF(DESTINATION_MAC_ADDRESS);</span>
+<span class="lineNum">     776 </span>                :<span class="lineNoCov">          0 :     DEF(ETHERNET_TYPE);</span>
+<span class="lineNum">     777 </span>                :<span class="lineNoCov">          0 :     DEF(ETHERNET_HEADER_LENGTH);</span>
+<span class="lineNum">     778 </span>                :            : 
+<span class="lineNum">     779 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (l2 == IPFIX_PROTO_L2_VLAN) {</span>
+<span class="lineNum">     780 </span>                :<span class="lineNoCov">          0 :         DEF(VLAN_ID);</span>
+<span class="lineNum">     781 </span>                :<span class="lineNoCov">          0 :         DEF(DOT1Q_VLAN_ID);</span>
+<span class="lineNum">     782 </span>                :<span class="lineNoCov">          0 :         DEF(DOT1Q_PRIORITY);</span>
+<span class="lineNum">     783 </span>                :            :     }
+<span class="lineNum">     784 </span>                :            : 
+<span class="lineNum">     785 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (l3 != IPFIX_PROTO_L3_UNKNOWN) {</span>
+<span class="lineNum">     786 </span>                :<span class="lineNoCov">          0 :         DEF(IP_VERSION);</span>
+<span class="lineNum">     787 </span>                :<span class="lineNoCov">          0 :         DEF(IP_TTL);</span>
+<span class="lineNum">     788 </span>                :<span class="lineNoCov">          0 :         DEF(PROTOCOL_IDENTIFIER);</span>
+<span class="lineNum">     789 </span>                :<span class="lineNoCov">          0 :         DEF(IP_DIFF_SERV_CODE_POINT);</span>
+<span class="lineNum">     790 </span>                :<span class="lineNoCov">          0 :         DEF(IP_PRECEDENCE);</span>
+<span class="lineNum">     791 </span>                :<span class="lineNoCov">          0 :         DEF(IP_CLASS_OF_SERVICE);</span>
+<span class="lineNum">     792 </span>                :            : 
+<span class="lineNum">     793 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (l3 == IPFIX_PROTO_L3_IPV4) {</span>
+<span class="lineNum">     794 </span>                :<span class="lineNoCov">          0 :             DEF(SOURCE_IPV4_ADDRESS);</span>
+<span class="lineNum">     795 </span>                :<span class="lineNoCov">          0 :             DEF(DESTINATION_IPV4_ADDRESS);</span>
+<span class="lineNum">     796 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (l4 == IPFIX_PROTO_L4_TCP_UDP_SCTP) {</span>
+<span class="lineNum">     797 </span>                :<span class="lineNoCov">          0 :                 DEF(SOURCE_TRANSPORT_PORT);</span>
+<span class="lineNum">     798 </span>                :<span class="lineNoCov">          0 :                 DEF(DESTINATION_TRANSPORT_PORT);</span>
+<span class="lineNum">     799 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             } else if (l4 == IPFIX_PROTO_L4_ICMP) {</span>
+<span class="lineNum">     800 </span>                :<span class="lineNoCov">          0 :                 DEF(ICMP_TYPE_IPV4);</span>
+<span class="lineNum">     801 </span>                :<span class="lineNoCov">          0 :                 DEF(ICMP_CODE_IPV4);</span>
+<span class="lineNum">     802 </span>                :            :             }
+<span class="lineNum">     803 </span>                :            :         } else {  /* l3 == IPFIX_PROTO_L3_IPV6 */
+<span class="lineNum">     804 </span>                :<span class="lineNoCov">          0 :             DEF(SOURCE_IPV6_ADDRESS);</span>
+<span class="lineNum">     805 </span>                :<span class="lineNoCov">          0 :             DEF(DESTINATION_IPV6_ADDRESS);</span>
+<span class="lineNum">     806 </span>                :<span class="lineNoCov">          0 :             DEF(FLOW_LABEL_IPV6);</span>
+<span class="lineNum">     807 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (l4 == IPFIX_PROTO_L4_TCP_UDP_SCTP) {</span>
+<span class="lineNum">     808 </span>                :<span class="lineNoCov">          0 :                 DEF(SOURCE_TRANSPORT_PORT);</span>
+<span class="lineNum">     809 </span>                :<span class="lineNoCov">          0 :                 DEF(DESTINATION_TRANSPORT_PORT);</span>
+<span class="lineNum">     810 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             } else if (l4 == IPFIX_PROTO_L4_ICMP) {</span>
+<span class="lineNum">     811 </span>                :<span class="lineNoCov">          0 :                 DEF(ICMP_TYPE_IPV6);</span>
+<span class="lineNum">     812 </span>                :<span class="lineNoCov">          0 :                 DEF(ICMP_CODE_IPV6);</span>
+<span class="lineNum">     813 </span>                :            :             }
+<span class="lineNum">     814 </span>                :            :         }
+<span class="lineNum">     815 </span>                :            :     }
+<span class="lineNum">     816 </span>                :            : 
+<span class="lineNum">     817 </span>                :            :     /* 2. Flow aggregated data. */
+<span class="lineNum">     818 </span>                :            : 
+<span class="lineNum">     819 </span>                :<span class="lineNoCov">          0 :     DEF(FLOW_START_DELTA_MICROSECONDS);</span>
+<span class="lineNum">     820 </span>                :<span class="lineNoCov">          0 :     DEF(FLOW_END_DELTA_MICROSECONDS);</span>
+<span class="lineNum">     821 </span>                :<span class="lineNoCov">          0 :     DEF(PACKET_DELTA_COUNT);</span>
+<span class="lineNum">     822 </span>                :<span class="lineNoCov">          0 :     DEF(LAYER2_OCTET_DELTA_COUNT);</span>
+<span class="lineNum">     823 </span>                :<span class="lineNoCov">          0 :     DEF(FLOW_END_REASON);</span>
+<span class="lineNum">     824 </span>                :            : 
+<span class="lineNum">     825 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (l3 != IPFIX_PROTO_L3_UNKNOWN) {</span>
+<span class="lineNum">     826 </span>                :<span class="lineNoCov">          0 :         DEF(OCTET_DELTA_COUNT);</span>
+<span class="lineNum">     827 </span>                :<span class="lineNoCov">          0 :         DEF(OCTET_DELTA_SUM_OF_SQUARES);</span>
+<span class="lineNum">     828 </span>                :<span class="lineNoCov">          0 :         DEF(MINIMUM_IP_TOTAL_LENGTH);</span>
+<span class="lineNum">     829 </span>                :<span class="lineNoCov">          0 :         DEF(MAXIMUM_IP_TOTAL_LENGTH);</span>
+<span class="lineNum">     830 </span>                :            :     }
+<span class="lineNum">     831 </span>                :            : 
+<span class="lineNum">     832 </span>                :            : #undef DEF
+<span class="lineNum">     833 </span>                :            : 
+<span class="lineNum">     834 </span>                :<span class="lineNoCov">          0 :     return count;</span>
+<span class="lineNum">     835 </span>                :            : }
+<a name="836"><span class="lineNum">     836 </span>                :            : </a>
+<span class="lineNum">     837 </span>                :            : static void
+<span class="lineNum">     838 </span>                :<span class="lineNoCov">          0 : ipfix_send_template_msg(struct dpif_ipfix_exporter *exporter,</span>
+<span class="lineNum">     839 </span>                :            :                         uint32_t export_time_sec, uint32_t obs_domain_id)
+<span class="lineNum">     840 </span>                :            : {
+<span class="lineNum">     841 </span>                :            :     uint64_t msg_stub[DIV_ROUND_UP(MAX_MESSAGE_LEN, 8)];
+<span class="lineNum">     842 </span>                :            :     struct ofpbuf msg;
+<span class="lineNum">     843 </span>                :            :     size_t set_hdr_offset, tmpl_hdr_offset;
+<span class="lineNum">     844 </span>                :            :     struct ipfix_set_header *set_hdr;
+<span class="lineNum">     845 </span>                :            :     struct ipfix_template_record_header *tmpl_hdr;
+<span class="lineNum">     846 </span>                :            :     uint16_t field_count;
+<span class="lineNum">     847 </span>                :            :     enum ipfix_proto_l2 l2;
+<span class="lineNum">     848 </span>                :            :     enum ipfix_proto_l3 l3;
+<span class="lineNum">     849 </span>                :            :     enum ipfix_proto_l4 l4;
+<span class="lineNum">     850 </span>                :            : 
+<span class="lineNum">     851 </span>                :<span class="lineNoCov">          0 :     ofpbuf_use_stub(&amp;msg, msg_stub, sizeof msg_stub);</span>
+<span class="lineNum">     852 </span>                :            : 
+<span class="lineNum">     853 </span>                :<span class="lineNoCov">          0 :     ipfix_init_header(export_time_sec, exporter-&gt;seq_number, obs_domain_id,</span>
+<span class="lineNum">     854 </span>                :            :                       &amp;msg);
+<span class="lineNum">     855 </span>                :<span class="lineNoCov">          0 :     set_hdr_offset = ofpbuf_size(&amp;msg);</span>
+<span class="lineNum">     856 </span>                :            : 
+<span class="lineNum">     857 </span>                :            :     /* Add a Template Set. */
+<span class="lineNum">     858 </span>                :<span class="lineNoCov">          0 :     set_hdr = ofpbuf_put_zeros(&amp;msg, sizeof *set_hdr);</span>
+<span class="lineNum">     859 </span>                :<span class="lineNoCov">          0 :     set_hdr-&gt;set_id = htons(IPFIX_SET_ID_TEMPLATE);</span>
+<span class="lineNum">     860 </span>                :            : 
+<span class="lineNum">     861 </span>                :            :     /* Define one template for each possible combination of
+<span class="lineNum">     862 </span>                :            :      * protocols. */
+<span class="lineNum">     863 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (l2 = 0; l2 &lt; NUM_IPFIX_PROTO_L2; l2++) {</span>
+<span class="lineNum">     864 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         for (l3 = 0; l3 &lt; NUM_IPFIX_PROTO_L3; l3++) {</span>
+<span class="lineNum">     865 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             for (l4 = 0; l4 &lt; NUM_IPFIX_PROTO_L4; l4++) {</span>
+<span class="lineNum">     866 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 if (l3 == IPFIX_PROTO_L3_UNKNOWN &amp;&amp;</span>
+<span class="lineNum">     867 </span>                :            :                     l4 != IPFIX_PROTO_L4_UNKNOWN) {
+<span class="lineNum">     868 </span>                :<span class="lineNoCov">          0 :                     continue;</span>
+<span class="lineNum">     869 </span>                :            :                 }
+<span class="lineNum">     870 </span>                :<span class="lineNoCov">          0 :                 tmpl_hdr_offset = ofpbuf_size(&amp;msg);</span>
+<span class="lineNum">     871 </span>                :<span class="lineNoCov">          0 :                 tmpl_hdr = ofpbuf_put_zeros(&amp;msg, sizeof *tmpl_hdr);</span>
+<span class="lineNum">     872 </span>                :<span class="lineNoCov">          0 :                 tmpl_hdr-&gt;template_id = htons(</span>
+<span class="lineNum">     873 </span>                :<span class="lineNoCov">          0 :                     ipfix_get_template_id(l2, l3, l4));</span>
+<span class="lineNum">     874 </span>                :<span class="lineNoCov">          0 :                 field_count = ipfix_define_template_fields(l2, l3, l4, &amp;msg);</span>
+<span class="lineNum">     875 </span>                :<span class="lineNoCov">          0 :                 tmpl_hdr = (struct ipfix_template_record_header*)</span>
+<span class="lineNum">     876 </span>                :<span class="lineNoCov">          0 :                     ((uint8_t*)ofpbuf_data(&amp;msg) + tmpl_hdr_offset);</span>
+<span class="lineNum">     877 </span>                :<span class="lineNoCov">          0 :                 tmpl_hdr-&gt;field_count = htons(field_count);</span>
+<span class="lineNum">     878 </span>                :            :             }
+<span class="lineNum">     879 </span>                :            :         }
+<span class="lineNum">     880 </span>                :            :     }
+<span class="lineNum">     881 </span>                :            : 
+<span class="lineNum">     882 </span>                :<span class="lineNoCov">          0 :     set_hdr = (struct ipfix_set_header*)((uint8_t*)ofpbuf_data(&amp;msg) + set_hdr_offset);</span>
+<span class="lineNum">     883 </span>                :<span class="lineNoCov">          0 :     set_hdr-&gt;length = htons(ofpbuf_size(&amp;msg) - set_hdr_offset);</span>
+<span class="lineNum">     884 </span>                :            : 
+<span class="lineNum">     885 </span>                :            :     /* XXX: Add Options Template Sets, at least to define a Flow Keys
+<span class="lineNum">     886 </span>                :            :      * Option Template. */
+<span class="lineNum">     887 </span>                :            : 
+<span class="lineNum">     888 </span>                :<span class="lineNoCov">          0 :     ipfix_send_msg(exporter-&gt;collectors, &amp;msg);</span>
+<span class="lineNum">     889 </span>                :            : 
+<span class="lineNum">     890 </span>                :<span class="lineNoCov">          0 :     ofpbuf_uninit(&amp;msg);</span>
+<span class="lineNum">     891 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="892"><span class="lineNum">     892 </span>                :            : </a>
+<span class="lineNum">     893 </span>                :            : static inline uint32_t
+<span class="lineNum">     894 </span>                :<span class="lineNoCov">          0 : ipfix_hash_flow_key(const struct ipfix_flow_key *flow_key, uint32_t basis)</span>
+<span class="lineNum">     895 </span>                :            : {
+<span class="lineNum">     896 </span>                :            :     uint32_t hash;
+<span class="lineNum">     897 </span>                :<span class="lineNoCov">          0 :     hash = hash_int(flow_key-&gt;obs_domain_id, basis);</span>
+<span class="lineNum">     898 </span>                :<span class="lineNoCov">          0 :     hash = hash_int(flow_key-&gt;template_id, hash);</span>
+<span class="lineNum">     899 </span>                :<span class="lineNoCov">          0 :     hash = hash_bytes(flow_key-&gt;flow_key_msg_part,</span>
+<span class="lineNum">     900 </span>                :            :                       flow_key-&gt;flow_key_msg_part_size, hash);
+<span class="lineNum">     901 </span>                :<span class="lineNoCov">          0 :     return hash;</span>
+<span class="lineNum">     902 </span>                :            : }
+<a name="903"><span class="lineNum">     903 </span>                :            : </a>
+<span class="lineNum">     904 </span>                :            : static bool
+<span class="lineNum">     905 </span>                :<span class="lineNoCov">          0 : ipfix_flow_key_equal(const struct ipfix_flow_key *a,</span>
+<span class="lineNum">     906 </span>                :            :                      const struct ipfix_flow_key *b)
+<span class="lineNum">     907 </span>                :            : {
+<span class="lineNum">     908 </span>                :            :     /* The template ID determines the flow key size, so not need to
+<span class="lineNum">     909 </span>                :            :      * compare it. */
+<span class="lineNum">     910 </span>                :<span class="lineNoCov">          0 :     return (a-&gt;obs_domain_id == b-&gt;obs_domain_id</span>
+<span class="lineNum">     911 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; a-&gt;template_id == b-&gt;template_id</span>
+<span class="lineNum">     912 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; memcmp(a-&gt;flow_key_msg_part, b-&gt;flow_key_msg_part,</span>
+<span class="lineNum">     913 </span>                :            :                       a-&gt;flow_key_msg_part_size) == 0);
+<span class="lineNum">     914 </span>                :            : }
+<a name="915"><span class="lineNum">     915 </span>                :            : </a>
+<span class="lineNum">     916 </span>                :            : static struct ipfix_flow_cache_entry*
+<span class="lineNum">     917 </span>                :<span class="lineNoCov">          0 : ipfix_cache_find_entry(const struct dpif_ipfix_exporter *exporter,</span>
+<span class="lineNum">     918 </span>                :            :                        const struct ipfix_flow_key *flow_key)
+<span class="lineNum">     919 </span>                :            : {
+<span class="lineNum">     920 </span>                :            :     struct ipfix_flow_cache_entry *entry;
+<span class="lineNum">     921 </span>                :            : 
+<span class="lineNum">     922 </span>        [<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :     HMAP_FOR_EACH_WITH_HASH (entry, flow_key_map_node,</span>
+<span class="lineNum">     923 </span>                :            :                              ipfix_hash_flow_key(flow_key, 0),
+<span class="lineNum">     924 </span>                :            :                              &amp;exporter-&gt;cache_flow_key_map) {
+<span class="lineNum">     925 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (ipfix_flow_key_equal(&amp;entry-&gt;flow_key, flow_key)) {</span>
+<span class="lineNum">     926 </span>                :<span class="lineNoCov">          0 :             return entry;</span>
+<span class="lineNum">     927 </span>                :            :         }
+<span class="lineNum">     928 </span>                :            :     }
+<span class="lineNum">     929 </span>                :            : 
+<span class="lineNum">     930 </span>                :<span class="lineNoCov">          0 :     return NULL;</span>
+<span class="lineNum">     931 </span>                :            : }
+<a name="932"><span class="lineNum">     932 </span>                :            : </a>
+<span class="lineNum">     933 </span>                :            : static bool
+<span class="lineNum">     934 </span>                :<span class="lineNoCov">          0 : ipfix_cache_next_timeout_msec(const struct dpif_ipfix_exporter *exporter,</span>
+<span class="lineNum">     935 </span>                :            :                               long long int *next_timeout_msec)
+<span class="lineNum">     936 </span>                :            : {
+<span class="lineNum">     937 </span>                :            :     struct ipfix_flow_cache_entry *entry;
+<span class="lineNum">     938 </span>                :            : 
+<span class="lineNum">     939 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     LIST_FOR_EACH (entry, cache_flow_start_timestamp_list_node,</span>
+<span class="lineNum">     940 </span>                :            :                    &amp;exporter-&gt;cache_flow_start_timestamp_list) {
+<span class="lineNum">     941 </span>                :<span class="lineNoCov">          0 :         *next_timeout_msec = entry-&gt;flow_start_timestamp_usec / 1000LL</span>
+<span class="lineNum">     942 </span>                :<span class="lineNoCov">          0 :             + 1000LL * exporter-&gt;cache_active_timeout;</span>
+<span class="lineNum">     943 </span>                :<span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">     944 </span>                :            :     }
+<span class="lineNum">     945 </span>                :            : 
+<span class="lineNum">     946 </span>                :<span class="lineNoCov">          0 :     return false;</span>
+<span class="lineNum">     947 </span>                :            : }
+<a name="948"><span class="lineNum">     948 </span>                :            : </a>
+<span class="lineNum">     949 </span>                :            : static void
+<span class="lineNum">     950 </span>                :<span class="lineNoCov">          0 : ipfix_cache_aggregate_entries(struct ipfix_flow_cache_entry *from_entry,</span>
+<span class="lineNum">     951 </span>                :            :                               struct ipfix_flow_cache_entry *to_entry)
+<span class="lineNum">     952 </span>                :            : {
+<span class="lineNum">     953 </span>                :            :     uint64_t *to_start, *to_end, *from_start, *from_end;
+<span class="lineNum">     954 </span>                :            :     uint16_t *to_min_len, *to_max_len, *from_min_len, *from_max_len;
+<span class="lineNum">     955 </span>                :            : 
+<span class="lineNum">     956 </span>                :<span class="lineNoCov">          0 :     to_start = &amp;to_entry-&gt;flow_start_timestamp_usec;</span>
+<span class="lineNum">     957 </span>                :<span class="lineNoCov">          0 :     to_end = &amp;to_entry-&gt;flow_end_timestamp_usec;</span>
+<span class="lineNum">     958 </span>                :<span class="lineNoCov">          0 :     from_start = &amp;from_entry-&gt;flow_start_timestamp_usec;</span>
+<span class="lineNum">     959 </span>                :<span class="lineNoCov">          0 :     from_end = &amp;from_entry-&gt;flow_end_timestamp_usec;</span>
+<span class="lineNum">     960 </span>                :            : 
+<span class="lineNum">     961 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (*to_start &gt; *from_start) {</span>
+<span class="lineNum">     962 </span>                :<span class="lineNoCov">          0 :         *to_start = *from_start;</span>
+<span class="lineNum">     963 </span>                :            :     }
+<span class="lineNum">     964 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (*to_end &lt; *from_end) {</span>
+<span class="lineNum">     965 </span>                :<span class="lineNoCov">          0 :         *to_end = *from_end;</span>
+<span class="lineNum">     966 </span>                :            :     }
+<span class="lineNum">     967 </span>                :            : 
+<span class="lineNum">     968 </span>                :<span class="lineNoCov">          0 :     to_entry-&gt;packet_delta_count += from_entry-&gt;packet_delta_count;</span>
+<span class="lineNum">     969 </span>                :<span class="lineNoCov">          0 :     to_entry-&gt;layer2_octet_delta_count += from_entry-&gt;layer2_octet_delta_count;</span>
+<span class="lineNum">     970 </span>                :            : 
+<span class="lineNum">     971 </span>                :<span class="lineNoCov">          0 :     to_entry-&gt;octet_delta_count += from_entry-&gt;octet_delta_count;</span>
+<span class="lineNum">     972 </span>                :<span class="lineNoCov">          0 :     to_entry-&gt;octet_delta_sum_of_squares +=</span>
+<span class="lineNum">     973 </span>                :<span class="lineNoCov">          0 :         from_entry-&gt;octet_delta_sum_of_squares;</span>
+<span class="lineNum">     974 </span>                :            : 
+<span class="lineNum">     975 </span>                :<span class="lineNoCov">          0 :     to_min_len = &amp;to_entry-&gt;minimum_ip_total_length;</span>
+<span class="lineNum">     976 </span>                :<span class="lineNoCov">          0 :     to_max_len = &amp;to_entry-&gt;maximum_ip_total_length;</span>
+<span class="lineNum">     977 </span>                :<span class="lineNoCov">          0 :     from_min_len = &amp;from_entry-&gt;minimum_ip_total_length;</span>
+<span class="lineNum">     978 </span>                :<span class="lineNoCov">          0 :     from_max_len = &amp;from_entry-&gt;maximum_ip_total_length;</span>
+<span class="lineNum">     979 </span>                :            : 
+<span class="lineNum">     980 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!*to_min_len || (*from_min_len &amp;&amp; *to_min_len &gt; *from_min_len)) {</span>
+<span class="lineNum">         </span>        [<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]
+<span class="lineNum">     981 </span>                :<span class="lineNoCov">          0 :         *to_min_len = *from_min_len;</span>
+<span class="lineNum">     982 </span>                :            :     }
+<span class="lineNum">     983 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (*to_max_len &lt; *from_max_len) {</span>
+<span class="lineNum">     984 </span>                :<span class="lineNoCov">          0 :         *to_max_len = *from_max_len;</span>
+<span class="lineNum">     985 </span>                :            :     }
+<span class="lineNum">     986 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     987 </span>                :            : 
+<span class="lineNum">     988 </span>                :            : /* Add an entry into a flow cache.  The entry is either aggregated into
+<span class="lineNum">     989 </span>                :            :  * an existing entry with the same flow key and free()d, or it is
+<a name="990"><span class="lineNum">     990 </span>                :            :  * inserted into the cache. */</a>
+<span class="lineNum">     991 </span>                :            : static void
+<span class="lineNum">     992 </span>                :<span class="lineNoCov">          0 : ipfix_cache_update(struct dpif_ipfix_exporter *exporter,</span>
+<span class="lineNum">     993 </span>                :            :                    struct ipfix_flow_cache_entry *entry)
+<span class="lineNum">     994 </span>                :            : {
+<span class="lineNum">     995 </span>                :            :     struct ipfix_flow_cache_entry *old_entry;
+<span class="lineNum">     996 </span>                :            : 
+<span class="lineNum">     997 </span>                :<span class="lineNoCov">          0 :     old_entry = ipfix_cache_find_entry(exporter, &amp;entry-&gt;flow_key);</span>
+<span class="lineNum">     998 </span>                :            : 
+<span class="lineNum">     999 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (old_entry == NULL) {</span>
+<span class="lineNum">    1000 </span>                :<span class="lineNoCov">          0 :         hmap_insert(&amp;exporter-&gt;cache_flow_key_map, &amp;entry-&gt;flow_key_map_node,</span>
+<span class="lineNum">    1001 </span>                :            :                     ipfix_hash_flow_key(&amp;entry-&gt;flow_key, 0));
+<span class="lineNum">    1002 </span>                :            : 
+<span class="lineNum">    1003 </span>                :            :         /* As the latest entry added into the cache, it should
+<span class="lineNum">    1004 </span>                :            :          * logically have the highest flow_start_timestamp_usec, so
+<span class="lineNum">    1005 </span>                :            :          * append it at the tail. */
+<span class="lineNum">    1006 </span>                :<span class="lineNoCov">          0 :         list_push_back(&amp;exporter-&gt;cache_flow_start_timestamp_list,</span>
+<span class="lineNum">    1007 </span>                :            :                        &amp;entry-&gt;cache_flow_start_timestamp_list_node);
+<span class="lineNum">    1008 </span>                :            : 
+<span class="lineNum">    1009 </span>                :            :         /* Enforce exporter-&gt;cache_max_flows limit. */
+<span class="lineNum">    1010 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (hmap_count(&amp;exporter-&gt;cache_flow_key_map)</span>
+<span class="lineNum">    1011 </span>                :<span class="lineNoCov">          0 :             &gt; exporter-&gt;cache_max_flows) {</span>
+<span class="lineNum">    1012 </span>                :<span class="lineNoCov">          0 :             dpif_ipfix_cache_expire_now(exporter, false);</span>
+<span class="lineNum">    1013 </span>                :            :         }
+<span class="lineNum">    1014 </span>                :            :     } else {
+<span class="lineNum">    1015 </span>                :<span class="lineNoCov">          0 :         ipfix_cache_aggregate_entries(entry, old_entry);</span>
+<span class="lineNum">    1016 </span>                :<span class="lineNoCov">          0 :         free(entry);</span>
+<span class="lineNum">    1017 </span>                :            :     }
+<span class="lineNum">    1018 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="1019"><span class="lineNum">    1019 </span>                :            : </a>
+<span class="lineNum">    1020 </span>                :            : static void
+<span class="lineNum">    1021 </span>                :<span class="lineNoCov">          0 : ipfix_cache_entry_init(struct ipfix_flow_cache_entry *entry,</span>
+<span class="lineNum">    1022 </span>                :            :                        struct ofpbuf *packet, const struct flow *flow,
+<span class="lineNum">    1023 </span>                :            :                        uint64_t packet_delta_count, uint32_t obs_domain_id,
+<span class="lineNum">    1024 </span>                :            :                        uint32_t obs_point_id)
+<span class="lineNum">    1025 </span>                :            : {
+<span class="lineNum">    1026 </span>                :            :     struct ipfix_flow_key *flow_key;
+<span class="lineNum">    1027 </span>                :            :     struct ofpbuf msg;
+<span class="lineNum">    1028 </span>                :            :     enum ipfix_proto_l2 l2;
+<span class="lineNum">    1029 </span>                :            :     enum ipfix_proto_l3 l3;
+<span class="lineNum">    1030 </span>                :            :     enum ipfix_proto_l4 l4;
+<span class="lineNum">    1031 </span>                :            :     uint8_t ethernet_header_length;
+<span class="lineNum">    1032 </span>                :            :     uint16_t ethernet_total_length;
+<span class="lineNum">    1033 </span>                :            : 
+<span class="lineNum">    1034 </span>                :<span class="lineNoCov">          0 :     flow_key = &amp;entry-&gt;flow_key;</span>
+<span class="lineNum">    1035 </span>                :<span class="lineNoCov">          0 :     ofpbuf_use_stack(&amp;msg, flow_key-&gt;flow_key_msg_part,</span>
+<span class="lineNum">    1036 </span>                :            :                      sizeof flow_key-&gt;flow_key_msg_part);
+<span class="lineNum">    1037 </span>                :            : 
+<span class="lineNum">    1038 </span>                :            :     /* Choose the right template ID matching the protocols in the
+<span class="lineNum">    1039 </span>                :            :      * sampled packet. */
+<span class="lineNum">    1040 </span>                :<span class="lineNoCov">          0 :     l2 = (flow-&gt;vlan_tci == 0) ? IPFIX_PROTO_L2_ETH : IPFIX_PROTO_L2_VLAN;</span>
+<span class="lineNum">    1041 </span>                :            : 
+<span class="lineNum">    1042 </span>     [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     switch(ntohs(flow-&gt;dl_type)) {</span>
+<span class="lineNum">    1043 </span>                :            :     case ETH_TYPE_IP:
+<span class="lineNum">    1044 </span>                :<span class="lineNoCov">          0 :         l3 = IPFIX_PROTO_L3_IPV4;</span>
+<span class="lineNum">    1045 </span>     [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         switch(flow-&gt;nw_proto) {</span>
+<span class="lineNum">    1046 </span>                :            :         case IPPROTO_TCP:
+<span class="lineNum">    1047 </span>                :            :         case IPPROTO_UDP:
+<span class="lineNum">    1048 </span>                :            :         case IPPROTO_SCTP:
+<span class="lineNum">    1049 </span>                :<span class="lineNoCov">          0 :             l4 = IPFIX_PROTO_L4_TCP_UDP_SCTP;</span>
+<span class="lineNum">    1050 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">    1051 </span>                :            :         case IPPROTO_ICMP:
+<span class="lineNum">    1052 </span>                :<span class="lineNoCov">          0 :             l4 = IPFIX_PROTO_L4_ICMP;</span>
+<span class="lineNum">    1053 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">    1054 </span>                :            :         default:
+<span class="lineNum">    1055 </span>                :<span class="lineNoCov">          0 :             l4 = IPFIX_PROTO_L4_UNKNOWN;</span>
+<span class="lineNum">    1056 </span>                :            :         }
+<span class="lineNum">    1057 </span>                :<span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">    1058 </span>                :            :     case ETH_TYPE_IPV6:
+<span class="lineNum">    1059 </span>                :<span class="lineNoCov">          0 :         l3 = IPFIX_PROTO_L3_IPV6;</span>
+<span class="lineNum">    1060 </span>     [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         switch(flow-&gt;nw_proto) {</span>
+<span class="lineNum">    1061 </span>                :            :         case IPPROTO_TCP:
+<span class="lineNum">    1062 </span>                :            :         case IPPROTO_UDP:
+<span class="lineNum">    1063 </span>                :            :         case IPPROTO_SCTP:
+<span class="lineNum">    1064 </span>                :<span class="lineNoCov">          0 :             l4 = IPFIX_PROTO_L4_TCP_UDP_SCTP;</span>
+<span class="lineNum">    1065 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">    1066 </span>                :            :         case IPPROTO_ICMPV6:
+<span class="lineNum">    1067 </span>                :<span class="lineNoCov">          0 :             l4 = IPFIX_PROTO_L4_ICMP;</span>
+<span class="lineNum">    1068 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">    1069 </span>                :            :         default:
+<span class="lineNum">    1070 </span>                :<span class="lineNoCov">          0 :             l4 = IPFIX_PROTO_L4_UNKNOWN;</span>
+<span class="lineNum">    1071 </span>                :            :         }
+<span class="lineNum">    1072 </span>                :<span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">    1073 </span>                :            :     default:
+<span class="lineNum">    1074 </span>                :<span class="lineNoCov">          0 :         l3 = IPFIX_PROTO_L3_UNKNOWN;</span>
+<span class="lineNum">    1075 </span>                :<span class="lineNoCov">          0 :         l4 = IPFIX_PROTO_L4_UNKNOWN;</span>
+<span class="lineNum">    1076 </span>                :            :     }
+<span class="lineNum">    1077 </span>                :            : 
+<span class="lineNum">    1078 </span>                :<span class="lineNoCov">          0 :     flow_key-&gt;obs_domain_id = obs_domain_id;</span>
+<span class="lineNum">    1079 </span>                :<span class="lineNoCov">          0 :     flow_key-&gt;template_id = ipfix_get_template_id(l2, l3, l4);</span>
+<span class="lineNum">    1080 </span>                :            : 
+<span class="lineNum">    1081 </span>                :            :     /* The fields defined in the ipfix_data_record_* structs and sent
+<span class="lineNum">    1082 </span>                :            :      * below must match exactly the templates defined in
+<span class="lineNum">    1083 </span>                :            :      * ipfix_define_template_fields. */
+<span class="lineNum">    1084 </span>                :            : 
+<span class="lineNum">    1085 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     ethernet_header_length = (l2 == IPFIX_PROTO_L2_VLAN)</span>
+<span class="lineNum">    1086 </span>                :            :         ? VLAN_ETH_HEADER_LEN : ETH_HEADER_LEN;
+<span class="lineNum">    1087 </span>                :<span class="lineNoCov">          0 :     ethernet_total_length = ofpbuf_size(packet);</span>
+<span class="lineNum">    1088 </span>                :            : 
+<span class="lineNum">    1089 </span>                :            :     /* Common Ethernet entities. */
+<span class="lineNum">    1090 </span>                :            :     {
+<span class="lineNum">    1091 </span>                :            :         struct ipfix_data_record_flow_key_common *data_common;
+<span class="lineNum">    1092 </span>                :            : 
+<span class="lineNum">    1093 </span>                :<span class="lineNoCov">          0 :         data_common = ofpbuf_put_zeros(&amp;msg, sizeof *data_common);</span>
+<span class="lineNum">    1094 </span>                :<span class="lineNoCov">          0 :         data_common-&gt;observation_point_id = htonl(obs_point_id);</span>
+<span class="lineNum">    1095 </span>                :<span class="lineNoCov">          0 :         memcpy(data_common-&gt;source_mac_address, flow-&gt;dl_src,</span>
+<span class="lineNum">    1096 </span>                :            :                sizeof flow-&gt;dl_src);
+<span class="lineNum">    1097 </span>                :<span class="lineNoCov">          0 :         memcpy(data_common-&gt;destination_mac_address, flow-&gt;dl_dst,</span>
+<span class="lineNum">    1098 </span>                :            :                sizeof flow-&gt;dl_dst);
+<span class="lineNum">    1099 </span>                :<span class="lineNoCov">          0 :         data_common-&gt;ethernet_type = flow-&gt;dl_type;</span>
+<span class="lineNum">    1100 </span>                :<span class="lineNoCov">          0 :         data_common-&gt;ethernet_header_length = ethernet_header_length;</span>
+<span class="lineNum">    1101 </span>                :            :     }
+<span class="lineNum">    1102 </span>                :            : 
+<span class="lineNum">    1103 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (l2 == IPFIX_PROTO_L2_VLAN) {</span>
+<span class="lineNum">    1104 </span>                :            :         struct ipfix_data_record_flow_key_vlan *data_vlan;
+<span class="lineNum">    1105 </span>                :<span class="lineNoCov">          0 :         uint16_t vlan_id = vlan_tci_to_vid(flow-&gt;vlan_tci);</span>
+<span class="lineNum">    1106 </span>                :<span class="lineNoCov">          0 :         uint8_t priority = vlan_tci_to_pcp(flow-&gt;vlan_tci);</span>
+<span class="lineNum">    1107 </span>                :            : 
+<span class="lineNum">    1108 </span>                :<span class="lineNoCov">          0 :         data_vlan = ofpbuf_put_zeros(&amp;msg, sizeof *data_vlan);</span>
+<span class="lineNum">    1109 </span>                :<span class="lineNoCov">          0 :         data_vlan-&gt;vlan_id = htons(vlan_id);</span>
+<span class="lineNum">    1110 </span>                :<span class="lineNoCov">          0 :         data_vlan-&gt;dot1q_vlan_id = htons(vlan_id);</span>
+<span class="lineNum">    1111 </span>                :<span class="lineNoCov">          0 :         data_vlan-&gt;dot1q_priority = priority;</span>
+<span class="lineNum">    1112 </span>                :            :     }
+<span class="lineNum">    1113 </span>                :            : 
+<span class="lineNum">    1114 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (l3 != IPFIX_PROTO_L3_UNKNOWN) {</span>
+<span class="lineNum">    1115 </span>                :            :         struct ipfix_data_record_flow_key_ip *data_ip;
+<span class="lineNum">    1116 </span>                :            : 
+<span class="lineNum">    1117 </span>                :<span class="lineNoCov">          0 :         data_ip = ofpbuf_put_zeros(&amp;msg, sizeof *data_ip);</span>
+<span class="lineNum">    1118 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         data_ip-&gt;ip_version = (l3 == IPFIX_PROTO_L3_IPV4) ? 4 : 6;</span>
+<span class="lineNum">    1119 </span>                :<span class="lineNoCov">          0 :         data_ip-&gt;ip_ttl = flow-&gt;nw_ttl;</span>
+<span class="lineNum">    1120 </span>                :<span class="lineNoCov">          0 :         data_ip-&gt;protocol_identifier = flow-&gt;nw_proto;</span>
+<span class="lineNum">    1121 </span>                :<span class="lineNoCov">          0 :         data_ip-&gt;ip_diff_serv_code_point = flow-&gt;nw_tos &gt;&gt; 2;</span>
+<span class="lineNum">    1122 </span>                :<span class="lineNoCov">          0 :         data_ip-&gt;ip_precedence = flow-&gt;nw_tos &gt;&gt; 5;</span>
+<span class="lineNum">    1123 </span>                :<span class="lineNoCov">          0 :         data_ip-&gt;ip_class_of_service = flow-&gt;nw_tos;</span>
+<span class="lineNum">    1124 </span>                :            : 
+<span class="lineNum">    1125 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (l3 == IPFIX_PROTO_L3_IPV4) {</span>
+<span class="lineNum">    1126 </span>                :            :             struct ipfix_data_record_flow_key_ipv4 *data_ipv4;
+<span class="lineNum">    1127 </span>                :            : 
+<span class="lineNum">    1128 </span>                :<span class="lineNoCov">          0 :             data_ipv4 = ofpbuf_put_zeros(&amp;msg, sizeof *data_ipv4);</span>
+<span class="lineNum">    1129 </span>                :<span class="lineNoCov">          0 :             data_ipv4-&gt;source_ipv4_address = flow-&gt;nw_src;</span>
+<span class="lineNum">    1130 </span>                :<span class="lineNoCov">          0 :             data_ipv4-&gt;destination_ipv4_address = flow-&gt;nw_dst;</span>
+<span class="lineNum">    1131 </span>                :            :         } else {  /* l3 == IPFIX_PROTO_L3_IPV6 */
+<span class="lineNum">    1132 </span>                :            :             struct ipfix_data_record_flow_key_ipv6 *data_ipv6;
+<span class="lineNum">    1133 </span>                :            : 
+<span class="lineNum">    1134 </span>                :<span class="lineNoCov">          0 :             data_ipv6 = ofpbuf_put_zeros(&amp;msg, sizeof *data_ipv6);</span>
+<span class="lineNum">    1135 </span>                :<span class="lineNoCov">          0 :             memcpy(data_ipv6-&gt;source_ipv6_address, &amp;flow-&gt;ipv6_src,</span>
+<span class="lineNum">    1136 </span>                :            :                    sizeof flow-&gt;ipv6_src);
+<span class="lineNum">    1137 </span>                :<span class="lineNoCov">          0 :             memcpy(data_ipv6-&gt;destination_ipv6_address, &amp;flow-&gt;ipv6_dst,</span>
+<span class="lineNum">    1138 </span>                :            :                    sizeof flow-&gt;ipv6_dst);
+<span class="lineNum">    1139 </span>                :<span class="lineNoCov">          0 :             data_ipv6-&gt;flow_label_ipv6 = flow-&gt;ipv6_label;</span>
+<span class="lineNum">    1140 </span>                :            :         }
+<span class="lineNum">    1141 </span>                :            :     }
+<span class="lineNum">    1142 </span>                :            : 
+<span class="lineNum">    1143 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (l4 == IPFIX_PROTO_L4_TCP_UDP_SCTP) {</span>
+<span class="lineNum">    1144 </span>                :            :         struct ipfix_data_record_flow_key_transport *data_transport;
+<span class="lineNum">    1145 </span>                :            : 
+<span class="lineNum">    1146 </span>                :<span class="lineNoCov">          0 :         data_transport = ofpbuf_put_zeros(&amp;msg, sizeof *data_transport);</span>
+<span class="lineNum">    1147 </span>                :<span class="lineNoCov">          0 :         data_transport-&gt;source_transport_port = flow-&gt;tp_src;</span>
+<span class="lineNum">    1148 </span>                :<span class="lineNoCov">          0 :         data_transport-&gt;destination_transport_port = flow-&gt;tp_dst;</span>
+<span class="lineNum">    1149 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     } else if (l4 == IPFIX_PROTO_L4_ICMP) {</span>
+<span class="lineNum">    1150 </span>                :            :         struct ipfix_data_record_flow_key_icmp *data_icmp;
+<span class="lineNum">    1151 </span>                :            : 
+<span class="lineNum">    1152 </span>                :<span class="lineNoCov">          0 :         data_icmp = ofpbuf_put_zeros(&amp;msg, sizeof *data_icmp);</span>
+<span class="lineNum">    1153 </span>                :<span class="lineNoCov">          0 :         data_icmp-&gt;icmp_type = ntohs(flow-&gt;tp_src) &amp; 0xff;</span>
+<span class="lineNum">    1154 </span>                :<span class="lineNoCov">          0 :         data_icmp-&gt;icmp_code = ntohs(flow-&gt;tp_dst) &amp; 0xff;</span>
+<span class="lineNum">    1155 </span>                :            :     }
+<span class="lineNum">    1156 </span>                :            : 
+<span class="lineNum">    1157 </span>                :<span class="lineNoCov">          0 :     flow_key-&gt;flow_key_msg_part_size = ofpbuf_size(&amp;msg);</span>
+<span class="lineNum">    1158 </span>                :            : 
+<span class="lineNum">    1159 </span>                :            :     {
+<span class="lineNum">    1160 </span>                :            :         struct timeval now;
+<span class="lineNum">    1161 </span>                :            :         uint64_t layer2_octet_delta_count;
+<span class="lineNum">    1162 </span>                :            : 
+<span class="lineNum">    1163 </span>                :            :         /* Calculate the total matched octet count by considering as
+<span class="lineNum">    1164 </span>                :            :          * an approximation that all matched packets have the same
+<span class="lineNum">    1165 </span>                :            :          * length. */
+<span class="lineNum">    1166 </span>                :<span class="lineNoCov">          0 :         layer2_octet_delta_count = packet_delta_count * ethernet_total_length;</span>
+<span class="lineNum">    1167 </span>                :            : 
+<span class="lineNum">    1168 </span>                :<span class="lineNoCov">          0 :         xgettimeofday(&amp;now);</span>
+<span class="lineNum">    1169 </span>                :<span class="lineNoCov">          0 :         entry-&gt;flow_end_timestamp_usec = now.tv_usec + 1000000LL * now.tv_sec;</span>
+<span class="lineNum">    1170 </span>                :<span class="lineNoCov">          0 :         entry-&gt;flow_start_timestamp_usec = entry-&gt;flow_end_timestamp_usec;</span>
+<span class="lineNum">    1171 </span>                :<span class="lineNoCov">          0 :         entry-&gt;packet_delta_count = packet_delta_count;</span>
+<span class="lineNum">    1172 </span>                :<span class="lineNoCov">          0 :         entry-&gt;layer2_octet_delta_count = layer2_octet_delta_count;</span>
+<span class="lineNum">    1173 </span>                :            :     }
+<span class="lineNum">    1174 </span>                :            : 
+<span class="lineNum">    1175 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (l3 != IPFIX_PROTO_L3_UNKNOWN) {</span>
+<span class="lineNum">    1176 </span>                :<span class="lineNoCov">          0 :         uint16_t ip_total_length =</span>
+<span class="lineNum">    1177 </span>                :            :             ethernet_total_length - ethernet_header_length;
+<span class="lineNum">    1178 </span>                :            :         uint64_t octet_delta_count;
+<span class="lineNum">    1179 </span>                :            : 
+<span class="lineNum">    1180 </span>                :            :         /* Calculate the total matched octet count by considering as
+<span class="lineNum">    1181 </span>                :            :          * an approximation that all matched packets have the same
+<span class="lineNum">    1182 </span>                :            :          * length. */
+<span class="lineNum">    1183 </span>                :<span class="lineNoCov">          0 :         octet_delta_count = packet_delta_count * ip_total_length;</span>
+<span class="lineNum">    1184 </span>                :            : 
+<span class="lineNum">    1185 </span>                :<span class="lineNoCov">          0 :         entry-&gt;octet_delta_count = octet_delta_count;</span>
+<span class="lineNum">    1186 </span>                :<span class="lineNoCov">          0 :         entry-&gt;octet_delta_sum_of_squares = octet_delta_count * ip_total_length;</span>
+<span class="lineNum">    1187 </span>                :<span class="lineNoCov">          0 :         entry-&gt;minimum_ip_total_length = ip_total_length;</span>
+<span class="lineNum">    1188 </span>                :<span class="lineNoCov">          0 :         entry-&gt;maximum_ip_total_length = ip_total_length;</span>
+<span class="lineNum">    1189 </span>                :            :     } else {
+<span class="lineNum">    1190 </span>                :<span class="lineNoCov">          0 :         entry-&gt;octet_delta_sum_of_squares = 0;</span>
+<span class="lineNum">    1191 </span>                :<span class="lineNoCov">          0 :         entry-&gt;minimum_ip_total_length = 0;</span>
+<span class="lineNum">    1192 </span>                :<span class="lineNoCov">          0 :         entry-&gt;maximum_ip_total_length = 0;</span>
+<span class="lineNum">    1193 </span>                :            :     }
+<span class="lineNum">    1194 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1195 </span>                :            : 
+<span class="lineNum">    1196 </span>                :            : /* Send each single data record in its own data set, to simplify the
+<span class="lineNum">    1197 </span>                :            :  * implementation by avoiding having to group record by template ID
+<a name="1198"><span class="lineNum">    1198 </span>                :            :  * before sending. */</a>
+<span class="lineNum">    1199 </span>                :            : static void
+<span class="lineNum">    1200 </span>                :<span class="lineNoCov">          0 : ipfix_put_data_set(uint32_t export_time_sec,</span>
+<span class="lineNum">    1201 </span>                :            :                    struct ipfix_flow_cache_entry *entry,
+<span class="lineNum">    1202 </span>                :            :                    enum ipfix_flow_end_reason flow_end_reason,
+<span class="lineNum">    1203 </span>                :            :                    struct ofpbuf *msg)
+<span class="lineNum">    1204 </span>                :            : {
+<span class="lineNum">    1205 </span>                :            :     size_t set_hdr_offset;
+<span class="lineNum">    1206 </span>                :            :     struct ipfix_set_header *set_hdr;
+<span class="lineNum">    1207 </span>                :            : 
+<span class="lineNum">    1208 </span>                :<span class="lineNoCov">          0 :     set_hdr_offset = ofpbuf_size(msg);</span>
+<span class="lineNum">    1209 </span>                :            : 
+<span class="lineNum">    1210 </span>                :            :     /* Put a Data Set. */
+<span class="lineNum">    1211 </span>                :<span class="lineNoCov">          0 :     set_hdr = ofpbuf_put_zeros(msg, sizeof *set_hdr);</span>
+<span class="lineNum">    1212 </span>                :<span class="lineNoCov">          0 :     set_hdr-&gt;set_id = htons(entry-&gt;flow_key.template_id);</span>
+<span class="lineNum">    1213 </span>                :            : 
+<span class="lineNum">    1214 </span>                :            :     /* Copy the flow key part of the data record. */
+<span class="lineNum">    1215 </span>                :            : 
+<span class="lineNum">    1216 </span>                :<span class="lineNoCov">          0 :     ofpbuf_put(msg, entry-&gt;flow_key.flow_key_msg_part,</span>
+<span class="lineNum">    1217 </span>                :            :                entry-&gt;flow_key.flow_key_msg_part_size);
+<span class="lineNum">    1218 </span>                :            : 
+<span class="lineNum">    1219 </span>                :            :     /* Put the non-key part of the data record. */
+<span class="lineNum">    1220 </span>                :            : 
+<span class="lineNum">    1221 </span>                :            :     {
+<span class="lineNum">    1222 </span>                :            :         struct ipfix_data_record_aggregated_common *data_aggregated_common;
+<span class="lineNum">    1223 </span>                :            :         uint64_t export_time_usec, flow_start_delta_usec, flow_end_delta_usec;
+<span class="lineNum">    1224 </span>                :            : 
+<span class="lineNum">    1225 </span>                :            :         /* Calculate the negative deltas relative to the export time
+<span class="lineNum">    1226 </span>                :            :          * in seconds sent in the header, not the exact export
+<span class="lineNum">    1227 </span>                :            :          * time. */
+<span class="lineNum">    1228 </span>                :<span class="lineNoCov">          0 :         export_time_usec = 1000000LL * export_time_sec;</span>
+<span class="lineNum">    1229 </span>                :<span class="lineNoCov">          0 :         flow_start_delta_usec = export_time_usec</span>
+<span class="lineNum">    1230 </span>                :<span class="lineNoCov">          0 :             - entry-&gt;flow_start_timestamp_usec;</span>
+<span class="lineNum">    1231 </span>                :<span class="lineNoCov">          0 :         flow_end_delta_usec = export_time_usec</span>
+<span class="lineNum">    1232 </span>                :<span class="lineNoCov">          0 :             - entry-&gt;flow_end_timestamp_usec;</span>
+<span class="lineNum">    1233 </span>                :            : 
+<span class="lineNum">    1234 </span>                :<span class="lineNoCov">          0 :         data_aggregated_common = ofpbuf_put_zeros(</span>
+<span class="lineNum">    1235 </span>                :            :             msg, sizeof *data_aggregated_common);
+<span class="lineNum">    1236 </span>                :<span class="lineNoCov">          0 :         data_aggregated_common-&gt;flow_start_delta_microseconds = htonl(</span>
+<span class="lineNum">    1237 </span>                :            :             flow_start_delta_usec);
+<span class="lineNum">    1238 </span>                :<span class="lineNoCov">          0 :         data_aggregated_common-&gt;flow_end_delta_microseconds = htonl(</span>
+<span class="lineNum">    1239 </span>                :            :             flow_end_delta_usec);
+<span class="lineNum">    1240 </span>                :<span class="lineNoCov">          0 :         data_aggregated_common-&gt;packet_delta_count = htonll(</span>
+<span class="lineNum">    1241 </span>                :            :             entry-&gt;packet_delta_count);
+<span class="lineNum">    1242 </span>                :<span class="lineNoCov">          0 :         data_aggregated_common-&gt;layer2_octet_delta_count = htonll(</span>
+<span class="lineNum">    1243 </span>                :            :             entry-&gt;layer2_octet_delta_count);
+<span class="lineNum">    1244 </span>                :<span class="lineNoCov">          0 :         data_aggregated_common-&gt;flow_end_reason = flow_end_reason;</span>
+<span class="lineNum">    1245 </span>                :            :     }
+<span class="lineNum">    1246 </span>                :            : 
+<span class="lineNum">    1247 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (entry-&gt;octet_delta_sum_of_squares) {  /* IP packet. */</span>
+<span class="lineNum">    1248 </span>                :            :         struct ipfix_data_record_aggregated_ip *data_aggregated_ip;
+<span class="lineNum">    1249 </span>                :            : 
+<span class="lineNum">    1250 </span>                :<span class="lineNoCov">          0 :         data_aggregated_ip = ofpbuf_put_zeros(</span>
+<span class="lineNum">    1251 </span>                :            :             msg, sizeof *data_aggregated_ip);
+<span class="lineNum">    1252 </span>                :<span class="lineNoCov">          0 :         data_aggregated_ip-&gt;octet_delta_count = htonll(</span>
+<span class="lineNum">    1253 </span>                :            :             entry-&gt;octet_delta_count);
+<span class="lineNum">    1254 </span>                :<span class="lineNoCov">          0 :         data_aggregated_ip-&gt;octet_delta_sum_of_squares = htonll(</span>
+<span class="lineNum">    1255 </span>                :            :             entry-&gt;octet_delta_sum_of_squares);
+<span class="lineNum">    1256 </span>                :<span class="lineNoCov">          0 :         data_aggregated_ip-&gt;minimum_ip_total_length = htonll(</span>
+<span class="lineNum">    1257 </span>                :<span class="lineNoCov">          0 :             entry-&gt;minimum_ip_total_length);</span>
+<span class="lineNum">    1258 </span>                :<span class="lineNoCov">          0 :         data_aggregated_ip-&gt;maximum_ip_total_length = htonll(</span>
+<span class="lineNum">    1259 </span>                :<span class="lineNoCov">          0 :             entry-&gt;maximum_ip_total_length);</span>
+<span class="lineNum">    1260 </span>                :            :     }
+<span class="lineNum">    1261 </span>                :            : 
+<span class="lineNum">    1262 </span>                :<span class="lineNoCov">          0 :     set_hdr = (struct ipfix_set_header*)((uint8_t*)ofpbuf_data(msg) + set_hdr_offset);</span>
+<span class="lineNum">    1263 </span>                :<span class="lineNoCov">          0 :     set_hdr-&gt;length = htons(ofpbuf_size(msg) - set_hdr_offset);</span>
+<span class="lineNum">    1264 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1265 </span>                :            : 
+<a name="1266"><span class="lineNum">    1266 </span>                :            : /* Send an IPFIX message with a single data record. */</a>
+<span class="lineNum">    1267 </span>                :            : static void
+<span class="lineNum">    1268 </span>                :<span class="lineNoCov">          0 : ipfix_send_data_msg(struct dpif_ipfix_exporter *exporter,</span>
+<span class="lineNum">    1269 </span>                :            :                     uint32_t export_time_sec,
+<span class="lineNum">    1270 </span>                :            :                     struct ipfix_flow_cache_entry *entry,
+<span class="lineNum">    1271 </span>                :            :                     enum ipfix_flow_end_reason flow_end_reason)
+<span class="lineNum">    1272 </span>                :            : {
+<span class="lineNum">    1273 </span>                :            :     uint64_t msg_stub[DIV_ROUND_UP(MAX_MESSAGE_LEN, 8)];
+<span class="lineNum">    1274 </span>                :            :     struct ofpbuf msg;
+<span class="lineNum">    1275 </span>                :<span class="lineNoCov">          0 :     ofpbuf_use_stub(&amp;msg, msg_stub, sizeof msg_stub);</span>
+<span class="lineNum">    1276 </span>                :            : 
+<span class="lineNum">    1277 </span>                :<span class="lineNoCov">          0 :     ipfix_init_header(export_time_sec, exporter-&gt;seq_number++,</span>
+<span class="lineNum">    1278 </span>                :            :                       entry-&gt;flow_key.obs_domain_id, &amp;msg);
+<span class="lineNum">    1279 </span>                :<span class="lineNoCov">          0 :     ipfix_put_data_set(export_time_sec, entry, flow_end_reason, &amp;msg);</span>
+<span class="lineNum">    1280 </span>                :<span class="lineNoCov">          0 :     ipfix_send_msg(exporter-&gt;collectors, &amp;msg);</span>
+<span class="lineNum">    1281 </span>                :            : 
+<span class="lineNum">    1282 </span>                :<span class="lineNoCov">          0 :     ofpbuf_uninit(&amp;msg);</span>
+<span class="lineNum">    1283 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="1284"><span class="lineNum">    1284 </span>                :            : </a>
+<span class="lineNum">    1285 </span>                :            : static void
+<span class="lineNum">    1286 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_sample(struct dpif_ipfix_exporter *exporter,</span>
+<span class="lineNum">    1287 </span>                :            :                   struct ofpbuf *packet, const struct flow *flow,
+<span class="lineNum">    1288 </span>                :            :                   uint64_t packet_delta_count, uint32_t obs_domain_id,
+<span class="lineNum">    1289 </span>                :            :                   uint32_t obs_point_id)
+<span class="lineNum">    1290 </span>                :            : {
+<span class="lineNum">    1291 </span>                :            :     struct ipfix_flow_cache_entry *entry;
+<span class="lineNum">    1292 </span>                :            : 
+<span class="lineNum">    1293 </span>                :            :     /* Create a flow cache entry from the sample. */
+<span class="lineNum">    1294 </span>                :<span class="lineNoCov">          0 :     entry = xmalloc(sizeof *entry);</span>
+<span class="lineNum">    1295 </span>                :<span class="lineNoCov">          0 :     ipfix_cache_entry_init(entry, packet, flow, packet_delta_count,</span>
+<span class="lineNum">    1296 </span>                :            :                            obs_domain_id, obs_point_id);
+<span class="lineNum">    1297 </span>                :<span class="lineNoCov">          0 :     ipfix_cache_update(exporter, entry);</span>
+<span class="lineNum">    1298 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="1299"><span class="lineNum">    1299 </span>                :            : </a>
+<span class="lineNum">    1300 </span>                :            : void
+<span class="lineNum">    1301 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_bridge_sample(struct dpif_ipfix *di, struct ofpbuf *packet,</span>
+<span class="lineNum">    1302 </span>                :            :                          const struct flow *flow) OVS_EXCLUDED(mutex)
+<span class="lineNum">    1303 </span>                :            : {
+<span class="lineNum">    1304 </span>                :            :     uint64_t packet_delta_count;
+<span class="lineNum">    1305 </span>                :            : 
+<span class="lineNum">    1306 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">    1307 </span>                :            :     /* Use the sampling probability as an approximation of the number
+<span class="lineNum">    1308 </span>                :            :      * of matched packets. */
+<span class="lineNum">    1309 </span>                :<span class="lineNoCov">          0 :     packet_delta_count = UINT32_MAX / di-&gt;bridge_exporter.probability;</span>
+<span class="lineNum">    1310 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_sample(&amp;di-&gt;bridge_exporter.exporter, packet, flow,</span>
+<span class="lineNum">    1311 </span>                :            :                       packet_delta_count,
+<span class="lineNum">    1312 </span>                :<span class="lineNoCov">          0 :                       di-&gt;bridge_exporter.options-&gt;obs_domain_id,</span>
+<span class="lineNum">    1313 </span>                :<span class="lineNoCov">          0 :                       di-&gt;bridge_exporter.options-&gt;obs_point_id);</span>
+<span class="lineNum">    1314 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">    1315 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="1316"><span class="lineNum">    1316 </span>                :            : </a>
+<span class="lineNum">    1317 </span>                :            : void
+<span class="lineNum">    1318 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_flow_sample(struct dpif_ipfix *di, struct ofpbuf *packet,</span>
+<span class="lineNum">    1319 </span>                :            :                        const struct flow *flow, uint32_t collector_set_id,
+<span class="lineNum">    1320 </span>                :            :                        uint16_t probability, uint32_t obs_domain_id,
+<span class="lineNum">    1321 </span>                :            :                        uint32_t obs_point_id) OVS_EXCLUDED(mutex)
+<span class="lineNum">    1322 </span>                :            : {
+<span class="lineNum">    1323 </span>                :            :     struct dpif_ipfix_flow_exporter_map_node *node;
+<span class="lineNum">    1324 </span>                :            :     /* Use the sampling probability as an approximation of the number
+<span class="lineNum">    1325 </span>                :            :      * of matched packets. */
+<span class="lineNum">    1326 </span>                :<span class="lineNoCov">          0 :     uint64_t packet_delta_count = USHRT_MAX / probability;</span>
+<span class="lineNum">    1327 </span>                :            : 
+<span class="lineNum">    1328 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">    1329 </span>                :<span class="lineNoCov">          0 :     node = dpif_ipfix_find_flow_exporter_map_node(di, collector_set_id);</span>
+<span class="lineNum">    1330 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (node) {</span>
+<span class="lineNum">    1331 </span>                :<span class="lineNoCov">          0 :         dpif_ipfix_sample(&amp;node-&gt;exporter.exporter, packet, flow,</span>
+<span class="lineNum">    1332 </span>                :            :                           packet_delta_count, obs_domain_id, obs_point_id);
+<span class="lineNum">    1333 </span>                :            :     }
+<span class="lineNum">    1334 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">    1335 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="1336"><span class="lineNum">    1336 </span>                :            : </a>
+<span class="lineNum">    1337 </span>                :            : static void
+<span class="lineNum">    1338 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_cache_expire(struct dpif_ipfix_exporter *exporter,</span>
+<span class="lineNum">    1339 </span>                :            :                         bool forced_end, const uint64_t export_time_usec,
+<span class="lineNum">    1340 </span>                :            :                         const uint32_t export_time_sec)
+<span class="lineNum">    1341 </span>                :            : {
+<span class="lineNum">    1342 </span>                :            :     struct ipfix_flow_cache_entry *entry, *next_entry;
+<span class="lineNum">    1343 </span>                :            :     uint64_t max_flow_start_timestamp_usec;
+<span class="lineNum">    1344 </span>                :<span class="lineNoCov">          0 :     bool template_msg_sent = false;</span>
+<span class="lineNum">    1345 </span>                :            :     enum ipfix_flow_end_reason flow_end_reason;
+<span class="lineNum">    1346 </span>                :            : 
+<span class="lineNum">    1347 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (list_is_empty(&amp;exporter-&gt;cache_flow_start_timestamp_list)) {</span>
+<span class="lineNum">    1348 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">    1349 </span>                :            :     }
+<span class="lineNum">    1350 </span>                :            : 
+<span class="lineNum">    1351 </span>                :<span class="lineNoCov">          0 :     max_flow_start_timestamp_usec = export_time_usec -</span>
+<span class="lineNum">    1352 </span>                :<span class="lineNoCov">          0 :         1000000LL * exporter-&gt;cache_active_timeout;</span>
+<span class="lineNum">    1353 </span>                :            : 
+<span class="lineNum">    1354 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     LIST_FOR_EACH_SAFE (entry, next_entry, cache_flow_start_timestamp_list_node,</span>
+<span class="lineNum">    1355 </span>                :            :                         &amp;exporter-&gt;cache_flow_start_timestamp_list) {
+<span class="lineNum">    1356 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (forced_end) {</span>
+<span class="lineNum">    1357 </span>                :<span class="lineNoCov">          0 :             flow_end_reason = FORCED_END;</span>
+<span class="lineNum">    1358 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         } else if (entry-&gt;flow_start_timestamp_usec</span>
+<span class="lineNum">    1359 </span>                :            :                    &lt;= max_flow_start_timestamp_usec) {
+<span class="lineNum">    1360 </span>                :<span class="lineNoCov">          0 :             flow_end_reason = ACTIVE_TIMEOUT;</span>
+<span class="lineNum">    1361 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         } else if (hmap_count(&amp;exporter-&gt;cache_flow_key_map)</span>
+<span class="lineNum">    1362 </span>                :<span class="lineNoCov">          0 :                    &gt; exporter-&gt;cache_max_flows) {</span>
+<span class="lineNum">    1363 </span>                :            :             /* Enforce exporter-&gt;cache_max_flows. */
+<span class="lineNum">    1364 </span>                :<span class="lineNoCov">          0 :             flow_end_reason = LACK_OF_RESOURCES;</span>
+<span class="lineNum">    1365 </span>                :            :         } else {
+<span class="lineNum">    1366 </span>                :            :             /* Remaining flows haven't expired yet. */
+<span class="lineNum">    1367 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">    1368 </span>                :            :         }
+<span class="lineNum">    1369 </span>                :            : 
+<span class="lineNum">    1370 </span>                :<span class="lineNoCov">          0 :         list_remove(&amp;entry-&gt;cache_flow_start_timestamp_list_node);</span>
+<span class="lineNum">    1371 </span>                :<span class="lineNoCov">          0 :         hmap_remove(&amp;exporter-&gt;cache_flow_key_map,</span>
+<span class="lineNum">    1372 </span>                :            :                     &amp;entry-&gt;flow_key_map_node);
+<span class="lineNum">    1373 </span>                :            : 
+<span class="lineNum">    1374 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!template_msg_sent</span>
+<span class="lineNum">    1375 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; (exporter-&gt;last_template_set_time + IPFIX_TEMPLATE_INTERVAL)</span>
+<span class="lineNum">    1376 </span>                :<span class="lineNoCov">          0 :                 &lt;= export_time_sec) {</span>
+<span class="lineNum">    1377 </span>                :<span class="lineNoCov">          0 :             ipfix_send_template_msg(exporter, export_time_sec,</span>
+<span class="lineNum">    1378 </span>                :            :                                     entry-&gt;flow_key.obs_domain_id);
+<span class="lineNum">    1379 </span>                :<span class="lineNoCov">          0 :             exporter-&gt;last_template_set_time = export_time_sec;</span>
+<span class="lineNum">    1380 </span>                :<span class="lineNoCov">          0 :             template_msg_sent = true;</span>
+<span class="lineNum">    1381 </span>                :            :         }
+<span class="lineNum">    1382 </span>                :            : 
+<span class="lineNum">    1383 </span>                :            :         /* XXX: Group multiple data records for the same obs domain id
+<span class="lineNum">    1384 </span>                :            :          * into the same message. */
+<span class="lineNum">    1385 </span>                :<span class="lineNoCov">          0 :         ipfix_send_data_msg(exporter, export_time_sec, entry, flow_end_reason);</span>
+<span class="lineNum">    1386 </span>                :<span class="lineNoCov">          0 :         free(entry);</span>
+<span class="lineNum">    1387 </span>                :            :     }
+<span class="lineNum">    1388 </span>                :            : }
+<a name="1389"><span class="lineNum">    1389 </span>                :            : </a>
+<span class="lineNum">    1390 </span>                :            : static void
+<span class="lineNum">    1391 </span>                :<span class="lineNoCov">          0 : get_export_time_now(uint64_t *export_time_usec, uint32_t *export_time_sec)</span>
+<span class="lineNum">    1392 </span>                :            : {
+<span class="lineNum">    1393 </span>                :            :     struct timeval export_time;
+<span class="lineNum">    1394 </span>                :<span class="lineNoCov">          0 :     xgettimeofday(&amp;export_time);</span>
+<span class="lineNum">    1395 </span>                :            : 
+<span class="lineNum">    1396 </span>                :<span class="lineNoCov">          0 :     *export_time_usec = export_time.tv_usec + 1000000LL * export_time.tv_sec;</span>
+<span class="lineNum">    1397 </span>                :            : 
+<span class="lineNum">    1398 </span>                :            :     /* The IPFIX start and end deltas are negative deltas relative to
+<span class="lineNum">    1399 </span>                :            :      * the export time, so set the export time 1 second off to
+<span class="lineNum">    1400 </span>                :            :      * calculate those deltas. */
+<span class="lineNum">    1401 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (export_time.tv_usec == 0) {</span>
+<span class="lineNum">    1402 </span>                :<span class="lineNoCov">          0 :         *export_time_sec = export_time.tv_sec;</span>
+<span class="lineNum">    1403 </span>                :            :     } else {
+<span class="lineNum">    1404 </span>                :<span class="lineNoCov">          0 :         *export_time_sec = export_time.tv_sec + 1;</span>
+<span class="lineNum">    1405 </span>                :            :     }
+<span class="lineNum">    1406 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="1407"><span class="lineNum">    1407 </span>                :            : </a>
+<span class="lineNum">    1408 </span>                :            : static void
+<span class="lineNum">    1409 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_cache_expire_now(struct dpif_ipfix_exporter *exporter,</span>
+<span class="lineNum">    1410 </span>                :            :                             bool forced_end)
+<span class="lineNum">    1411 </span>                :            : {
+<span class="lineNum">    1412 </span>                :            :     uint64_t export_time_usec;
+<span class="lineNum">    1413 </span>                :            :     uint32_t export_time_sec;
+<span class="lineNum">    1414 </span>                :            : 
+<span class="lineNum">    1415 </span>                :<span class="lineNoCov">          0 :     get_export_time_now(&amp;export_time_usec, &amp;export_time_sec);</span>
+<span class="lineNum">    1416 </span>                :<span class="lineNoCov">          0 :     dpif_ipfix_cache_expire(exporter, forced_end, export_time_usec,</span>
+<span class="lineNum">    1417 </span>                :            :                             export_time_sec);
+<span class="lineNum">    1418 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="1419"><span class="lineNum">    1419 </span>                :            : </a>
+<span class="lineNum">    1420 </span>                :            : void
+<span class="lineNum">    1421 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_run(struct dpif_ipfix *di) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">    1422 </span>                :            : {
+<span class="lineNum">    1423 </span>                :            :     uint64_t export_time_usec;
+<span class="lineNum">    1424 </span>                :            :     uint32_t export_time_sec;
+<span class="lineNum">    1425 </span>                :            :     struct dpif_ipfix_flow_exporter_map_node *flow_exporter_node;
+<span class="lineNum">    1426 </span>                :            : 
+<span class="lineNum">    1427 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">    1428 </span>                :<span class="lineNoCov">          0 :     get_export_time_now(&amp;export_time_usec, &amp;export_time_sec);</span>
+<span class="lineNum">    1429 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (di-&gt;bridge_exporter.probability &gt; 0) {  /* Bridge exporter enabled. */</span>
+<span class="lineNum">    1430 </span>                :<span class="lineNoCov">          0 :       dpif_ipfix_cache_expire(</span>
+<span class="lineNum">    1431 </span>                :            :           &amp;di-&gt;bridge_exporter.exporter, false, export_time_usec,
+<span class="lineNum">    1432 </span>                :            :           export_time_sec);
+<span class="lineNum">    1433 </span>                :            :     }
+<span class="lineNum">    1434 </span>        [<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     HMAP_FOR_EACH (flow_exporter_node, node, &amp;di-&gt;flow_exporter_map) {</span>
+<span class="lineNum">    1435 </span>                :<span class="lineNoCov">          0 :         dpif_ipfix_cache_expire(</span>
+<span class="lineNum">    1436 </span>                :            :             &amp;flow_exporter_node-&gt;exporter.exporter, false, export_time_usec,
+<span class="lineNum">    1437 </span>                :            :             export_time_sec);
+<span class="lineNum">    1438 </span>                :            :     }
+<span class="lineNum">    1439 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">    1440 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="1441"><span class="lineNum">    1441 </span>                :            : </a>
+<span class="lineNum">    1442 </span>                :            : void
+<span class="lineNum">    1443 </span>                :<span class="lineNoCov">          0 : dpif_ipfix_wait(struct dpif_ipfix *di) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">    1444 </span>                :            : {
+<span class="lineNum">    1445 </span>                :<span class="lineNoCov">          0 :     long long int next_timeout_msec = LLONG_MAX;</span>
+<span class="lineNum">    1446 </span>                :            :     struct dpif_ipfix_flow_exporter_map_node *flow_exporter_node;
+<span class="lineNum">    1447 </span>                :            : 
+<span class="lineNum">    1448 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">    1449 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (di-&gt;bridge_exporter.probability &gt; 0) {  /* Bridge exporter enabled. */</span>
+<span class="lineNum">    1450 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (ipfix_cache_next_timeout_msec(</span>
+<span class="lineNum">    1451 </span>                :<span class="lineNoCov">          0 :                 &amp;di-&gt;bridge_exporter.exporter, &amp;next_timeout_msec)) {</span>
+<span class="lineNum">    1452 </span>                :<span class="lineNoCov">          0 :             poll_timer_wait_until(next_timeout_msec);</span>
+<span class="lineNum">    1453 </span>                :            :         }
+<span class="lineNum">    1454 </span>                :            :     }
+<span class="lineNum">    1455 </span>        [<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     HMAP_FOR_EACH (flow_exporter_node, node, &amp;di-&gt;flow_exporter_map) {</span>
+<span class="lineNum">    1456 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (ipfix_cache_next_timeout_msec(</span>
+<span class="lineNum">    1457 </span>                :<span class="lineNoCov">          0 :                 &amp;flow_exporter_node-&gt;exporter.exporter, &amp;next_timeout_msec)) {</span>
+<span class="lineNum">    1458 </span>                :<span class="lineNoCov">          0 :             poll_timer_wait_until(next_timeout_msec);</span>
+<span class="lineNum">    1459 </span>                :            :         }
+<span class="lineNum">    1460 </span>                :            :     }
+<span class="lineNum">    1461 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">    1462 </span>                :<span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

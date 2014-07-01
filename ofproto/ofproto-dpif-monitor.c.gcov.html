@@ -1,0 +1,418 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ofproto/ofproto-dpif-monitor.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">ofproto</a> - ofproto-dpif-monitor.c<span style="font-size: 80%;"> (source / <a href="ofproto-dpif-monitor.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">109</td>
+            <td class="headerCovTableEntry">109</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">11</td>
+            <td class="headerCovTableEntry">11</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">57</td>
+            <td class="headerCovTableEntry">64</td>
+            <td class="headerCovTableEntryMed">89.1 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2009, 2010, 2011, 2012, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;ofproto-dpif-monitor.h&quot;
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      21 </span>                :            : 
+<span class="lineNum">      22 </span>                :            : #include &quot;bfd.h&quot;
+<span class="lineNum">      23 </span>                :            : #include &quot;cfm.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;guarded-list.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;heap.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;hmap.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;latch.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;ofproto-dpif.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;ovs-thread.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;seq.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;util.h&quot;
+<a name="36"><span class="lineNum">      36 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      37 </span>                :            : 
+<span class="lineNum">      38 </span>                :<span class="lineCov">        525 : VLOG_DEFINE_THIS_MODULE(ofproto_dpif_monitor);</span>
+<span class="lineNum">      39 </span>                :            : 
+<span class="lineNum">      40 </span>                :            : /* Converts the time in millisecond to heap priority. */
+<span class="lineNum">      41 </span>                :            : #define MSEC_TO_PRIO(TIME) (LLONG_MAX - (TIME))
+<span class="lineNum">      42 </span>                :            : /* Converts the heap priority to time in millisecond. */
+<span class="lineNum">      43 </span>                :            : #define PRIO_TO_MSEC(PRIO) (LLONG_MAX - (PRIO))
+<span class="lineNum">      44 </span>                :            : 
+<span class="lineNum">      45 </span>                :            : /* Monitored port.  It owns references to ofport, bfd, cfm structs. */
+<span class="lineNum">      46 </span>                :            : struct mport {
+<span class="lineNum">      47 </span>                :            :     struct hmap_node hmap_node;       /* In monitor_hmap. */
+<span class="lineNum">      48 </span>                :            :     struct heap_node heap_node;       /* In monitor_heap. */
+<span class="lineNum">      49 </span>                :            :     const struct ofport_dpif *ofport; /* The corresponding ofport. */
+<span class="lineNum">      50 </span>                :            : 
+<span class="lineNum">      51 </span>                :            :     struct cfm *cfm;                  /* Reference to cfm. */
+<span class="lineNum">      52 </span>                :            :     struct bfd *bfd;                  /* Reference to bfd. */
+<span class="lineNum">      53 </span>                :            :     uint8_t hw_addr[OFP_ETH_ALEN];    /* Hardware address. */
+<span class="lineNum">      54 </span>                :            : };
+<span class="lineNum">      55 </span>                :            : 
+<span class="lineNum">      56 </span>                :            : /* Entry of the 'send_soon' list.  Contains the pointer to the
+<span class="lineNum">      57 </span>                :            :  * 'ofport_dpif'.  Note, the pointed object is not protected, so
+<span class="lineNum">      58 </span>                :            :  * users should always use the mport_find() to convert it to 'mport'. */
+<span class="lineNum">      59 </span>                :            : struct send_soon_entry {
+<span class="lineNum">      60 </span>                :            :     struct list list_node;            /* In send_soon. */
+<span class="lineNum">      61 </span>                :            :     const struct ofport_dpif *ofport;
+<span class="lineNum">      62 </span>                :            : };
+<span class="lineNum">      63 </span>                :            : 
+<span class="lineNum">      64 </span>                :            : /* hmap that contains &quot;struct mport&quot;s. */
+<span class="lineNum">      65 </span>                :            : static struct hmap monitor_hmap = HMAP_INITIALIZER(&amp;monitor_hmap);
+<span class="lineNum">      66 </span>                :            : 
+<span class="lineNum">      67 </span>                :            : /* heap for ordering mport based on bfd/cfm wakeup time. */
+<span class="lineNum">      68 </span>                :            : static struct heap monitor_heap;
+<span class="lineNum">      69 </span>                :            : 
+<span class="lineNum">      70 </span>                :            : /* guarded-list for storing the mports that need to send bfd/cfm control
+<span class="lineNum">      71 </span>                :            :  * packet soon. */
+<span class="lineNum">      72 </span>                :            : static struct guarded_list send_soon = GUARDED_LIST_INITIALIZER(&amp;send_soon);
+<span class="lineNum">      73 </span>                :            : 
+<span class="lineNum">      74 </span>                :            : /* The monitor thread id. */
+<span class="lineNum">      75 </span>                :            : static pthread_t monitor_tid;
+<span class="lineNum">      76 </span>                :            : /* True if the monitor thread is running. */
+<span class="lineNum">      77 </span>                :            : static bool monitor_running;
+<span class="lineNum">      78 </span>                :            : 
+<span class="lineNum">      79 </span>                :            : static struct latch monitor_exit_latch;
+<span class="lineNum">      80 </span>                :            : static struct ovs_mutex monitor_mutex = OVS_MUTEX_INITIALIZER;
+<span class="lineNum">      81 </span>                :            : 
+<span class="lineNum">      82 </span>                :            : static void *monitor_main(void *);
+<span class="lineNum">      83 </span>                :            : static void monitor_check_send_soon(struct ofpbuf *);
+<span class="lineNum">      84 </span>                :            : static void monitor_run(void);
+<span class="lineNum">      85 </span>                :            : static void monitor_mport_run(struct mport *, struct ofpbuf *);
+<span class="lineNum">      86 </span>                :            : 
+<span class="lineNum">      87 </span>                :            : static void mport_register(const struct ofport_dpif *, struct bfd *,
+<span class="lineNum">      88 </span>                :            :                            struct cfm *, uint8_t[ETH_ADDR_LEN])
+<span class="lineNum">      89 </span>                :            :     OVS_REQUIRES(monitor_mutex);
+<span class="lineNum">      90 </span>                :            : static void mport_unregister(const struct ofport_dpif *)
+<span class="lineNum">      91 </span>                :            :     OVS_REQUIRES(monitor_mutex);
+<span class="lineNum">      92 </span>                :            : static void mport_update(struct mport *, struct bfd *, struct cfm *,
+<span class="lineNum">      93 </span>                :            :                          uint8_t[ETH_ADDR_LEN]) OVS_REQUIRES(monitor_mutex);
+<span class="lineNum">      94 </span>                :            : static struct mport *mport_find(const struct ofport_dpif *)
+<span class="lineNum">      95 </span>                :            :     OVS_REQUIRES(monitor_mutex);
+<span class="lineNum">      96 </span>                :            : 
+<span class="lineNum">      97 </span>                :            : /* Tries finding and returning the 'mport' from the monitor_hmap.
+<a name="98"><span class="lineNum">      98 </span>                :            :  * If there is no such 'mport', returns NULL. */</a>
+<span class="lineNum">      99 </span>                :            : static struct mport *
+<span class="lineNum">     100 </span>                :<span class="lineCov">       7603 : mport_find(const struct ofport_dpif *ofport) OVS_REQUIRES(monitor_mutex)</span>
+<span class="lineNum">     101 </span>                :            : {
+<span class="lineNum">     102 </span>                :            :     struct mport *node;
+<span class="lineNum">     103 </span>                :            : 
+<span class="lineNum">     104 </span>        [<span class="branchCov" title="Branch 3 was taken 605 times"> + </span><span class="branchCov" title="Branch 4 was taken 6998 times"> + </span>]:<span class="lineCov">       7603 :     HMAP_FOR_EACH_WITH_HASH (node, hmap_node, hash_pointer(ofport, 0),</span>
+<span class="lineNum">     105 </span>                :            :                              &amp;monitor_hmap) {
+<span class="lineNum">     106 </span>        [<span class="branchCov" title="Branch 0 was taken 605 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        605 :         if (node-&gt;ofport == ofport) {</span>
+<span class="lineNum">     107 </span>                :<span class="lineCov">        605 :             return node;</span>
+<span class="lineNum">     108 </span>                :            :         }
+<span class="lineNum">     109 </span>                :            :     }
+<span class="lineNum">     110 </span>                :<span class="lineCov">       7603 :     return NULL;</span>
+<span class="lineNum">     111 </span>                :            : }
+<span class="lineNum">     112 </span>                :            : 
+<span class="lineNum">     113 </span>                :            : /* Creates a new mport and inserts it into monitor_hmap and monitor_heap,
+<a name="114"><span class="lineNum">     114 </span>                :            :  * if it doesn't exist.  Otherwise, just updates its fields. */</a>
+<span class="lineNum">     115 </span>                :            : static void
+<span class="lineNum">     116 </span>                :<span class="lineCov">        260 : mport_register(const struct ofport_dpif *ofport, struct bfd *bfd,</span>
+<span class="lineNum">     117 </span>                :            :                struct cfm *cfm, uint8_t *hw_addr)
+<span class="lineNum">     118 </span>                :            :     OVS_REQUIRES(monitor_mutex)
+<span class="lineNum">     119 </span>                :            : {
+<span class="lineNum">     120 </span>                :<span class="lineCov">        260 :     struct mport *mport = mport_find(ofport);</span>
+<span class="lineNum">     121 </span>                :            : 
+<span class="lineNum">     122 </span>        [<span class="branchCov" title="Branch 0 was taken 36 times"> + </span><span class="branchCov" title="Branch 1 was taken 224 times"> + </span>]:<span class="lineCov">        260 :     if (!mport) {</span>
+<span class="lineNum">     123 </span>                :<span class="lineCov">         36 :         mport = xzalloc(sizeof *mport);</span>
+<span class="lineNum">     124 </span>                :<span class="lineCov">         36 :         mport-&gt;ofport = ofport;</span>
+<span class="lineNum">     125 </span>                :<span class="lineCov">         36 :         hmap_insert(&amp;monitor_hmap, &amp;mport-&gt;hmap_node, hash_pointer(ofport, 0));</span>
+<span class="lineNum">     126 </span>                :<span class="lineCov">         36 :         heap_insert(&amp;monitor_heap, &amp;mport-&gt;heap_node, 0);</span>
+<span class="lineNum">     127 </span>                :            :     }
+<span class="lineNum">     128 </span>                :<span class="lineCov">        260 :     mport_update(mport, bfd, cfm, hw_addr);</span>
+<span class="lineNum">     129 </span>                :<span class="lineCov">        260 : }</span>
+<span class="lineNum">     130 </span>                :            : 
+<a name="131"><span class="lineNum">     131 </span>                :            : /* Removes mport from monitor_hmap and monitor_heap and frees it. */</a>
+<span class="lineNum">     132 </span>                :            : static void
+<span class="lineNum">     133 </span>                :<span class="lineCov">       6998 : mport_unregister(const struct ofport_dpif *ofport)</span>
+<span class="lineNum">     134 </span>                :            :     OVS_REQUIRES(monitor_mutex)
+<span class="lineNum">     135 </span>                :            : {
+<span class="lineNum">     136 </span>                :<span class="lineCov">       6998 :     struct mport *mport = mport_find(ofport);</span>
+<span class="lineNum">     137 </span>                :            : 
+<span class="lineNum">     138 </span>        [<span class="branchCov" title="Branch 0 was taken 36 times"> + </span><span class="branchCov" title="Branch 1 was taken 6962 times"> + </span>]:<span class="lineCov">       6998 :     if (mport) {</span>
+<span class="lineNum">     139 </span>                :<span class="lineCov">         36 :         mport_update(mport, NULL, NULL, NULL);</span>
+<span class="lineNum">     140 </span>                :<span class="lineCov">         36 :         hmap_remove(&amp;monitor_hmap, &amp;mport-&gt;hmap_node);</span>
+<span class="lineNum">     141 </span>                :<span class="lineCov">         36 :         heap_remove(&amp;monitor_heap, &amp;mport-&gt;heap_node);</span>
+<span class="lineNum">     142 </span>                :<span class="lineCov">         36 :         free(mport);</span>
+<span class="lineNum">     143 </span>                :            :     }
+<span class="lineNum">     144 </span>                :<span class="lineCov">       6998 : }</span>
+<span class="lineNum">     145 </span>                :            : 
+<a name="146"><span class="lineNum">     146 </span>                :            : /* Updates the fields of an existing mport struct. */</a>
+<span class="lineNum">     147 </span>                :            : static void
+<span class="lineNum">     148 </span>                :<span class="lineCov">        296 : mport_update(struct mport *mport, struct bfd *bfd, struct cfm *cfm,</span>
+<span class="lineNum">     149 </span>                :            :              uint8_t hw_addr[ETH_ADDR_LEN]) OVS_REQUIRES(monitor_mutex)
+<span class="lineNum">     150 </span>                :            : {
+<span class="lineNum">     151 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 296 times"> + </span>]:<span class="lineCov">        296 :     ovs_assert(mport);</span>
+<span class="lineNum">     152 </span>                :            : 
+<span class="lineNum">     153 </span>        [<span class="branchCov" title="Branch 0 was taken 32 times"> + </span><span class="branchCov" title="Branch 1 was taken 264 times"> + </span>]:<span class="lineCov">        296 :     if (mport-&gt;cfm != cfm) {</span>
+<span class="lineNum">     154 </span>                :<span class="lineCov">         32 :         cfm_unref(mport-&gt;cfm);</span>
+<span class="lineNum">     155 </span>                :<span class="lineCov">         32 :         mport-&gt;cfm = cfm_ref(cfm);</span>
+<span class="lineNum">     156 </span>                :            :     }
+<span class="lineNum">     157 </span>        [<span class="branchCov" title="Branch 0 was taken 46 times"> + </span><span class="branchCov" title="Branch 1 was taken 250 times"> + </span>]:<span class="lineCov">        296 :     if (mport-&gt;bfd != bfd) {</span>
+<span class="lineNum">     158 </span>                :<span class="lineCov">         46 :         bfd_unref(mport-&gt;bfd);</span>
+<span class="lineNum">     159 </span>                :<span class="lineCov">         46 :         mport-&gt;bfd = bfd_ref(bfd);</span>
+<span class="lineNum">     160 </span>                :            :     }
+<span class="lineNum">     161 </span>[<span class="branchCov" title="Branch 0 was taken 260 times"> + </span><span class="branchCov" title="Branch 1 was taken 36 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 36 times"> + </span><span class="branchCov" title="Branch 3 was taken 224 times"> + </span>]:<span class="lineCov">        296 :     if (hw_addr &amp;&amp; memcmp(mport-&gt;hw_addr, hw_addr, ETH_ADDR_LEN)) {</span>
+<span class="lineNum">     162 </span>                :<span class="lineCov">         36 :         memcpy(mport-&gt;hw_addr, hw_addr, ETH_ADDR_LEN);</span>
+<span class="lineNum">     163 </span>                :            :     }
+<span class="lineNum">     164 </span>                :            :     /* If bfd/cfm is added or reconfigured, move the mport on top of the heap
+<span class="lineNum">     165 </span>                :            :      * so that the monitor thread can run the mport next time it wakes up. */
+<span class="lineNum">     166 </span>[<span class="branchCov" title="Branch 0 was taken 110 times"> + </span><span class="branchCov" title="Branch 1 was taken 186 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 74 times"> + </span><span class="branchCov" title="Branch 3 was taken 36 times"> + </span>]:<span class="lineCov">        296 :     if (mport-&gt;bfd || mport-&gt;cfm) {</span>
+<span class="lineNum">     167 </span>                :<span class="lineCov">        260 :         heap_change(&amp;monitor_heap, &amp;mport-&gt;heap_node, LLONG_MAX);</span>
+<span class="lineNum">     168 </span>                :            :     }
+<span class="lineNum">     169 </span>                :<span class="lineCov">        296 : }</span>
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>                :            : 
+<a name="172"><span class="lineNum">     172 </span>                :            : /* The 'main' function for the monitor thread. */</a>
+<span class="lineNum">     173 </span>                :            : static void *
+<span class="lineNum">     174 </span>                :<span class="lineCov">         16 : monitor_main(void * args OVS_UNUSED)</span>
+<span class="lineNum">     175 </span>                :            : {
+<span class="lineNum">     176 </span>        [<span class="branchCov" title="Branch 0 was taken 16 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         16 :     VLOG_INFO(&quot;monitor thread created&quot;);</span>
+<span class="lineNum">     177 </span>        [<span class="branchCov" title="Branch 1 was taken 3307 times"> + </span><span class="branchCov" title="Branch 2 was taken 16 times"> + </span>]:<span class="lineCov">       3323 :     while (!latch_is_set(&amp;monitor_exit_latch)) {</span>
+<span class="lineNum">     178 </span>                :<span class="lineCov">       3307 :         monitor_run();</span>
+<span class="lineNum">     179 </span>                :<span class="lineCov">       3307 :         latch_wait(&amp;monitor_exit_latch);</span>
+<span class="lineNum">     180 </span>                :<span class="lineCov">       3307 :         poll_block();</span>
+<span class="lineNum">     181 </span>                :            :     }
+<span class="lineNum">     182 </span>        [<span class="branchCov" title="Branch 0 was taken 16 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         16 :     VLOG_INFO(&quot;monitor thread terminated&quot;);</span>
+<span class="lineNum">     183 </span>                :<span class="lineCov">         16 :     return NULL;</span>
+<span class="lineNum">     184 </span>                :            : }
+<span class="lineNum">     185 </span>                :            : 
+<span class="lineNum">     186 </span>                :            : /* The monitor thread should wake up this often to ensure that newly added or
+<span class="lineNum">     187 </span>                :            :  * reconfigured monitoring ports are run in a timely manner. */
+<span class="lineNum">     188 </span>                :            : #define MONITOR_INTERVAL_MSEC 100
+<span class="lineNum">     189 </span>                :            : 
+<span class="lineNum">     190 </span>                :            : /* Checks the 'send_soon' list and the heap for mports that have timed
+<a name="191"><span class="lineNum">     191 </span>                :            :  * out bfd/cfm sessions. */</a>
+<span class="lineNum">     192 </span>                :            : static void
+<span class="lineNum">     193 </span>                :<span class="lineCov">       3307 : monitor_run(void)</span>
+<span class="lineNum">     194 </span>                :            : {
+<span class="lineNum">     195 </span>                :            :     uint32_t stub[512 / 4];
+<span class="lineNum">     196 </span>                :            :     long long int prio_now;
+<span class="lineNum">     197 </span>                :            :     struct ofpbuf packet;
+<span class="lineNum">     198 </span>                :            : 
+<span class="lineNum">     199 </span>                :<span class="lineCov">       3307 :     ofpbuf_use_stub(&amp;packet, stub, sizeof stub);</span>
+<span class="lineNum">     200 </span>                :<span class="lineCov">       3307 :     ovs_mutex_lock(&amp;monitor_mutex);</span>
+<span class="lineNum">     201 </span>                :            : 
+<span class="lineNum">     202 </span>                :            :     /* The monitor_check_send_soon() needs to be run twice.  The first
+<span class="lineNum">     203 </span>                :            :      * time is for preventing the same 'mport' from being processed twice
+<span class="lineNum">     204 </span>                :            :      * (i.e. once from heap, the other from the 'send_soon' array).
+<span class="lineNum">     205 </span>                :            :      * The second run is to cover the case when the control packet is sent
+<span class="lineNum">     206 </span>                :            :      * via patch port and the other end needs to send back immediately. */
+<span class="lineNum">     207 </span>                :<span class="lineCov">       3307 :     monitor_check_send_soon(&amp;packet);</span>
+<span class="lineNum">     208 </span>                :            : 
+<span class="lineNum">     209 </span>                :<span class="lineCov">       3307 :     prio_now = MSEC_TO_PRIO(time_msec());</span>
+<span class="lineNum">     210 </span>                :            :     /* Peeks the top of heap and checks if we should run this mport. */
+<span class="lineNum">     211 </span>        [<span class="branchCov" title="Branch 1 was taken 5633 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">       5633 :     while (!heap_is_empty(&amp;monitor_heap)</span>
+<span class="lineNum">     212 </span>        [<span class="branchCov" title="Branch 1 was taken 2326 times"> + </span><span class="branchCov" title="Branch 2 was taken 3307 times"> + </span>]:<span class="lineCov">       5633 :            &amp;&amp; heap_max(&amp;monitor_heap)-&gt;priority &gt;= prio_now) {</span>
+<span class="lineNum">     213 </span>                :            :         struct mport *mport;
+<span class="lineNum">     214 </span>                :            : 
+<span class="lineNum">     215 </span>                :<span class="lineCov">       2326 :         mport = CONTAINER_OF(heap_max(&amp;monitor_heap), struct mport, heap_node);</span>
+<span class="lineNum">     216 </span>                :<span class="lineCov">       2326 :         monitor_mport_run(mport, &amp;packet);</span>
+<span class="lineNum">     217 </span>                :            :     }
+<span class="lineNum">     218 </span>                :            : 
+<span class="lineNum">     219 </span>                :<span class="lineCov">       3307 :     monitor_check_send_soon(&amp;packet);</span>
+<span class="lineNum">     220 </span>                :            : 
+<span class="lineNum">     221 </span>                :            :     /* Waits on the earliest next wakeup time. */
+<span class="lineNum">     222 </span>        [<span class="branchCov" title="Branch 1 was taken 3307 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">       3307 :     if (!heap_is_empty(&amp;monitor_heap)) {</span>
+<span class="lineNum">     223 </span>                :            :         long long int next_timeout, next_mport_wakeup;
+<span class="lineNum">     224 </span>                :            : 
+<span class="lineNum">     225 </span>                :<span class="lineCov">       3307 :         next_timeout = time_msec() + MONITOR_INTERVAL_MSEC;</span>
+<span class="lineNum">     226 </span>                :<span class="lineCov">       3307 :         next_mport_wakeup = PRIO_TO_MSEC(heap_max(&amp;monitor_heap)-&gt;priority);</span>
+<span class="lineNum">     227 </span>                :<span class="lineCov">       3307 :         poll_timer_wait_until(MIN(next_timeout, next_mport_wakeup));</span>
+<span class="lineNum">     228 </span>                :            :     }
+<span class="lineNum">     229 </span>                :<span class="lineCov">       3307 :     ovs_mutex_unlock(&amp;monitor_mutex);</span>
+<span class="lineNum">     230 </span>                :<span class="lineCov">       3307 :     ofpbuf_uninit(&amp;packet);</span>
+<span class="lineNum">     231 </span>                :<span class="lineCov">       3307 : }</span>
+<span class="lineNum">     232 </span>                :            : 
+<span class="lineNum">     233 </span>                :            : /* Checks the 'send_soon' list for any mport that needs to send cfm/bfd
+<a name="234"><span class="lineNum">     234 </span>                :            :  * control packet immediately, and calls monitor_mport_run(). */</a>
+<span class="lineNum">     235 </span>                :            : static void
+<span class="lineNum">     236 </span>                :<span class="lineCov">       6614 : monitor_check_send_soon(struct ofpbuf *packet)</span>
+<span class="lineNum">     237 </span>                :            :     OVS_REQUIRES(monitor_mutex)
+<span class="lineNum">     238 </span>                :            : {
+<span class="lineNum">     239 </span>        [<span class="branchCov" title="Branch 1 was taken 345 times"> + </span><span class="branchCov" title="Branch 2 was taken 6614 times"> + </span>]:<span class="lineCov">       6959 :     while (!guarded_list_is_empty(&amp;send_soon)) {</span>
+<span class="lineNum">     240 </span>                :            :         struct send_soon_entry *entry;
+<span class="lineNum">     241 </span>                :            :         struct mport *mport;
+<span class="lineNum">     242 </span>                :            : 
+<span class="lineNum">     243 </span>                :<span class="lineCov">        345 :         entry = CONTAINER_OF(guarded_list_pop_front(&amp;send_soon),</span>
+<span class="lineNum">     244 </span>                :            :                              struct send_soon_entry, list_node);
+<span class="lineNum">     245 </span>                :<span class="lineCov">        345 :         mport = mport_find(entry-&gt;ofport);</span>
+<span class="lineNum">     246 </span>        [<span class="branchCov" title="Branch 0 was taken 345 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        345 :         if (mport) {</span>
+<span class="lineNum">     247 </span>                :<span class="lineCov">        345 :             monitor_mport_run(mport, packet);</span>
+<span class="lineNum">     248 </span>                :            :         }
+<span class="lineNum">     249 </span>                :<span class="lineCov">        345 :         free(entry);</span>
+<span class="lineNum">     250 </span>                :            :     }
+<span class="lineNum">     251 </span>                :<span class="lineCov">       6614 : }</span>
+<span class="lineNum">     252 </span>                :            : 
+<span class="lineNum">     253 </span>                :            : /* Checks the sending of control packet on 'mport'.  Sends the control
+<span class="lineNum">     254 </span>                :            :  * packet if needed.  Executes bfd and cfm periodic functions (run, wait)
+<span class="lineNum">     255 </span>                :            :  * on 'mport'.  And changes the location of 'mport' in heap based on next
+<a name="256"><span class="lineNum">     256 </span>                :            :  * timeout. */</a>
+<span class="lineNum">     257 </span>                :            : static void
+<span class="lineNum">     258 </span>                :<span class="lineCov">       2671 : monitor_mport_run(struct mport *mport, struct ofpbuf *packet)</span>
+<span class="lineNum">     259 </span>                :            :     OVS_REQUIRES(monitor_mutex)
+<span class="lineNum">     260 </span>                :            : {
+<span class="lineNum">     261 </span>                :            :     long long int next_wake_time;
+<span class="lineNum">     262 </span>                :            : 
+<span class="lineNum">     263 </span>[<span class="branchCov" title="Branch 0 was taken 1321 times"> + </span><span class="branchCov" title="Branch 1 was taken 1350 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 1228 times"> + </span><span class="branchCov" title="Branch 4 was taken 93 times"> + </span>]:<span class="lineCov">       2671 :     if (mport-&gt;cfm &amp;&amp; cfm_should_send_ccm(mport-&gt;cfm)) {</span>
+<span class="lineNum">     264 </span>                :<span class="lineCov">       1228 :         ofpbuf_clear(packet);</span>
+<span class="lineNum">     265 </span>                :<span class="lineCov">       1228 :         cfm_compose_ccm(mport-&gt;cfm, packet, mport-&gt;hw_addr);</span>
+<span class="lineNum">     266 </span>                :<span class="lineCov">       1228 :         ofproto_dpif_send_packet(mport-&gt;ofport, packet);</span>
+<span class="lineNum">     267 </span>                :            :     }
+<span class="lineNum">     268 </span>[<span class="branchCov" title="Branch 0 was taken 1378 times"> + </span><span class="branchCov" title="Branch 1 was taken 1293 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 990 times"> + </span><span class="branchCov" title="Branch 4 was taken 388 times"> + </span>]:<span class="lineCov">       2671 :     if (mport-&gt;bfd &amp;&amp; bfd_should_send_packet(mport-&gt;bfd)) {</span>
+<span class="lineNum">     269 </span>                :<span class="lineCov">        990 :         ofpbuf_clear(packet);</span>
+<span class="lineNum">     270 </span>                :<span class="lineCov">        990 :         bfd_put_packet(mport-&gt;bfd, packet, mport-&gt;hw_addr);</span>
+<span class="lineNum">     271 </span>                :<span class="lineCov">        990 :         ofproto_dpif_send_packet(mport-&gt;ofport, packet);</span>
+<span class="lineNum">     272 </span>                :            :     }
+<span class="lineNum">     273 </span>        [<span class="branchCov" title="Branch 0 was taken 1321 times"> + </span><span class="branchCov" title="Branch 1 was taken 1350 times"> + </span>]:<span class="lineCov">       2671 :     if (mport-&gt;cfm) {</span>
+<span class="lineNum">     274 </span>                :<span class="lineCov">       1321 :         cfm_run(mport-&gt;cfm);</span>
+<span class="lineNum">     275 </span>                :<span class="lineCov">       1321 :         cfm_wait(mport-&gt;cfm);</span>
+<span class="lineNum">     276 </span>                :            :     }
+<span class="lineNum">     277 </span>        [<span class="branchCov" title="Branch 0 was taken 1378 times"> + </span><span class="branchCov" title="Branch 1 was taken 1293 times"> + </span>]:<span class="lineCov">       2671 :     if (mport-&gt;bfd) {</span>
+<span class="lineNum">     278 </span>                :<span class="lineCov">       1378 :         bfd_run(mport-&gt;bfd);</span>
+<span class="lineNum">     279 </span>                :<span class="lineCov">       1378 :         bfd_wait(mport-&gt;bfd);</span>
+<span class="lineNum">     280 </span>                :            :     }
+<span class="lineNum">     281 </span>                :            :     /* Computes the next wakeup time for this mport. */
+<span class="lineNum">     282 </span>        [<span class="branchCov" title="Branch 2 was taken 1370 times"> + </span><span class="branchCov" title="Branch 3 was taken 1301 times"> + </span>]:<span class="lineCov">       2671 :     next_wake_time = MIN(bfd_wake_time(mport-&gt;bfd),</span>
+<span class="lineNum">     283 </span>                :            :                          cfm_wake_time(mport-&gt;cfm));
+<span class="lineNum">     284 </span>                :<span class="lineCov">       2671 :     heap_change(&amp;monitor_heap, &amp;mport-&gt;heap_node,</span>
+<span class="lineNum">     285 </span>                :<span class="lineCov">       2671 :                 MSEC_TO_PRIO(next_wake_time));</span>
+<span class="lineNum">     286 </span>                :<span class="lineCov">       2671 : }</span>
+<span class="lineNum">     287 </span>                :            : 
+<span class="lineNum">     288 </span>                :            : 
+<span class="lineNum">     289 </span>                :            : /* Creates the mport in monitor module if either bfd or cfm
+<span class="lineNum">     290 </span>                :            :  * is configured.  Otherwise, deletes the mport.
+<span class="lineNum">     291 </span>                :            :  * Also checks whether the monitor thread should be started
+<a name="292"><span class="lineNum">     292 </span>                :            :  * or terminated. */</a>
+<span class="lineNum">     293 </span>                :            : void
+<span class="lineNum">     294 </span>                :<span class="lineCov">       7258 : ofproto_dpif_monitor_port_update(const struct ofport_dpif *ofport,</span>
+<span class="lineNum">     295 </span>                :            :                                  struct bfd *bfd, struct cfm *cfm,
+<span class="lineNum">     296 </span>                :            :                                  uint8_t hw_addr[ETH_ADDR_LEN])
+<span class="lineNum">     297 </span>                :            : {
+<span class="lineNum">     298 </span>                :<span class="lineCov">       7258 :     ovs_mutex_lock(&amp;monitor_mutex);</span>
+<span class="lineNum">     299 </span>[<span class="branchCov" title="Branch 0 was taken 7171 times"> + </span><span class="branchCov" title="Branch 1 was taken 87 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 6998 times"> + </span><span class="branchCov" title="Branch 3 was taken 173 times"> + </span>]:<span class="lineCov">       7258 :     if (!cfm &amp;&amp; !bfd) {</span>
+<span class="lineNum">     300 </span>                :<span class="lineCov">       6998 :         mport_unregister(ofport);</span>
+<span class="lineNum">     301 </span>                :            :     } else {
+<span class="lineNum">     302 </span>                :<span class="lineCov">        260 :         mport_register(ofport, bfd, cfm, hw_addr);</span>
+<span class="lineNum">     303 </span>                :            :     }
+<span class="lineNum">     304 </span>                :<span class="lineCov">       7258 :     ovs_mutex_unlock(&amp;monitor_mutex);</span>
+<span class="lineNum">     305 </span>                :            : 
+<span class="lineNum">     306 </span>                :            :     /* If the monitor thread is not running and the hmap
+<span class="lineNum">     307 </span>                :            :      * is not empty, starts it.  If it is and the hmap is empty,
+<span class="lineNum">     308 </span>                :            :      * terminates it. */
+<span class="lineNum">     309 </span>[<span class="branchCov" title="Branch 0 was taken 6662 times"> + </span><span class="branchCov" title="Branch 1 was taken 596 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 16 times"> + </span><span class="branchCov" title="Branch 4 was taken 6646 times"> + </span>]:<span class="lineCov">       7258 :     if (!monitor_running &amp;&amp; !hmap_is_empty(&amp;monitor_hmap))  {</span>
+<span class="lineNum">     310 </span>                :<span class="lineCov">         16 :         latch_init(&amp;monitor_exit_latch);</span>
+<span class="lineNum">     311 </span>                :<span class="lineCov">         16 :         monitor_tid = ovs_thread_create(&quot;monitor&quot;, monitor_main, NULL);</span>
+<span class="lineNum">     312 </span>                :<span class="lineCov">         16 :         monitor_running = true;</span>
+<span class="lineNum">     313 </span>[<span class="branchCov" title="Branch 0 was taken 596 times"> + </span><span class="branchCov" title="Branch 1 was taken 6646 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 16 times"> + </span><span class="branchCov" title="Branch 4 was taken 580 times"> + </span>]:<span class="lineCov">       7242 :     } else if (monitor_running &amp;&amp; hmap_is_empty(&amp;monitor_hmap))  {</span>
+<span class="lineNum">     314 </span>                :<span class="lineCov">         16 :         latch_set(&amp;monitor_exit_latch);</span>
+<span class="lineNum">     315 </span>                :<span class="lineCov">         16 :         xpthread_join(monitor_tid, NULL);</span>
+<span class="lineNum">     316 </span>                :<span class="lineCov">         16 :         latch_destroy(&amp;monitor_exit_latch);</span>
+<span class="lineNum">     317 </span>                :<span class="lineCov">         16 :         monitor_running = false;</span>
+<span class="lineNum">     318 </span>                :            :     }
+<span class="lineNum">     319 </span>                :<span class="lineCov">       7258 : }</span>
+<span class="lineNum">     320 </span>                :            : 
+<span class="lineNum">     321 </span>                :            : /* Registers the 'ofport' in the 'send_soon' list.  We cannot directly
+<span class="lineNum">     322 </span>                :            :  * insert the corresponding mport to the 'send_soon' list, since the
+<span class="lineNum">     323 </span>                :            :  * 'send_soon' list is not updated when the mport is removed.
+<span class="lineNum">     324 </span>                :            :  *
+<a name="325"><span class="lineNum">     325 </span>                :            :  * Reader of the 'send_soon' list is responsible for freeing the entry. */</a>
+<span class="lineNum">     326 </span>                :            : void
+<span class="lineNum">     327 </span>                :<span class="lineCov">        345 : ofproto_dpif_monitor_port_send_soon(const struct ofport_dpif *ofport)</span>
+<span class="lineNum">     328 </span>                :            : {
+<span class="lineNum">     329 </span>                :<span class="lineCov">        345 :     struct send_soon_entry *entry = xzalloc(sizeof *entry);</span>
+<span class="lineNum">     330 </span>                :<span class="lineCov">        345 :     entry-&gt;ofport = ofport;</span>
+<span class="lineNum">     331 </span>                :            : 
+<span class="lineNum">     332 </span>                :<span class="lineCov">        345 :     guarded_list_push_back(&amp;send_soon, &amp;entry-&gt;list_node, SIZE_MAX);</span>
+<span class="lineNum">     333 </span>                :<span class="lineCov">        345 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

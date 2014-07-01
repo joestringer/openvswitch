@@ -1,0 +1,843 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/mcast-snooping.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - mcast-snooping.c<span style="font-size: 80%;"> (source / <a href="mcast-snooping.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">14</td>
+            <td class="headerCovTableEntry">303</td>
+            <td class="headerCovTableEntryLo">4.6 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">12</td>
+            <td class="headerCovTableEntry">56</td>
+            <td class="headerCovTableEntryLo">21.4 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">3</td>
+            <td class="headerCovTableEntry">134</td>
+            <td class="headerCovTableEntryLo">2.2 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2014 Red Hat, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Based on mac-learning implementation.
+<span class="lineNum">       5 </span>                :            :  *
+<span class="lineNum">       6 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       7 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       8 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">      11 </span>                :            :  *
+<span class="lineNum">      12 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      13 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      14 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      15 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      16 </span>                :            :  * limitations under the License.
+<span class="lineNum">      17 </span>                :            :  */
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &quot;mcast-snooping.h&quot;
+<span class="lineNum">      21 </span>                :            : 
+<span class="lineNum">      22 </span>                :            : #include &lt;inttypes.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      24 </span>                :            : 
+<span class="lineNum">      25 </span>                :            : #include &quot;bitmap.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;byte-order.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;coverage.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;list.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;entropy.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;unaligned.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;vlan-bitmap.h&quot;
+<a name="36"><span class="lineNum">      36 </span>                :            : #include &quot;vlog.h&quot;</a>
+<a name="37"><span class="lineNum">      37 </span>                :            : </a>
+<span class="lineNum">      38 </span>                :<span class="lineCov">      18843 : COVERAGE_DEFINE(mcast_snooping_learned);</span>
+<span class="lineNum">      39 </span>                :<span class="lineCov">      18843 : COVERAGE_DEFINE(mcast_snooping_expired);</span>
+<span class="lineNum">      40 </span>                :            : 
+<span class="lineNum">      41 </span>                :            : static struct mcast_mrouter_bundle *
+<span class="lineNum">      42 </span>                :            : mcast_snooping_mrouter_lookup(struct mcast_snooping *ms, uint16_t vlan,
+<span class="lineNum">      43 </span>                :            :                               void *port)
+<span class="lineNum">      44 </span>                :            :     OVS_REQ_RDLOCK(ms-&gt;rwlock);
+<a name="45"><span class="lineNum">      45 </span>                :            : </a>
+<span class="lineNum">      46 </span>                :            : bool
+<span class="lineNum">      47 </span>                :<span class="lineCov">      79767 : mcast_snooping_enabled(const struct mcast_snooping *ms)</span>
+<span class="lineNum">      48 </span>                :            : {
+<span class="lineNum">      49 </span>                :<span class="lineCov">      79767 :     return !!ms;</span>
+<span class="lineNum">      50 </span>                :            : }
+<a name="51"><span class="lineNum">      51 </span>                :            : </a>
+<span class="lineNum">      52 </span>                :            : bool
+<span class="lineNum">      53 </span>                :<span class="lineNoCov">          0 : mcast_snooping_flood_unreg(const struct mcast_snooping *ms)</span>
+<span class="lineNum">      54 </span>                :            : {
+<span class="lineNum">      55 </span>                :<span class="lineNoCov">          0 :     return ms-&gt;flood_unreg;</span>
+<span class="lineNum">      56 </span>                :            : }
+<a name="57"><span class="lineNum">      57 </span>                :            : </a>
+<span class="lineNum">      58 </span>                :            : bool
+<span class="lineNum">      59 </span>                :<span class="lineNoCov">          0 : mcast_snooping_is_query(ovs_be16 igmp_type)</span>
+<span class="lineNum">      60 </span>                :            : {
+<span class="lineNum">      61 </span>                :<span class="lineNoCov">          0 :     return igmp_type == htons(IGMP_HOST_MEMBERSHIP_QUERY);</span>
+<span class="lineNum">      62 </span>                :            : }
+<a name="63"><span class="lineNum">      63 </span>                :            : </a>
+<span class="lineNum">      64 </span>                :            : bool
+<span class="lineNum">      65 </span>                :<span class="lineNoCov">          0 : mcast_snooping_is_membership(ovs_be16 igmp_type)</span>
+<span class="lineNum">      66 </span>                :            : {
+<span class="lineNum">      67 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     switch (ntohs(igmp_type)) {</span>
+<span class="lineNum">      68 </span>                :            :     case IGMP_HOST_MEMBERSHIP_REPORT:
+<span class="lineNum">      69 </span>                :            :     case IGMPV2_HOST_MEMBERSHIP_REPORT:
+<span class="lineNum">      70 </span>                :            :     case IGMP_HOST_LEAVE_MESSAGE:
+<span class="lineNum">      71 </span>                :<span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">      72 </span>                :            :     }
+<span class="lineNum">      73 </span>                :<span class="lineNoCov">          0 :     return false;</span>
+<span class="lineNum">      74 </span>                :            : }
+<span class="lineNum">      75 </span>                :            : 
+<span class="lineNum">      76 </span>                :            : /* Returns the number of seconds since multicast group 'b' was learned in a
+<a name="77"><span class="lineNum">      77 </span>                :            :  * port on 'ms'. */</a>
+<span class="lineNum">      78 </span>                :            : int
+<span class="lineNum">      79 </span>                :<span class="lineNoCov">          0 : mcast_bundle_age(const struct mcast_snooping *ms,</span>
+<span class="lineNum">      80 </span>                :            :                  const struct mcast_group_bundle *b)
+<span class="lineNum">      81 </span>                :            : {
+<span class="lineNum">      82 </span>                :<span class="lineNoCov">          0 :     time_t remaining = b-&gt;expires - time_now();</span>
+<span class="lineNum">      83 </span>                :<span class="lineNoCov">          0 :     return ms-&gt;idle_time - remaining;</span>
+<span class="lineNum">      84 </span>                :            : }
+<a name="85"><span class="lineNum">      85 </span>                :            : </a>
+<span class="lineNum">      86 </span>                :            : static uint32_t
+<span class="lineNum">      87 </span>                :<span class="lineNoCov">          0 : mcast_table_hash(const struct mcast_snooping *ms, ovs_be32 grp_ip4,</span>
+<span class="lineNum">      88 </span>                :            :                  uint16_t vlan)
+<span class="lineNum">      89 </span>                :            : {
+<span class="lineNum">      90 </span>                :<span class="lineNoCov">          0 :     return hash_3words((OVS_FORCE uint32_t) grp_ip4, vlan, ms-&gt;secret);</span>
+<span class="lineNum">      91 </span>                :            : }
+<a name="92"><span class="lineNum">      92 </span>                :            : </a>
+<span class="lineNum">      93 </span>                :            : static struct mcast_group_bundle *
+<span class="lineNum">      94 </span>                :<span class="lineNoCov">          0 : mcast_group_bundle_from_lru_node(struct list *list)</span>
+<span class="lineNum">      95 </span>                :            : {
+<span class="lineNum">      96 </span>                :<span class="lineNoCov">          0 :     return CONTAINER_OF(list, struct mcast_group_bundle, bundle_node);</span>
+<span class="lineNum">      97 </span>                :            : }
+<a name="98"><span class="lineNum">      98 </span>                :            : </a>
+<span class="lineNum">      99 </span>                :            : static struct mcast_group *
+<span class="lineNum">     100 </span>                :<span class="lineNoCov">          0 : mcast_group_from_lru_node(struct list *list)</span>
+<span class="lineNum">     101 </span>                :            : {
+<span class="lineNum">     102 </span>                :<span class="lineNoCov">          0 :     return CONTAINER_OF(list, struct mcast_group, group_node);</span>
+<span class="lineNum">     103 </span>                :            : }
+<span class="lineNum">     104 </span>                :            : 
+<span class="lineNum">     105 </span>                :            : /* Searches 'ms' for and returns an mcast group for destination address
+<a name="106"><span class="lineNum">     106 </span>                :            :  * 'dip' in 'vlan'. */</a>
+<span class="lineNum">     107 </span>                :            : struct mcast_group *
+<span class="lineNum">     108 </span>                :<span class="lineNoCov">          0 : mcast_snooping_lookup(const struct mcast_snooping *ms, ovs_be32 dip,</span>
+<span class="lineNum">     109 </span>                :            :                       uint16_t vlan)
+<span class="lineNum">     110 </span>                :            :     OVS_REQ_RDLOCK(ms-&gt;rwlock)
+<span class="lineNum">     111 </span>                :            : {
+<span class="lineNum">     112 </span>                :            :     struct mcast_group *grp;
+<span class="lineNum">     113 </span>                :            :     uint32_t hash;
+<span class="lineNum">     114 </span>                :            : 
+<span class="lineNum">     115 </span>                :<span class="lineNoCov">          0 :     hash = mcast_table_hash(ms, dip, vlan);</span>
+<span class="lineNum">     116 </span>        [<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     HMAP_FOR_EACH_WITH_HASH (grp, hmap_node, hash, &amp;ms-&gt;table) {</span>
+<span class="lineNum">     117 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (grp-&gt;vlan == vlan &amp;&amp; grp-&gt;ip4 == dip) {</span>
+<span class="lineNum">     118 </span>                :<span class="lineNoCov">          0 :            return grp;</span>
+<span class="lineNum">     119 </span>                :            :         }
+<span class="lineNum">     120 </span>                :            :     }
+<span class="lineNum">     121 </span>                :<span class="lineNoCov">          0 :     return NULL;</span>
+<span class="lineNum">     122 </span>                :            : }
+<span class="lineNum">     123 </span>                :            : 
+<span class="lineNum">     124 </span>                :            : /* If the LRU list is not empty, stores the least-recently-used entry
+<span class="lineNum">     125 </span>                :            :  * in '*e' and returns true.  Otherwise, if the LRU list is empty,
+<a name="126"><span class="lineNum">     126 </span>                :            :  * stores NULL in '*e' and return false. */</a>
+<span class="lineNum">     127 </span>                :            : static bool
+<span class="lineNum">     128 </span>                :<span class="lineNoCov">          0 : group_get_lru(const struct mcast_snooping *ms, struct mcast_group **grp)</span>
+<span class="lineNum">     129 </span>                :            :     OVS_REQ_RDLOCK(ms-&gt;rwlock)
+<span class="lineNum">     130 </span>                :            : {
+<span class="lineNum">     131 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!list_is_empty(&amp;ms-&gt;group_lru)) {</span>
+<span class="lineNum">     132 </span>                :<span class="lineNoCov">          0 :         *grp = mcast_group_from_lru_node(ms-&gt;group_lru.next);</span>
+<span class="lineNum">     133 </span>                :<span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">     134 </span>                :            :     } else {
+<span class="lineNum">     135 </span>                :<span class="lineNoCov">          0 :         *grp = NULL;</span>
+<span class="lineNum">     136 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     137 </span>                :            :     }
+<span class="lineNum">     138 </span>                :            : }
+<a name="139"><span class="lineNum">     139 </span>                :            : </a>
+<span class="lineNum">     140 </span>                :            : static unsigned int
+<span class="lineNum">     141 </span>                :<span class="lineNoCov">          0 : normalize_idle_time(unsigned int idle_time)</span>
+<span class="lineNum">     142 </span>                :            : {
+<span class="lineNum">     143 </span>                :<span class="lineNoCov">          0 :     return (idle_time &lt; 15 ? 15</span>
+<span class="lineNum">     144 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             : idle_time &gt; 3600 ? 3600</span>
+<span class="lineNum">     145 </span>                :            :             : idle_time);
+<span class="lineNum">     146 </span>                :            : }
+<span class="lineNum">     147 </span>                :            : 
+<span class="lineNum">     148 </span>                :            : /* Creates and returns a new mcast table with an initial mcast aging
+<span class="lineNum">     149 </span>                :            :  * timeout of MCAST_ENTRY_DEFAULT_IDLE_TIME seconds and an initial maximum of
+<a name="150"><span class="lineNum">     150 </span>                :            :  * MCAST_DEFAULT_MAX entries. */</a>
+<span class="lineNum">     151 </span>                :            : struct mcast_snooping *
+<span class="lineNum">     152 </span>                :<span class="lineNoCov">          0 : mcast_snooping_create(void)</span>
+<span class="lineNum">     153 </span>                :            : {
+<span class="lineNum">     154 </span>                :            :     struct mcast_snooping *ms;
+<span class="lineNum">     155 </span>                :            : 
+<span class="lineNum">     156 </span>                :<span class="lineNoCov">          0 :     ms = xmalloc(sizeof *ms);</span>
+<span class="lineNum">     157 </span>                :<span class="lineNoCov">          0 :     hmap_init(&amp;ms-&gt;table);</span>
+<span class="lineNum">     158 </span>                :<span class="lineNoCov">          0 :     list_init(&amp;ms-&gt;group_lru);</span>
+<span class="lineNum">     159 </span>                :<span class="lineNoCov">          0 :     list_init(&amp;ms-&gt;mrouter_lru);</span>
+<span class="lineNum">     160 </span>                :<span class="lineNoCov">          0 :     list_init(&amp;ms-&gt;fport_list);</span>
+<span class="lineNum">     161 </span>                :<span class="lineNoCov">          0 :     ms-&gt;secret = random_uint32();</span>
+<span class="lineNum">     162 </span>                :<span class="lineNoCov">          0 :     ms-&gt;idle_time = MCAST_ENTRY_DEFAULT_IDLE_TIME;</span>
+<span class="lineNum">     163 </span>                :<span class="lineNoCov">          0 :     ms-&gt;max_entries = MCAST_DEFAULT_MAX_ENTRIES;</span>
+<span class="lineNum">     164 </span>                :<span class="lineNoCov">          0 :     ms-&gt;need_revalidate = false;</span>
+<span class="lineNum">     165 </span>                :<span class="lineNoCov">          0 :     ms-&gt;flood_unreg = true;</span>
+<span class="lineNum">     166 </span>                :<span class="lineNoCov">          0 :     ovs_refcount_init(&amp;ms-&gt;ref_cnt);</span>
+<span class="lineNum">     167 </span>                :<span class="lineNoCov">          0 :     ovs_rwlock_init(&amp;ms-&gt;rwlock);</span>
+<span class="lineNum">     168 </span>                :<span class="lineNoCov">          0 :     return ms;</span>
+<span class="lineNum">     169 </span>                :            : }
+<a name="170"><span class="lineNum">     170 </span>                :            : </a>
+<span class="lineNum">     171 </span>                :            : struct mcast_snooping *
+<span class="lineNum">     172 </span>                :<span class="lineNoCov">          0 : mcast_snooping_ref(const struct mcast_snooping *ms_)</span>
+<span class="lineNum">     173 </span>                :            : {
+<span class="lineNum">     174 </span>                :<span class="lineNoCov">          0 :     struct mcast_snooping *ms = CONST_CAST(struct mcast_snooping *, ms_);</span>
+<span class="lineNum">     175 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (ms) {</span>
+<span class="lineNum">     176 </span>                :<span class="lineNoCov">          0 :         ovs_refcount_ref(&amp;ms-&gt;ref_cnt);</span>
+<span class="lineNum">     177 </span>                :            :     }
+<span class="lineNum">     178 </span>                :<span class="lineNoCov">          0 :     return ms;</span>
+<span class="lineNum">     179 </span>                :            : }
+<span class="lineNum">     180 </span>                :            : 
+<a name="181"><span class="lineNum">     181 </span>                :            : /* Unreferences (and possibly destroys) mcast snooping table 'ms'. */</a>
+<span class="lineNum">     182 </span>                :            : void
+<span class="lineNum">     183 </span>                :<span class="lineCov">       7993 : mcast_snooping_unref(struct mcast_snooping *ms)</span>
+<span class="lineNum">     184 </span>                :            : {
+<span class="lineNum">     185 </span>        [<span class="branchCov" title="Branch 1 was taken 7993 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">       7993 :     if (!mcast_snooping_enabled(ms)) {</span>
+<span class="lineNum">     186 </span>                :<span class="lineCov">       7993 :         return;</span>
+<span class="lineNum">     187 </span>                :            :     }
+<span class="lineNum">     188 </span>                :            : 
+<span class="lineNum">     189 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (ovs_refcount_unref(&amp;ms-&gt;ref_cnt) == 1) {</span>
+<span class="lineNum">     190 </span>                :<span class="lineNoCov">          0 :         mcast_snooping_flush(ms);</span>
+<span class="lineNum">     191 </span>                :<span class="lineNoCov">          0 :         hmap_destroy(&amp;ms-&gt;table);</span>
+<span class="lineNum">     192 </span>                :<span class="lineNoCov">          0 :         ovs_rwlock_destroy(&amp;ms-&gt;rwlock);</span>
+<span class="lineNum">     193 </span>                :<span class="lineNoCov">          0 :         free(ms);</span>
+<span class="lineNum">     194 </span>                :            :     }
+<span class="lineNum">     195 </span>                :            : }
+<span class="lineNum">     196 </span>                :            : 
+<a name="197"><span class="lineNum">     197 </span>                :            : /* Changes the mcast aging timeout of 'ms' to 'idle_time' seconds. */</a>
+<span class="lineNum">     198 </span>                :            : void
+<span class="lineNum">     199 </span>                :<span class="lineNoCov">          0 : mcast_snooping_set_idle_time(struct mcast_snooping *ms, unsigned int idle_time)</span>
+<span class="lineNum">     200 </span>                :            :     OVS_REQ_WRLOCK(ms-&gt;rwlock)
+<span class="lineNum">     201 </span>                :            : {
+<span class="lineNum">     202 </span>                :            :     struct mcast_group *grp;
+<span class="lineNum">     203 </span>                :            :     struct mcast_group_bundle *b;
+<span class="lineNum">     204 </span>                :            :     int delta;
+<span class="lineNum">     205 </span>                :            : 
+<span class="lineNum">     206 </span>                :<span class="lineNoCov">          0 :     idle_time = normalize_idle_time(idle_time);</span>
+<span class="lineNum">     207 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (idle_time != ms-&gt;idle_time) {</span>
+<span class="lineNum">     208 </span>                :<span class="lineNoCov">          0 :         delta = (int) idle_time - (int) ms-&gt;idle_time;</span>
+<span class="lineNum">     209 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         LIST_FOR_EACH (grp, group_node, &amp;ms-&gt;group_lru) {</span>
+<span class="lineNum">     210 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             LIST_FOR_EACH (b, bundle_node, &amp;grp-&gt;bundle_lru) {</span>
+<span class="lineNum">     211 </span>                :<span class="lineNoCov">          0 :                 b-&gt;expires += delta;</span>
+<span class="lineNum">     212 </span>                :            :             }
+<span class="lineNum">     213 </span>                :            :         }
+<span class="lineNum">     214 </span>                :<span class="lineNoCov">          0 :         ms-&gt;idle_time = idle_time;</span>
+<span class="lineNum">     215 </span>                :            :     }
+<span class="lineNum">     216 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     217 </span>                :            : 
+<span class="lineNum">     218 </span>                :            : /* Sets the maximum number of entries in 'ms' to 'max_entries', adjusting it
+<a name="219"><span class="lineNum">     219 </span>                :            :  * to be within a reasonable range. */</a>
+<span class="lineNum">     220 </span>                :            : void
+<span class="lineNum">     221 </span>                :<span class="lineNoCov">          0 : mcast_snooping_set_max_entries(struct mcast_snooping *ms,</span>
+<span class="lineNum">     222 </span>                :            :                                size_t max_entries)
+<span class="lineNum">     223 </span>                :            :     OVS_REQ_WRLOCK(ms-&gt;rwlock)
+<span class="lineNum">     224 </span>                :            : {
+<span class="lineNum">     225 </span>                :<span class="lineNoCov">          0 :     ms-&gt;max_entries = (max_entries &lt; 10 ? 10</span>
+<span class="lineNum">     226 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                        : max_entries &gt; 1000 * 1000 ? 1000 * 1000</span>
+<span class="lineNum">     227 </span>                :            :                        : max_entries);
+<span class="lineNum">     228 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     229 </span>                :            : 
+<span class="lineNum">     230 </span>                :            : /* Sets if unregistered multicast packets should be flooded to
+<span class="lineNum">     231 </span>                :            :  * all ports or only to ports connected to multicast routers
+<span class="lineNum">     232 </span>                :            :  *
+<span class="lineNum">     233 </span>                :            :  * Returns true if previous state differs from current state,
+<a name="234"><span class="lineNum">     234 </span>                :            :  * false otherwise. */</a>
+<span class="lineNum">     235 </span>                :            : bool
+<span class="lineNum">     236 </span>                :<span class="lineNoCov">          0 : mcast_snooping_set_flood_unreg(struct mcast_snooping *ms, bool enable)</span>
+<span class="lineNum">     237 </span>                :            :     OVS_REQ_WRLOCK(ms-&gt;rwlock)
+<span class="lineNum">     238 </span>                :            : {
+<span class="lineNum">     239 </span>                :<span class="lineNoCov">          0 :     bool prev = ms-&gt;flood_unreg;</span>
+<span class="lineNum">     240 </span>                :<span class="lineNoCov">          0 :     ms-&gt;flood_unreg = enable;</span>
+<span class="lineNum">     241 </span>                :<span class="lineNoCov">          0 :     return prev != enable;</span>
+<span class="lineNum">     242 </span>                :            : }
+<a name="243"><span class="lineNum">     243 </span>                :            : </a>
+<span class="lineNum">     244 </span>                :            : static struct mcast_group_bundle *
+<span class="lineNum">     245 </span>                :<span class="lineNoCov">          0 : mcast_group_bundle_lookup(struct mcast_snooping *ms OVS_UNUSED,</span>
+<span class="lineNum">     246 </span>                :            :                           struct mcast_group *grp, void *port)
+<span class="lineNum">     247 </span>                :            :     OVS_REQ_RDLOCK(ms-&gt;rwlock)
+<span class="lineNum">     248 </span>                :            : {
+<span class="lineNum">     249 </span>                :            :     struct mcast_group_bundle *b;
+<span class="lineNum">     250 </span>                :            : 
+<span class="lineNum">     251 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     LIST_FOR_EACH (b, bundle_node, &amp;grp-&gt;bundle_lru) {</span>
+<span class="lineNum">     252 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (b-&gt;port == port) {</span>
+<span class="lineNum">     253 </span>                :<span class="lineNoCov">          0 :             return b;</span>
+<span class="lineNum">     254 </span>                :            :         }
+<span class="lineNum">     255 </span>                :            :     }
+<span class="lineNum">     256 </span>                :<span class="lineNoCov">          0 :     return NULL;</span>
+<span class="lineNum">     257 </span>                :            : }
+<span class="lineNum">     258 </span>                :            : 
+<span class="lineNum">     259 </span>                :            : /* Insert a new bundle to the mcast group or update its
+<a name="260"><span class="lineNum">     260 </span>                :            :  * position and expiration if it is already there. */</a>
+<span class="lineNum">     261 </span>                :            : static struct mcast_group_bundle *
+<span class="lineNum">     262 </span>                :<span class="lineNoCov">          0 : mcast_group_insert_bundle(struct mcast_snooping *ms OVS_UNUSED,</span>
+<span class="lineNum">     263 </span>                :            :                           struct mcast_group *grp, void *port, int idle_time)
+<span class="lineNum">     264 </span>                :            :     OVS_REQ_WRLOCK(ms-&gt;rwlock)
+<span class="lineNum">     265 </span>                :            : {
+<span class="lineNum">     266 </span>                :            :     struct mcast_group_bundle *b;
+<span class="lineNum">     267 </span>                :            : 
+<span class="lineNum">     268 </span>                :<span class="lineNoCov">          0 :     b = mcast_group_bundle_lookup(ms, grp, port);</span>
+<span class="lineNum">     269 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (b) {</span>
+<span class="lineNum">     270 </span>                :<span class="lineNoCov">          0 :         list_remove(&amp;b-&gt;bundle_node);</span>
+<span class="lineNum">     271 </span>                :            :     } else {
+<span class="lineNum">     272 </span>                :<span class="lineNoCov">          0 :         b = xmalloc(sizeof *b);</span>
+<span class="lineNum">     273 </span>                :<span class="lineNoCov">          0 :         list_init(&amp;b-&gt;bundle_node);</span>
+<span class="lineNum">     274 </span>                :<span class="lineNoCov">          0 :         b-&gt;port = port;</span>
+<span class="lineNum">     275 </span>                :            :     }
+<span class="lineNum">     276 </span>                :            : 
+<span class="lineNum">     277 </span>                :<span class="lineNoCov">          0 :     b-&gt;expires = time_now() + idle_time;</span>
+<span class="lineNum">     278 </span>                :<span class="lineNoCov">          0 :     list_push_back(&amp;grp-&gt;bundle_lru, &amp;b-&gt;bundle_node);</span>
+<span class="lineNum">     279 </span>                :<span class="lineNoCov">          0 :     return b;</span>
+<span class="lineNum">     280 </span>                :            : }
+<span class="lineNum">     281 </span>                :            : 
+<span class="lineNum">     282 </span>                :            : /* Return true if multicast still has bundles associated.
+<a name="283"><span class="lineNum">     283 </span>                :            :  * Return false if there is no bundles. */</a>
+<span class="lineNum">     284 </span>                :            : static bool
+<span class="lineNum">     285 </span>                :<span class="lineNoCov">          0 : mcast_group_has_bundles(struct mcast_group *grp)</span>
+<span class="lineNum">     286 </span>                :            : {
+<span class="lineNum">     287 </span>                :<span class="lineNoCov">          0 :     return !list_is_empty(&amp;grp-&gt;bundle_lru);</span>
+<span class="lineNum">     288 </span>                :            : }
+<span class="lineNum">     289 </span>                :            : 
+<span class="lineNum">     290 </span>                :            : /* Delete 'grp' from the 'ms' hash table.
+<a name="291"><span class="lineNum">     291 </span>                :            :  * Caller is responsible to clean bundle lru first. */</a>
+<span class="lineNum">     292 </span>                :            : static void
+<span class="lineNum">     293 </span>                :<span class="lineNoCov">          0 : mcast_snooping_flush_group__(struct mcast_snooping *ms,</span>
+<span class="lineNum">     294 </span>                :            :                              struct mcast_group *grp)
+<span class="lineNum">     295 </span>                :            : {
+<span class="lineNum">     296 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     ovs_assert(list_is_empty(&amp;grp-&gt;bundle_lru));</span>
+<span class="lineNum">     297 </span>                :<span class="lineNoCov">          0 :     hmap_remove(&amp;ms-&gt;table, &amp;grp-&gt;hmap_node);</span>
+<span class="lineNum">     298 </span>                :<span class="lineNoCov">          0 :     list_remove(&amp;grp-&gt;group_node);</span>
+<span class="lineNum">     299 </span>                :<span class="lineNoCov">          0 :     free(grp);</span>
+<span class="lineNum">     300 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     301 </span>                :            : 
+<a name="302"><span class="lineNum">     302 </span>                :            : /* Flush out mcast group and its bundles */</a>
+<span class="lineNum">     303 </span>                :            : static void
+<span class="lineNum">     304 </span>                :<span class="lineNoCov">          0 : mcast_snooping_flush_group(struct mcast_snooping *ms, struct mcast_group *grp)</span>
+<span class="lineNum">     305 </span>                :            :     OVS_REQ_WRLOCK(ms-&gt;rwlock)
+<span class="lineNum">     306 </span>                :            : {
+<span class="lineNum">     307 </span>                :            :     struct mcast_group_bundle *b, *next_b;
+<span class="lineNum">     308 </span>                :            : 
+<span class="lineNum">     309 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     LIST_FOR_EACH_SAFE (b, next_b, bundle_node, &amp;grp-&gt;bundle_lru) {</span>
+<span class="lineNum">     310 </span>                :<span class="lineNoCov">          0 :         list_remove(&amp;b-&gt;bundle_node);</span>
+<span class="lineNum">     311 </span>                :<span class="lineNoCov">          0 :         free(b);</span>
+<span class="lineNum">     312 </span>                :            :     }
+<span class="lineNum">     313 </span>                :<span class="lineNoCov">          0 :     mcast_snooping_flush_group__(ms, grp);</span>
+<span class="lineNum">     314 </span>                :<span class="lineNoCov">          0 :     ms-&gt;need_revalidate = true;</span>
+<span class="lineNum">     315 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     316 </span>                :            : 
+<span class="lineNum">     317 </span>                :            : 
+<span class="lineNum">     318 </span>                :            : /* Delete bundle returning true if it succeeds,
+<a name="319"><span class="lineNum">     319 </span>                :            :  * false if it didn't find the group. */</a>
+<span class="lineNum">     320 </span>                :            : static bool
+<span class="lineNum">     321 </span>                :<span class="lineNoCov">          0 : mcast_group_delete_bundle(struct mcast_snooping *ms OVS_UNUSED,</span>
+<span class="lineNum">     322 </span>                :            :                           struct mcast_group *grp, void *port)
+<span class="lineNum">     323 </span>                :            :     OVS_REQ_WRLOCK(ms-&gt;rwlock)
+<span class="lineNum">     324 </span>                :            : {
+<span class="lineNum">     325 </span>                :            :     struct mcast_group_bundle *b;
+<span class="lineNum">     326 </span>                :            : 
+<span class="lineNum">     327 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     LIST_FOR_EACH (b, bundle_node, &amp;grp-&gt;bundle_lru) {</span>
+<span class="lineNum">     328 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (b-&gt;port == port) {</span>
+<span class="lineNum">     329 </span>                :<span class="lineNoCov">          0 :             list_remove(&amp;b-&gt;bundle_node);</span>
+<span class="lineNum">     330 </span>                :<span class="lineNoCov">          0 :             free(b);</span>
+<span class="lineNum">     331 </span>                :<span class="lineNoCov">          0 :             return true;</span>
+<span class="lineNum">     332 </span>                :            :         }
+<span class="lineNum">     333 </span>                :            :     }
+<span class="lineNum">     334 </span>                :<span class="lineNoCov">          0 :     return false;</span>
+<span class="lineNum">     335 </span>                :            : }
+<span class="lineNum">     336 </span>                :            : 
+<span class="lineNum">     337 </span>                :            : /* If any bundle has expired, delete it.  Returns the number of deleted
+<a name="338"><span class="lineNum">     338 </span>                :            :  * bundles. */</a>
+<span class="lineNum">     339 </span>                :            : static int
+<span class="lineNum">     340 </span>                :<span class="lineNoCov">          0 : mcast_snooping_prune_expired(struct mcast_snooping *ms,</span>
+<span class="lineNum">     341 </span>                :            :                              struct mcast_group *grp)
+<span class="lineNum">     342 </span>                :            :     OVS_REQ_WRLOCK(ms-&gt;rwlock)
+<span class="lineNum">     343 </span>                :            : {
+<span class="lineNum">     344 </span>                :            :     int expired;
+<span class="lineNum">     345 </span>                :            :     struct mcast_group_bundle *b, *next_b;
+<span class="lineNum">     346 </span>                :<span class="lineNoCov">          0 :     time_t timenow = time_now();</span>
+<span class="lineNum">     347 </span>                :            : 
+<span class="lineNum">     348 </span>                :<span class="lineNoCov">          0 :     expired = 0;</span>
+<span class="lineNum">     349 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     LIST_FOR_EACH_SAFE (b, next_b, bundle_node, &amp;grp-&gt;bundle_lru) {</span>
+<span class="lineNum">     350 </span>                :            :         /* This list is sorted on expiration time. */
+<span class="lineNum">     351 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (b-&gt;expires &gt; timenow) {</span>
+<span class="lineNum">     352 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     353 </span>                :            :         }
+<span class="lineNum">     354 </span>                :<span class="lineNoCov">          0 :         list_remove(&amp;b-&gt;bundle_node);</span>
+<span class="lineNum">     355 </span>                :<span class="lineNoCov">          0 :         free(b);</span>
+<span class="lineNum">     356 </span>                :<span class="lineNoCov">          0 :         expired++;</span>
+<span class="lineNum">     357 </span>                :            :     }
+<span class="lineNum">     358 </span>                :            : 
+<span class="lineNum">     359 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!mcast_group_has_bundles(grp)) {</span>
+<span class="lineNum">     360 </span>                :<span class="lineNoCov">          0 :         mcast_snooping_flush_group__(ms, grp);</span>
+<span class="lineNum">     361 </span>                :<span class="lineNoCov">          0 :         expired++;</span>
+<span class="lineNum">     362 </span>                :            :     }
+<span class="lineNum">     363 </span>                :            : 
+<span class="lineNum">     364 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (expired) {</span>
+<span class="lineNum">     365 </span>                :<span class="lineNoCov">          0 :         ms-&gt;need_revalidate = true;</span>
+<span class="lineNum">     366 </span>                :<span class="lineNoCov">          0 :         COVERAGE_ADD(mcast_snooping_expired, expired);</span>
+<span class="lineNum">     367 </span>                :            :     }
+<span class="lineNum">     368 </span>                :            : 
+<span class="lineNum">     369 </span>                :<span class="lineNoCov">          0 :     return expired;</span>
+<span class="lineNum">     370 </span>                :            : }
+<span class="lineNum">     371 </span>                :            : 
+<span class="lineNum">     372 </span>                :            : /* Add a multicast group to the mdb. If it exists, then
+<span class="lineNum">     373 </span>                :            :  * move to the last position in the LRU list.
+<a name="374"><span class="lineNum">     374 </span>                :            :  */</a>
+<span class="lineNum">     375 </span>                :            : bool
+<span class="lineNum">     376 </span>                :<span class="lineNoCov">          0 : mcast_snooping_add_group(struct mcast_snooping *ms, ovs_be32 ip4,</span>
+<span class="lineNum">     377 </span>                :            :                          uint16_t vlan, void *port)
+<span class="lineNum">     378 </span>                :            :     OVS_REQ_WRLOCK(ms-&gt;rwlock)
+<span class="lineNum">     379 </span>                :            : {
+<span class="lineNum">     380 </span>                :            :     bool learned;
+<span class="lineNum">     381 </span>                :            :     struct mcast_group *grp;
+<span class="lineNum">     382 </span>                :            : 
+<span class="lineNum">     383 </span>                :            :     /* Avoid duplicate packets. */
+<span class="lineNum">     384 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (mcast_snooping_mrouter_lookup(ms, vlan, port)</span>
+<span class="lineNum">     385 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         || mcast_snooping_fport_lookup(ms, vlan, port)) {</span>
+<span class="lineNum">     386 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     387 </span>                :            :     }
+<span class="lineNum">     388 </span>                :            : 
+<span class="lineNum">     389 </span>                :<span class="lineNoCov">          0 :     learned = false;</span>
+<span class="lineNum">     390 </span>                :<span class="lineNoCov">          0 :     grp = mcast_snooping_lookup(ms, ip4, vlan);</span>
+<span class="lineNum">     391 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!grp) {</span>
+<span class="lineNum">     392 </span>                :<span class="lineNoCov">          0 :         uint32_t hash = mcast_table_hash(ms, ip4, vlan);</span>
+<span class="lineNum">     393 </span>                :            : 
+<span class="lineNum">     394 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (hmap_count(&amp;ms-&gt;table) &gt;= ms-&gt;max_entries) {</span>
+<span class="lineNum">     395 </span>                :<span class="lineNoCov">          0 :             group_get_lru(ms, &amp;grp);</span>
+<span class="lineNum">     396 </span>                :<span class="lineNoCov">          0 :             mcast_snooping_flush_group(ms, grp);</span>
+<span class="lineNum">     397 </span>                :            :         }
+<span class="lineNum">     398 </span>                :            : 
+<span class="lineNum">     399 </span>                :<span class="lineNoCov">          0 :         grp = xmalloc(sizeof *grp);</span>
+<span class="lineNum">     400 </span>                :<span class="lineNoCov">          0 :         hmap_insert(&amp;ms-&gt;table, &amp;grp-&gt;hmap_node, hash);</span>
+<span class="lineNum">     401 </span>                :<span class="lineNoCov">          0 :         grp-&gt;ip4 = ip4;</span>
+<span class="lineNum">     402 </span>                :<span class="lineNoCov">          0 :         grp-&gt;vlan = vlan;</span>
+<span class="lineNum">     403 </span>                :<span class="lineNoCov">          0 :         list_init(&amp;grp-&gt;bundle_lru);</span>
+<span class="lineNum">     404 </span>                :<span class="lineNoCov">          0 :         learned = true;</span>
+<span class="lineNum">     405 </span>                :<span class="lineNoCov">          0 :         ms-&gt;need_revalidate = true;</span>
+<span class="lineNum">     406 </span>                :<span class="lineNoCov">          0 :         COVERAGE_INC(mcast_snooping_learned);</span>
+<span class="lineNum">     407 </span>                :            :     } else {
+<span class="lineNum">     408 </span>                :<span class="lineNoCov">          0 :         list_remove(&amp;grp-&gt;group_node);</span>
+<span class="lineNum">     409 </span>                :            :     }
+<span class="lineNum">     410 </span>                :<span class="lineNoCov">          0 :     mcast_group_insert_bundle(ms, grp, port, ms-&gt;idle_time);</span>
+<span class="lineNum">     411 </span>                :            : 
+<span class="lineNum">     412 </span>                :            :     /* Mark 'grp' as recently used. */
+<span class="lineNum">     413 </span>                :<span class="lineNoCov">          0 :     list_push_back(&amp;ms-&gt;group_lru, &amp;grp-&gt;group_node);</span>
+<span class="lineNum">     414 </span>                :<span class="lineNoCov">          0 :     return learned;</span>
+<span class="lineNum">     415 </span>                :            : }
+<a name="416"><span class="lineNum">     416 </span>                :            : </a>
+<span class="lineNum">     417 </span>                :            : bool
+<span class="lineNum">     418 </span>                :<span class="lineNoCov">          0 : mcast_snooping_leave_group(struct mcast_snooping *ms, ovs_be32 ip4,</span>
+<span class="lineNum">     419 </span>                :            :                            uint16_t vlan, void *port)
+<span class="lineNum">     420 </span>                :            :     OVS_REQ_WRLOCK(ms-&gt;rwlock)
+<span class="lineNum">     421 </span>                :            : {
+<span class="lineNum">     422 </span>                :            :     struct mcast_group *grp;
+<span class="lineNum">     423 </span>                :            : 
+<span class="lineNum">     424 </span>                :<span class="lineNoCov">          0 :     grp = mcast_snooping_lookup(ms, ip4, vlan);</span>
+<span class="lineNum">     425 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (grp &amp;&amp; mcast_group_delete_bundle(ms, grp, port)) {</span>
+<span class="lineNum">     426 </span>                :<span class="lineNoCov">          0 :         ms-&gt;need_revalidate = true;</span>
+<span class="lineNum">     427 </span>                :<span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">     428 </span>                :            :     }
+<span class="lineNum">     429 </span>                :<span class="lineNoCov">          0 :     return false;</span>
+<span class="lineNum">     430 </span>                :            : }
+<span class="lineNum">     431 </span>                :            : 
+<span class="lineNum">     432 </span>                :            : 
+<span class="lineNum">     433 </span>                :            : /* Router ports. */
+<span class="lineNum">     434 </span>                :            : 
+<span class="lineNum">     435 </span>                :            : /* Returns the number of seconds since the multicast router
+<a name="436"><span class="lineNum">     436 </span>                :            :  * was learned in a port. */</a>
+<span class="lineNum">     437 </span>                :            : int
+<span class="lineNum">     438 </span>                :<span class="lineNoCov">          0 : mcast_mrouter_age(const struct mcast_snooping *ms OVS_UNUSED,</span>
+<span class="lineNum">     439 </span>                :            :                   const struct mcast_mrouter_bundle *mrouter)
+<span class="lineNum">     440 </span>                :            : {
+<span class="lineNum">     441 </span>                :<span class="lineNoCov">          0 :     time_t remaining = mrouter-&gt;expires - time_now();</span>
+<span class="lineNum">     442 </span>                :<span class="lineNoCov">          0 :     return MCAST_MROUTER_PORT_IDLE_TIME - remaining;</span>
+<span class="lineNum">     443 </span>                :            : }
+<a name="444"><span class="lineNum">     444 </span>                :            : </a>
+<span class="lineNum">     445 </span>                :            : static struct mcast_mrouter_bundle *
+<span class="lineNum">     446 </span>                :<span class="lineNoCov">          0 : mcast_mrouter_from_lru_node(struct list *list)</span>
+<span class="lineNum">     447 </span>                :            : {
+<span class="lineNum">     448 </span>                :<span class="lineNoCov">          0 :     return CONTAINER_OF(list, struct mcast_mrouter_bundle, mrouter_node);</span>
+<span class="lineNum">     449 </span>                :            : }
+<span class="lineNum">     450 </span>                :            : 
+<span class="lineNum">     451 </span>                :            : /* If the LRU list is not empty, stores the least-recently-used mrouter
+<span class="lineNum">     452 </span>                :            :  * in '*m' and returns true.  Otherwise, if the LRU list is empty,
+<a name="453"><span class="lineNum">     453 </span>                :            :  * stores NULL in '*m' and return false. */</a>
+<span class="lineNum">     454 </span>                :            : static bool
+<span class="lineNum">     455 </span>                :<span class="lineNoCov">          0 : mrouter_get_lru(const struct mcast_snooping *ms,</span>
+<span class="lineNum">     456 </span>                :            :                 struct mcast_mrouter_bundle **m)
+<span class="lineNum">     457 </span>                :            :     OVS_REQ_RDLOCK(ms-&gt;rwlock)
+<span class="lineNum">     458 </span>                :            : {
+<span class="lineNum">     459 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!list_is_empty(&amp;ms-&gt;mrouter_lru)) {</span>
+<span class="lineNum">     460 </span>                :<span class="lineNoCov">          0 :         *m = mcast_mrouter_from_lru_node(ms-&gt;mrouter_lru.next);</span>
+<span class="lineNum">     461 </span>                :<span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">     462 </span>                :            :     } else {
+<span class="lineNum">     463 </span>                :<span class="lineNoCov">          0 :         *m = NULL;</span>
+<span class="lineNum">     464 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     465 </span>                :            :     }
+<span class="lineNum">     466 </span>                :            : }
+<a name="467"><span class="lineNum">     467 </span>                :            : </a>
+<span class="lineNum">     468 </span>                :            : static struct mcast_mrouter_bundle *
+<span class="lineNum">     469 </span>                :<span class="lineNoCov">          0 : mcast_snooping_mrouter_lookup(struct mcast_snooping *ms, uint16_t vlan,</span>
+<span class="lineNum">     470 </span>                :            :                               void *port)
+<span class="lineNum">     471 </span>                :            :     OVS_REQ_RDLOCK(ms-&gt;rwlock)
+<span class="lineNum">     472 </span>                :            : {
+<span class="lineNum">     473 </span>                :            :     struct mcast_mrouter_bundle *mrouter;
+<span class="lineNum">     474 </span>                :            : 
+<span class="lineNum">     475 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     LIST_FOR_EACH (mrouter, mrouter_node, &amp;ms-&gt;mrouter_lru) {</span>
+<span class="lineNum">     476 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (mrouter-&gt;vlan == vlan &amp;&amp; mrouter-&gt;port == port) {</span>
+<span class="lineNum">     477 </span>                :<span class="lineNoCov">          0 :             return mrouter;</span>
+<span class="lineNum">     478 </span>                :            :         }
+<span class="lineNum">     479 </span>                :            :     }
+<span class="lineNum">     480 </span>                :<span class="lineNoCov">          0 :     return NULL;</span>
+<span class="lineNum">     481 </span>                :            : }
+<a name="482"><span class="lineNum">     482 </span>                :            : </a>
+<span class="lineNum">     483 </span>                :            : bool
+<span class="lineNum">     484 </span>                :<span class="lineNoCov">          0 : mcast_snooping_add_mrouter(struct mcast_snooping *ms, uint16_t vlan,</span>
+<span class="lineNum">     485 </span>                :            :                            void *port)
+<span class="lineNum">     486 </span>                :            :     OVS_REQ_WRLOCK(ms-&gt;rwlock)
+<span class="lineNum">     487 </span>                :            : {
+<span class="lineNum">     488 </span>                :            :     struct mcast_mrouter_bundle *mrouter;
+<span class="lineNum">     489 </span>                :            : 
+<span class="lineNum">     490 </span>                :            :     /* Avoid duplicate packets. */
+<span class="lineNum">     491 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (mcast_snooping_fport_lookup(ms, vlan, port)) {</span>
+<span class="lineNum">     492 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     493 </span>                :            :     }
+<span class="lineNum">     494 </span>                :            : 
+<span class="lineNum">     495 </span>                :<span class="lineNoCov">          0 :     mrouter = mcast_snooping_mrouter_lookup(ms, vlan, port);</span>
+<span class="lineNum">     496 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (mrouter) {</span>
+<span class="lineNum">     497 </span>                :<span class="lineNoCov">          0 :         list_remove(&amp;mrouter-&gt;mrouter_node);</span>
+<span class="lineNum">     498 </span>                :            :     } else {
+<span class="lineNum">     499 </span>                :<span class="lineNoCov">          0 :         mrouter = xmalloc(sizeof *mrouter);</span>
+<span class="lineNum">     500 </span>                :<span class="lineNoCov">          0 :         mrouter-&gt;vlan = vlan;</span>
+<span class="lineNum">     501 </span>                :<span class="lineNoCov">          0 :         mrouter-&gt;port = port;</span>
+<span class="lineNum">     502 </span>                :<span class="lineNoCov">          0 :         COVERAGE_INC(mcast_snooping_learned);</span>
+<span class="lineNum">     503 </span>                :<span class="lineNoCov">          0 :         ms-&gt;need_revalidate = true;</span>
+<span class="lineNum">     504 </span>                :            :     }
+<span class="lineNum">     505 </span>                :            : 
+<span class="lineNum">     506 </span>                :<span class="lineNoCov">          0 :     mrouter-&gt;expires = time_now() + MCAST_MROUTER_PORT_IDLE_TIME;</span>
+<span class="lineNum">     507 </span>                :<span class="lineNoCov">          0 :     list_push_back(&amp;ms-&gt;mrouter_lru, &amp;mrouter-&gt;mrouter_node);</span>
+<span class="lineNum">     508 </span>                :<span class="lineNoCov">          0 :     return ms-&gt;need_revalidate;</span>
+<span class="lineNum">     509 </span>                :            : }
+<a name="510"><span class="lineNum">     510 </span>                :            : </a>
+<span class="lineNum">     511 </span>                :            : static void
+<span class="lineNum">     512 </span>                :<span class="lineNoCov">          0 : mcast_snooping_flush_mrouter(struct mcast_mrouter_bundle *mrouter)</span>
+<span class="lineNum">     513 </span>                :            : {
+<span class="lineNum">     514 </span>                :<span class="lineNoCov">          0 :     list_remove(&amp;mrouter-&gt;mrouter_node);</span>
+<span class="lineNum">     515 </span>                :<span class="lineNoCov">          0 :     free(mrouter);</span>
+<span class="lineNum">     516 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     517 </span>                :            : 
+<span class="lineNum">     518 </span>                :            : /* Flood ports. */
+<a name="519"><span class="lineNum">     519 </span>                :            : </a>
+<span class="lineNum">     520 </span>                :            : static struct mcast_fport_bundle *
+<span class="lineNum">     521 </span>                :<span class="lineNoCov">          0 : mcast_fport_from_list_node(struct list *list)</span>
+<span class="lineNum">     522 </span>                :            : {
+<span class="lineNum">     523 </span>                :<span class="lineNoCov">          0 :     return CONTAINER_OF(list, struct mcast_fport_bundle, fport_node);</span>
+<span class="lineNum">     524 </span>                :            : }
+<span class="lineNum">     525 </span>                :            : 
+<span class="lineNum">     526 </span>                :            : /* If the list is not empty, stores the fport in '*f' and returns true.
+<a name="527"><span class="lineNum">     527 </span>                :            :  * Otherwise, if the list is empty, stores NULL in '*f' and return false. */</a>
+<span class="lineNum">     528 </span>                :            : static bool
+<span class="lineNum">     529 </span>                :<span class="lineNoCov">          0 : fport_get(const struct mcast_snooping *ms, struct mcast_fport_bundle **f)</span>
+<span class="lineNum">     530 </span>                :            :     OVS_REQ_RDLOCK(ms-&gt;rwlock)
+<span class="lineNum">     531 </span>                :            : {
+<span class="lineNum">     532 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!list_is_empty(&amp;ms-&gt;fport_list)) {</span>
+<span class="lineNum">     533 </span>                :<span class="lineNoCov">          0 :         *f = mcast_fport_from_list_node(ms-&gt;fport_list.next);</span>
+<span class="lineNum">     534 </span>                :<span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">     535 </span>                :            :     } else {
+<span class="lineNum">     536 </span>                :<span class="lineNoCov">          0 :         *f = NULL;</span>
+<span class="lineNum">     537 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     538 </span>                :            :     }
+<span class="lineNum">     539 </span>                :            : }
+<a name="540"><span class="lineNum">     540 </span>                :            : </a>
+<span class="lineNum">     541 </span>                :            : struct mcast_fport_bundle *
+<span class="lineNum">     542 </span>                :<span class="lineNoCov">          0 : mcast_snooping_fport_lookup(struct mcast_snooping *ms, uint16_t vlan,</span>
+<span class="lineNum">     543 </span>                :            :                             void *port)
+<span class="lineNum">     544 </span>                :            :     OVS_REQ_RDLOCK(ms-&gt;rwlock)
+<span class="lineNum">     545 </span>                :            : {
+<span class="lineNum">     546 </span>                :            :     struct mcast_fport_bundle *fport;
+<span class="lineNum">     547 </span>                :            : 
+<span class="lineNum">     548 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     LIST_FOR_EACH (fport, fport_node, &amp;ms-&gt;fport_list) {</span>
+<span class="lineNum">     549 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (fport-&gt;vlan == vlan &amp;&amp; fport-&gt;port == port) {</span>
+<span class="lineNum">     550 </span>                :<span class="lineNoCov">          0 :             return fport;</span>
+<span class="lineNum">     551 </span>                :            :         }
+<span class="lineNum">     552 </span>                :            :     }
+<span class="lineNum">     553 </span>                :<span class="lineNoCov">          0 :     return NULL;</span>
+<span class="lineNum">     554 </span>                :            : }
+<a name="555"><span class="lineNum">     555 </span>                :            : </a>
+<span class="lineNum">     556 </span>                :            : static void
+<span class="lineNum">     557 </span>                :<span class="lineNoCov">          0 : mcast_snooping_add_fport(struct mcast_snooping *ms, uint16_t vlan, void *port)</span>
+<span class="lineNum">     558 </span>                :            :     OVS_REQ_WRLOCK(ms-&gt;rwlock)
+<span class="lineNum">     559 </span>                :            : {
+<span class="lineNum">     560 </span>                :            :     struct mcast_fport_bundle *fport;
+<span class="lineNum">     561 </span>                :            : 
+<span class="lineNum">     562 </span>                :<span class="lineNoCov">          0 :     fport = xmalloc(sizeof *fport);</span>
+<span class="lineNum">     563 </span>                :<span class="lineNoCov">          0 :     fport-&gt;vlan = vlan;</span>
+<span class="lineNum">     564 </span>                :<span class="lineNoCov">          0 :     fport-&gt;port = port;</span>
+<span class="lineNum">     565 </span>                :<span class="lineNoCov">          0 :     list_insert(&amp;ms-&gt;fport_list, &amp;fport-&gt;fport_node);</span>
+<span class="lineNum">     566 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="567"><span class="lineNum">     567 </span>                :            : </a>
+<span class="lineNum">     568 </span>                :            : static void
+<span class="lineNum">     569 </span>                :<span class="lineNoCov">          0 : mcast_snooping_flush_fport(struct mcast_fport_bundle *fport)</span>
+<span class="lineNum">     570 </span>                :            : {
+<span class="lineNum">     571 </span>                :<span class="lineNoCov">          0 :     list_remove(&amp;fport-&gt;fport_node);</span>
+<span class="lineNum">     572 </span>                :<span class="lineNoCov">          0 :     free(fport);</span>
+<span class="lineNum">     573 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="574"><span class="lineNum">     574 </span>                :            : </a>
+<span class="lineNum">     575 </span>                :            : void
+<span class="lineNum">     576 </span>                :<span class="lineNoCov">          0 : mcast_snooping_set_port_flood(struct mcast_snooping *ms, uint16_t vlan,</span>
+<span class="lineNum">     577 </span>                :            :                               void *port, bool flood)
+<span class="lineNum">     578 </span>                :            :     OVS_REQ_WRLOCK(ms-&gt;rwlock)
+<span class="lineNum">     579 </span>                :            : {
+<span class="lineNum">     580 </span>                :            :     struct mcast_fport_bundle *fport;
+<span class="lineNum">     581 </span>                :            : 
+<span class="lineNum">     582 </span>                :<span class="lineNoCov">          0 :     fport = mcast_snooping_fport_lookup(ms, vlan, port);</span>
+<span class="lineNum">     583 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (flood &amp;&amp; !fport) {</span>
+<span class="lineNum">     584 </span>                :<span class="lineNoCov">          0 :         mcast_snooping_add_fport(ms, vlan, port);</span>
+<span class="lineNum">     585 </span>                :<span class="lineNoCov">          0 :         ms-&gt;need_revalidate = true;</span>
+<span class="lineNum">     586 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     } else if (!flood &amp;&amp; fport) {</span>
+<span class="lineNum">     587 </span>                :<span class="lineNoCov">          0 :         mcast_snooping_flush_fport(fport);</span>
+<span class="lineNum">     588 </span>                :<span class="lineNoCov">          0 :         ms-&gt;need_revalidate = true;</span>
+<span class="lineNum">     589 </span>                :            :     }
+<span class="lineNum">     590 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     591 </span>                :            : 
+<span class="lineNum">     592 </span>                :            : /* Run and flush. */
+<a name="593"><span class="lineNum">     593 </span>                :            : </a>
+<span class="lineNum">     594 </span>                :            : static void
+<span class="lineNum">     595 </span>                :<span class="lineNoCov">          0 : mcast_snooping_mdb_flush__(struct mcast_snooping *ms)</span>
+<span class="lineNum">     596 </span>                :            :     OVS_REQ_WRLOCK(ms-&gt;rwlock)
+<span class="lineNum">     597 </span>                :            : {
+<span class="lineNum">     598 </span>                :            :     struct mcast_group *grp;
+<span class="lineNum">     599 </span>                :            :     struct mcast_mrouter_bundle *mrouter;
+<span class="lineNum">     600 </span>                :            : 
+<span class="lineNum">     601 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     while (group_get_lru(ms, &amp;grp)) {</span>
+<span class="lineNum">     602 </span>                :<span class="lineNoCov">          0 :         mcast_snooping_flush_group(ms, grp);</span>
+<span class="lineNum">     603 </span>                :            :     }
+<span class="lineNum">     604 </span>                :            : 
+<span class="lineNum">     605 </span>                :<span class="lineNoCov">          0 :     hmap_shrink(&amp;ms-&gt;table);</span>
+<span class="lineNum">     606 </span>                :            : 
+<span class="lineNum">     607 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     while (mrouter_get_lru(ms, &amp;mrouter)) {</span>
+<span class="lineNum">     608 </span>                :<span class="lineNoCov">          0 :         mcast_snooping_flush_mrouter(mrouter);</span>
+<span class="lineNum">     609 </span>                :            :     }
+<span class="lineNum">     610 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="611"><span class="lineNum">     611 </span>                :            : </a>
+<span class="lineNum">     612 </span>                :            : void
+<span class="lineNum">     613 </span>                :<span class="lineNoCov">          0 : mcast_snooping_mdb_flush(struct mcast_snooping *ms)</span>
+<span class="lineNum">     614 </span>                :            : {
+<span class="lineNum">     615 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!mcast_snooping_enabled(ms)) {</span>
+<span class="lineNum">     616 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     617 </span>                :            :     }
+<span class="lineNum">     618 </span>                :            : 
+<span class="lineNum">     619 </span>                :<span class="lineNoCov">          0 :     ovs_rwlock_wrlock(&amp;ms-&gt;rwlock);</span>
+<span class="lineNum">     620 </span>                :<span class="lineNoCov">          0 :     mcast_snooping_mdb_flush__(ms);</span>
+<span class="lineNum">     621 </span>                :<span class="lineNoCov">          0 :     ovs_rwlock_unlock(&amp;ms-&gt;rwlock);</span>
+<span class="lineNum">     622 </span>                :            : }
+<span class="lineNum">     623 </span>                :            : 
+<a name="624"><span class="lineNum">     624 </span>                :            : /* Flushes mdb and flood ports. */</a>
+<span class="lineNum">     625 </span>                :            : static void
+<span class="lineNum">     626 </span>                :<span class="lineNoCov">          0 : mcast_snooping_flush__(struct mcast_snooping *ms)</span>
+<span class="lineNum">     627 </span>                :            :     OVS_REQ_WRLOCK(ms-&gt;rwlock)
+<span class="lineNum">     628 </span>                :            : {
+<span class="lineNum">     629 </span>                :            :     struct mcast_group *grp;
+<span class="lineNum">     630 </span>                :            :     struct mcast_mrouter_bundle *mrouter;
+<span class="lineNum">     631 </span>                :            :     struct mcast_fport_bundle *fport;
+<span class="lineNum">     632 </span>                :            : 
+<span class="lineNum">     633 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     while (group_get_lru(ms, &amp;grp)) {</span>
+<span class="lineNum">     634 </span>                :<span class="lineNoCov">          0 :         mcast_snooping_flush_group(ms, grp);</span>
+<span class="lineNum">     635 </span>                :            :     }
+<span class="lineNum">     636 </span>                :            : 
+<span class="lineNum">     637 </span>                :<span class="lineNoCov">          0 :     hmap_shrink(&amp;ms-&gt;table);</span>
+<span class="lineNum">     638 </span>                :            : 
+<span class="lineNum">     639 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     while (mrouter_get_lru(ms, &amp;mrouter)) {</span>
+<span class="lineNum">     640 </span>                :<span class="lineNoCov">          0 :         mcast_snooping_flush_mrouter(mrouter);</span>
+<span class="lineNum">     641 </span>                :            :     }
+<span class="lineNum">     642 </span>                :            : 
+<span class="lineNum">     643 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     while (fport_get(ms, &amp;fport)) {</span>
+<span class="lineNum">     644 </span>                :<span class="lineNoCov">          0 :         mcast_snooping_flush_fport(fport);</span>
+<span class="lineNum">     645 </span>                :            :     }
+<span class="lineNum">     646 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="647"><span class="lineNum">     647 </span>                :            : </a>
+<span class="lineNum">     648 </span>                :            : void
+<span class="lineNum">     649 </span>                :<span class="lineNoCov">          0 : mcast_snooping_flush(struct mcast_snooping *ms)</span>
+<span class="lineNum">     650 </span>                :            : {
+<span class="lineNum">     651 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!mcast_snooping_enabled(ms)) {</span>
+<span class="lineNum">     652 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     653 </span>                :            :     }
+<span class="lineNum">     654 </span>                :            : 
+<span class="lineNum">     655 </span>                :<span class="lineNoCov">          0 :     ovs_rwlock_wrlock(&amp;ms-&gt;rwlock);</span>
+<span class="lineNum">     656 </span>                :<span class="lineNoCov">          0 :     mcast_snooping_flush__(ms);</span>
+<span class="lineNum">     657 </span>                :<span class="lineNoCov">          0 :     ovs_rwlock_unlock(&amp;ms-&gt;rwlock);</span>
+<span class="lineNum">     658 </span>                :            : }
+<a name="659"><span class="lineNum">     659 </span>                :            : </a>
+<span class="lineNum">     660 </span>                :            : static bool
+<span class="lineNum">     661 </span>                :<span class="lineNoCov">          0 : mcast_snooping_run__(struct mcast_snooping *ms)</span>
+<span class="lineNum">     662 </span>                :            :     OVS_REQ_WRLOCK(ms-&gt;rwlock)
+<span class="lineNum">     663 </span>                :            : {
+<span class="lineNum">     664 </span>                :            :     bool need_revalidate;
+<span class="lineNum">     665 </span>                :            :     struct mcast_group *grp;
+<span class="lineNum">     666 </span>                :            :     struct mcast_mrouter_bundle *mrouter;
+<span class="lineNum">     667 </span>                :            :     int mrouter_expired;
+<span class="lineNum">     668 </span>                :            : 
+<span class="lineNum">     669 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     while (group_get_lru(ms, &amp;grp)) {</span>
+<span class="lineNum">     670 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (hmap_count(&amp;ms-&gt;table) &gt; ms-&gt;max_entries) {</span>
+<span class="lineNum">     671 </span>                :<span class="lineNoCov">          0 :             mcast_snooping_flush_group(ms, grp);</span>
+<span class="lineNum">     672 </span>                :            :         } else {
+<span class="lineNum">     673 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (!mcast_snooping_prune_expired(ms, grp)) {</span>
+<span class="lineNum">     674 </span>                :<span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     675 </span>                :            :             }
+<span class="lineNum">     676 </span>                :            :         }
+<span class="lineNum">     677 </span>                :            :     }
+<span class="lineNum">     678 </span>                :            : 
+<span class="lineNum">     679 </span>                :<span class="lineNoCov">          0 :     hmap_shrink(&amp;ms-&gt;table);</span>
+<span class="lineNum">     680 </span>                :            : 
+<span class="lineNum">     681 </span>                :<span class="lineNoCov">          0 :     mrouter_expired = 0;</span>
+<span class="lineNum">     682 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     while (mrouter_get_lru(ms, &amp;mrouter)</span>
+<span class="lineNum">     683 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :            &amp;&amp; time_now() &gt;= mrouter-&gt;expires) {</span>
+<span class="lineNum">     684 </span>                :<span class="lineNoCov">          0 :         mcast_snooping_flush_mrouter(mrouter);</span>
+<span class="lineNum">     685 </span>                :<span class="lineNoCov">          0 :         mrouter_expired++;</span>
+<span class="lineNum">     686 </span>                :            :     }
+<span class="lineNum">     687 </span>                :            : 
+<span class="lineNum">     688 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (mrouter_expired) {</span>
+<span class="lineNum">     689 </span>                :<span class="lineNoCov">          0 :         ms-&gt;need_revalidate = true;</span>
+<span class="lineNum">     690 </span>                :<span class="lineNoCov">          0 :         COVERAGE_ADD(mcast_snooping_expired, mrouter_expired);</span>
+<span class="lineNum">     691 </span>                :            :     }
+<span class="lineNum">     692 </span>                :            : 
+<span class="lineNum">     693 </span>                :<span class="lineNoCov">          0 :     need_revalidate = ms-&gt;need_revalidate;</span>
+<span class="lineNum">     694 </span>                :<span class="lineNoCov">          0 :     ms-&gt;need_revalidate = false;</span>
+<span class="lineNum">     695 </span>                :<span class="lineNoCov">          0 :     return need_revalidate;</span>
+<span class="lineNum">     696 </span>                :            : }
+<span class="lineNum">     697 </span>                :            : 
+<span class="lineNum">     698 </span>                :            : /* Does periodic work required by 'ms'. Returns true if something changed
+<a name="699"><span class="lineNum">     699 </span>                :            :  * that may require flow revalidation. */</a>
+<span class="lineNum">     700 </span>                :            : bool
+<span class="lineNum">     701 </span>                :<span class="lineCov">      35602 : mcast_snooping_run(struct mcast_snooping *ms)</span>
+<span class="lineNum">     702 </span>                :            : {
+<span class="lineNum">     703 </span>                :            :     bool need_revalidate;
+<span class="lineNum">     704 </span>                :            : 
+<span class="lineNum">     705 </span>        [<span class="branchCov" title="Branch 1 was taken 35602 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">      35602 :     if (!mcast_snooping_enabled(ms)) {</span>
+<span class="lineNum">     706 </span>                :<span class="lineCov">      35602 :         return false;</span>
+<span class="lineNum">     707 </span>                :            :     }
+<span class="lineNum">     708 </span>                :            : 
+<span class="lineNum">     709 </span>                :<span class="lineNoCov">          0 :     ovs_rwlock_wrlock(&amp;ms-&gt;rwlock);</span>
+<span class="lineNum">     710 </span>                :<span class="lineNoCov">          0 :     need_revalidate = mcast_snooping_run__(ms);</span>
+<span class="lineNum">     711 </span>                :<span class="lineNoCov">          0 :     ovs_rwlock_unlock(&amp;ms-&gt;rwlock);</span>
+<span class="lineNum">     712 </span>                :            : 
+<span class="lineNum">     713 </span>                :<span class="lineCov">      35602 :     return need_revalidate;</span>
+<span class="lineNum">     714 </span>                :            : }
+<a name="715"><span class="lineNum">     715 </span>                :            : </a>
+<span class="lineNum">     716 </span>                :            : static void
+<span class="lineNum">     717 </span>                :<span class="lineNoCov">          0 : mcast_snooping_wait__(struct mcast_snooping *ms)</span>
+<span class="lineNum">     718 </span>                :            :     OVS_REQ_RDLOCK(ms-&gt;rwlock)
+<span class="lineNum">     719 </span>                :            : {
+<span class="lineNum">     720 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (hmap_count(&amp;ms-&gt;table) &gt; ms-&gt;max_entries</span>
+<span class="lineNum">     721 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         || ms-&gt;need_revalidate) {</span>
+<span class="lineNum">     722 </span>                :<span class="lineNoCov">          0 :         poll_immediate_wake();</span>
+<span class="lineNum">     723 </span>                :            :     } else {
+<span class="lineNum">     724 </span>                :            :         struct mcast_group *grp;
+<span class="lineNum">     725 </span>                :            :         struct mcast_group_bundle *bundle;
+<span class="lineNum">     726 </span>                :            :         struct mcast_mrouter_bundle *mrouter;
+<span class="lineNum">     727 </span>                :            :         long long int mrouter_msec;
+<span class="lineNum">     728 </span>                :<span class="lineNoCov">          0 :         long long int msec = 0;</span>
+<span class="lineNum">     729 </span>                :            : 
+<span class="lineNum">     730 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!list_is_empty(&amp;ms-&gt;group_lru)) {</span>
+<span class="lineNum">     731 </span>                :<span class="lineNoCov">          0 :             grp = mcast_group_from_lru_node(ms-&gt;group_lru.next);</span>
+<span class="lineNum">     732 </span>                :<span class="lineNoCov">          0 :             bundle = mcast_group_bundle_from_lru_node(grp-&gt;bundle_lru.next);</span>
+<span class="lineNum">     733 </span>                :<span class="lineNoCov">          0 :             msec = bundle-&gt;expires * 1000LL;</span>
+<span class="lineNum">     734 </span>                :            :         }
+<span class="lineNum">     735 </span>                :            : 
+<span class="lineNum">     736 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!list_is_empty(&amp;ms-&gt;mrouter_lru)) {</span>
+<span class="lineNum">     737 </span>                :<span class="lineNoCov">          0 :             mrouter = mcast_mrouter_from_lru_node(ms-&gt;mrouter_lru.next);</span>
+<span class="lineNum">     738 </span>                :<span class="lineNoCov">          0 :             mrouter_msec = mrouter-&gt;expires * 1000LL;</span>
+<span class="lineNum">     739 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             msec = msec ? MIN(msec, mrouter_msec) : mrouter_msec;</span>
+<span class="lineNum">     740 </span>                :            :         }
+<span class="lineNum">     741 </span>                :            : 
+<span class="lineNum">     742 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (msec) {</span>
+<span class="lineNum">     743 </span>                :<span class="lineNoCov">          0 :             poll_timer_wait_until(msec);</span>
+<span class="lineNum">     744 </span>                :            :         }
+<span class="lineNum">     745 </span>                :            :     }
+<span class="lineNum">     746 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="747"><span class="lineNum">     747 </span>                :            : </a>
+<span class="lineNum">     748 </span>                :            : void
+<span class="lineNum">     749 </span>                :<span class="lineCov">      35071 : mcast_snooping_wait(struct mcast_snooping *ms)</span>
+<span class="lineNum">     750 </span>                :            : {
+<span class="lineNum">     751 </span>        [<span class="branchCov" title="Branch 1 was taken 35071 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">      35071 :     if (!mcast_snooping_enabled(ms)) {</span>
+<span class="lineNum">     752 </span>                :<span class="lineCov">      35071 :         return;</span>
+<span class="lineNum">     753 </span>                :            :     }
+<span class="lineNum">     754 </span>                :            : 
+<span class="lineNum">     755 </span>                :<span class="lineNoCov">          0 :     ovs_rwlock_rdlock(&amp;ms-&gt;rwlock);</span>
+<span class="lineNum">     756 </span>                :<span class="lineNoCov">          0 :     mcast_snooping_wait__(ms);</span>
+<span class="lineNum">     757 </span>                :<span class="lineNoCov">          0 :     ovs_rwlock_unlock(&amp;ms-&gt;rwlock);</span>
+<span class="lineNum">     758 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

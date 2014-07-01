@@ -1,0 +1,601 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/route-table.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - route-table.c<span style="font-size: 80%;"> (source / <a href="route-table.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">167</td>
+            <td class="headerCovTableEntry">189</td>
+            <td class="headerCovTableEntryMed">88.4 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">20</td>
+            <td class="headerCovTableEntry">22</td>
+            <td class="headerCovTableEntryHi">90.9 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">59</td>
+            <td class="headerCovTableEntry">90</td>
+            <td class="headerCovTableEntryLo">65.6 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2011, 2012, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &quot;route-table.h&quot;
+<span class="lineNum">      20 </span>                :            : 
+<span class="lineNum">      21 </span>                :            : #include &lt;arpa/inet.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;linux/rtnetlink.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &lt;net/if.h&gt;
+<span class="lineNum">      25 </span>                :            : 
+<span class="lineNum">      26 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;hmap.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;netlink.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;netlink-notifier.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;netlink-socket.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;rtnetlink-link.h&quot;
+<a name="33"><span class="lineNum">      33 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      34 </span>                :            : 
+<span class="lineNum">      35 </span>                :<span class="lineCov">       7479 : VLOG_DEFINE_THIS_MODULE(route_table);</span>
+<span class="lineNum">      36 </span>                :            : 
+<span class="lineNum">      37 </span>                :            : struct route_data {
+<span class="lineNum">      38 </span>                :            :     /* Copied from struct rtmsg. */
+<span class="lineNum">      39 </span>                :            :     unsigned char rtm_dst_len;
+<span class="lineNum">      40 </span>                :            : 
+<span class="lineNum">      41 </span>                :            :     /* Extracted from Netlink attributes. */
+<span class="lineNum">      42 </span>                :            :     uint32_t rta_dst; /* Destination in host byte order. 0 if missing. */
+<span class="lineNum">      43 </span>                :            :     int rta_oif;      /* Output interface index. */
+<span class="lineNum">      44 </span>                :            : };
+<span class="lineNum">      45 </span>                :            : 
+<span class="lineNum">      46 </span>                :            : /* A digested version of a route message sent down by the kernel to indicate
+<span class="lineNum">      47 </span>                :            :  * that a route has changed. */
+<span class="lineNum">      48 </span>                :            : struct route_table_msg {
+<span class="lineNum">      49 </span>                :            :     bool relevant;        /* Should this message be processed? */
+<span class="lineNum">      50 </span>                :            :     int nlmsg_type;       /* e.g. RTM_NEWROUTE, RTM_DELROUTE. */
+<span class="lineNum">      51 </span>                :            :     struct route_data rd; /* Data parsed from this message. */
+<span class="lineNum">      52 </span>                :            : };
+<span class="lineNum">      53 </span>                :            : 
+<span class="lineNum">      54 </span>                :            : struct route_node {
+<span class="lineNum">      55 </span>                :            :     struct hmap_node node; /* Node in route_map. */
+<span class="lineNum">      56 </span>                :            :     struct route_data rd;  /* Data associated with this node. */
+<span class="lineNum">      57 </span>                :            : };
+<span class="lineNum">      58 </span>                :            : 
+<span class="lineNum">      59 </span>                :            : struct name_node {
+<span class="lineNum">      60 </span>                :            :     struct hmap_node node; /* Node in name_map. */
+<span class="lineNum">      61 </span>                :            :     uint32_t ifi_index;    /* Kernel interface index. */
+<span class="lineNum">      62 </span>                :            : 
+<span class="lineNum">      63 </span>                :            :     char ifname[IFNAMSIZ]; /* Interface name. */
+<span class="lineNum">      64 </span>                :            : };
+<span class="lineNum">      65 </span>                :            : 
+<span class="lineNum">      66 </span>                :            : static struct ovs_mutex route_table_mutex = OVS_MUTEX_INITIALIZER;
+<span class="lineNum">      67 </span>                :            : static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 20);
+<span class="lineNum">      68 </span>                :            : 
+<span class="lineNum">      69 </span>                :            : /* Global change number for route-table, which should be incremented
+<span class="lineNum">      70 </span>                :            :  * every time route_table_reset() is called.  */
+<span class="lineNum">      71 </span>                :            : static uint64_t rt_change_seq;
+<span class="lineNum">      72 </span>                :            : 
+<span class="lineNum">      73 </span>                :            : static unsigned int register_count = 0;
+<span class="lineNum">      74 </span>                :            : static struct nln *nln = NULL;
+<span class="lineNum">      75 </span>                :            : static struct route_table_msg rtmsg;
+<span class="lineNum">      76 </span>                :            : static struct nln_notifier *route_notifier = NULL;
+<span class="lineNum">      77 </span>                :            : static struct nln_notifier *name_notifier = NULL;
+<span class="lineNum">      78 </span>                :            : 
+<span class="lineNum">      79 </span>                :            : static bool route_table_valid = false;
+<span class="lineNum">      80 </span>                :            : static bool name_table_valid = false;
+<span class="lineNum">      81 </span>                :            : static struct hmap route_map;
+<span class="lineNum">      82 </span>                :            : static struct hmap name_map;
+<span class="lineNum">      83 </span>                :            : 
+<span class="lineNum">      84 </span>                :            : static int route_table_reset(void);
+<span class="lineNum">      85 </span>                :            : static bool route_table_get_ifindex(ovs_be32 ip, int *)
+<span class="lineNum">      86 </span>                :            :     OVS_REQUIRES(route_table_mutex);
+<span class="lineNum">      87 </span>                :            : static void route_table_handle_msg(const struct route_table_msg *);
+<span class="lineNum">      88 </span>                :            : static bool route_table_parse(struct ofpbuf *, struct route_table_msg *);
+<span class="lineNum">      89 </span>                :            : static void route_table_change(const struct route_table_msg *, void *);
+<span class="lineNum">      90 </span>                :            : static struct route_node *route_node_lookup(const struct route_data *);
+<span class="lineNum">      91 </span>                :            : static struct route_node *route_node_lookup_by_ip(uint32_t ip);
+<span class="lineNum">      92 </span>                :            : static void route_map_clear(void);
+<span class="lineNum">      93 </span>                :            : static uint32_t hash_route_data(const struct route_data *);
+<span class="lineNum">      94 </span>                :            : 
+<span class="lineNum">      95 </span>                :            : static void name_table_init(void);
+<span class="lineNum">      96 </span>                :            : static void name_table_uninit(void);
+<span class="lineNum">      97 </span>                :            : static int name_table_reset(void);
+<span class="lineNum">      98 </span>                :            : static void name_table_change(const struct rtnetlink_link_change *, void *);
+<span class="lineNum">      99 </span>                :            : static void name_map_clear(void);
+<span class="lineNum">     100 </span>                :            : static struct name_node *name_node_lookup(int ifi_index);
+<span class="lineNum">     101 </span>                :            : 
+<span class="lineNum">     102 </span>                :            : /* Populates 'name' with the name of the interface traffic destined for 'ip'
+<span class="lineNum">     103 </span>                :            :  * is likely to egress out of (see route_table_get_ifindex).
+<span class="lineNum">     104 </span>                :            :  *
+<a name="105"><span class="lineNum">     105 </span>                :            :  * Returns true if successful, otherwise false. */</a>
+<span class="lineNum">     106 </span>                :            : bool
+<span class="lineNum">     107 </span>                :<span class="lineCov">        138 : route_table_get_name(ovs_be32 ip, char name[IFNAMSIZ])</span>
+<span class="lineNum">     108 </span>                :            :     OVS_EXCLUDED(route_table_mutex)
+<span class="lineNum">     109 </span>                :            : {
+<span class="lineNum">     110 </span>                :            :     int ifindex;
+<span class="lineNum">     111 </span>                :            : 
+<span class="lineNum">     112 </span>                :<span class="lineCov">        138 :     ovs_mutex_lock(&amp;route_table_mutex);</span>
+<span class="lineNum">     113 </span>                :            : 
+<span class="lineNum">     114 </span>        [<span class="branchCov" title="Branch 0 was taken 17 times"> + </span><span class="branchCov" title="Branch 1 was taken 121 times"> + </span>]:<span class="lineCov">        138 :     if (!name_table_valid) {</span>
+<span class="lineNum">     115 </span>                :<span class="lineCov">         17 :         name_table_reset();</span>
+<span class="lineNum">     116 </span>                :            :     }
+<span class="lineNum">     117 </span>                :            : 
+<span class="lineNum">     118 </span>        [<span class="branchCov" title="Branch 1 was taken 138 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        138 :     if (route_table_get_ifindex(ip, &amp;ifindex)) {</span>
+<span class="lineNum">     119 </span>                :            :         struct name_node *nn;
+<span class="lineNum">     120 </span>                :            : 
+<span class="lineNum">     121 </span>                :<span class="lineCov">        138 :         nn = name_node_lookup(ifindex);</span>
+<span class="lineNum">     122 </span>        [<span class="branchCov" title="Branch 0 was taken 138 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        138 :         if (nn) {</span>
+<span class="lineNum">     123 </span>                :<span class="lineCov">        138 :             ovs_strlcpy(name, nn-&gt;ifname, IFNAMSIZ);</span>
+<span class="lineNum">     124 </span>                :<span class="lineCov">        138 :             ovs_mutex_unlock(&amp;route_table_mutex);</span>
+<span class="lineNum">     125 </span>                :<span class="lineCov">        138 :             return true;</span>
+<span class="lineNum">     126 </span>                :            :         }
+<span class="lineNum">     127 </span>                :            :     }
+<span class="lineNum">     128 </span>                :            : 
+<span class="lineNum">     129 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;route_table_mutex);</span>
+<span class="lineNum">     130 </span>                :<span class="lineCov">        138 :     return false;</span>
+<span class="lineNum">     131 </span>                :            : }
+<span class="lineNum">     132 </span>                :            : 
+<span class="lineNum">     133 </span>                :            : /* Populates 'ifindex' with the interface index traffic destined for 'ip' is
+<span class="lineNum">     134 </span>                :            :  * likely to egress.  There is no hard guarantee that traffic destined for 'ip'
+<span class="lineNum">     135 </span>                :            :  * will egress out the specified interface.  'ifindex' may refer to an
+<span class="lineNum">     136 </span>                :            :  * interface which is not physical (such as a bridge port).
+<span class="lineNum">     137 </span>                :            :  *
+<a name="138"><span class="lineNum">     138 </span>                :            :  * Returns true if successful, otherwise false. */</a>
+<span class="lineNum">     139 </span>                :            : static bool
+<span class="lineNum">     140 </span>                :<span class="lineCov">        138 : route_table_get_ifindex(ovs_be32 ip_, int *ifindex)</span>
+<span class="lineNum">     141 </span>                :            :     OVS_REQUIRES(route_table_mutex)
+<span class="lineNum">     142 </span>                :            : {
+<span class="lineNum">     143 </span>                :            :     struct route_node *rn;
+<span class="lineNum">     144 </span>                :<span class="lineCov">        138 :     uint32_t ip = ntohl(ip_);</span>
+<span class="lineNum">     145 </span>                :            : 
+<span class="lineNum">     146 </span>                :<span class="lineCov">        138 :     *ifindex = 0;</span>
+<span class="lineNum">     147 </span>                :            : 
+<span class="lineNum">     148 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 138 times"> + </span>]:<span class="lineCov">        138 :     if (!route_table_valid) {</span>
+<span class="lineNum">     149 </span>                :<span class="lineNoCov">          0 :         route_table_reset();</span>
+<span class="lineNum">     150 </span>                :            :     }
+<span class="lineNum">     151 </span>                :            : 
+<span class="lineNum">     152 </span>                :<span class="lineCov">        138 :     rn = route_node_lookup_by_ip(ip);</span>
+<span class="lineNum">     153 </span>                :            : 
+<span class="lineNum">     154 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 138 times"> + </span>]:<span class="lineCov">        138 :     if (rn) {</span>
+<span class="lineNum">     155 </span>                :<span class="lineNoCov">          0 :         *ifindex = rn-&gt;rd.rta_oif;</span>
+<span class="lineNum">     156 </span>                :<span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">     157 </span>                :            :     }
+<span class="lineNum">     158 </span>                :            : 
+<span class="lineNum">     159 </span>                :            :     /* Choose a default route. */
+<span class="lineNum">     160 </span>        [<span class="branchCov" title="Branch 2 was taken 276 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        276 :     HMAP_FOR_EACH(rn, node, &amp;route_map) {</span>
+<span class="lineNum">     161 </span>[<span class="branchCov" title="Branch 0 was taken 138 times"> + </span><span class="branchCov" title="Branch 1 was taken 138 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 138 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        276 :         if (rn-&gt;rd.rta_dst == 0 &amp;&amp; rn-&gt;rd.rtm_dst_len == 0) {</span>
+<span class="lineNum">     162 </span>                :<span class="lineCov">        138 :             *ifindex = rn-&gt;rd.rta_oif;</span>
+<span class="lineNum">     163 </span>                :<span class="lineCov">        138 :             return true;</span>
+<span class="lineNum">     164 </span>                :            :         }
+<span class="lineNum">     165 </span>                :            :     }
+<span class="lineNum">     166 </span>                :            : 
+<span class="lineNum">     167 </span>                :<span class="lineCov">        138 :     return false;</span>
+<span class="lineNum">     168 </span>                :            : }
+<a name="169"><span class="lineNum">     169 </span>                :            : </a>
+<span class="lineNum">     170 </span>                :            : uint64_t
+<span class="lineNum">     171 </span>                :<span class="lineCov">     463978 : route_table_get_change_seq(void)</span>
+<span class="lineNum">     172 </span>                :            : {
+<span class="lineNum">     173 </span>                :<span class="lineCov">     463978 :     return rt_change_seq;</span>
+<span class="lineNum">     174 </span>                :            : }
+<span class="lineNum">     175 </span>                :            : 
+<span class="lineNum">     176 </span>                :            : /* Users of the route_table module should register themselves with this
+<a name="177"><span class="lineNum">     177 </span>                :            :  * function before making any other route_table function calls. */</a>
+<span class="lineNum">     178 </span>                :            : void
+<span class="lineNum">     179 </span>                :<span class="lineCov">         99 : route_table_register(void)</span>
+<span class="lineNum">     180 </span>                :            :     OVS_EXCLUDED(route_table_mutex)
+<span class="lineNum">     181 </span>                :            : {
+<span class="lineNum">     182 </span>                :<span class="lineCov">         99 :     ovs_mutex_lock(&amp;route_table_mutex);</span>
+<span class="lineNum">     183 </span>        [<span class="branchCov" title="Branch 0 was taken 34 times"> + </span><span class="branchCov" title="Branch 1 was taken 65 times"> + </span>]:<span class="lineCov">         99 :     if (!register_count) {</span>
+<span class="lineNum">     184 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 34 times"> + </span>]:<span class="lineCov">         34 :         ovs_assert(!nln);</span>
+<span class="lineNum">     185 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 34 times"> + </span>]:<span class="lineCov">         34 :         ovs_assert(!route_notifier);</span>
+<span class="lineNum">     186 </span>                :            : 
+<span class="lineNum">     187 </span>                :<span class="lineCov">         34 :         nln = nln_create(NETLINK_ROUTE, RTNLGRP_IPV4_ROUTE,</span>
+<span class="lineNum">     188 </span>                :            :                          (nln_parse_func *) route_table_parse, &amp;rtmsg);
+<span class="lineNum">     189 </span>                :            : 
+<span class="lineNum">     190 </span>                :<span class="lineCov">         34 :         route_notifier =</span>
+<span class="lineNum">     191 </span>                :<span class="lineCov">         34 :             nln_notifier_create(nln, (nln_notify_func *) route_table_change,</span>
+<span class="lineNum">     192 </span>                :            :                                 NULL);
+<span class="lineNum">     193 </span>                :            : 
+<span class="lineNum">     194 </span>                :<span class="lineCov">         34 :         hmap_init(&amp;route_map);</span>
+<span class="lineNum">     195 </span>                :<span class="lineCov">         34 :         route_table_reset();</span>
+<span class="lineNum">     196 </span>                :<span class="lineCov">         34 :         name_table_init();</span>
+<span class="lineNum">     197 </span>                :            :     }
+<span class="lineNum">     198 </span>                :            : 
+<span class="lineNum">     199 </span>                :<span class="lineCov">         99 :     register_count++;</span>
+<span class="lineNum">     200 </span>                :<span class="lineCov">         99 :     ovs_mutex_unlock(&amp;route_table_mutex);</span>
+<span class="lineNum">     201 </span>                :<span class="lineCov">         99 : }</span>
+<span class="lineNum">     202 </span>                :            : 
+<span class="lineNum">     203 </span>                :            : /* Users of the route_table module should unregister themselves with this
+<span class="lineNum">     204 </span>                :            :  * function when they will no longer be making any more route_table fuction
+<a name="205"><span class="lineNum">     205 </span>                :            :  * calls. */</a>
+<span class="lineNum">     206 </span>                :            : void
+<span class="lineNum">     207 </span>                :<span class="lineCov">         75 : route_table_unregister(void)</span>
+<span class="lineNum">     208 </span>                :            :     OVS_EXCLUDED(route_table_mutex)
+<span class="lineNum">     209 </span>                :            : {
+<span class="lineNum">     210 </span>                :<span class="lineCov">         75 :     ovs_mutex_lock(&amp;route_table_mutex);</span>
+<span class="lineNum">     211 </span>                :<span class="lineCov">         75 :     register_count--;</span>
+<span class="lineNum">     212 </span>                :            : 
+<span class="lineNum">     213 </span>        [<span class="branchCov" title="Branch 0 was taken 15 times"> + </span><span class="branchCov" title="Branch 1 was taken 60 times"> + </span>]:<span class="lineCov">         75 :     if (!register_count) {</span>
+<span class="lineNum">     214 </span>                :<span class="lineCov">         15 :         nln_notifier_destroy(route_notifier);</span>
+<span class="lineNum">     215 </span>                :<span class="lineCov">         15 :         route_notifier = NULL;</span>
+<span class="lineNum">     216 </span>                :<span class="lineCov">         15 :         nln_destroy(nln);</span>
+<span class="lineNum">     217 </span>                :<span class="lineCov">         15 :         nln = NULL;</span>
+<span class="lineNum">     218 </span>                :            : 
+<span class="lineNum">     219 </span>                :<span class="lineCov">         15 :         route_map_clear();</span>
+<span class="lineNum">     220 </span>                :<span class="lineCov">         15 :         hmap_destroy(&amp;route_map);</span>
+<span class="lineNum">     221 </span>                :<span class="lineCov">         15 :         name_table_uninit();</span>
+<span class="lineNum">     222 </span>                :            :     }
+<span class="lineNum">     223 </span>                :<span class="lineCov">         75 :     ovs_mutex_unlock(&amp;route_table_mutex);</span>
+<span class="lineNum">     224 </span>                :<span class="lineCov">         75 : }</span>
+<span class="lineNum">     225 </span>                :            : 
+<a name="226"><span class="lineNum">     226 </span>                :            : /* Run periodically to update the locally maintained routing table. */</a>
+<span class="lineNum">     227 </span>                :            : void
+<span class="lineNum">     228 </span>                :<span class="lineCov">     232144 : route_table_run(void)</span>
+<span class="lineNum">     229 </span>                :            :     OVS_EXCLUDED(route_table_mutex)
+<span class="lineNum">     230 </span>                :            : {
+<span class="lineNum">     231 </span>                :<span class="lineCov">     232144 :     ovs_mutex_lock(&amp;route_table_mutex);</span>
+<span class="lineNum">     232 </span>        [<span class="branchCov" title="Branch 0 was taken 77827 times"> + </span><span class="branchCov" title="Branch 1 was taken 154317 times"> + </span>]:<span class="lineCov">     232144 :     if (nln) {</span>
+<span class="lineNum">     233 </span>                :<span class="lineCov">      77827 :         rtnetlink_link_run();</span>
+<span class="lineNum">     234 </span>                :<span class="lineCov">      77827 :         nln_run(nln);</span>
+<span class="lineNum">     235 </span>                :            : 
+<span class="lineNum">     236 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 77827 times"> + </span>]:<span class="lineCov">      77827 :         if (!route_table_valid) {</span>
+<span class="lineNum">     237 </span>                :<span class="lineNoCov">          0 :             route_table_reset();</span>
+<span class="lineNum">     238 </span>                :            :         }
+<span class="lineNum">     239 </span>                :            :     }
+<span class="lineNum">     240 </span>                :<span class="lineCov">     232144 :     ovs_mutex_unlock(&amp;route_table_mutex);</span>
+<span class="lineNum">     241 </span>                :<span class="lineCov">     232144 : }</span>
+<span class="lineNum">     242 </span>                :            : 
+<a name="243"><span class="lineNum">     243 </span>                :            : /* Causes poll_block() to wake up when route_table updates are required. */</a>
+<span class="lineNum">     244 </span>                :            : void
+<span class="lineNum">     245 </span>                :<span class="lineCov">     231989 : route_table_wait(void)</span>
+<span class="lineNum">     246 </span>                :            :     OVS_EXCLUDED(route_table_mutex)
+<span class="lineNum">     247 </span>                :            : {
+<span class="lineNum">     248 </span>                :<span class="lineCov">     231989 :     ovs_mutex_lock(&amp;route_table_mutex);</span>
+<span class="lineNum">     249 </span>        [<span class="branchCov" title="Branch 0 was taken 77672 times"> + </span><span class="branchCov" title="Branch 1 was taken 154317 times"> + </span>]:<span class="lineCov">     231989 :     if (nln) {</span>
+<span class="lineNum">     250 </span>                :<span class="lineCov">      77672 :         rtnetlink_link_wait();</span>
+<span class="lineNum">     251 </span>                :<span class="lineCov">      77672 :         nln_wait(nln);</span>
+<span class="lineNum">     252 </span>                :            :     }
+<span class="lineNum">     253 </span>                :<span class="lineCov">     231989 :     ovs_mutex_unlock(&amp;route_table_mutex);</span>
+<span class="lineNum">     254 </span>                :<span class="lineCov">     231989 : }</span>
+<a name="255"><span class="lineNum">     255 </span>                :            : </a>
+<span class="lineNum">     256 </span>                :            : static int
+<span class="lineNum">     257 </span>                :<span class="lineCov">         34 : route_table_reset(void)</span>
+<span class="lineNum">     258 </span>                :            : {
+<span class="lineNum">     259 </span>                :            :     struct nl_dump dump;
+<span class="lineNum">     260 </span>                :            :     struct rtgenmsg *rtmsg;
+<span class="lineNum">     261 </span>                :            :     uint64_t reply_stub[NL_DUMP_BUFSIZE / 8];
+<span class="lineNum">     262 </span>                :            :     struct ofpbuf request, reply, buf;
+<span class="lineNum">     263 </span>                :            : 
+<span class="lineNum">     264 </span>                :<span class="lineCov">         34 :     route_map_clear();</span>
+<span class="lineNum">     265 </span>                :<span class="lineCov">         34 :     route_table_valid = true;</span>
+<span class="lineNum">     266 </span>                :<span class="lineCov">         34 :     rt_change_seq++;</span>
+<span class="lineNum">     267 </span>                :            : 
+<span class="lineNum">     268 </span>                :<span class="lineCov">         34 :     ofpbuf_init(&amp;request, 0);</span>
+<span class="lineNum">     269 </span>                :            : 
+<span class="lineNum">     270 </span>                :<span class="lineCov">         34 :     nl_msg_put_nlmsghdr(&amp;request, sizeof *rtmsg, RTM_GETROUTE, NLM_F_REQUEST);</span>
+<span class="lineNum">     271 </span>                :            : 
+<span class="lineNum">     272 </span>                :<span class="lineCov">         34 :     rtmsg = ofpbuf_put_zeros(&amp;request, sizeof *rtmsg);</span>
+<span class="lineNum">     273 </span>                :<span class="lineCov">         34 :     rtmsg-&gt;rtgen_family = AF_INET;</span>
+<span class="lineNum">     274 </span>                :            : 
+<span class="lineNum">     275 </span>                :<span class="lineCov">         34 :     nl_dump_start(&amp;dump, NETLINK_ROUTE, &amp;request);</span>
+<span class="lineNum">     276 </span>                :<span class="lineCov">         34 :     ofpbuf_uninit(&amp;request);</span>
+<span class="lineNum">     277 </span>                :            : 
+<span class="lineNum">     278 </span>                :<span class="lineCov">         34 :     ofpbuf_use_stub(&amp;buf, reply_stub, sizeof reply_stub);</span>
+<span class="lineNum">     279 </span>        [<span class="branchCov" title="Branch 1 was taken 306 times"> + </span><span class="branchCov" title="Branch 2 was taken 34 times"> + </span>]:<span class="lineCov">        340 :     while (nl_dump_next(&amp;dump, &amp;reply, &amp;buf)) {</span>
+<span class="lineNum">     280 </span>                :            :         struct route_table_msg msg;
+<span class="lineNum">     281 </span>                :            : 
+<span class="lineNum">     282 </span>        [<span class="branchCov" title="Branch 1 was taken 306 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        306 :         if (route_table_parse(&amp;reply, &amp;msg)) {</span>
+<span class="lineNum">     283 </span>                :<span class="lineCov">        306 :             route_table_handle_msg(&amp;msg);</span>
+<span class="lineNum">     284 </span>                :            :         }
+<span class="lineNum">     285 </span>                :            :     }
+<span class="lineNum">     286 </span>                :<span class="lineCov">         34 :     ofpbuf_uninit(&amp;buf);</span>
+<span class="lineNum">     287 </span>                :            : 
+<span class="lineNum">     288 </span>                :<span class="lineCov">         34 :     return nl_dump_done(&amp;dump);</span>
+<span class="lineNum">     289 </span>                :            : }
+<span class="lineNum">     290 </span>                :            : 
+<a name="291"><span class="lineNum">     291 </span>                :            : </a>
+<span class="lineNum">     292 </span>                :            : static bool
+<span class="lineNum">     293 </span>                :<span class="lineCov">        306 : route_table_parse(struct ofpbuf *buf, struct route_table_msg *change)</span>
+<span class="lineNum">     294 </span>                :            : {
+<span class="lineNum">     295 </span>                :            :     bool parsed;
+<span class="lineNum">     296 </span>                :            : 
+<span class="lineNum">     297 </span>                :            :     static const struct nl_policy policy[] = {
+<span class="lineNum">     298 </span>                :            :         [RTA_DST] = { .type = NL_A_U32, .optional = true  },
+<span class="lineNum">     299 </span>                :            :         [RTA_OIF] = { .type = NL_A_U32, .optional = false },
+<span class="lineNum">     300 </span>                :            :     };
+<span class="lineNum">     301 </span>                :            : 
+<span class="lineNum">     302 </span>                :            :     struct nlattr *attrs[ARRAY_SIZE(policy)];
+<span class="lineNum">     303 </span>                :            : 
+<span class="lineNum">     304 </span>                :<span class="lineCov">        306 :     parsed = nl_policy_parse(buf, NLMSG_HDRLEN + sizeof(struct rtmsg),</span>
+<span class="lineNum">     305 </span>                :            :                              policy, attrs, ARRAY_SIZE(policy));
+<span class="lineNum">     306 </span>                :            : 
+<span class="lineNum">     307 </span>        [<span class="branchCov" title="Branch 0 was taken 306 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        306 :     if (parsed) {</span>
+<span class="lineNum">     308 </span>                :            :         const struct rtmsg *rtm;
+<span class="lineNum">     309 </span>                :            :         const struct nlmsghdr *nlmsg;
+<span class="lineNum">     310 </span>                :            : 
+<span class="lineNum">     311 </span>                :<span class="lineCov">        306 :         nlmsg = ofpbuf_data(buf);</span>
+<span class="lineNum">     312 </span>                :<span class="lineCov">        306 :         rtm = ofpbuf_at(buf, NLMSG_HDRLEN, sizeof *rtm);</span>
+<span class="lineNum">     313 </span>                :            : 
+<span class="lineNum">     314 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 306 times"> + </span>]:<span class="lineCov">        306 :         if (rtm-&gt;rtm_family != AF_INET) {</span>
+<span class="lineNum">     315 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_DBG_RL(&amp;rl, &quot;received non AF_INET rtnetlink route message&quot;);</span>
+<span class="lineNum">     316 </span>                :<span class="lineNoCov">          0 :             return false;</span>
+<span class="lineNum">     317 </span>                :            :         }
+<span class="lineNum">     318 </span>                :            : 
+<span class="lineNum">     319 </span>                :<span class="lineCov">        306 :         memset(change, 0, sizeof *change);</span>
+<span class="lineNum">     320 </span>                :<span class="lineCov">        306 :         change-&gt;relevant = true;</span>
+<span class="lineNum">     321 </span>                :            : 
+<span class="lineNum">     322 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 306 times"> + </span>]:<span class="lineCov">        306 :         if (rtm-&gt;rtm_scope == RT_SCOPE_NOWHERE) {</span>
+<span class="lineNum">     323 </span>                :<span class="lineNoCov">          0 :             change-&gt;relevant = false;</span>
+<span class="lineNum">     324 </span>                :            :         }
+<span class="lineNum">     325 </span>                :            : 
+<span class="lineNum">     326 </span>[<span class="branchCov" title="Branch 0 was taken 238 times"> + </span><span class="branchCov" title="Branch 1 was taken 68 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 136 times"> + </span><span class="branchCov" title="Branch 3 was taken 102 times"> + </span>]:<span class="lineCov">        306 :         if (rtm-&gt;rtm_type != RTN_UNICAST &amp;&amp;</span>
+<span class="lineNum">     327 </span>                :<span class="lineCov">        238 :             rtm-&gt;rtm_type != RTN_LOCAL) {</span>
+<span class="lineNum">     328 </span>                :<span class="lineCov">        136 :             change-&gt;relevant = false;</span>
+<span class="lineNum">     329 </span>                :            :         }
+<span class="lineNum">     330 </span>                :            : 
+<span class="lineNum">     331 </span>                :<span class="lineCov">        306 :         change-&gt;nlmsg_type     = nlmsg-&gt;nlmsg_type;</span>
+<span class="lineNum">     332 </span>                :<span class="lineCov">        306 :         change-&gt;rd.rtm_dst_len = rtm-&gt;rtm_dst_len;</span>
+<span class="lineNum">     333 </span>                :<span class="lineCov">        306 :         change-&gt;rd.rta_oif     = nl_attr_get_u32(attrs[RTA_OIF]);</span>
+<span class="lineNum">     334 </span>                :            : 
+<span class="lineNum">     335 </span>        [<span class="branchCov" title="Branch 0 was taken 272 times"> + </span><span class="branchCov" title="Branch 1 was taken 34 times"> + </span>]:<span class="lineCov">        306 :         if (attrs[RTA_DST]) {</span>
+<span class="lineNum">     336 </span>                :<span class="lineCov">        272 :             change-&gt;rd.rta_dst = ntohl(nl_attr_get_be32(attrs[RTA_DST]));</span>
+<span class="lineNum">     337 </span>                :            :         }
+<span class="lineNum">     338 </span>                :            : 
+<span class="lineNum">     339 </span>                :            :     } else {
+<span class="lineNum">     340 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_DBG_RL(&amp;rl, &quot;received unparseable rtnetlink route message&quot;);</span>
+<span class="lineNum">     341 </span>                :            :     }
+<span class="lineNum">     342 </span>                :            : 
+<span class="lineNum">     343 </span>                :<span class="lineCov">        306 :     return parsed;</span>
+<span class="lineNum">     344 </span>                :            : }
+<a name="345"><span class="lineNum">     345 </span>                :            : </a>
+<span class="lineNum">     346 </span>                :            : static void
+<span class="lineNum">     347 </span>                :<span class="lineNoCov">          0 : route_table_change(const struct route_table_msg *change OVS_UNUSED,</span>
+<span class="lineNum">     348 </span>                :            :                    void *aux OVS_UNUSED)
+<span class="lineNum">     349 </span>                :            : {
+<span class="lineNum">     350 </span>                :<span class="lineNoCov">          0 :     route_table_valid = false;</span>
+<span class="lineNum">     351 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="352"><span class="lineNum">     352 </span>                :            : </a>
+<span class="lineNum">     353 </span>                :            : static void
+<span class="lineNum">     354 </span>                :<span class="lineCov">        306 : route_table_handle_msg(const struct route_table_msg *change)</span>
+<span class="lineNum">     355 </span>                :            : {
+<span class="lineNum">     356 </span>        [<span class="branchCov" title="Branch 0 was taken 170 times"> + </span><span class="branchCov" title="Branch 1 was taken 136 times"> + </span>]:<span class="lineCov">        476 :     if (change-&gt;relevant &amp;&amp; change-&gt;nlmsg_type == RTM_NEWROUTE &amp;&amp;</span>
+<span class="lineNum">         </span>  [<span class="branchCov" title="Branch 2 was taken 170 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 170 times"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span>]
+<span class="lineNum">     357 </span>                :<span class="lineCov">        170 :         !route_node_lookup(&amp;change-&gt;rd)) {</span>
+<span class="lineNum">     358 </span>                :            :         struct route_node *rn;
+<span class="lineNum">     359 </span>                :            : 
+<span class="lineNum">     360 </span>                :<span class="lineCov">        170 :         rn = xzalloc(sizeof *rn);</span>
+<span class="lineNum">     361 </span>                :<span class="lineCov">        170 :         memcpy(&amp;rn-&gt;rd, &amp;change-&gt;rd, sizeof change-&gt;rd);</span>
+<span class="lineNum">     362 </span>                :            : 
+<span class="lineNum">     363 </span>                :<span class="lineCov">        170 :         hmap_insert(&amp;route_map, &amp;rn-&gt;node, hash_route_data(&amp;rn-&gt;rd));</span>
+<span class="lineNum">     364 </span>                :            :     }
+<span class="lineNum">     365 </span>                :<span class="lineCov">        306 : }</span>
+<a name="366"><span class="lineNum">     366 </span>                :            : </a>
+<span class="lineNum">     367 </span>                :            : static struct route_node *
+<span class="lineNum">     368 </span>                :<span class="lineCov">        170 : route_node_lookup(const struct route_data *rd)</span>
+<span class="lineNum">     369 </span>                :            : {
+<span class="lineNum">     370 </span>                :            :     struct route_node *rn;
+<span class="lineNum">     371 </span>                :            : 
+<span class="lineNum">     372 </span>        [<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 170 times"> + </span>]:<span class="lineCov">        170 :     HMAP_FOR_EACH_WITH_HASH(rn, node, hash_route_data(rd), &amp;route_map) {</span>
+<span class="lineNum">     373 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!memcmp(&amp;rn-&gt;rd, rd, sizeof *rd)) {</span>
+<span class="lineNum">     374 </span>                :<span class="lineNoCov">          0 :             return rn;</span>
+<span class="lineNum">     375 </span>                :            :         }
+<span class="lineNum">     376 </span>                :            :     }
+<span class="lineNum">     377 </span>                :            : 
+<span class="lineNum">     378 </span>                :<span class="lineCov">        170 :     return NULL;</span>
+<span class="lineNum">     379 </span>                :            : }
+<a name="380"><span class="lineNum">     380 </span>                :            : </a>
+<span class="lineNum">     381 </span>                :            : static struct route_node *
+<span class="lineNum">     382 </span>                :<span class="lineCov">        138 : route_node_lookup_by_ip(uint32_t ip)</span>
+<span class="lineNum">     383 </span>                :            : {
+<span class="lineNum">     384 </span>                :            :     int dst_len;
+<span class="lineNum">     385 </span>                :            :     struct route_node *rn, *rn_ret;
+<span class="lineNum">     386 </span>                :            : 
+<span class="lineNum">     387 </span>                :<span class="lineCov">        138 :     dst_len = -1;</span>
+<span class="lineNum">     388 </span>                :<span class="lineCov">        138 :     rn_ret  = NULL;</span>
+<span class="lineNum">     389 </span>                :            : 
+<span class="lineNum">     390 </span>        [<span class="branchCov" title="Branch 2 was taken 690 times"> + </span><span class="branchCov" title="Branch 3 was taken 138 times"> + </span>]:<span class="lineCov">        828 :     HMAP_FOR_EACH(rn, node, &amp;route_map) {</span>
+<span class="lineNum">     391 </span>                :<span class="lineCov">        690 :         uint32_t mask = 0xffffffff &lt;&lt; (32 - rn-&gt;rd.rtm_dst_len);</span>
+<span class="lineNum">     392 </span>                :            : 
+<span class="lineNum">     393 </span>[<span class="branchCov" title="Branch 0 was taken 138 times"> + </span><span class="branchCov" title="Branch 1 was taken 552 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 138 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        690 :         if (rn-&gt;rd.rta_dst == 0 &amp;&amp; rn-&gt;rd.rtm_dst_len == 0) {</span>
+<span class="lineNum">     394 </span>                :            :             /* Default route. */
+<span class="lineNum">     395 </span>                :<span class="lineCov">        138 :             continue;</span>
+<span class="lineNum">     396 </span>                :            :         }
+<span class="lineNum">     397 </span>                :            : 
+<span class="lineNum">     398 </span>[<span class="branchCov" title="Branch 0 was taken 552 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 552 times"> + </span>]:<span class="lineCov">        552 :         if (rn-&gt;rd.rtm_dst_len &gt; dst_len &amp;&amp;</span>
+<span class="lineNum">     399 </span>                :<span class="lineCov">        552 :             (ip &amp; mask) == (rn-&gt;rd.rta_dst &amp; mask)) {</span>
+<span class="lineNum">     400 </span>                :<span class="lineNoCov">          0 :             rn_ret  = rn;</span>
+<span class="lineNum">     401 </span>                :<span class="lineNoCov">          0 :             dst_len = rn-&gt;rd.rtm_dst_len;</span>
+<span class="lineNum">     402 </span>                :            :         }
+<span class="lineNum">     403 </span>                :            :     }
+<span class="lineNum">     404 </span>                :            : 
+<span class="lineNum">     405 </span>                :<span class="lineCov">        138 :     return rn_ret;</span>
+<span class="lineNum">     406 </span>                :            : }
+<a name="407"><span class="lineNum">     407 </span>                :            : </a>
+<span class="lineNum">     408 </span>                :            : static void
+<span class="lineNum">     409 </span>                :<span class="lineCov">         49 : route_map_clear(void)</span>
+<span class="lineNum">     410 </span>                :            : {
+<span class="lineNum">     411 </span>                :            :     struct route_node *rn, *rn_next;
+<span class="lineNum">     412 </span>                :            : 
+<span class="lineNum">     413 </span>[<span class="branchCov" title="Branch 1 was taken 75 times"> + </span><span class="branchCov" title="Branch 2 was taken 49 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 75 times"> + </span><span class="branchCov" title="Branch 5 was taken 49 times"> + </span>]:<span class="lineCov">        124 :     HMAP_FOR_EACH_SAFE(rn, rn_next, node, &amp;route_map) {</span>
+<span class="lineNum">     414 </span>                :<span class="lineCov">         75 :         hmap_remove(&amp;route_map, &amp;rn-&gt;node);</span>
+<span class="lineNum">     415 </span>                :<span class="lineCov">         75 :         free(rn);</span>
+<span class="lineNum">     416 </span>                :            :     }
+<span class="lineNum">     417 </span>                :<span class="lineCov">         49 : }</span>
+<a name="418"><span class="lineNum">     418 </span>                :            : </a>
+<span class="lineNum">     419 </span>                :            : static uint32_t
+<span class="lineNum">     420 </span>                :<span class="lineCov">        340 : hash_route_data(const struct route_data *rd)</span>
+<span class="lineNum">     421 </span>                :            : {
+<span class="lineNum">     422 </span>                :<span class="lineCov">        340 :     return hash_bytes(rd, sizeof *rd, 0);</span>
+<span class="lineNum">     423 </span>                :            : }
+<span class="lineNum">     424 </span>                :            : 
+<span class="lineNum">     425 </span>                :            : /* name_table . */
+<a name="426"><span class="lineNum">     426 </span>                :            : </a>
+<span class="lineNum">     427 </span>                :            : static void
+<span class="lineNum">     428 </span>                :<span class="lineCov">         34 : name_table_init(void)</span>
+<span class="lineNum">     429 </span>                :            : {
+<span class="lineNum">     430 </span>                :<span class="lineCov">         34 :     hmap_init(&amp;name_map);</span>
+<span class="lineNum">     431 </span>                :<span class="lineCov">         34 :     name_notifier = rtnetlink_link_notifier_create(name_table_change, NULL);</span>
+<span class="lineNum">     432 </span>                :<span class="lineCov">         34 :     name_table_valid = false;</span>
+<span class="lineNum">     433 </span>                :<span class="lineCov">         34 : }</span>
+<a name="434"><span class="lineNum">     434 </span>                :            : </a>
+<span class="lineNum">     435 </span>                :            : static void
+<span class="lineNum">     436 </span>                :<span class="lineCov">         15 : name_table_uninit(void)</span>
+<span class="lineNum">     437 </span>                :            : {
+<span class="lineNum">     438 </span>                :<span class="lineCov">         15 :     rtnetlink_link_notifier_destroy(name_notifier);</span>
+<span class="lineNum">     439 </span>                :<span class="lineCov">         15 :     name_notifier = NULL;</span>
+<span class="lineNum">     440 </span>                :<span class="lineCov">         15 :     name_map_clear();</span>
+<span class="lineNum">     441 </span>                :<span class="lineCov">         15 :     hmap_destroy(&amp;name_map);</span>
+<span class="lineNum">     442 </span>                :<span class="lineCov">         15 : }</span>
+<a name="443"><span class="lineNum">     443 </span>                :            : </a>
+<span class="lineNum">     444 </span>                :            : static int
+<span class="lineNum">     445 </span>                :<span class="lineCov">         17 : name_table_reset(void)</span>
+<span class="lineNum">     446 </span>                :            : {
+<span class="lineNum">     447 </span>                :            :     struct nl_dump dump;
+<span class="lineNum">     448 </span>                :            :     struct rtgenmsg *rtmsg;
+<span class="lineNum">     449 </span>                :            :     uint64_t reply_stub[NL_DUMP_BUFSIZE / 8];
+<span class="lineNum">     450 </span>                :            :     struct ofpbuf request, reply, buf;
+<span class="lineNum">     451 </span>                :            : 
+<span class="lineNum">     452 </span>                :<span class="lineCov">         17 :     name_table_valid = true;</span>
+<span class="lineNum">     453 </span>                :<span class="lineCov">         17 :     name_map_clear();</span>
+<span class="lineNum">     454 </span>                :            : 
+<span class="lineNum">     455 </span>                :<span class="lineCov">         17 :     ofpbuf_init(&amp;request, 0);</span>
+<span class="lineNum">     456 </span>                :<span class="lineCov">         17 :     nl_msg_put_nlmsghdr(&amp;request, sizeof *rtmsg, RTM_GETLINK, NLM_F_REQUEST);</span>
+<span class="lineNum">     457 </span>                :<span class="lineCov">         17 :     rtmsg = ofpbuf_put_zeros(&amp;request, sizeof *rtmsg);</span>
+<span class="lineNum">     458 </span>                :<span class="lineCov">         17 :     rtmsg-&gt;rtgen_family = AF_INET;</span>
+<span class="lineNum">     459 </span>                :            : 
+<span class="lineNum">     460 </span>                :<span class="lineCov">         17 :     nl_dump_start(&amp;dump, NETLINK_ROUTE, &amp;request);</span>
+<span class="lineNum">     461 </span>                :<span class="lineCov">         17 :     ofpbuf_uninit(&amp;request);</span>
+<span class="lineNum">     462 </span>                :            : 
+<span class="lineNum">     463 </span>                :<span class="lineCov">         17 :     ofpbuf_use_stub(&amp;buf, reply_stub, sizeof reply_stub);</span>
+<span class="lineNum">     464 </span>        [<span class="branchCov" title="Branch 1 was taken 85 times"> + </span><span class="branchCov" title="Branch 2 was taken 17 times"> + </span>]:<span class="lineCov">        102 :     while (nl_dump_next(&amp;dump, &amp;reply, &amp;buf)) {</span>
+<span class="lineNum">     465 </span>                :            :         struct rtnetlink_link_change change;
+<span class="lineNum">     466 </span>                :            : 
+<span class="lineNum">     467 </span>        [<span class="branchCov" title="Branch 1 was taken 85 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">         85 :         if (rtnetlink_link_parse(&amp;reply, &amp;change)</span>
+<span class="lineNum">     468 </span>        [<span class="branchCov" title="Branch 0 was taken 85 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         85 :             &amp;&amp; change.nlmsg_type == RTM_NEWLINK</span>
+<span class="lineNum">     469 </span>        [<span class="branchCov" title="Branch 1 was taken 85 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">         85 :             &amp;&amp; !name_node_lookup(change.ifi_index)) {</span>
+<span class="lineNum">     470 </span>                :            :             struct name_node *nn;
+<span class="lineNum">     471 </span>                :            : 
+<span class="lineNum">     472 </span>                :<span class="lineCov">         85 :             nn = xzalloc(sizeof *nn);</span>
+<span class="lineNum">     473 </span>                :<span class="lineCov">         85 :             nn-&gt;ifi_index = change.ifi_index;</span>
+<span class="lineNum">     474 </span>                :<span class="lineCov">         85 :             ovs_strlcpy(nn-&gt;ifname, change.ifname, IFNAMSIZ);</span>
+<span class="lineNum">     475 </span>                :<span class="lineCov">         85 :             hmap_insert(&amp;name_map, &amp;nn-&gt;node, hash_int(nn-&gt;ifi_index, 0));</span>
+<span class="lineNum">     476 </span>                :            :         }
+<span class="lineNum">     477 </span>                :            :     }
+<span class="lineNum">     478 </span>                :<span class="lineCov">         17 :     ofpbuf_uninit(&amp;buf);</span>
+<span class="lineNum">     479 </span>                :<span class="lineCov">         17 :     return nl_dump_done(&amp;dump);</span>
+<span class="lineNum">     480 </span>                :            : }
+<a name="481"><span class="lineNum">     481 </span>                :            : </a>
+<span class="lineNum">     482 </span>                :            : static void
+<span class="lineNum">     483 </span>                :<span class="lineNoCov">          0 : name_table_change(const struct rtnetlink_link_change *change OVS_UNUSED,</span>
+<span class="lineNum">     484 </span>                :            :                   void *aux OVS_UNUSED)
+<span class="lineNum">     485 </span>                :            : {
+<span class="lineNum">     486 </span>                :            :     /* Changes to interface status can cause routing table changes that some
+<span class="lineNum">     487 </span>                :            :      * versions of the linux kernel do not advertise for some reason. */
+<span class="lineNum">     488 </span>                :<span class="lineNoCov">          0 :     route_table_valid = false;</span>
+<span class="lineNum">     489 </span>                :<span class="lineNoCov">          0 :     name_table_valid = false;</span>
+<span class="lineNum">     490 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="491"><span class="lineNum">     491 </span>                :            : </a>
+<span class="lineNum">     492 </span>                :            : static struct name_node *
+<span class="lineNum">     493 </span>                :<span class="lineCov">        223 : name_node_lookup(int ifi_index)</span>
+<span class="lineNum">     494 </span>                :            : {
+<span class="lineNum">     495 </span>                :            :     struct name_node *nn;
+<span class="lineNum">     496 </span>                :            : 
+<span class="lineNum">     497 </span>        [<span class="branchCov" title="Branch 3 was taken 138 times"> + </span><span class="branchCov" title="Branch 4 was taken 85 times"> + </span>]:<span class="lineCov">        223 :     HMAP_FOR_EACH_WITH_HASH(nn, node, hash_int(ifi_index, 0), &amp;name_map) {</span>
+<span class="lineNum">     498 </span>        [<span class="branchCov" title="Branch 0 was taken 138 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        138 :         if (nn-&gt;ifi_index == ifi_index) {</span>
+<span class="lineNum">     499 </span>                :<span class="lineCov">        138 :             return nn;</span>
+<span class="lineNum">     500 </span>                :            :         }
+<span class="lineNum">     501 </span>                :            :     }
+<span class="lineNum">     502 </span>                :            : 
+<span class="lineNum">     503 </span>                :<span class="lineCov">        223 :     return NULL;</span>
+<span class="lineNum">     504 </span>                :            : }
+<a name="505"><span class="lineNum">     505 </span>                :            : </a>
+<span class="lineNum">     506 </span>                :            : static void
+<span class="lineNum">     507 </span>                :<span class="lineCov">         32 : name_map_clear(void)</span>
+<span class="lineNum">     508 </span>                :            : {
+<span class="lineNum">     509 </span>                :            :     struct name_node *nn, *nn_next;
+<span class="lineNum">     510 </span>                :            : 
+<span class="lineNum">     511 </span>[<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 32 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 32 times"> + </span>]:<span class="lineCov">         32 :     HMAP_FOR_EACH_SAFE(nn, nn_next, node, &amp;name_map) {</span>
+<span class="lineNum">     512 </span>                :<span class="lineNoCov">          0 :         hmap_remove(&amp;name_map, &amp;nn-&gt;node);</span>
+<span class="lineNum">     513 </span>                :<span class="lineNoCov">          0 :         free(nn);</span>
+<span class="lineNum">     514 </span>                :            :     }
+<span class="lineNum">     515 </span>                :<span class="lineCov">         32 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

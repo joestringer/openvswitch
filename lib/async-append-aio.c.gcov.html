@@ -1,0 +1,248 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/async-append-aio.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - async-append-aio.c<span style="font-size: 80%;"> (source / <a href="async-append-aio.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">50</td>
+            <td class="headerCovTableEntry">63</td>
+            <td class="headerCovTableEntryMed">79.4 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">5</td>
+            <td class="headerCovTableEntry">7</td>
+            <td class="headerCovTableEntryLo">71.4 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">17</td>
+            <td class="headerCovTableEntry">22</td>
+            <td class="headerCovTableEntryMed">77.3 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (c) 2013 Nicira, Inc.</a>
+<span class="lineNum">       2 </span>                :            :  *
+<span class="lineNum">       3 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       4 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       5 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       6 </span>                :            :  *
+<span class="lineNum">       7 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       8 </span>                :            :  *
+<span class="lineNum">       9 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      10 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      11 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      12 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      13 </span>                :            :  * limitations under the License.
+<span class="lineNum">      14 </span>                :            :  */
+<span class="lineNum">      15 </span>                :            : 
+<span class="lineNum">      16 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      17 </span>                :            : 
+<span class="lineNum">      18 </span>                :            : /* This implementation of the async-append.h interface uses the POSIX
+<span class="lineNum">      19 </span>                :            :  * asynchronous I/O interface.  */
+<span class="lineNum">      20 </span>                :            : 
+<span class="lineNum">      21 </span>                :            : #include &quot;async-append.h&quot;
+<span class="lineNum">      22 </span>                :            : 
+<span class="lineNum">      23 </span>                :            : #include &lt;aio.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      25 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      26 </span>                :            : #include &lt;unistd.h&gt;
+<span class="lineNum">      27 </span>                :            : 
+<span class="lineNum">      28 </span>                :            : #include &quot;byteq.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;ovs-thread.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      31 </span>                :            : 
+<span class="lineNum">      32 </span>                :            : /* Maximum number of bytes of buffered data. */
+<span class="lineNum">      33 </span>                :            : enum { BUFFER_SIZE = 65536 };
+<span class="lineNum">      34 </span>                :            : 
+<span class="lineNum">      35 </span>                :            : /* Maximum number of aiocbs to use.
+<span class="lineNum">      36 </span>                :            :  *
+<span class="lineNum">      37 </span>                :            :  * aiocbs are big (144 bytes with glibc 2.11 on i386) so we try to allow for a
+<span class="lineNum">      38 </span>                :            :  * reasonable number by basing the number we allocate on the amount of buffer
+<span class="lineNum">      39 </span>                :            :  * space. */
+<span class="lineNum">      40 </span>                :            : enum { MAX_CBS = ROUND_DOWN_POW2(BUFFER_SIZE / sizeof(struct aiocb)) };
+<span class="lineNum">      41 </span>                :            : BUILD_ASSERT_DECL(IS_POW2(MAX_CBS));
+<span class="lineNum">      42 </span>                :            : 
+<span class="lineNum">      43 </span>                :            : struct async_append {
+<span class="lineNum">      44 </span>                :            :     int fd;
+<span class="lineNum">      45 </span>                :            : 
+<span class="lineNum">      46 </span>                :            :     struct aiocb *aiocbs;
+<span class="lineNum">      47 </span>                :            :     unsigned int aiocb_head, aiocb_tail;
+<span class="lineNum">      48 </span>                :            : 
+<span class="lineNum">      49 </span>                :            :     uint8_t *buffer;
+<span class="lineNum">      50 </span>                :            :     struct byteq byteq;
+<span class="lineNum">      51 </span>                :            : };
+<a name="52"><span class="lineNum">      52 </span>                :            : </a>
+<span class="lineNum">      53 </span>                :            : struct async_append *
+<span class="lineNum">      54 </span>                :<span class="lineCov">        257 : async_append_create(int fd)</span>
+<span class="lineNum">      55 </span>                :            : {
+<span class="lineNum">      56 </span>                :            :     struct async_append *ap;
+<span class="lineNum">      57 </span>                :            : 
+<span class="lineNum">      58 </span>                :<span class="lineCov">        257 :     ap = xmalloc(sizeof *ap);</span>
+<span class="lineNum">      59 </span>                :<span class="lineCov">        257 :     ap-&gt;fd = fd;</span>
+<span class="lineNum">      60 </span>                :<span class="lineCov">        257 :     ap-&gt;aiocbs = xmalloc(MAX_CBS * sizeof *ap-&gt;aiocbs);</span>
+<span class="lineNum">      61 </span>                :<span class="lineCov">        257 :     ap-&gt;aiocb_head = ap-&gt;aiocb_tail = 0;</span>
+<span class="lineNum">      62 </span>                :<span class="lineCov">        257 :     ap-&gt;buffer = xmalloc(BUFFER_SIZE);</span>
+<span class="lineNum">      63 </span>                :<span class="lineCov">        257 :     byteq_init(&amp;ap-&gt;byteq, ap-&gt;buffer, BUFFER_SIZE);</span>
+<span class="lineNum">      64 </span>                :            : 
+<span class="lineNum">      65 </span>                :<span class="lineCov">        257 :     return ap;</span>
+<span class="lineNum">      66 </span>                :            : }
+<a name="67"><span class="lineNum">      67 </span>                :            : </a>
+<span class="lineNum">      68 </span>                :            : void
+<span class="lineNum">      69 </span>                :<span class="lineNoCov">          0 : async_append_destroy(struct async_append *ap)</span>
+<span class="lineNum">      70 </span>                :            : {
+<span class="lineNum">      71 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (ap) {</span>
+<span class="lineNum">      72 </span>                :<span class="lineNoCov">          0 :         async_append_flush(ap);</span>
+<span class="lineNum">      73 </span>                :<span class="lineNoCov">          0 :         free(ap-&gt;aiocbs);</span>
+<span class="lineNum">      74 </span>                :<span class="lineNoCov">          0 :         free(ap-&gt;buffer);</span>
+<span class="lineNum">      75 </span>                :<span class="lineNoCov">          0 :         free(ap);</span>
+<span class="lineNum">      76 </span>                :            :     }
+<span class="lineNum">      77 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="78"><span class="lineNum">      78 </span>                :            : </a>
+<span class="lineNum">      79 </span>                :            : static bool
+<span class="lineNum">      80 </span>                :<span class="lineCov">      21136 : async_append_is_full(const struct async_append *ap)</span>
+<span class="lineNum">      81 </span>                :            : {
+<span class="lineNum">      82 </span>                :<span class="lineCov">      21136 :     return (ap-&gt;aiocb_head - ap-&gt;aiocb_tail &gt;= MAX_CBS</span>
+<span class="lineNum">      83 </span>[<span class="branchCov" title="Branch 0 was taken 21104 times"> + </span><span class="branchCov" title="Branch 1 was taken 32 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 12 times"> + </span><span class="branchCov" title="Branch 4 was taken 21092 times"> + </span>]:<span class="lineCov">      21136 :             || byteq_is_full(&amp;ap-&gt;byteq));</span>
+<span class="lineNum">      84 </span>                :            : }
+<a name="85"><span class="lineNum">      85 </span>                :            : </a>
+<span class="lineNum">      86 </span>                :            : static bool
+<span class="lineNum">      87 </span>                :<span class="lineCov">       8439 : async_append_is_empty(const struct async_append *ap)</span>
+<span class="lineNum">      88 </span>                :            : {
+<span class="lineNum">      89 </span>                :<span class="lineCov">       8439 :     return byteq_is_empty(&amp;ap-&gt;byteq);</span>
+<span class="lineNum">      90 </span>                :            : }
+<a name="91"><span class="lineNum">      91 </span>                :            : </a>
+<span class="lineNum">      92 </span>                :            : static void
+<span class="lineNum">      93 </span>                :<span class="lineCov">         44 : async_append_wait(struct async_append *ap)</span>
+<span class="lineNum">      94 </span>                :            : {
+<span class="lineNum">      95 </span>                :<span class="lineCov">         44 :     int n = 0;</span>
+<span class="lineNum">      96 </span>                :            : 
+<span class="lineNum">      97 </span>        [<span class="branchCov" title="Branch 1 was taken 8415 times"> + </span><span class="branchCov" title="Branch 2 was taken 24 times"> + </span>]:<span class="lineCov">       8439 :     while (!async_append_is_empty(ap)) {</span>
+<span class="lineNum">      98 </span>                :<span class="lineCov">       8415 :         struct aiocb *aiocb = &amp;ap-&gt;aiocbs[ap-&gt;aiocb_tail &amp; (MAX_CBS - 1)];</span>
+<span class="lineNum">      99 </span>                :<span class="lineCov">       8415 :         int error = aio_error(aiocb);</span>
+<span class="lineNum">     100 </span>                :            : 
+<span class="lineNum">     101 </span>        [<span class="branchCov" title="Branch 0 was taken 25 times"> + </span><span class="branchCov" title="Branch 1 was taken 8390 times"> + </span>]:<span class="lineCov">       8415 :         if (error == EINPROGRESS) {</span>
+<span class="lineNum">     102 </span>                :<span class="lineCov">         25 :             const struct aiocb *p = aiocb;</span>
+<span class="lineNum">     103 </span>        [<span class="branchCov" title="Branch 0 was taken 5 times"> + </span><span class="branchCov" title="Branch 1 was taken 20 times"> + </span>]:<span class="lineCov">         25 :             if (n &gt; 0) {</span>
+<span class="lineNum">     104 </span>                :<span class="lineCov">         44 :                 return;</span>
+<span class="lineNum">     105 </span>                :            :             }
+<span class="lineNum">     106 </span>                :<span class="lineCov">         25 :             aio_suspend(&amp;p, 1, NULL);</span>
+<span class="lineNum">     107 </span>                :            :         } else {
+<span class="lineNum">     108 </span>                :<span class="lineCov">       8390 :             ignore(aio_return(aiocb));</span>
+<span class="lineNum">     109 </span>                :<span class="lineCov">       8390 :             ap-&gt;aiocb_tail++;</span>
+<span class="lineNum">     110 </span>                :<span class="lineCov">       8390 :             byteq_advance_tail(&amp;ap-&gt;byteq, aiocb-&gt;aio_nbytes);</span>
+<span class="lineNum">     111 </span>                :<span class="lineCov">       8390 :             n++;</span>
+<span class="lineNum">     112 </span>                :            :         }
+<span class="lineNum">     113 </span>                :            :     }
+<span class="lineNum">     114 </span>                :            : }
+<a name="115"><span class="lineNum">     115 </span>                :            : </a>
+<span class="lineNum">     116 </span>                :            : void
+<span class="lineNum">     117 </span>                :<span class="lineCov">      21065 : async_append_write(struct async_append *ap, const void *data_, size_t size)</span>
+<span class="lineNum">     118 </span>                :            : {
+<span class="lineNum">     119 </span>                :<span class="lineCov">      21065 :     const uint8_t *data = data_;</span>
+<span class="lineNum">     120 </span>                :            : 
+<span class="lineNum">     121 </span>        [<span class="branchCov" title="Branch 0 was taken 21092 times"> + </span><span class="branchCov" title="Branch 1 was taken 21065 times"> + </span>]:<span class="lineCov">      42157 :     while (size &gt; 0) {</span>
+<span class="lineNum">     122 </span>                :            :         struct aiocb *aiocb;
+<span class="lineNum">     123 </span>                :            :         size_t chunk_size;
+<span class="lineNum">     124 </span>                :            :         void *chunk;
+<span class="lineNum">     125 </span>                :            : 
+<span class="lineNum">     126 </span>        [<span class="branchCov" title="Branch 1 was taken 44 times"> + </span><span class="branchCov" title="Branch 2 was taken 21092 times"> + </span>]:<span class="lineCov">      21136 :         while (async_append_is_full(ap)) {</span>
+<span class="lineNum">     127 </span>                :<span class="lineCov">         44 :             async_append_wait(ap);</span>
+<span class="lineNum">     128 </span>                :            :         }
+<span class="lineNum">     129 </span>                :            : 
+<span class="lineNum">     130 </span>                :<span class="lineCov">      21092 :         chunk = byteq_head(&amp;ap-&gt;byteq);</span>
+<span class="lineNum">     131 </span>                :<span class="lineCov">      21092 :         chunk_size = byteq_headroom(&amp;ap-&gt;byteq);</span>
+<span class="lineNum">     132 </span>        [<span class="branchCov" title="Branch 0 was taken 21065 times"> + </span><span class="branchCov" title="Branch 1 was taken 27 times"> + </span>]:<span class="lineCov">      21092 :         if (chunk_size &gt; size) {</span>
+<span class="lineNum">     133 </span>                :<span class="lineCov">      21065 :             chunk_size = size;</span>
+<span class="lineNum">     134 </span>                :            :         }
+<span class="lineNum">     135 </span>                :<span class="lineCov">      21092 :         memcpy(chunk, data, chunk_size);</span>
+<span class="lineNum">     136 </span>                :            : 
+<span class="lineNum">     137 </span>                :<span class="lineCov">      21092 :         aiocb = &amp;ap-&gt;aiocbs[ap-&gt;aiocb_head &amp; (MAX_CBS - 1)];</span>
+<span class="lineNum">     138 </span>                :<span class="lineCov">      21092 :         memset(aiocb, 0, sizeof *aiocb);</span>
+<span class="lineNum">     139 </span>                :<span class="lineCov">      21092 :         aiocb-&gt;aio_fildes = ap-&gt;fd;</span>
+<span class="lineNum">     140 </span>                :<span class="lineCov">      21092 :         aiocb-&gt;aio_offset = 0;</span>
+<span class="lineNum">     141 </span>                :<span class="lineCov">      21092 :         aiocb-&gt;aio_buf = chunk;</span>
+<span class="lineNum">     142 </span>                :<span class="lineCov">      21092 :         aiocb-&gt;aio_nbytes = chunk_size;</span>
+<span class="lineNum">     143 </span>                :<span class="lineCov">      21092 :         aiocb-&gt;aio_sigevent.sigev_notify = SIGEV_NONE;</span>
+<span class="lineNum">     144 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 21092 times"> + </span>]:<span class="lineCov">      21092 :         if (aio_write(aiocb) == -1) {</span>
+<span class="lineNum">     145 </span>                :<span class="lineNoCov">          0 :             async_append_flush(ap);</span>
+<span class="lineNum">     146 </span>                :<span class="lineNoCov">          0 :             ignore(write(ap-&gt;fd, data, size));</span>
+<span class="lineNum">     147 </span>                :<span class="lineCov">      21065 :             return;</span>
+<span class="lineNum">     148 </span>                :            :         }
+<span class="lineNum">     149 </span>                :            : 
+<span class="lineNum">     150 </span>                :<span class="lineCov">      21092 :         data += chunk_size;</span>
+<span class="lineNum">     151 </span>                :<span class="lineCov">      21092 :         size -= chunk_size;</span>
+<span class="lineNum">     152 </span>                :<span class="lineCov">      21092 :         byteq_advance_head(&amp;ap-&gt;byteq, chunk_size);</span>
+<span class="lineNum">     153 </span>                :<span class="lineCov">      21092 :         ap-&gt;aiocb_head++;</span>
+<span class="lineNum">     154 </span>                :            :     }
+<span class="lineNum">     155 </span>                :            : }
+<a name="156"><span class="lineNum">     156 </span>                :            : </a>
+<span class="lineNum">     157 </span>                :            : void
+<span class="lineNum">     158 </span>                :<span class="lineNoCov">          0 : async_append_flush(struct async_append *ap)</span>
+<span class="lineNum">     159 </span>                :            : {
+<span class="lineNum">     160 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     while (!async_append_is_empty(ap)) {</span>
+<span class="lineNum">     161 </span>                :<span class="lineNoCov">          0 :         async_append_wait(ap);</span>
+<span class="lineNum">     162 </span>                :            :     }
+<span class="lineNum">     163 </span>                :<span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

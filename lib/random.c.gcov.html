@@ -1,0 +1,204 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/random.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - random.c<span style="font-size: 80%;"> (source / <a href="random.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">38</td>
+            <td class="headerCovTableEntry">38</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">8</td>
+            <td class="headerCovTableEntry">8</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">6</td>
+            <td class="headerCovTableEntry">8</td>
+            <td class="headerCovTableEntryMed">75.0 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2008, 2009, 2010, 2011, 2012, 2013 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;random.h&quot;
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;sys/time.h&gt;
+<span class="lineNum">      23 </span>                :            : 
+<span class="lineNum">      24 </span>                :            : #include &quot;entropy.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;ovs-thread.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      29 </span>                :            : 
+<span class="lineNum">      30 </span>                :            : /* This is the 32-bit PRNG recommended in G. Marsaglia, &quot;Xorshift RNGs&quot;,
+<span class="lineNum">      31 </span>                :            :  * _Journal of Statistical Software_ 8:14 (July 2003).  According to the paper,
+<span class="lineNum">      32 </span>                :            :  * it has a period of 2**32 - 1 and passes almost all tests of randomness.
+<span class="lineNum">      33 </span>                :            :  *
+<span class="lineNum">      34 </span>                :            :  * We use this PRNG instead of libc's rand() because rand() varies in quality
+<span class="lineNum">      35 </span>                :            :  * and because its maximum value also varies between 32767 and INT_MAX, whereas
+<span class="lineNum">      36 </span>                :            :  * we often want random numbers in the full range of uint32_t.
+<span class="lineNum">      37 </span>                :            :  *
+<span class="lineNum">      38 </span>                :            :  * This random number generator is intended for purposes that do not require
+<span class="lineNum">      39 </span>                :            :  * cryptographic-quality randomness. */
+<a name="40"><span class="lineNum">      40 </span>                :            : </a>
+<span class="lineNum">      41 </span>                :            : /* Current random state. */
+<span class="lineNum">      42 </span>                :<span class="lineCov">  501706717 : DEFINE_STATIC_PER_THREAD_DATA(uint32_t, seed, 0);</span>
+<span class="lineNum">      43 </span>                :            : 
+<span class="lineNum">      44 </span>                :            : static uint32_t random_next(void);
+<a name="45"><span class="lineNum">      45 </span>                :            : </a>
+<span class="lineNum">      46 </span>                :            : void
+<span class="lineNum">      47 </span>                :<span class="lineCov">  147670365 : random_init(void)</span>
+<span class="lineNum">      48 </span>                :            : {
+<span class="lineNum">      49 </span>                :<span class="lineCov">  147670365 :     uint32_t *seedp = seed_get();</span>
+<span class="lineNum">      50 </span>        [<span class="branchCov" title="Branch 0 was taken 4026 times"> + </span><span class="branchCov" title="Branch 1 was taken 147670365 times"> + </span>]:<span class="lineCov">  147674391 :     while (!*seedp) {</span>
+<span class="lineNum">      51 </span>                :            :         struct timeval tv;
+<span class="lineNum">      52 </span>                :            :         uint32_t entropy;
+<span class="lineNum">      53 </span>                :            :         pthread_t self;
+<span class="lineNum">      54 </span>                :            : 
+<span class="lineNum">      55 </span>                :<span class="lineCov">       4026 :         xgettimeofday(&amp;tv);</span>
+<span class="lineNum">      56 </span>                :<span class="lineCov">       4026 :         get_entropy_or_die(&amp;entropy, 4);</span>
+<span class="lineNum">      57 </span>                :<span class="lineCov">       4026 :         self = pthread_self();</span>
+<span class="lineNum">      58 </span>                :            : 
+<span class="lineNum">      59 </span>                :<span class="lineCov">       4026 :         *seedp = (tv.tv_sec ^ tv.tv_usec ^ entropy</span>
+<span class="lineNum">      60 </span>                :<span class="lineCov">       4026 :                   ^ hash_bytes(&amp;self, sizeof self, 0));</span>
+<span class="lineNum">      61 </span>                :            :     }
+<span class="lineNum">      62 </span>                :<span class="lineCov">  147670365 : }</span>
+<a name="63"><span class="lineNum">      63 </span>                :            : </a>
+<span class="lineNum">      64 </span>                :            : void
+<span class="lineNum">      65 </span>                :<span class="lineCov">         64 : random_set_seed(uint32_t seed_)</span>
+<span class="lineNum">      66 </span>                :            : {
+<span class="lineNum">      67 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 64 times"> + </span>]:<span class="lineCov">         64 :     ovs_assert(seed_);</span>
+<span class="lineNum">      68 </span>                :<span class="lineCov">         64 :     *seed_get() = seed_;</span>
+<span class="lineNum">      69 </span>                :<span class="lineCov">         64 : }</span>
+<a name="70"><span class="lineNum">      70 </span>                :            : </a>
+<span class="lineNum">      71 </span>                :            : void
+<span class="lineNum">      72 </span>                :<span class="lineCov">   41791122 : random_bytes(void *p_, size_t n)</span>
+<span class="lineNum">      73 </span>                :            : {
+<span class="lineNum">      74 </span>                :<span class="lineCov">   41791122 :     uint8_t *p = p_;</span>
+<span class="lineNum">      75 </span>                :            : 
+<span class="lineNum">      76 </span>                :<span class="lineCov">   41791122 :     random_init();</span>
+<span class="lineNum">      77 </span>                :            : 
+<span class="lineNum">      78 </span>        [<span class="branchCov" title="Branch 0 was taken 58512326 times"> + </span><span class="branchCov" title="Branch 1 was taken 41791122 times"> + </span>]:<span class="lineCov">  100303448 :     for (; n &gt; 4; p += 4, n -= 4) {</span>
+<span class="lineNum">      79 </span>                :<span class="lineCov">   58512326 :         uint32_t x = random_next();</span>
+<span class="lineNum">      80 </span>                :<span class="lineCov">   58512326 :         memcpy(p, &amp;x, 4);</span>
+<span class="lineNum">      81 </span>                :            :     }
+<span class="lineNum">      82 </span>                :            : 
+<span class="lineNum">      83 </span>        [<span class="branchCov" title="Branch 0 was taken 41791122 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">   41791122 :     if (n) {</span>
+<span class="lineNum">      84 </span>                :<span class="lineCov">   41791122 :         uint32_t x = random_next();</span>
+<span class="lineNum">      85 </span>                :<span class="lineCov">   41791122 :         memcpy(p, &amp;x, n);</span>
+<span class="lineNum">      86 </span>                :            :     }
+<span class="lineNum">      87 </span>                :<span class="lineCov">   41791122 : }</span>
+<span class="lineNum">      88 </span>                :            : 
+<a name="89"><span class="lineNum">      89 </span>                :            : </a>
+<span class="lineNum">      90 </span>                :            : uint32_t
+<span class="lineNum">      91 </span>                :<span class="lineCov">  105696075 : random_uint32(void)</span>
+<span class="lineNum">      92 </span>                :            : {
+<span class="lineNum">      93 </span>                :<span class="lineCov">  105696075 :     random_init();</span>
+<span class="lineNum">      94 </span>                :<span class="lineCov">  105696075 :     return random_next();</span>
+<span class="lineNum">      95 </span>                :            : }
+<a name="96"><span class="lineNum">      96 </span>                :            : </a>
+<span class="lineNum">      97 </span>                :            : uint64_t
+<span class="lineNum">      98 </span>                :<span class="lineCov">     183168 : random_uint64(void)</span>
+<span class="lineNum">      99 </span>                :            : {
+<span class="lineNum">     100 </span>                :            :     uint64_t x;
+<span class="lineNum">     101 </span>                :            : 
+<span class="lineNum">     102 </span>                :<span class="lineCov">     183168 :     random_init();</span>
+<span class="lineNum">     103 </span>                :            : 
+<span class="lineNum">     104 </span>                :<span class="lineCov">     183168 :     x = random_next();</span>
+<span class="lineNum">     105 </span>                :<span class="lineCov">     183168 :     x |= (uint64_t) random_next() &lt;&lt; 32;</span>
+<span class="lineNum">     106 </span>                :<span class="lineCov">     183168 :     return x;</span>
+<span class="lineNum">     107 </span>                :            : }
+<a name="108"><span class="lineNum">     108 </span>                :            : </a>
+<span class="lineNum">     109 </span>                :            : static uint32_t
+<span class="lineNum">     110 </span>                :<span class="lineCov">  206365859 : random_next(void)</span>
+<span class="lineNum">     111 </span>                :            : {
+<span class="lineNum">     112 </span>                :<span class="lineCov">  206365859 :     uint32_t *seedp = seed_get_unsafe();</span>
+<span class="lineNum">     113 </span>                :            : 
+<span class="lineNum">     114 </span>                :<span class="lineCov">  206365859 :     *seedp ^= *seedp &lt;&lt; 13;</span>
+<span class="lineNum">     115 </span>                :<span class="lineCov">  206365859 :     *seedp ^= *seedp &gt;&gt; 17;</span>
+<span class="lineNum">     116 </span>                :<span class="lineCov">  206365859 :     *seedp ^= *seedp &lt;&lt; 5;</span>
+<span class="lineNum">     117 </span>                :            : 
+<span class="lineNum">     118 </span>                :<span class="lineCov">  206365859 :     return *seedp;</span>
+<span class="lineNum">     119 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

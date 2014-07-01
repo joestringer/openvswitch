@@ -1,0 +1,1077 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/socket-util.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - socket-util.c<span style="font-size: 80%;"> (source / <a href="socket-util.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">222</td>
+            <td class="headerCovTableEntry">384</td>
+            <td class="headerCovTableEntryLo">57.8 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">24</td>
+            <td class="headerCovTableEntry">29</td>
+            <td class="headerCovTableEntryMed">82.8 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">104</td>
+            <td class="headerCovTableEntry">301</td>
+            <td class="headerCovTableEntryLo">34.6 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2008, 2009, 2010, 2011, 2012, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;socket-util.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &lt;arpa/inet.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;fcntl.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;net/if.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;netdb.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &lt;poll.h&gt;
+<span class="lineNum">      25 </span>                :            : #include &lt;stddef.h&gt;
+<span class="lineNum">      26 </span>                :            : #include &lt;stdio.h&gt;
+<span class="lineNum">      27 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      28 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      29 </span>                :            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      30 </span>                :            : #include &lt;sys/stat.h&gt;
+<span class="lineNum">      31 </span>                :            : #include &lt;sys/uio.h&gt;
+<span class="lineNum">      32 </span>                :            : #include &lt;sys/un.h&gt;
+<span class="lineNum">      33 </span>                :            : #include &lt;unistd.h&gt;
+<span class="lineNum">      34 </span>                :            : #include &quot;dynamic-string.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;ovs-thread.h&quot;
+<span class="lineNum">      36 </span>                :            : #include &quot;packets.h&quot;
+<span class="lineNum">      37 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      38 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      39 </span>                :            : #include &quot;vlog.h&quot;
+<span class="lineNum">      40 </span>                :            : #ifdef __linux__
+<span class="lineNum">      41 </span>                :            : #include &lt;linux/if_packet.h&gt;
+<span class="lineNum">      42 </span>                :            : #endif
+<span class="lineNum">      43 </span>                :            : #ifdef HAVE_NETLINK
+<span class="lineNum">      44 </span>                :            : #include &quot;netlink-protocol.h&quot;
+<span class="lineNum">      45 </span>                :            : #include &quot;netlink-socket.h&quot;
+<a name="46"><span class="lineNum">      46 </span>                :            : #endif</a>
+<span class="lineNum">      47 </span>                :            : 
+<span class="lineNum">      48 </span>                :<span class="lineCov">      15103 : VLOG_DEFINE_THIS_MODULE(socket_util);</span>
+<span class="lineNum">      49 </span>                :            : 
+<span class="lineNum">      50 </span>                :            : static int getsockopt_int(int fd, int level, int option, const char *optname,
+<span class="lineNum">      51 </span>                :            :                           int *valuep);
+<span class="lineNum">      52 </span>                :            : 
+<span class="lineNum">      53 </span>                :            : /* Sets 'fd' to non-blocking mode.  Returns 0 if successful, otherwise a
+<a name="54"><span class="lineNum">      54 </span>                :            :  * positive errno value. */</a>
+<span class="lineNum">      55 </span>                :            : int
+<span class="lineNum">      56 </span>                :<span class="lineCov">      60359 : set_nonblocking(int fd)</span>
+<span class="lineNum">      57 </span>                :            : {
+<span class="lineNum">      58 </span>                :            : #ifndef _WIN32
+<span class="lineNum">      59 </span>                :<span class="lineCov">      60359 :     int flags = fcntl(fd, F_GETFL, 0);</span>
+<span class="lineNum">      60 </span>        [<span class="branchCov" title="Branch 0 was taken 60360 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      60360 :     if (flags != -1) {</span>
+<span class="lineNum">      61 </span>        [<span class="branchCov" title="Branch 1 was taken 60360 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">      60360 :         if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) != -1) {</span>
+<span class="lineNum">      62 </span>                :<span class="lineCov">      60360 :             return 0;</span>
+<span class="lineNum">      63 </span>                :            :         } else {
+<span class="lineNum">      64 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_ERR(&quot;fcntl(F_SETFL) failed: %s&quot;, ovs_strerror(errno));</span>
+<span class="lineNum">      65 </span>                :<span class="lineNoCov">          0 :             return errno;</span>
+<span class="lineNum">      66 </span>                :            :         }
+<span class="lineNum">      67 </span>                :            :     } else {
+<span class="lineNum">      68 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;fcntl(F_GETFL) failed: %s&quot;, ovs_strerror(errno));</span>
+<span class="lineNum">      69 </span>                :<span class="lineCov">      60360 :         return errno;</span>
+<span class="lineNum">      70 </span>                :            :     }
+<span class="lineNum">      71 </span>                :            : #else
+<span class="lineNum">      72 </span>                :            :     unsigned long arg = 1;
+<span class="lineNum">      73 </span>                :            :     if (ioctlsocket(fd, FIONBIO, &amp;arg)) {
+<span class="lineNum">      74 </span>                :            :         int error = sock_errno();
+<span class="lineNum">      75 </span>                :            :         VLOG_ERR(&quot;set_nonblocking failed: %s&quot;, sock_strerror(error));
+<span class="lineNum">      76 </span>                :            :         return error;
+<span class="lineNum">      77 </span>                :            :     }
+<span class="lineNum">      78 </span>                :            :     return 0;
+<span class="lineNum">      79 </span>                :            : #endif
+<span class="lineNum">      80 </span>                :            : }
+<a name="81"><span class="lineNum">      81 </span>                :            : </a>
+<span class="lineNum">      82 </span>                :            : void
+<span class="lineNum">      83 </span>                :<span class="lineCov">      33558 : xset_nonblocking(int fd)</span>
+<span class="lineNum">      84 </span>                :            : {
+<span class="lineNum">      85 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 33558 times"> + </span>]:<span class="lineCov">      33558 :     if (set_nonblocking(fd)) {</span>
+<span class="lineNum">      86 </span>                :<span class="lineNoCov">          0 :         exit(EXIT_FAILURE);</span>
+<span class="lineNum">      87 </span>                :            :     }
+<span class="lineNum">      88 </span>                :<span class="lineCov">      33558 : }</span>
+<a name="89"><span class="lineNum">      89 </span>                :            : </a>
+<span class="lineNum">      90 </span>                :            : int
+<span class="lineNum">      91 </span>                :<span class="lineCov">       1923 : set_dscp(int fd, uint8_t dscp)</span>
+<span class="lineNum">      92 </span>                :            : {
+<span class="lineNum">      93 </span>                :            :     int val;
+<span class="lineNum">      94 </span>                :            :     bool success;
+<span class="lineNum">      95 </span>                :            : 
+<span class="lineNum">      96 </span>                :            : #ifdef _WIN32
+<span class="lineNum">      97 </span>                :            :     /* XXX: Consider using QoS2 APIs for Windows to set dscp. */
+<span class="lineNum">      98 </span>                :            :     return 0;
+<span class="lineNum">      99 </span>                :            : #endif
+<span class="lineNum">     100 </span>                :            : 
+<span class="lineNum">     101 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1923 times"> + </span>]:<span class="lineCov">       1923 :     if (dscp &gt; 63) {</span>
+<span class="lineNum">     102 </span>                :<span class="lineNoCov">          0 :         return EINVAL;</span>
+<span class="lineNum">     103 </span>                :            :     }
+<span class="lineNum">     104 </span>                :            : 
+<span class="lineNum">     105 </span>                :            :     /* Note: this function is used for both of IPv4 and IPv6 sockets */
+<span class="lineNum">     106 </span>                :<span class="lineCov">       1923 :     success = false;</span>
+<span class="lineNum">     107 </span>                :<span class="lineCov">       1923 :     val = dscp &lt;&lt; 2;</span>
+<span class="lineNum">     108 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1923 times"> + </span>]:<span class="lineCov">       1923 :     if (setsockopt(fd, IPPROTO_IP, IP_TOS, &amp;val, sizeof val)) {</span>
+<span class="lineNum">     109 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (sock_errno() != ENOPROTOOPT) {</span>
+<span class="lineNum">     110 </span>                :<span class="lineNoCov">          0 :             return sock_errno();</span>
+<span class="lineNum">     111 </span>                :            :         }
+<span class="lineNum">     112 </span>                :            :     } else {
+<span class="lineNum">     113 </span>                :<span class="lineCov">       1923 :         success = true;</span>
+<span class="lineNum">     114 </span>                :            :     }
+<span class="lineNum">     115 </span>        [<span class="branchCov" title="Branch 1 was taken 1680 times"> + </span><span class="branchCov" title="Branch 2 was taken 243 times"> + </span>]:<span class="lineCov">       1923 :     if (setsockopt(fd, IPPROTO_IPV6, IPV6_TCLASS, &amp;val, sizeof val)) {</span>
+<span class="lineNum">     116 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1680 times"> + </span>]:<span class="lineCov">       1680 :         if (sock_errno() != ENOPROTOOPT) {</span>
+<span class="lineNum">     117 </span>                :<span class="lineNoCov">          0 :             return sock_errno();</span>
+<span class="lineNum">     118 </span>                :            :         }
+<span class="lineNum">     119 </span>                :            :     } else {
+<span class="lineNum">     120 </span>                :<span class="lineCov">        243 :         success = true;</span>
+<span class="lineNum">     121 </span>                :            :     }
+<span class="lineNum">     122 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1923 times"> + </span>]:<span class="lineCov">       1923 :     if (!success) {</span>
+<span class="lineNum">     123 </span>                :<span class="lineNoCov">          0 :         return ENOPROTOOPT;</span>
+<span class="lineNum">     124 </span>                :            :     }
+<span class="lineNum">     125 </span>                :            : 
+<span class="lineNum">     126 </span>                :<span class="lineCov">       1923 :     return 0;</span>
+<span class="lineNum">     127 </span>                :            : }
+<span class="lineNum">     128 </span>                :            : 
+<span class="lineNum">     129 </span>                :            : /* Translates 'host_name', which must be a string representation of an IP
+<span class="lineNum">     130 </span>                :            :  * address, into a numeric IP address in '*addr'.  Returns 0 if successful,
+<a name="131"><span class="lineNum">     131 </span>                :            :  * otherwise a positive errno value. */</a>
+<span class="lineNum">     132 </span>                :            : int
+<span class="lineNum">     133 </span>                :<span class="lineCov">        122 : lookup_ip(const char *host_name, struct in_addr *addr)</span>
+<span class="lineNum">     134 </span>                :            : {
+<span class="lineNum">     135 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 122 times"> + </span>]:<span class="lineCov">        122 :     if (!inet_pton(AF_INET, host_name, addr)) {</span>
+<span class="lineNum">     136 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     137 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;\&quot;%s\&quot; is not a valid IP address&quot;, host_name);</span>
+<span class="lineNum">     138 </span>                :<span class="lineNoCov">          0 :         return ENOENT;</span>
+<span class="lineNum">     139 </span>                :            :     }
+<span class="lineNum">     140 </span>                :<span class="lineCov">        122 :     return 0;</span>
+<span class="lineNum">     141 </span>                :            : }
+<span class="lineNum">     142 </span>                :            : 
+<span class="lineNum">     143 </span>                :            : /* Translates 'host_name', which must be a string representation of an IPv6
+<span class="lineNum">     144 </span>                :            :  * address, into a numeric IPv6 address in '*addr'.  Returns 0 if successful,
+<a name="145"><span class="lineNum">     145 </span>                :            :  * otherwise a positive errno value. */</a>
+<span class="lineNum">     146 </span>                :            : int
+<span class="lineNum">     147 </span>                :<span class="lineCov">         27 : lookup_ipv6(const char *host_name, struct in6_addr *addr)</span>
+<span class="lineNum">     148 </span>                :            : {
+<span class="lineNum">     149 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 27 times"> + </span>]:<span class="lineCov">         27 :     if (inet_pton(AF_INET6, host_name, addr) != 1) {</span>
+<span class="lineNum">     150 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     151 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;\&quot;%s\&quot; is not a valid IPv6 address&quot;, host_name);</span>
+<span class="lineNum">     152 </span>                :<span class="lineNoCov">          0 :         return ENOENT;</span>
+<span class="lineNum">     153 </span>                :            :     }
+<span class="lineNum">     154 </span>                :<span class="lineCov">         27 :     return 0;</span>
+<span class="lineNum">     155 </span>                :            : }
+<span class="lineNum">     156 </span>                :            : 
+<span class="lineNum">     157 </span>                :            : /* Translates 'host_name', which must be a host name or a string representation
+<span class="lineNum">     158 </span>                :            :  * of an IP address, into a numeric IP address in '*addr'.  Returns 0 if
+<span class="lineNum">     159 </span>                :            :  * successful, otherwise a positive errno value.
+<span class="lineNum">     160 </span>                :            :  *
+<span class="lineNum">     161 </span>                :            :  * Most Open vSwitch code should not use this because it causes deadlocks:
+<span class="lineNum">     162 </span>                :            :  * getaddrinfo() sends out a DNS request but that starts a new flow for which
+<span class="lineNum">     163 </span>                :            :  * OVS must set up a flow, but it can't because it's waiting for a DNS reply.
+<span class="lineNum">     164 </span>                :            :  * The synchronous lookup also delays other activity.  (Of course we can solve
+<a name="165"><span class="lineNum">     165 </span>                :            :  * this but it doesn't seem worthwhile quite yet.)  */</a>
+<span class="lineNum">     166 </span>                :            : int
+<span class="lineNum">     167 </span>                :<span class="lineNoCov">          0 : lookup_hostname(const char *host_name, struct in_addr *addr)</span>
+<span class="lineNum">     168 </span>                :            : {
+<span class="lineNum">     169 </span>                :            :     struct addrinfo *result;
+<span class="lineNum">     170 </span>                :            :     struct addrinfo hints;
+<span class="lineNum">     171 </span>                :            : 
+<span class="lineNum">     172 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (inet_pton(AF_INET, host_name, addr)) {</span>
+<span class="lineNum">     173 </span>                :<span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     174 </span>                :            :     }
+<span class="lineNum">     175 </span>                :            : 
+<span class="lineNum">     176 </span>                :<span class="lineNoCov">          0 :     memset(&amp;hints, 0, sizeof hints);</span>
+<span class="lineNum">     177 </span>                :<span class="lineNoCov">          0 :     hints.ai_family = AF_INET;</span>
+<span class="lineNum">     178 </span>                :            : 
+<span class="lineNum">     179 </span>  [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span> :<span class="lineNoCov">          0 :     switch (getaddrinfo(host_name, NULL, &amp;hints, &amp;result)) {</span>
+<span class="lineNum">         </span>   <span class="branchNoExec" title="Branch 5 was not executed"> # </span><span class="branchNoExec" title="Branch 6 was not executed"> # </span><span class="branchNoExec" title="Branch 7 was not executed"> # </span><span class="branchNoExec" title="Branch 8 was not executed"> # </span> 
+<span class="lineNum">         </span>            <span class="branchNoExec" title="Branch 9 was not executed"> # </span>]
+<span class="lineNum">     180 </span>                :            :     case 0:
+<span class="lineNum">     181 </span>                :<span class="lineNoCov">          0 :         *addr = ALIGNED_CAST(struct sockaddr_in *,</span>
+<span class="lineNum">     182 </span>                :            :                              result-&gt;ai_addr)-&gt;sin_addr;
+<span class="lineNum">     183 </span>                :<span class="lineNoCov">          0 :         freeaddrinfo(result);</span>
+<span class="lineNum">     184 </span>                :<span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     185 </span>                :            : 
+<span class="lineNum">     186 </span>                :            : #ifdef EAI_ADDRFAMILY
+<span class="lineNum">     187 </span>                :            :     case EAI_ADDRFAMILY:
+<span class="lineNum">     188 </span>                :            : #endif
+<span class="lineNum">     189 </span>                :            :     case EAI_NONAME:
+<span class="lineNum">     190 </span>                :            :     case EAI_SERVICE:
+<span class="lineNum">     191 </span>                :<span class="lineNoCov">          0 :         return ENOENT;</span>
+<span class="lineNum">     192 </span>                :            : 
+<span class="lineNum">     193 </span>                :            :     case EAI_AGAIN:
+<span class="lineNum">     194 </span>                :<span class="lineNoCov">          0 :         return EAGAIN;</span>
+<span class="lineNum">     195 </span>                :            : 
+<span class="lineNum">     196 </span>                :            :     case EAI_BADFLAGS:
+<span class="lineNum">     197 </span>                :            :     case EAI_FAMILY:
+<span class="lineNum">     198 </span>                :            :     case EAI_SOCKTYPE:
+<span class="lineNum">     199 </span>                :<span class="lineNoCov">          0 :         return EINVAL;</span>
+<span class="lineNum">     200 </span>                :            : 
+<span class="lineNum">     201 </span>                :            :     case EAI_FAIL:
+<span class="lineNum">     202 </span>                :<span class="lineNoCov">          0 :         return EIO;</span>
+<span class="lineNum">     203 </span>                :            : 
+<span class="lineNum">     204 </span>                :            :     case EAI_MEMORY:
+<span class="lineNum">     205 </span>                :<span class="lineNoCov">          0 :         return ENOMEM;</span>
+<span class="lineNum">     206 </span>                :            : 
+<span class="lineNum">     207 </span>                :            : #if defined (EAI_NODATA) &amp;&amp; EAI_NODATA != EAI_NONAME
+<span class="lineNum">     208 </span>                :            :     case EAI_NODATA:
+<span class="lineNum">     209 </span>                :<span class="lineNoCov">          0 :         return ENXIO;</span>
+<span class="lineNum">     210 </span>                :            : #endif
+<span class="lineNum">     211 </span>                :            : 
+<span class="lineNum">     212 </span>                :            : #ifdef EAI_SYSTEM
+<span class="lineNum">     213 </span>                :            :     case EAI_SYSTEM:
+<span class="lineNum">     214 </span>                :<span class="lineNoCov">          0 :         return sock_errno();</span>
+<span class="lineNum">     215 </span>                :            : #endif
+<span class="lineNum">     216 </span>                :            : 
+<span class="lineNum">     217 </span>                :            :     default:
+<span class="lineNum">     218 </span>                :<span class="lineNoCov">          0 :         return EPROTO;</span>
+<span class="lineNum">     219 </span>                :            :     }
+<span class="lineNum">     220 </span>                :            : }
+<a name="221"><span class="lineNum">     221 </span>                :            : </a>
+<span class="lineNum">     222 </span>                :            : int
+<span class="lineNum">     223 </span>                :<span class="lineCov">      11655 : check_connection_completion(int fd)</span>
+<span class="lineNum">     224 </span>                :            : {
+<span class="lineNum">     225 </span>                :            :     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 10);
+<span class="lineNum">     226 </span>                :            :     struct pollfd pfd;
+<span class="lineNum">     227 </span>                :            :     int retval;
+<span class="lineNum">     228 </span>                :            : 
+<span class="lineNum">     229 </span>                :<span class="lineCov">      11655 :     pfd.fd = fd;</span>
+<span class="lineNum">     230 </span>                :<span class="lineCov">      11655 :     pfd.events = POLLOUT;</span>
+<span class="lineNum">     231 </span>                :            : 
+<span class="lineNum">     232 </span>                :            : #ifndef _WIN32
+<span class="lineNum">     233 </span>                :            :     do {
+<span class="lineNum">     234 </span>                :<span class="lineCov">      11655 :         retval = poll(&amp;pfd, 1, 0);</span>
+<span class="lineNum">     235 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 11655 times"> + </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineCov">      11655 :     } while (retval &lt; 0 &amp;&amp; errno == EINTR);</span>
+<span class="lineNum">     236 </span>                :            : #else
+<span class="lineNum">     237 </span>                :            :     retval = WSAPoll(&amp;pfd, 1, 0);
+<span class="lineNum">     238 </span>                :            : #endif
+<span class="lineNum">     239 </span>        [<span class="branchCov" title="Branch 0 was taken 11655 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      11655 :     if (retval == 1) {</span>
+<span class="lineNum">     240 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 11655 times"> + </span>]:<span class="lineCov">      11655 :         if (pfd.revents &amp; POLLERR) {</span>
+<span class="lineNum">     241 </span>                :<span class="lineNoCov">          0 :             ssize_t n = send(fd, &quot;&quot;, 1, 0);</span>
+<span class="lineNum">     242 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (n &lt; 0) {</span>
+<span class="lineNum">     243 </span>                :<span class="lineNoCov">          0 :                 return sock_errno();</span>
+<span class="lineNum">     244 </span>                :            :             } else {
+<span class="lineNum">     245 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_ERR_RL(&amp;rl, &quot;poll return POLLERR but send succeeded&quot;);</span>
+<span class="lineNum">     246 </span>                :<span class="lineNoCov">          0 :                 return EPROTO;</span>
+<span class="lineNum">     247 </span>                :            :             }
+<span class="lineNum">     248 </span>                :            :         }
+<span class="lineNum">     249 </span>                :<span class="lineCov">      11655 :         return 0;</span>
+<span class="lineNum">     250 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     } else if (retval &lt; 0) {</span>
+<span class="lineNum">     251 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;poll: %s&quot;, sock_strerror(sock_errno()));</span>
+<span class="lineNum">     252 </span>                :<span class="lineNoCov">          0 :         return errno;</span>
+<span class="lineNum">     253 </span>                :            :     } else {
+<span class="lineNum">     254 </span>                :<span class="lineCov">      11655 :         return EAGAIN;</span>
+<span class="lineNum">     255 </span>                :            :     }
+<span class="lineNum">     256 </span>                :            : }
+<span class="lineNum">     257 </span>                :            : 
+<span class="lineNum">     258 </span>                :            : /* Returns the size of socket 'sock''s receive buffer (SO_RCVBUF), or a
+<a name="259"><span class="lineNum">     259 </span>                :            :  * negative errno value if an error occurs. */</a>
+<span class="lineNum">     260 </span>                :            : int
+<span class="lineNum">     261 </span>                :<span class="lineCov">        358 : get_socket_rcvbuf(int sock)</span>
+<span class="lineNum">     262 </span>                :            : {
+<span class="lineNum">     263 </span>                :            :     int rcvbuf;
+<span class="lineNum">     264 </span>                :            :     int error;
+<span class="lineNum">     265 </span>                :            : 
+<span class="lineNum">     266 </span>                :<span class="lineCov">        358 :     error = getsockopt_int(sock, SOL_SOCKET, SO_RCVBUF, &quot;SO_RCVBUF&quot;, &amp;rcvbuf);</span>
+<span class="lineNum">     267 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 358 times"> + </span>]:<span class="lineCov">        358 :     return error ? -error : rcvbuf;</span>
+<span class="lineNum">     268 </span>                :            : }
+<span class="lineNum">     269 </span>                :            : 
+<span class="lineNum">     270 </span>                :            : /* Reads and discards up to 'n' datagrams from 'fd', stopping as soon as no
+<span class="lineNum">     271 </span>                :            :  * more data can be immediately read.  ('fd' should therefore be in
+<a name="272"><span class="lineNum">     272 </span>                :            :  * non-blocking mode.)*/</a>
+<span class="lineNum">     273 </span>                :            : void
+<span class="lineNum">     274 </span>                :<span class="lineNoCov">          0 : drain_fd(int fd, size_t n_packets)</span>
+<span class="lineNum">     275 </span>                :            : {
+<span class="lineNum">     276 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (; n_packets &gt; 0; n_packets--) {</span>
+<span class="lineNum">     277 </span>                :            :         /* 'buffer' only needs to be 1 byte long in most circumstances.  This
+<span class="lineNum">     278 </span>                :            :          * size is defensive against the possibility that we someday want to
+<span class="lineNum">     279 </span>                :            :          * use a Linux tap device without TUN_NO_PI, in which case a buffer
+<span class="lineNum">     280 </span>                :            :          * smaller than sizeof(struct tun_pi) will give EINVAL on read. */
+<span class="lineNum">     281 </span>                :            :         char buffer[128];
+<span class="lineNum">     282 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (read(fd, buffer, sizeof buffer) &lt;= 0) {</span>
+<span class="lineNum">     283 </span>                :            :             break;
+<span class="lineNum">     284 </span>                :            :         }
+<span class="lineNum">     285 </span>                :            :     }
+<span class="lineNum">     286 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="287"><span class="lineNum">     287 </span>                :            : </a>
+<span class="lineNum">     288 </span>                :            : ovs_be32
+<span class="lineNum">     289 </span>                :<span class="lineNoCov">          0 : guess_netmask(ovs_be32 ip_)</span>
+<span class="lineNum">     290 </span>                :            : {
+<span class="lineNum">     291 </span>                :<span class="lineNoCov">          0 :     uint32_t ip = ntohl(ip_);</span>
+<span class="lineNum">     292 </span>                :<span class="lineNoCov">          0 :     return ((ip &gt;&gt; 31) == 0 ? htonl(0xff000000)   /* Class A */</span>
+<span class="lineNum">     293 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :             : (ip &gt;&gt; 30) == 2 ? htonl(0xffff0000) /* Class B */</span>
+<span class="lineNum">         </span>        [<span class="branchNoExec" title="Branch 6 was not executed"> # </span><span class="branchNoExec" title="Branch 7 was not executed"> # </span>]
+<span class="lineNum">     294 </span>                :<span class="lineNoCov">          0 :             : (ip &gt;&gt; 29) == 6 ? htonl(0xffffff00) /* Class C */</span>
+<span class="lineNum">     295 </span>                :            :             : htonl(0));                          /* ??? */
+<span class="lineNum">     296 </span>                :            : }
+<span class="lineNum">     297 </span>                :            : 
+<span class="lineNum">     298 </span>                :            : /* This is like strsep() except:
+<span class="lineNum">     299 </span>                :            :  *
+<span class="lineNum">     300 </span>                :            :  *    - The separator string is &quot;:&quot;.
+<span class="lineNum">     301 </span>                :            :  *
+<span class="lineNum">     302 </span>                :            :  *    - Square brackets [] quote &quot;:&quot; separators and are removed from the
+<a name="303"><span class="lineNum">     303 </span>                :            :  *      tokens. */</a>
+<span class="lineNum">     304 </span>                :            : static char *
+<span class="lineNum">     305 </span>                :<span class="lineCov">        700 : parse_bracketed_token(char **pp)</span>
+<span class="lineNum">     306 </span>                :            : {
+<span class="lineNum">     307 </span>                :<span class="lineCov">        700 :     char *p = *pp;</span>
+<span class="lineNum">     308 </span>                :            : 
+<span class="lineNum">     309 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 700 times"> + </span>]:<span class="lineCov">        700 :     if (p == NULL) {</span>
+<span class="lineNum">     310 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     311 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 700 times"> + </span>]:<span class="lineCov">        700 :     } else if (*p == '\0') {</span>
+<span class="lineNum">     312 </span>                :<span class="lineNoCov">          0 :         *pp = NULL;</span>
+<span class="lineNum">     313 </span>                :<span class="lineNoCov">          0 :         return p;</span>
+<span class="lineNum">     314 </span>        [<span class="branchCov" title="Branch 0 was taken 35 times"> + </span><span class="branchCov" title="Branch 1 was taken 665 times"> + </span>]:<span class="lineCov">        700 :     } else if (*p == '[') {</span>
+<span class="lineNum">     315 </span>                :<span class="lineCov">         35 :         char *start = p + 1;</span>
+<span class="lineNum">     316 </span>                :<span class="lineCov">         35 :         char *end = start + strcspn(start, &quot;]&quot;);</span>
+<span class="lineNum">     317 </span>                :<span class="lineCov">         70 :         *pp = (*end == '\0' ? NULL</span>
+<span class="lineNum">     318 </span>        [<span class="branchCov" title="Branch 0 was taken 35 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         70 :                : end[1] == ':' ? end + 2</span>
+<span class="lineNum">     319 </span>        [<span class="branchCov" title="Branch 0 was taken 14 times"> + </span><span class="branchCov" title="Branch 1 was taken 21 times"> + </span>]:<span class="lineCov">         35 :                : end + 1);</span>
+<span class="lineNum">     320 </span>                :<span class="lineCov">         35 :         *end = '\0';</span>
+<span class="lineNum">     321 </span>                :<span class="lineCov">         35 :         return start;</span>
+<span class="lineNum">     322 </span>                :            :     } else {
+<span class="lineNum">     323 </span>                :<span class="lineCov">        665 :         char *start = p;</span>
+<span class="lineNum">     324 </span>                :<span class="lineCov">        665 :         char *end = start + strcspn(start, &quot;:&quot;);</span>
+<span class="lineNum">     325 </span>        [<span class="branchCov" title="Branch 0 was taken 336 times"> + </span><span class="branchCov" title="Branch 1 was taken 329 times"> + </span>]:<span class="lineCov">        665 :         *pp = *end == '\0' ? NULL : end + 1;</span>
+<span class="lineNum">     326 </span>                :<span class="lineCov">        665 :         *end = '\0';</span>
+<span class="lineNum">     327 </span>                :<span class="lineCov">        700 :         return start;</span>
+<span class="lineNum">     328 </span>                :            :     }
+<span class="lineNum">     329 </span>                :            : }
+<a name="330"><span class="lineNum">     330 </span>                :            : </a>
+<span class="lineNum">     331 </span>                :            : static bool
+<span class="lineNum">     332 </span>                :<span class="lineCov">        350 : parse_sockaddr_components(struct sockaddr_storage *ss,</span>
+<span class="lineNum">     333 </span>                :            :                           const char *host_s,
+<span class="lineNum">     334 </span>                :            :                           const char *port_s, uint16_t default_port,
+<span class="lineNum">     335 </span>                :            :                           const char *s)
+<span class="lineNum">     336 </span>                :            : {
+<span class="lineNum">     337 </span>                :<span class="lineCov">        350 :     struct sockaddr_in *sin = ALIGNED_CAST(struct sockaddr_in *, ss);</span>
+<span class="lineNum">     338 </span>                :            :     int port;
+<span class="lineNum">     339 </span>                :            : 
+<span class="lineNum">     340 </span>[<span class="branchCov" title="Branch 0 was taken 350 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 350 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        350 :     if (port_s &amp;&amp; port_s[0]) {</span>
+<span class="lineNum">     341 </span>[<span class="branchCov" title="Branch 1 was taken 350 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>][<span class="branchCov" title="Branch 3 was taken 350 times"> + </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span>]:<span class="lineCov">        350 :         if (!str_to_int(port_s, 10, &amp;port) || port &lt; 0 || port &gt; 65535) {</span>
+<span class="lineNum">         </span>        [<span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchCov" title="Branch 6 was taken 350 times"> + </span>]
+<span class="lineNum">     342 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_ERR(&quot;%s: bad port number \&quot;%s\&quot;&quot;, s, port_s);</span>
+<span class="lineNum">     343 </span>                :            :         }
+<span class="lineNum">     344 </span>                :            :     } else {
+<span class="lineNum">     345 </span>                :<span class="lineNoCov">          0 :         port = default_port;</span>
+<span class="lineNum">     346 </span>                :            :     }
+<span class="lineNum">     347 </span>                :            : 
+<span class="lineNum">     348 </span>                :<span class="lineCov">        350 :     memset(ss, 0, sizeof *ss);</span>
+<span class="lineNum">     349 </span>        [<span class="branchCov" title="Branch 0 was taken 35 times"> + </span><span class="branchCov" title="Branch 1 was taken 315 times"> + </span>]:<span class="lineCov">        350 :     if (strchr(host_s, ':')) {</span>
+<span class="lineNum">     350 </span>                :<span class="lineCov">         35 :         struct sockaddr_in6 *sin6</span>
+<span class="lineNum">     351 </span>                :            :             = ALIGNED_CAST(struct sockaddr_in6 *, ss);
+<span class="lineNum">     352 </span>                :            : 
+<span class="lineNum">     353 </span>                :<span class="lineCov">         35 :         sin6-&gt;sin6_family = AF_INET6;</span>
+<span class="lineNum">     354 </span>                :<span class="lineCov">         35 :         sin6-&gt;sin6_port = htons(port);</span>
+<span class="lineNum">     355 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 35 times"> + </span>]:<span class="lineCov">         35 :         if (!inet_pton(AF_INET6, host_s, sin6-&gt;sin6_addr.s6_addr)) {</span>
+<span class="lineNum">     356 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_ERR(&quot;%s: bad IPv6 address \&quot;%s\&quot;&quot;, s, host_s);</span>
+<span class="lineNum">     357 </span>                :<span class="lineNoCov">          0 :             goto exit;</span>
+<span class="lineNum">     358 </span>                :            :         }
+<span class="lineNum">     359 </span>                :            :     } else {
+<span class="lineNum">     360 </span>                :<span class="lineCov">        315 :         sin-&gt;sin_family = AF_INET;</span>
+<span class="lineNum">     361 </span>                :<span class="lineCov">        315 :         sin-&gt;sin_port = htons(port);</span>
+<span class="lineNum">     362 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 315 times"> + </span>]:<span class="lineCov">        315 :         if (!inet_pton(AF_INET, host_s, &amp;sin-&gt;sin_addr.s_addr)) {</span>
+<span class="lineNum">     363 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_ERR(&quot;%s: bad IPv4 address \&quot;%s\&quot;&quot;, s, host_s);</span>
+<span class="lineNum">     364 </span>                :<span class="lineNoCov">          0 :             goto exit;</span>
+<span class="lineNum">     365 </span>                :            :         }
+<span class="lineNum">     366 </span>                :            :     }
+<span class="lineNum">     367 </span>                :            : 
+<span class="lineNum">     368 </span>                :<span class="lineCov">        350 :     return true;</span>
+<span class="lineNum">     369 </span>                :            : 
+<span class="lineNum">     370 </span>                :            : exit:
+<span class="lineNum">     371 </span>                :<span class="lineNoCov">          0 :     memset(ss, 0, sizeof *ss);</span>
+<span class="lineNum">     372 </span>                :<span class="lineCov">        350 :     return false;</span>
+<span class="lineNum">     373 </span>                :            : }
+<span class="lineNum">     374 </span>                :            : 
+<span class="lineNum">     375 </span>                :            : /* Parses 'target', which should be a string in the format &quot;&lt;host&gt;[:&lt;port&gt;]&quot;.
+<span class="lineNum">     376 </span>                :            :  * &lt;host&gt;, which is required, may be an IPv4 address or an IPv6 address
+<span class="lineNum">     377 </span>                :            :  * enclosed in square brackets.  If 'default_port' is nonzero then &lt;port&gt; is
+<span class="lineNum">     378 </span>                :            :  * optional and defaults to 'default_port'.
+<span class="lineNum">     379 </span>                :            :  *
+<span class="lineNum">     380 </span>                :            :  * On success, returns true and stores the parsed remote address into '*ss'.
+<a name="381"><span class="lineNum">     381 </span>                :            :  * On failure, logs an error, stores zeros into '*ss', and returns false. */</a>
+<span class="lineNum">     382 </span>                :            : bool
+<span class="lineNum">     383 </span>                :<span class="lineCov">        242 : inet_parse_active(const char *target_, uint16_t default_port,</span>
+<span class="lineNum">     384 </span>                :            :                   struct sockaddr_storage *ss)
+<span class="lineNum">     385 </span>                :            : {
+<span class="lineNum">     386 </span>                :<span class="lineCov">        242 :     char *target = xstrdup(target_);</span>
+<span class="lineNum">     387 </span>                :            :     const char *port;
+<span class="lineNum">     388 </span>                :            :     const char *host;
+<span class="lineNum">     389 </span>                :            :     char *p;
+<span class="lineNum">     390 </span>                :            :     bool ok;
+<span class="lineNum">     391 </span>                :            : 
+<span class="lineNum">     392 </span>                :<span class="lineCov">        242 :     p = target;</span>
+<span class="lineNum">     393 </span>                :<span class="lineCov">        242 :     host = parse_bracketed_token(&amp;p);</span>
+<span class="lineNum">     394 </span>                :<span class="lineCov">        242 :     port = parse_bracketed_token(&amp;p);</span>
+<span class="lineNum">     395 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 242 times"> + </span>]:<span class="lineCov">        242 :     if (!host) {</span>
+<span class="lineNum">     396 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;%s: host must be specified&quot;, target_);</span>
+<span class="lineNum">     397 </span>                :<span class="lineNoCov">          0 :         ok = false;</span>
+<span class="lineNum">     398 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 242 times"> + </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">        242 :     } else if (!port &amp;&amp; !default_port) {</span>
+<span class="lineNum">     399 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;%s: port must be specified&quot;, target_);</span>
+<span class="lineNum">     400 </span>                :<span class="lineNoCov">          0 :         ok = false;</span>
+<span class="lineNum">     401 </span>                :            :     } else {
+<span class="lineNum">     402 </span>                :<span class="lineCov">        242 :         ok = parse_sockaddr_components(ss, host, port, default_port, target_);</span>
+<span class="lineNum">     403 </span>                :            :     }
+<span class="lineNum">     404 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 242 times"> + </span>]:<span class="lineCov">        242 :     if (!ok) {</span>
+<span class="lineNum">     405 </span>                :<span class="lineNoCov">          0 :         memset(ss, 0, sizeof *ss);</span>
+<span class="lineNum">     406 </span>                :            :     }
+<span class="lineNum">     407 </span>                :<span class="lineCov">        242 :     free(target);</span>
+<span class="lineNum">     408 </span>                :<span class="lineCov">        242 :     return ok;</span>
+<span class="lineNum">     409 </span>                :            : }
+<span class="lineNum">     410 </span>                :            : 
+<span class="lineNum">     411 </span>                :            : 
+<span class="lineNum">     412 </span>                :            : /* Opens a non-blocking IPv4 or IPv6 socket of the specified 'style' and
+<span class="lineNum">     413 </span>                :            :  * connects to 'target', which should be a string in the format
+<span class="lineNum">     414 </span>                :            :  * &quot;&lt;host&gt;[:&lt;port&gt;]&quot;.  &lt;host&gt;, which is required, may be an IPv4 address or an
+<span class="lineNum">     415 </span>                :            :  * IPv6 address enclosed in square brackets.  If 'default_port' is nonzero then
+<span class="lineNum">     416 </span>                :            :  * &lt;port&gt; is optional and defaults to 'default_port'.
+<span class="lineNum">     417 </span>                :            :  *
+<span class="lineNum">     418 </span>                :            :  * 'style' should be SOCK_STREAM (for TCP) or SOCK_DGRAM (for UDP).
+<span class="lineNum">     419 </span>                :            :  *
+<span class="lineNum">     420 </span>                :            :  * On success, returns 0 (indicating connection complete) or EAGAIN (indicating
+<span class="lineNum">     421 </span>                :            :  * connection in progress), in which case the new file descriptor is stored
+<span class="lineNum">     422 </span>                :            :  * into '*fdp'.  On failure, returns a positive errno value other than EAGAIN
+<span class="lineNum">     423 </span>                :            :  * and stores -1 into '*fdp'.
+<span class="lineNum">     424 </span>                :            :  *
+<span class="lineNum">     425 </span>                :            :  * If 'ss' is non-null, then on success stores the target address into '*ss'.
+<span class="lineNum">     426 </span>                :            :  *
+<span class="lineNum">     427 </span>                :            :  * 'dscp' becomes the DSCP bits in the IP headers for the new connection.  It
+<span class="lineNum">     428 </span>                :            :  * should be in the range [0, 63] and will automatically be shifted to the
+<a name="429"><span class="lineNum">     429 </span>                :            :  * appropriately place in the IP tos field. */</a>
+<span class="lineNum">     430 </span>                :            : int
+<span class="lineNum">     431 </span>                :<span class="lineCov">        242 : inet_open_active(int style, const char *target, uint16_t default_port,</span>
+<span class="lineNum">     432 </span>                :            :                  struct sockaddr_storage *ssp, int *fdp, uint8_t dscp)
+<span class="lineNum">     433 </span>                :            : {
+<span class="lineNum">     434 </span>                :            :     struct sockaddr_storage ss;
+<span class="lineNum">     435 </span>                :<span class="lineCov">        242 :     int fd = -1;</span>
+<span class="lineNum">     436 </span>                :            :     int error;
+<span class="lineNum">     437 </span>                :            : 
+<span class="lineNum">     438 </span>                :            :     /* Parse. */
+<span class="lineNum">     439 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 242 times"> + </span>]:<span class="lineCov">        242 :     if (!inet_parse_active(target, default_port, &amp;ss)) {</span>
+<span class="lineNum">     440 </span>                :<span class="lineNoCov">          0 :         error = EAFNOSUPPORT;</span>
+<span class="lineNum">     441 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     442 </span>                :            :     }
+<span class="lineNum">     443 </span>                :            : 
+<span class="lineNum">     444 </span>                :            :     /* Create non-blocking socket. */
+<span class="lineNum">     445 </span>                :<span class="lineCov">        242 :     fd = socket(ss.ss_family, style, 0);</span>
+<span class="lineNum">     446 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 242 times"> + </span>]:<span class="lineCov">        242 :     if (fd &lt; 0) {</span>
+<span class="lineNum">     447 </span>                :<span class="lineNoCov">          0 :         error = sock_errno();</span>
+<span class="lineNum">     448 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;%s: socket: %s&quot;, target, sock_strerror(error));</span>
+<span class="lineNum">     449 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     450 </span>                :            :     }
+<span class="lineNum">     451 </span>                :<span class="lineCov">        242 :     error = set_nonblocking(fd);</span>
+<span class="lineNum">     452 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 242 times"> + </span>]:<span class="lineCov">        242 :     if (error) {</span>
+<span class="lineNum">     453 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     454 </span>                :            :     }
+<span class="lineNum">     455 </span>                :            : 
+<span class="lineNum">     456 </span>                :            :     /* The dscp bits must be configured before connect() to ensure that the
+<span class="lineNum">     457 </span>                :            :      * TOS field is set during the connection establishment.  If set after
+<span class="lineNum">     458 </span>                :            :      * connect(), the handshake SYN frames will be sent with a TOS of 0. */
+<span class="lineNum">     459 </span>                :<span class="lineCov">        242 :     error = set_dscp(fd, dscp);</span>
+<span class="lineNum">     460 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 242 times"> + </span>]:<span class="lineCov">        242 :     if (error) {</span>
+<span class="lineNum">     461 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;%s: set_dscp: %s&quot;, target, sock_strerror(error));</span>
+<span class="lineNum">     462 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     463 </span>                :            :     }
+<span class="lineNum">     464 </span>                :            : 
+<span class="lineNum">     465 </span>                :            :     /* Connect. */
+<span class="lineNum">     466 </span>                :<span class="lineCov">        242 :     error = connect(fd, (struct sockaddr *) &amp;ss, ss_length(&amp;ss)) == 0</span>
+<span class="lineNum">     467 </span>                :            :                     ? 0
+<span class="lineNum">     468 </span>        [<span class="branchCov" title="Branch 0 was taken 234 times"> + </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>]:<span class="lineCov">        242 :                     : sock_errno();</span>
+<span class="lineNum">     469 </span>        [<span class="branchCov" title="Branch 0 was taken 234 times"> + </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>]:<span class="lineCov">        242 :     if (error == EINPROGRESS</span>
+<span class="lineNum">     470 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     471 </span>                :            :         || error == WSAEALREADY || error == WSAEWOULDBLOCK
+<span class="lineNum">     472 </span>                :            : #endif
+<span class="lineNum">     473 </span>                :            :         ) {
+<span class="lineNum">     474 </span>                :<span class="lineCov">        234 :         error = EAGAIN;</span>
+<span class="lineNum">     475 </span>                :            :     }
+<span class="lineNum">     476 </span>                :            : 
+<span class="lineNum">     477 </span>                :            : exit:
+<span class="lineNum">     478 </span>[<span class="branchCov" title="Branch 0 was taken 234 times"> + </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 234 times"> + </span>]:<span class="lineCov">        242 :     if (error &amp;&amp; error != EAGAIN) {</span>
+<span class="lineNum">     479 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (ssp) {</span>
+<span class="lineNum">     480 </span>                :<span class="lineNoCov">          0 :             memset(ssp, 0, sizeof *ssp);</span>
+<span class="lineNum">     481 </span>                :            :         }
+<span class="lineNum">     482 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (fd &gt;= 0) {</span>
+<span class="lineNum">     483 </span>                :<span class="lineNoCov">          0 :             closesocket(fd);</span>
+<span class="lineNum">     484 </span>                :<span class="lineNoCov">          0 :             fd = -1;</span>
+<span class="lineNum">     485 </span>                :            :         }
+<span class="lineNum">     486 </span>                :            :     } else {
+<span class="lineNum">     487 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 242 times"> + </span>]:<span class="lineCov">        242 :         if (ssp) {</span>
+<span class="lineNum">     488 </span>                :<span class="lineNoCov">          0 :             *ssp = ss;</span>
+<span class="lineNum">     489 </span>                :            :         }
+<span class="lineNum">     490 </span>                :            :     }
+<span class="lineNum">     491 </span>                :<span class="lineCov">        242 :     *fdp = fd;</span>
+<span class="lineNum">     492 </span>                :<span class="lineCov">        242 :     return error;</span>
+<span class="lineNum">     493 </span>                :            : }
+<span class="lineNum">     494 </span>                :            : 
+<span class="lineNum">     495 </span>                :            : /* Parses 'target', which should be a string in the format &quot;[&lt;port&gt;][:&lt;host&gt;]&quot;:
+<span class="lineNum">     496 </span>                :            :  *
+<span class="lineNum">     497 </span>                :            :  *      - If 'default_port' is -1, then &lt;port&gt; is required.  Otherwise, if
+<span class="lineNum">     498 </span>                :            :  *        &lt;port&gt; is omitted, then 'default_port' is used instead.
+<span class="lineNum">     499 </span>                :            :  *
+<span class="lineNum">     500 </span>                :            :  *      - If &lt;port&gt; (or 'default_port', if used) is 0, then no port is bound
+<span class="lineNum">     501 </span>                :            :  *        and the TCP/IP stack will select a port.
+<span class="lineNum">     502 </span>                :            :  *
+<span class="lineNum">     503 </span>                :            :  *      - &lt;host&gt; is optional.  If supplied, it may be an IPv4 address or an
+<span class="lineNum">     504 </span>                :            :  *        IPv6 address enclosed in square brackets.  If omitted, the IP address
+<span class="lineNum">     505 </span>                :            :  *        is wildcarded.
+<span class="lineNum">     506 </span>                :            :  *
+<span class="lineNum">     507 </span>                :            :  * If successful, stores the address into '*ss' and returns true; otherwise
+<a name="508"><span class="lineNum">     508 </span>                :            :  * zeros '*ss' and returns false. */</a>
+<span class="lineNum">     509 </span>                :            : bool
+<span class="lineNum">     510 </span>                :<span class="lineCov">        108 : inet_parse_passive(const char *target_, int default_port,</span>
+<span class="lineNum">     511 </span>                :            :                    struct sockaddr_storage *ss)
+<span class="lineNum">     512 </span>                :            : {
+<span class="lineNum">     513 </span>                :<span class="lineCov">        108 :     char *target = xstrdup(target_);</span>
+<span class="lineNum">     514 </span>                :            :     const char *port;
+<span class="lineNum">     515 </span>                :            :     const char *host;
+<span class="lineNum">     516 </span>                :            :     char *p;
+<span class="lineNum">     517 </span>                :            :     bool ok;
+<span class="lineNum">     518 </span>                :            : 
+<span class="lineNum">     519 </span>                :<span class="lineCov">        108 :     p = target;</span>
+<span class="lineNum">     520 </span>                :<span class="lineCov">        108 :     port = parse_bracketed_token(&amp;p);</span>
+<span class="lineNum">     521 </span>                :<span class="lineCov">        108 :     host = parse_bracketed_token(&amp;p);</span>
+<span class="lineNum">     522 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 108 times"> + </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">        108 :     if (!port &amp;&amp; default_port &lt; 0) {</span>
+<span class="lineNum">     523 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;%s: port must be specified&quot;, target_);</span>
+<span class="lineNum">     524 </span>                :<span class="lineNoCov">          0 :         ok = false;</span>
+<span class="lineNum">     525 </span>                :            :     } else {
+<span class="lineNum">     526 </span>        [<span class="branchCov" title="Branch 0 was taken 108 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        108 :         ok = parse_sockaddr_components(ss, host ? host : &quot;0.0.0.0&quot;,</span>
+<span class="lineNum">     527 </span>                :            :                                        port, default_port, target_);
+<span class="lineNum">     528 </span>                :            :     }
+<span class="lineNum">     529 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 108 times"> + </span>]:<span class="lineCov">        108 :     if (!ok) {</span>
+<span class="lineNum">     530 </span>                :<span class="lineNoCov">          0 :         memset(ss, 0, sizeof *ss);</span>
+<span class="lineNum">     531 </span>                :            :     }
+<span class="lineNum">     532 </span>                :<span class="lineCov">        108 :     free(target);</span>
+<span class="lineNum">     533 </span>                :<span class="lineCov">        108 :     return ok;</span>
+<span class="lineNum">     534 </span>                :            : }
+<span class="lineNum">     535 </span>                :            : 
+<span class="lineNum">     536 </span>                :            : 
+<span class="lineNum">     537 </span>                :            : /* Opens a non-blocking IPv4 or IPv6 socket of the specified 'style', binds to
+<span class="lineNum">     538 </span>                :            :  * 'target', and listens for incoming connections.  Parses 'target' in the same
+<span class="lineNum">     539 </span>                :            :  * way was inet_parse_passive().
+<span class="lineNum">     540 </span>                :            :  *
+<span class="lineNum">     541 </span>                :            :  * 'style' should be SOCK_STREAM (for TCP) or SOCK_DGRAM (for UDP).
+<span class="lineNum">     542 </span>                :            :  *
+<span class="lineNum">     543 </span>                :            :  * For TCP, the socket will have SO_REUSEADDR turned on.
+<span class="lineNum">     544 </span>                :            :  *
+<span class="lineNum">     545 </span>                :            :  * On success, returns a non-negative file descriptor.  On failure, returns a
+<span class="lineNum">     546 </span>                :            :  * negative errno value.
+<span class="lineNum">     547 </span>                :            :  *
+<span class="lineNum">     548 </span>                :            :  * If 'ss' is non-null, then on success stores the bound address into '*ss'.
+<span class="lineNum">     549 </span>                :            :  *
+<span class="lineNum">     550 </span>                :            :  * 'dscp' becomes the DSCP bits in the IP headers for the new connection.  It
+<span class="lineNum">     551 </span>                :            :  * should be in the range [0, 63] and will automatically be shifted to the
+<span class="lineNum">     552 </span>                :            :  * appropriately place in the IP tos field.
+<span class="lineNum">     553 </span>                :            :  *
+<span class="lineNum">     554 </span>                :            :  * If 'kernel_print_port' is true and the port is dynamically assigned by
+<a name="555"><span class="lineNum">     555 </span>                :            :  * the kernel, print the chosen port. */</a>
+<span class="lineNum">     556 </span>                :            : int
+<span class="lineNum">     557 </span>                :<span class="lineCov">        108 : inet_open_passive(int style, const char *target, int default_port,</span>
+<span class="lineNum">     558 </span>                :            :                   struct sockaddr_storage *ssp, uint8_t dscp,
+<span class="lineNum">     559 </span>                :            :                   bool kernel_print_port)
+<span class="lineNum">     560 </span>                :            : {
+<span class="lineNum">     561 </span>                :            :     bool kernel_chooses_port;
+<span class="lineNum">     562 </span>                :            :     struct sockaddr_storage ss;
+<span class="lineNum">     563 </span>                :<span class="lineCov">        108 :     int fd = 0, error;</span>
+<span class="lineNum">     564 </span>                :<span class="lineCov">        108 :     unsigned int yes = 1;</span>
+<span class="lineNum">     565 </span>                :            : 
+<span class="lineNum">     566 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 108 times"> + </span>]:<span class="lineCov">        108 :     if (!inet_parse_passive(target, default_port, &amp;ss)) {</span>
+<span class="lineNum">     567 </span>                :<span class="lineNoCov">          0 :         return -EAFNOSUPPORT;</span>
+<span class="lineNum">     568 </span>                :            :     }
+<span class="lineNum">     569 </span>                :<span class="lineCov">        108 :     kernel_chooses_port = ss_get_port(&amp;ss) == 0;</span>
+<span class="lineNum">     570 </span>                :            : 
+<span class="lineNum">     571 </span>                :            :     /* Create non-blocking socket, set SO_REUSEADDR. */
+<span class="lineNum">     572 </span>                :<span class="lineCov">        108 :     fd = socket(ss.ss_family, style, 0);</span>
+<span class="lineNum">     573 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 108 times"> + </span>]:<span class="lineCov">        108 :     if (fd &lt; 0) {</span>
+<span class="lineNum">     574 </span>                :<span class="lineNoCov">          0 :         error = sock_errno();</span>
+<span class="lineNum">     575 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;%s: socket: %s&quot;, target, sock_strerror(error));</span>
+<span class="lineNum">     576 </span>                :<span class="lineNoCov">          0 :         return -error;</span>
+<span class="lineNum">     577 </span>                :            :     }
+<span class="lineNum">     578 </span>                :<span class="lineCov">        108 :     error = set_nonblocking(fd);</span>
+<span class="lineNum">     579 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 108 times"> + </span>]:<span class="lineCov">        108 :     if (error) {</span>
+<span class="lineNum">     580 </span>                :<span class="lineNoCov">          0 :         goto error;</span>
+<span class="lineNum">     581 </span>                :            :     }
+<span class="lineNum">     582 </span>        [<span class="branchCov" title="Branch 0 was taken 94 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>]:<span class="lineCov">        108 :     if (style == SOCK_STREAM</span>
+<span class="lineNum">     583 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 94 times"> + </span>]:<span class="lineCov">         94 :         &amp;&amp; setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &amp;yes, sizeof yes) &lt; 0) {</span>
+<span class="lineNum">     584 </span>                :<span class="lineNoCov">          0 :         error = sock_errno();</span>
+<span class="lineNum">     585 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;%s: setsockopt(SO_REUSEADDR): %s&quot;,</span>
+<span class="lineNum">     586 </span>                :            :                  target, sock_strerror(error));
+<span class="lineNum">     587 </span>                :<span class="lineNoCov">          0 :         goto error;</span>
+<span class="lineNum">     588 </span>                :            :     }
+<span class="lineNum">     589 </span>                :            : 
+<span class="lineNum">     590 </span>                :            :     /* Bind. */
+<span class="lineNum">     591 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 108 times"> + </span>]:<span class="lineCov">        108 :     if (bind(fd, (struct sockaddr *) &amp;ss, ss_length(&amp;ss)) &lt; 0) {</span>
+<span class="lineNum">     592 </span>                :<span class="lineNoCov">          0 :         error = sock_errno();</span>
+<span class="lineNum">     593 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;%s: bind: %s&quot;, target, sock_strerror(error));</span>
+<span class="lineNum">     594 </span>                :<span class="lineNoCov">          0 :         goto error;</span>
+<span class="lineNum">     595 </span>                :            :     }
+<span class="lineNum">     596 </span>                :            : 
+<span class="lineNum">     597 </span>                :            :     /* The dscp bits must be configured before connect() to ensure that the TOS
+<span class="lineNum">     598 </span>                :            :      * field is set during the connection establishment.  If set after
+<span class="lineNum">     599 </span>                :            :      * connect(), the handshake SYN frames will be sent with a TOS of 0. */
+<span class="lineNum">     600 </span>                :<span class="lineCov">        108 :     error = set_dscp(fd, dscp);</span>
+<span class="lineNum">     601 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 108 times"> + </span>]:<span class="lineCov">        108 :     if (error) {</span>
+<span class="lineNum">     602 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;%s: set_dscp: %s&quot;, target, sock_strerror(error));</span>
+<span class="lineNum">     603 </span>                :<span class="lineNoCov">          0 :         goto error;</span>
+<span class="lineNum">     604 </span>                :            :     }
+<span class="lineNum">     605 </span>                :            : 
+<span class="lineNum">     606 </span>                :            :     /* Listen. */
+<span class="lineNum">     607 </span>[<span class="branchCov" title="Branch 0 was taken 94 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 94 times"> + </span>]:<span class="lineCov">        108 :     if (style == SOCK_STREAM &amp;&amp; listen(fd, 10) &lt; 0) {</span>
+<span class="lineNum">     608 </span>                :<span class="lineNoCov">          0 :         error = sock_errno();</span>
+<span class="lineNum">     609 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;%s: listen: %s&quot;, target, sock_strerror(error));</span>
+<span class="lineNum">     610 </span>                :<span class="lineNoCov">          0 :         goto error;</span>
+<span class="lineNum">     611 </span>                :            :     }
+<span class="lineNum">     612 </span>                :            : 
+<span class="lineNum">     613 </span>[<span class="branchCov" title="Branch 0 was taken 14 times"> + </span><span class="branchCov" title="Branch 1 was taken 94 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 14 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        108 :     if (ssp || kernel_chooses_port) {</span>
+<span class="lineNum">     614 </span>                :<span class="lineCov">        108 :         socklen_t ss_len = sizeof ss;</span>
+<span class="lineNum">     615 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 108 times"> + </span>]:<span class="lineCov">        108 :         if (getsockname(fd, (struct sockaddr *) &amp;ss, &amp;ss_len) &lt; 0) {</span>
+<span class="lineNum">     616 </span>                :<span class="lineNoCov">          0 :             error = sock_errno();</span>
+<span class="lineNum">     617 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_ERR(&quot;%s: getsockname: %s&quot;, target, sock_strerror(error));</span>
+<span class="lineNum">     618 </span>                :            :             goto error;
+<span class="lineNum">     619 </span>                :            :         }
+<span class="lineNum">     620 </span>[<span class="branchCov" title="Branch 0 was taken 108 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 108 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        108 :         if (kernel_chooses_port &amp;&amp; kernel_print_port) {</span>
+<span class="lineNum">     621 </span>        [<span class="branchCov" title="Branch 0 was taken 108 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        108 :             VLOG_INFO(&quot;%s: listening on port %&quot;PRIu16,</span>
+<span class="lineNum">     622 </span>                :            :                       target, ss_get_port(&amp;ss));
+<span class="lineNum">     623 </span>                :            :         }
+<span class="lineNum">     624 </span>        [<span class="branchCov" title="Branch 0 was taken 94 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>]:<span class="lineCov">        108 :         if (ssp) {</span>
+<span class="lineNum">     625 </span>                :<span class="lineCov">        108 :             *ssp = ss;</span>
+<span class="lineNum">     626 </span>                :            :         }
+<span class="lineNum">     627 </span>                :            :     }
+<span class="lineNum">     628 </span>                :            : 
+<span class="lineNum">     629 </span>                :<span class="lineCov">        108 :     return fd;</span>
+<span class="lineNum">     630 </span>                :            : 
+<span class="lineNum">     631 </span>                :            : error:
+<span class="lineNum">     632 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (ssp) {</span>
+<span class="lineNum">     633 </span>                :<span class="lineNoCov">          0 :         memset(ssp, 0, sizeof *ssp);</span>
+<span class="lineNum">     634 </span>                :            :     }
+<span class="lineNum">     635 </span>                :<span class="lineNoCov">          0 :     closesocket(fd);</span>
+<span class="lineNum">     636 </span>                :<span class="lineCov">        108 :     return -error;</span>
+<span class="lineNum">     637 </span>                :            : }
+<a name="638"><span class="lineNum">     638 </span>                :            : </a>
+<span class="lineNum">     639 </span>                :            : int
+<span class="lineNum">     640 </span>                :<span class="lineCov">       9114 : read_fully(int fd, void *p_, size_t size, size_t *bytes_read)</span>
+<span class="lineNum">     641 </span>                :            : {
+<span class="lineNum">     642 </span>                :<span class="lineCov">       9114 :     uint8_t *p = p_;</span>
+<span class="lineNum">     643 </span>                :            : 
+<span class="lineNum">     644 </span>                :<span class="lineCov">       9114 :     *bytes_read = 0;</span>
+<span class="lineNum">     645 </span>        [<span class="branchCov" title="Branch 0 was taken 9114 times"> + </span><span class="branchCov" title="Branch 1 was taken 9111 times"> + </span>]:<span class="lineCov">      18225 :     while (size &gt; 0) {</span>
+<span class="lineNum">     646 </span>                :<span class="lineCov">       9114 :         ssize_t retval = read(fd, p, size);</span>
+<span class="lineNum">     647 </span>        [<span class="branchCov" title="Branch 0 was taken 9111 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">       9114 :         if (retval &gt; 0) {</span>
+<span class="lineNum">     648 </span>                :<span class="lineCov">       9111 :             *bytes_read += retval;</span>
+<span class="lineNum">     649 </span>                :<span class="lineCov">       9111 :             size -= retval;</span>
+<span class="lineNum">     650 </span>                :<span class="lineCov">       9111 :             p += retval;</span>
+<span class="lineNum">     651 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          3 :         } else if (retval == 0) {</span>
+<span class="lineNum">     652 </span>                :<span class="lineCov">          3 :             return EOF;</span>
+<span class="lineNum">     653 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         } else if (errno != EINTR) {</span>
+<span class="lineNum">     654 </span>                :<span class="lineNoCov">          0 :             return errno;</span>
+<span class="lineNum">     655 </span>                :            :         }
+<span class="lineNum">     656 </span>                :            :     }
+<span class="lineNum">     657 </span>                :<span class="lineCov">       9114 :     return 0;</span>
+<span class="lineNum">     658 </span>                :            : }
+<a name="659"><span class="lineNum">     659 </span>                :            : </a>
+<span class="lineNum">     660 </span>                :            : int
+<span class="lineNum">     661 </span>                :<span class="lineCov">        867 : write_fully(int fd, const void *p_, size_t size, size_t *bytes_written)</span>
+<span class="lineNum">     662 </span>                :            : {
+<span class="lineNum">     663 </span>                :<span class="lineCov">        867 :     const uint8_t *p = p_;</span>
+<span class="lineNum">     664 </span>                :            : 
+<span class="lineNum">     665 </span>                :<span class="lineCov">        867 :     *bytes_written = 0;</span>
+<span class="lineNum">     666 </span>        [<span class="branchCov" title="Branch 0 was taken 867 times"> + </span><span class="branchCov" title="Branch 1 was taken 867 times"> + </span>]:<span class="lineCov">       1734 :     while (size &gt; 0) {</span>
+<span class="lineNum">     667 </span>                :<span class="lineCov">        867 :         ssize_t retval = write(fd, p, size);</span>
+<span class="lineNum">     668 </span>        [<span class="branchCov" title="Branch 0 was taken 867 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        867 :         if (retval &gt; 0) {</span>
+<span class="lineNum">     669 </span>                :<span class="lineCov">        867 :             *bytes_written += retval;</span>
+<span class="lineNum">     670 </span>                :<span class="lineCov">        867 :             size -= retval;</span>
+<span class="lineNum">     671 </span>                :<span class="lineCov">        867 :             p += retval;</span>
+<span class="lineNum">     672 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         } else if (retval == 0) {</span>
+<span class="lineNum">     673 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN(&quot;write returned 0&quot;);</span>
+<span class="lineNum">     674 </span>                :<span class="lineNoCov">          0 :             return EPROTO;</span>
+<span class="lineNum">     675 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         } else if (errno != EINTR) {</span>
+<span class="lineNum">     676 </span>                :<span class="lineNoCov">          0 :             return errno;</span>
+<span class="lineNum">     677 </span>                :            :         }
+<span class="lineNum">     678 </span>                :            :     }
+<span class="lineNum">     679 </span>                :<span class="lineCov">        867 :     return 0;</span>
+<span class="lineNum">     680 </span>                :            : }
+<span class="lineNum">     681 </span>                :            : 
+<span class="lineNum">     682 </span>                :            : /* Given file name 'file_name', fsyncs the directory in which it is contained.
+<a name="683"><span class="lineNum">     683 </span>                :            :  * Returns 0 if successful, otherwise a positive errno value. */</a>
+<span class="lineNum">     684 </span>                :            : int
+<span class="lineNum">     685 </span>                :<span class="lineCov">        583 : fsync_parent_dir(const char *file_name)</span>
+<span class="lineNum">     686 </span>                :            : {
+<span class="lineNum">     687 </span>                :<span class="lineCov">        583 :     int error = 0;</span>
+<span class="lineNum">     688 </span>                :            : #ifndef _WIN32
+<span class="lineNum">     689 </span>                :            :     char *dir;
+<span class="lineNum">     690 </span>                :            :     int fd;
+<span class="lineNum">     691 </span>                :            : 
+<span class="lineNum">     692 </span>                :<span class="lineCov">        583 :     dir = dir_name(file_name);</span>
+<span class="lineNum">     693 </span>                :<span class="lineCov">        583 :     fd = open(dir, O_RDONLY);</span>
+<span class="lineNum">     694 </span>        [<span class="branchCov" title="Branch 0 was taken 583 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        583 :     if (fd &gt;= 0) {</span>
+<span class="lineNum">     695 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 583 times"> + </span>]:<span class="lineCov">        583 :         if (fsync(fd)) {</span>
+<span class="lineNum">     696 </span>[<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>][<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (errno == EINVAL || errno == EROFS) {</span>
+<span class="lineNum">     697 </span>                :            :                 /* This directory does not support synchronization.  Not
+<span class="lineNum">     698 </span>                :            :                  * really an error. */
+<span class="lineNum">     699 </span>                :            :             } else {
+<span class="lineNum">     700 </span>                :<span class="lineNoCov">          0 :                 error = errno;</span>
+<span class="lineNum">     701 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_ERR(&quot;%s: fsync failed (%s)&quot;, dir, ovs_strerror(error));</span>
+<span class="lineNum">     702 </span>                :            :             }
+<span class="lineNum">     703 </span>                :            :         }
+<span class="lineNum">     704 </span>                :<span class="lineCov">        583 :         close(fd);</span>
+<span class="lineNum">     705 </span>                :            :     } else {
+<span class="lineNum">     706 </span>                :<span class="lineNoCov">          0 :         error = errno;</span>
+<span class="lineNum">     707 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;%s: open failed (%s)&quot;, dir, ovs_strerror(error));</span>
+<span class="lineNum">     708 </span>                :            :     }
+<span class="lineNum">     709 </span>                :<span class="lineCov">        583 :     free(dir);</span>
+<span class="lineNum">     710 </span>                :            : #endif
+<span class="lineNum">     711 </span>                :            : 
+<span class="lineNum">     712 </span>                :<span class="lineCov">        583 :     return error;</span>
+<span class="lineNum">     713 </span>                :            : }
+<span class="lineNum">     714 </span>                :            : 
+<span class="lineNum">     715 </span>                :            : /* Obtains the modification time of the file named 'file_name' to the greatest
+<span class="lineNum">     716 </span>                :            :  * supported precision.  If successful, stores the mtime in '*mtime' and
+<span class="lineNum">     717 </span>                :            :  * returns 0.  On error, returns a positive errno value and stores zeros in
+<a name="718"><span class="lineNum">     718 </span>                :            :  * '*mtime'. */</a>
+<span class="lineNum">     719 </span>                :            : int
+<span class="lineNum">     720 </span>                :<span class="lineCov">       2544 : get_mtime(const char *file_name, struct timespec *mtime)</span>
+<span class="lineNum">     721 </span>                :            : {
+<span class="lineNum">     722 </span>                :            :     struct stat s;
+<span class="lineNum">     723 </span>                :            : 
+<span class="lineNum">     724 </span>        [<span class="branchCov" title="Branch 1 was taken 2544 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">       2544 :     if (!stat(file_name, &amp;s)) {</span>
+<span class="lineNum">     725 </span>                :<span class="lineCov">       2544 :         mtime-&gt;tv_sec = s.st_mtime;</span>
+<span class="lineNum">     726 </span>                :            : 
+<span class="lineNum">     727 </span>                :            : #if HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC
+<span class="lineNum">     728 </span>                :<span class="lineCov">       2544 :         mtime-&gt;tv_nsec = s.st_mtim.tv_nsec;</span>
+<span class="lineNum">     729 </span>                :            : #elif HAVE_STRUCT_STAT_ST_MTIMENSEC
+<span class="lineNum">     730 </span>                :            :         mtime-&gt;tv_nsec = s.st_mtimensec;
+<span class="lineNum">     731 </span>                :            : #else
+<span class="lineNum">     732 </span>                :            :         mtime-&gt;tv_nsec = 0;
+<span class="lineNum">     733 </span>                :            : #endif
+<span class="lineNum">     734 </span>                :            : 
+<span class="lineNum">     735 </span>                :<span class="lineCov">       2544 :         return 0;</span>
+<span class="lineNum">     736 </span>                :            :     } else {
+<span class="lineNum">     737 </span>                :<span class="lineNoCov">          0 :         mtime-&gt;tv_sec = mtime-&gt;tv_nsec = 0;</span>
+<span class="lineNum">     738 </span>                :<span class="lineCov">       2544 :         return errno;</span>
+<span class="lineNum">     739 </span>                :            :     }
+<span class="lineNum">     740 </span>                :            : }
+<a name="741"><span class="lineNum">     741 </span>                :            : </a>
+<span class="lineNum">     742 </span>                :            : static int
+<span class="lineNum">     743 </span>                :<span class="lineCov">        358 : getsockopt_int(int fd, int level, int option, const char *optname, int *valuep)</span>
+<span class="lineNum">     744 </span>                :            : {
+<span class="lineNum">     745 </span>                :            :     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 10);
+<span class="lineNum">     746 </span>                :            :     socklen_t len;
+<span class="lineNum">     747 </span>                :            :     int value;
+<span class="lineNum">     748 </span>                :            :     int error;
+<span class="lineNum">     749 </span>                :            : 
+<span class="lineNum">     750 </span>                :<span class="lineCov">        358 :     len = sizeof value;</span>
+<span class="lineNum">     751 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 358 times"> + </span>]:<span class="lineCov">        358 :     if (getsockopt(fd, level, option, &amp;value, &amp;len)) {</span>
+<span class="lineNum">     752 </span>                :<span class="lineNoCov">          0 :         error = sock_errno();</span>
+<span class="lineNum">     753 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;getsockopt(%s): %s&quot;, optname, sock_strerror(error));</span>
+<span class="lineNum">     754 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 358 times"> + </span>]:<span class="lineCov">        358 :     } else if (len != sizeof value) {</span>
+<span class="lineNum">     755 </span>                :<span class="lineNoCov">          0 :         error = EINVAL;</span>
+<span class="lineNum">     756 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;getsockopt(%s): value is %u bytes (expected %&quot;PRIuSIZE&quot;)&quot;,</span>
+<span class="lineNum">     757 </span>                :            :                     optname, (unsigned int) len, sizeof value);
+<span class="lineNum">     758 </span>                :            :     } else {
+<span class="lineNum">     759 </span>                :<span class="lineCov">        358 :         error = 0;</span>
+<span class="lineNum">     760 </span>                :            :     }
+<span class="lineNum">     761 </span>                :            : 
+<span class="lineNum">     762 </span>        [<span class="branchCov" title="Branch 0 was taken 358 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        358 :     *valuep = error ? 0 : value;</span>
+<span class="lineNum">     763 </span>                :<span class="lineCov">        358 :     return error;</span>
+<span class="lineNum">     764 </span>                :            : }
+<a name="765"><span class="lineNum">     765 </span>                :            : </a>
+<span class="lineNum">     766 </span>                :            : static void
+<span class="lineNum">     767 </span>                :<span class="lineCov">        154 : describe_sockaddr(struct ds *string, int fd,</span>
+<span class="lineNum">     768 </span>                :            :                   int (*getaddr)(int, struct sockaddr *, socklen_t *))
+<span class="lineNum">     769 </span>                :            : {
+<span class="lineNum">     770 </span>                :            :     struct sockaddr_storage ss;
+<span class="lineNum">     771 </span>                :<span class="lineCov">        154 :     socklen_t len = sizeof ss;</span>
+<span class="lineNum">     772 </span>                :            : 
+<span class="lineNum">     773 </span>        [<span class="branchCov" title="Branch 1 was taken 152 times"> + </span><span class="branchCov" title="Branch 2 was taken 2 times"> + </span>]:<span class="lineCov">        154 :     if (!getaddr(fd, (struct sockaddr *) &amp;ss, &amp;len)) {</span>
+<span class="lineNum">     774 </span>[<span class="branchCov" title="Branch 0 was taken 144 times"> + </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 144 times"> + </span>]:<span class="lineCov">        160 :         if (ss.ss_family == AF_INET || ss.ss_family == AF_INET6) {</span>
+<span class="lineNum">     775 </span>                :            :             char addrbuf[SS_NTOP_BUFSIZE];
+<span class="lineNum">     776 </span>                :            : 
+<span class="lineNum">     777 </span>                :<span class="lineCov">          8 :             ds_put_format(string, &quot;%s:%&quot;PRIu16,</span>
+<span class="lineNum">     778 </span>                :            :                           ss_format_address(&amp;ss, addrbuf, sizeof addrbuf),
+<span class="lineNum">     779 </span>                :<span class="lineCov">          8 :                           ss_get_port(&amp;ss));</span>
+<span class="lineNum">     780 </span>                :            : #ifndef _WIN32
+<span class="lineNum">     781 </span>        [<span class="branchCov" title="Branch 0 was taken 144 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        144 :         } else if (ss.ss_family == AF_UNIX) {</span>
+<span class="lineNum">     782 </span>                :            :             struct sockaddr_un sun;
+<span class="lineNum">     783 </span>                :            :             const char *null;
+<span class="lineNum">     784 </span>                :            :             size_t maxlen;
+<span class="lineNum">     785 </span>                :            : 
+<span class="lineNum">     786 </span>                :<span class="lineCov">        144 :             memcpy(&amp;sun, &amp;ss, sizeof sun);</span>
+<span class="lineNum">     787 </span>                :<span class="lineCov">        144 :             maxlen = len - offsetof(struct sockaddr_un, sun_path);</span>
+<span class="lineNum">     788 </span>                :<span class="lineCov">        144 :             null = memchr(sun.sun_path, '\0', maxlen);</span>
+<span class="lineNum">     789 </span>        [<span class="branchCov" title="Branch 0 was taken 73 times"> + </span><span class="branchCov" title="Branch 1 was taken 71 times"> + </span>]:<span class="lineCov">        144 :             ds_put_buffer(string, sun.sun_path,</span>
+<span class="lineNum">     790 </span>                :<span class="lineCov">         73 :                           null ? null - sun.sun_path : maxlen);</span>
+<span class="lineNum">     791 </span>                :            : #endif
+<span class="lineNum">     792 </span>                :            :         }
+<span class="lineNum">     793 </span>                :            : #ifdef HAVE_NETLINK
+<span class="lineNum">     794 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         else if (ss.ss_family == AF_NETLINK) {</span>
+<span class="lineNum">     795 </span>                :            :             int protocol;
+<span class="lineNum">     796 </span>                :            : 
+<span class="lineNum">     797 </span>                :            : /* SO_PROTOCOL was introduced in 2.6.32.  Support it regardless of the version
+<span class="lineNum">     798 </span>                :            :  * of the Linux kernel headers in use at build time. */
+<span class="lineNum">     799 </span>                :            : #ifndef SO_PROTOCOL
+<span class="lineNum">     800 </span>                :            : #define SO_PROTOCOL 38
+<span class="lineNum">     801 </span>                :            : #endif
+<span class="lineNum">     802 </span>                :            : 
+<span class="lineNum">     803 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (!getsockopt_int(fd, SOL_SOCKET, SO_PROTOCOL, &quot;SO_PROTOCOL&quot;,</span>
+<span class="lineNum">     804 </span>                :            :                                 &amp;protocol)) {
+<span class="lineNum">     805 </span>     [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 switch (protocol) {</span>
+<span class="lineNum">     806 </span>                :            :                 case NETLINK_ROUTE:
+<span class="lineNum">     807 </span>                :<span class="lineNoCov">          0 :                     ds_put_cstr(string, &quot;NETLINK_ROUTE&quot;);</span>
+<span class="lineNum">     808 </span>                :<span class="lineNoCov">          0 :                     break;</span>
+<span class="lineNum">     809 </span>                :            : 
+<span class="lineNum">     810 </span>                :            :                 case NETLINK_GENERIC:
+<span class="lineNum">     811 </span>                :<span class="lineNoCov">          0 :                     ds_put_cstr(string, &quot;NETLINK_GENERIC&quot;);</span>
+<span class="lineNum">     812 </span>                :<span class="lineNoCov">          0 :                     break;</span>
+<span class="lineNum">     813 </span>                :            : 
+<span class="lineNum">     814 </span>                :            :                 default:
+<span class="lineNum">     815 </span>                :<span class="lineNoCov">          0 :                     ds_put_format(string, &quot;AF_NETLINK family %d&quot;, protocol);</span>
+<span class="lineNum">     816 </span>                :<span class="lineNoCov">          0 :                     break;</span>
+<span class="lineNum">     817 </span>                :            :                 }
+<span class="lineNum">     818 </span>                :            :             } else {
+<span class="lineNum">     819 </span>                :<span class="lineNoCov">          0 :                 ds_put_cstr(string, &quot;AF_NETLINK&quot;);</span>
+<span class="lineNum">     820 </span>                :            :             }
+<span class="lineNum">     821 </span>                :            :         }
+<span class="lineNum">     822 </span>                :            : #endif
+<span class="lineNum">     823 </span>                :            : #if __linux__
+<span class="lineNum">     824 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         else if (ss.ss_family == AF_PACKET) {</span>
+<span class="lineNum">     825 </span>                :            :             struct sockaddr_ll sll;
+<span class="lineNum">     826 </span>                :            : 
+<span class="lineNum">     827 </span>                :<span class="lineNoCov">          0 :             memcpy(&amp;sll, &amp;ss, sizeof sll);</span>
+<span class="lineNum">     828 </span>                :<span class="lineNoCov">          0 :             ds_put_cstr(string, &quot;AF_PACKET&quot;);</span>
+<span class="lineNum">     829 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (sll.sll_ifindex) {</span>
+<span class="lineNum">     830 </span>                :            :                 char name[IFNAMSIZ];
+<span class="lineNum">     831 </span>                :            : 
+<span class="lineNum">     832 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 if (if_indextoname(sll.sll_ifindex, name)) {</span>
+<span class="lineNum">     833 </span>                :<span class="lineNoCov">          0 :                     ds_put_format(string, &quot;(%s)&quot;, name);</span>
+<span class="lineNum">     834 </span>                :            :                 } else {
+<span class="lineNum">     835 </span>                :<span class="lineNoCov">          0 :                     ds_put_format(string, &quot;(ifindex=%d)&quot;, sll.sll_ifindex);</span>
+<span class="lineNum">     836 </span>                :            :                 }
+<span class="lineNum">     837 </span>                :            :             }
+<span class="lineNum">     838 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (sll.sll_protocol) {</span>
+<span class="lineNum">     839 </span>                :<span class="lineNoCov">          0 :                 ds_put_format(string, &quot;(protocol=0x%&quot;PRIu16&quot;)&quot;,</span>
+<span class="lineNum">     840 </span>                :<span class="lineNoCov">          0 :                               ntohs(sll.sll_protocol));</span>
+<span class="lineNum">     841 </span>                :            :             }
+<span class="lineNum">     842 </span>                :            :         }
+<span class="lineNum">     843 </span>                :            : #endif
+<span class="lineNum">     844 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         else if (ss.ss_family == AF_UNSPEC) {</span>
+<span class="lineNum">     845 </span>                :<span class="lineNoCov">          0 :             ds_put_cstr(string, &quot;AF_UNSPEC&quot;);</span>
+<span class="lineNum">     846 </span>                :            :         } else {
+<span class="lineNum">     847 </span>                :<span class="lineNoCov">          0 :             ds_put_format(string, &quot;AF_%d&quot;, (int) ss.ss_family);</span>
+<span class="lineNum">     848 </span>                :            :         }
+<span class="lineNum">     849 </span>                :            :     }
+<span class="lineNum">     850 </span>                :<span class="lineCov">        154 : }</span>
+<span class="lineNum">     851 </span>                :            : 
+<span class="lineNum">     852 </span>                :            : 
+<a name="853"><span class="lineNum">     853 </span>                :            : #ifdef __linux__</a>
+<span class="lineNum">     854 </span>                :            : static void
+<span class="lineNum">     855 </span>                :<span class="lineNoCov">          0 : put_fd_filename(struct ds *string, int fd)</span>
+<span class="lineNum">     856 </span>                :            : {
+<span class="lineNum">     857 </span>                :            :     char buf[1024];
+<span class="lineNum">     858 </span>                :            :     char *linkname;
+<span class="lineNum">     859 </span>                :            :     int n;
+<span class="lineNum">     860 </span>                :            : 
+<span class="lineNum">     861 </span>                :<span class="lineNoCov">          0 :     linkname = xasprintf(&quot;/proc/self/fd/%d&quot;, fd);</span>
+<span class="lineNum">     862 </span>                :<span class="lineNoCov">          0 :     n = readlink(linkname, buf, sizeof buf);</span>
+<span class="lineNum">     863 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (n &gt; 0) {</span>
+<span class="lineNum">     864 </span>                :<span class="lineNoCov">          0 :         ds_put_char(string, ' ');</span>
+<span class="lineNum">     865 </span>                :<span class="lineNoCov">          0 :         ds_put_buffer(string, buf, n);</span>
+<span class="lineNum">     866 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (n &gt; sizeof buf) {</span>
+<span class="lineNum">     867 </span>                :<span class="lineNoCov">          0 :             ds_put_cstr(string, &quot;...&quot;);</span>
+<span class="lineNum">     868 </span>                :            :         }
+<span class="lineNum">     869 </span>                :            :     }
+<span class="lineNum">     870 </span>                :<span class="lineNoCov">          0 :     free(linkname);</span>
+<span class="lineNum">     871 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     872 </span>                :            : #endif
+<span class="lineNum">     873 </span>                :            : 
+<a name="874"><span class="lineNum">     874 </span>                :            : /* Returns a malloc()'d string describing 'fd', for use in logging. */</a>
+<span class="lineNum">     875 </span>                :            : char *
+<span class="lineNum">     876 </span>                :<span class="lineCov">         77 : describe_fd(int fd)</span>
+<span class="lineNum">     877 </span>                :            : {
+<span class="lineNum">     878 </span>                :            :     struct ds string;
+<span class="lineNum">     879 </span>                :            :     struct stat s;
+<span class="lineNum">     880 </span>                :            : 
+<span class="lineNum">     881 </span>                :<span class="lineCov">         77 :     ds_init(&amp;string);</span>
+<span class="lineNum">     882 </span>                :            : #ifndef _WIN32
+<span class="lineNum">     883 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 77 times"> + </span>]:<span class="lineCov">         77 :     if (fstat(fd, &amp;s)) {</span>
+<span class="lineNum">     884 </span>                :<span class="lineNoCov">          0 :         ds_put_format(&amp;string, &quot;fstat failed (%s)&quot;, ovs_strerror(errno));</span>
+<span class="lineNum">     885 </span>        [<span class="branchCov" title="Branch 0 was taken 77 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         77 :     } else if (S_ISSOCK(s.st_mode)) {</span>
+<span class="lineNum">     886 </span>                :<span class="lineCov">         77 :         describe_sockaddr(&amp;string, fd, getsockname);</span>
+<span class="lineNum">     887 </span>                :<span class="lineCov">         77 :         ds_put_cstr(&amp;string, &quot;&lt;-&gt;&quot;);</span>
+<span class="lineNum">     888 </span>                :<span class="lineCov">         77 :         describe_sockaddr(&amp;string, fd, getpeername);</span>
+<span class="lineNum">     889 </span>                :            :     } else {
+<span class="lineNum">     890 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         ds_put_cstr(&amp;string, (isatty(fd) ? &quot;tty&quot;</span>
+<span class="lineNum">     891 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :                               : S_ISDIR(s.st_mode) ? &quot;directory&quot;</span>
+<span class="lineNum">         </span>[<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>][<span class="branchNoExec" title="Branch 6 was not executed"> # </span><span class="branchNoExec" title="Branch 7 was not executed"> # </span>]
+<span class="lineNum">         </span>[<span class="branchNoExec" title="Branch 8 was not executed"> # </span><span class="branchNoExec" title="Branch 9 was not executed"> # </span>][<span class="branchNoExec" title="Branch 10 was not executed"> # </span><span class="branchNoExec" title="Branch 11 was not executed"> # </span>]
+<span class="lineNum">     892 </span>                :<span class="lineNoCov">          0 :                               : S_ISCHR(s.st_mode) ? &quot;character device&quot;</span>
+<span class="lineNum">     893 </span>                :<span class="lineNoCov">          0 :                               : S_ISBLK(s.st_mode) ? &quot;block device&quot;</span>
+<span class="lineNum">     894 </span>                :<span class="lineNoCov">          0 :                               : S_ISREG(s.st_mode) ? &quot;file&quot;</span>
+<span class="lineNum">     895 </span>                :<span class="lineNoCov">          0 :                               : S_ISFIFO(s.st_mode) ? &quot;FIFO&quot;</span>
+<span class="lineNum">     896 </span>                :<span class="lineNoCov">          0 :                               : S_ISLNK(s.st_mode) ? &quot;symbolic link&quot;</span>
+<span class="lineNum">     897 </span>                :            :                               : &quot;unknown&quot;));
+<span class="lineNum">     898 </span>                :            : #ifdef __linux__
+<span class="lineNum">     899 </span>                :<span class="lineNoCov">          0 :         put_fd_filename(&amp;string, fd);</span>
+<span class="lineNum">     900 </span>                :            : #endif
+<span class="lineNum">     901 </span>                :            :     }
+<span class="lineNum">     902 </span>                :            : #else
+<span class="lineNum">     903 </span>                :            :     ds_put_format(&amp;string,&quot;file descriptor&quot;);
+<span class="lineNum">     904 </span>                :            : #endif /* _WIN32 */
+<span class="lineNum">     905 </span>                :<span class="lineCov">         77 :     return ds_steal_cstr(&amp;string);</span>
+<span class="lineNum">     906 </span>                :            : }
+<span class="lineNum">     907 </span>                :            : 
+<span class="lineNum">     908 </span>                :            : 
+<span class="lineNum">     909 </span>                :            : /* sockaddr_storage helpers. */
+<span class="lineNum">     910 </span>                :            : 
+<a name="911"><span class="lineNum">     911 </span>                :            : /* Returns the IPv4 or IPv6 port in 'ss'. */</a>
+<span class="lineNum">     912 </span>                :            : uint16_t
+<span class="lineNum">     913 </span>                :<span class="lineCov">        598 : ss_get_port(const struct sockaddr_storage *ss)</span>
+<span class="lineNum">     914 </span>                :            : {
+<span class="lineNum">     915 </span>        [<span class="branchCov" title="Branch 0 was taken 508 times"> + </span><span class="branchCov" title="Branch 1 was taken 90 times"> + </span>]:<span class="lineCov">        598 :     if (ss-&gt;ss_family == AF_INET) {</span>
+<span class="lineNum">     916 </span>                :<span class="lineCov">        508 :         const struct sockaddr_in *sin</span>
+<span class="lineNum">     917 </span>                :            :             = ALIGNED_CAST(const struct sockaddr_in *, ss);
+<span class="lineNum">     918 </span>                :<span class="lineCov">        508 :         return ntohs(sin-&gt;sin_port);</span>
+<span class="lineNum">     919 </span>        [<span class="branchCov" title="Branch 0 was taken 90 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         90 :     } else if (ss-&gt;ss_family == AF_INET6) {</span>
+<span class="lineNum">     920 </span>                :<span class="lineCov">         90 :         const struct sockaddr_in6 *sin6</span>
+<span class="lineNum">     921 </span>                :            :             = ALIGNED_CAST(const struct sockaddr_in6 *, ss);
+<span class="lineNum">     922 </span>                :<span class="lineCov">         90 :         return ntohs(sin6-&gt;sin6_port);</span>
+<span class="lineNum">     923 </span>                :            :     } else {
+<span class="lineNum">     924 </span>                :<span class="lineCov">        598 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     925 </span>                :            :     }
+<span class="lineNum">     926 </span>                :            : }
+<span class="lineNum">     927 </span>                :            : 
+<span class="lineNum">     928 </span>                :            : /* Formats the IPv4 or IPv6 address in 'ss' into the 'bufsize' bytes in 'buf'.
+<span class="lineNum">     929 </span>                :            :  * If 'ss' is an IPv6 address, puts square brackets around the address.
+<span class="lineNum">     930 </span>                :            :  * 'bufsize' should be at least SS_NTOP_BUFSIZE.
+<span class="lineNum">     931 </span>                :            :  *
+<a name="932"><span class="lineNum">     932 </span>                :            :  * Returns 'buf'. */</a>
+<span class="lineNum">     933 </span>                :            : char *
+<span class="lineNum">     934 </span>                :<span class="lineCov">        382 : ss_format_address(const struct sockaddr_storage *ss,</span>
+<span class="lineNum">     935 </span>                :            :                   char *buf, size_t bufsize)
+<span class="lineNum">     936 </span>                :            : {
+<span class="lineNum">     937 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 382 times"> + </span>]:<span class="lineCov">        382 :     ovs_assert(bufsize &gt;= SS_NTOP_BUFSIZE);</span>
+<span class="lineNum">     938 </span>        [<span class="branchCov" title="Branch 0 was taken 334 times"> + </span><span class="branchCov" title="Branch 1 was taken 48 times"> + </span>]:<span class="lineCov">        382 :     if (ss-&gt;ss_family == AF_INET) {</span>
+<span class="lineNum">     939 </span>                :<span class="lineCov">        334 :         const struct sockaddr_in *sin</span>
+<span class="lineNum">     940 </span>                :            :             = ALIGNED_CAST(const struct sockaddr_in *, ss);
+<span class="lineNum">     941 </span>                :            : 
+<span class="lineNum">     942 </span>                :<span class="lineCov">        334 :         snprintf(buf, bufsize, IP_FMT, IP_ARGS(sin-&gt;sin_addr.s_addr));</span>
+<span class="lineNum">     943 </span>        [<span class="branchCov" title="Branch 0 was taken 48 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         48 :     } else if (ss-&gt;ss_family == AF_INET6) {</span>
+<span class="lineNum">     944 </span>                :<span class="lineCov">         48 :         const struct sockaddr_in6 *sin6</span>
+<span class="lineNum">     945 </span>                :            :             = ALIGNED_CAST(const struct sockaddr_in6 *, ss);
+<span class="lineNum">     946 </span>                :            : 
+<span class="lineNum">     947 </span>                :<span class="lineCov">         48 :         buf[0] = '[';</span>
+<span class="lineNum">     948 </span>                :<span class="lineCov">         48 :         inet_ntop(AF_INET6, sin6-&gt;sin6_addr.s6_addr, buf + 1, bufsize - 1);</span>
+<span class="lineNum">     949 </span>                :<span class="lineCov">         48 :         strcpy(strchr(buf, '\0'), &quot;]&quot;);</span>
+<span class="lineNum">     950 </span>                :            :     } else {
+<span class="lineNum">     951 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     952 </span>                :            :     }
+<span class="lineNum">     953 </span>                :            : 
+<span class="lineNum">     954 </span>                :<span class="lineCov">        382 :     return buf;</span>
+<span class="lineNum">     955 </span>                :            : }
+<a name="956"><span class="lineNum">     956 </span>                :            : </a>
+<span class="lineNum">     957 </span>                :            : size_t
+<span class="lineNum">     958 </span>                :<span class="lineCov">        350 : ss_length(const struct sockaddr_storage *ss)</span>
+<span class="lineNum">     959 </span>                :            : {
+<span class="lineNum">     960 </span>     [<span class="branchCov" title="Branch 0 was taken 315 times"> + </span><span class="branchCov" title="Branch 1 was taken 35 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        350 :     switch (ss-&gt;ss_family) {</span>
+<span class="lineNum">     961 </span>                :            :     case AF_INET:
+<span class="lineNum">     962 </span>                :<span class="lineCov">        315 :         return sizeof(struct sockaddr_in);</span>
+<span class="lineNum">     963 </span>                :            : 
+<span class="lineNum">     964 </span>                :            :     case AF_INET6:
+<span class="lineNum">     965 </span>                :<span class="lineCov">         35 :         return sizeof(struct sockaddr_in6);</span>
+<span class="lineNum">     966 </span>                :            : 
+<span class="lineNum">     967 </span>                :            :     default:
+<span class="lineNum">     968 </span>                :<span class="lineCov">        350 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     969 </span>                :            :     }
+<span class="lineNum">     970 </span>                :            : }
+<span class="lineNum">     971 </span>                :            : 
+<span class="lineNum">     972 </span>                :            : /* For Windows socket calls, 'errno' is not set.  One has to call
+<span class="lineNum">     973 </span>                :            :  * WSAGetLastError() to get the error number and then pass it to
+<span class="lineNum">     974 </span>                :            :  * this function to get the correct error string.
+<span class="lineNum">     975 </span>                :            :  *
+<span class="lineNum">     976 </span>                :            :  * ovs_strerror() calls strerror_r() and would not get the correct error
+<a name="977"><span class="lineNum">     977 </span>                :            :  * string for Windows sockets, but is good for POSIX. */</a>
+<span class="lineNum">     978 </span>                :            : const char *
+<span class="lineNum">     979 </span>                :<span class="lineNoCov">          0 : sock_strerror(int error)</span>
+<span class="lineNum">     980 </span>                :            : {
+<span class="lineNum">     981 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     982 </span>                :            :     return ovs_format_message(error);
+<span class="lineNum">     983 </span>                :            : #else
+<span class="lineNum">     984 </span>                :<span class="lineNoCov">          0 :     return ovs_strerror(error);</span>
+<span class="lineNum">     985 </span>                :            : #endif
+<span class="lineNum">     986 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

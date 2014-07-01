@@ -1,0 +1,1172 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/ofp-msgs.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - ofp-msgs.c<span style="font-size: 80%;"> (source / <a href="ofp-msgs.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">296</td>
+            <td class="headerCovTableEntry">350</td>
+            <td class="headerCovTableEntryMed">84.6 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">43</td>
+            <td class="headerCovTableEntry">47</td>
+            <td class="headerCovTableEntryHi">91.5 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">124</td>
+            <td class="headerCovTableEntry">186</td>
+            <td class="headerCovTableEntryLo">66.7 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2012, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;ofp-msgs.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &quot;byte-order.h&quot;
+<span class="lineNum">      20 </span>                :            : #include &quot;dynamic-string.h&quot;
+<span class="lineNum">      21 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      22 </span>                :            : #include &quot;hmap.h&quot;
+<span class="lineNum">      23 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;openflow/nicira-ext.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;openflow/openflow.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;ovs-thread.h&quot;
+<a name="27"><span class="lineNum">      27 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      28 </span>                :            : 
+<span class="lineNum">      29 </span>                :<span class="lineCov">       7479 : VLOG_DEFINE_THIS_MODULE(ofp_msgs);</span>
+<span class="lineNum">      30 </span>                :            : 
+<span class="lineNum">      31 </span>                :            : #define OFPT_VENDOR 4
+<span class="lineNum">      32 </span>                :            : #define OFPT10_STATS_REQUEST 16
+<span class="lineNum">      33 </span>                :            : #define OFPT10_STATS_REPLY 17
+<span class="lineNum">      34 </span>                :            : #define OFPT11_STATS_REQUEST 18
+<span class="lineNum">      35 </span>                :            : #define OFPT11_STATS_REPLY 19
+<span class="lineNum">      36 </span>                :            : #define OFPST_VENDOR 0xffff
+<span class="lineNum">      37 </span>                :            : 
+<span class="lineNum">      38 </span>                :            : /* A thin abstraction of OpenFlow headers:
+<span class="lineNum">      39 </span>                :            :  *
+<span class="lineNum">      40 </span>                :            :  *   - 'version' and 'type' come straight from struct ofp_header, so these are
+<span class="lineNum">      41 </span>                :            :  *     always present and meaningful.
+<span class="lineNum">      42 </span>                :            :  *
+<span class="lineNum">      43 </span>                :            :  *   - 'stat' comes from the 'type' member in statistics messages only.  It is
+<span class="lineNum">      44 </span>                :            :  *     meaningful, therefore, only if 'version' and 'type' taken together
+<span class="lineNum">      45 </span>                :            :  *     specify a statistics request or reply.  Otherwise it is 0.
+<span class="lineNum">      46 </span>                :            :  *
+<span class="lineNum">      47 </span>                :            :  *   - 'vendor' is meaningful only for vendor messages, that is, if 'version'
+<span class="lineNum">      48 </span>                :            :  *     and 'type' specify a vendor message or if 'version' and 'type' specify
+<span class="lineNum">      49 </span>                :            :  *     a statistics message and 'stat' specifies a vendor statistic type.
+<span class="lineNum">      50 </span>                :            :  *     Otherwise it is 0.
+<span class="lineNum">      51 </span>                :            :  *
+<span class="lineNum">      52 </span>                :            :  *   - 'subtype' is meaningful only for vendor messages and otherwise 0.  It
+<span class="lineNum">      53 </span>                :            :  *     specifies a vendor-defined subtype.  There is no standard format for
+<span class="lineNum">      54 </span>                :            :  *     these but 32 bits seems like it should be enough. */
+<span class="lineNum">      55 </span>                :            : struct ofphdrs {
+<span class="lineNum">      56 </span>                :            :     uint8_t version;            /* From ofp_header. */
+<span class="lineNum">      57 </span>                :            :     uint8_t type;               /* From ofp_header. */
+<span class="lineNum">      58 </span>                :            :     uint16_t stat;              /* From ofp10_stats_msg or ofp11_stats_msg. */
+<span class="lineNum">      59 </span>                :            :     uint32_t vendor;            /* From ofp_vendor_header,
+<span class="lineNum">      60 </span>                :            :                                  * ofp10_vendor_stats_msg, or
+<span class="lineNum">      61 </span>                :            :                                  * ofp11_vendor_stats_msg. */
+<span class="lineNum">      62 </span>                :            :     uint32_t subtype;           /* From nicira_header, nicira10_stats_msg, or
+<span class="lineNum">      63 </span>                :            :                                  * nicira11_stats_msg. */
+<span class="lineNum">      64 </span>                :            : };
+<span class="lineNum">      65 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ofphdrs) == 12);
+<span class="lineNum">      66 </span>                :            : 
+<span class="lineNum">      67 </span>                :            : /* A mapping from OpenFlow headers to OFPRAW_*.  */
+<span class="lineNum">      68 </span>                :            : struct raw_instance {
+<span class="lineNum">      69 </span>                :            :     struct hmap_node hmap_node; /* In 'raw_instance_map'. */
+<span class="lineNum">      70 </span>                :            :     struct ofphdrs hdrs;        /* Key. */
+<span class="lineNum">      71 </span>                :            :     enum ofpraw raw;            /* Value. */
+<span class="lineNum">      72 </span>                :            :     unsigned int hdrs_len;      /* ofphdrs_len(hdrs). */
+<span class="lineNum">      73 </span>                :            : };
+<span class="lineNum">      74 </span>                :            : 
+<span class="lineNum">      75 </span>                :            : /* Information about a particular 'enum ofpraw'. */
+<span class="lineNum">      76 </span>                :            : struct raw_info {
+<span class="lineNum">      77 </span>                :            :     /* All possible instantiations of this OFPRAW_* into OpenFlow headers. */
+<span class="lineNum">      78 </span>                :            :     struct raw_instance *instances; /* min_version - max_version + 1 elems. */
+<span class="lineNum">      79 </span>                :            :     uint8_t min_version;
+<span class="lineNum">      80 </span>                :            :     uint8_t max_version;
+<span class="lineNum">      81 </span>                :            : 
+<span class="lineNum">      82 </span>                :            :     unsigned int min_body;
+<span class="lineNum">      83 </span>                :            :     unsigned int extra_multiple;
+<span class="lineNum">      84 </span>                :            :     enum ofptype type;
+<span class="lineNum">      85 </span>                :            :     const char *name;
+<span class="lineNum">      86 </span>                :            : };
+<span class="lineNum">      87 </span>                :            : 
+<span class="lineNum">      88 </span>                :            : /* All understood OpenFlow message types, indexed by their 'struct ofphdrs'. */
+<span class="lineNum">      89 </span>                :            : static struct hmap raw_instance_map;
+<span class="lineNum">      90 </span>                :            : #include &quot;ofp-msgs.inc&quot;
+<span class="lineNum">      91 </span>                :            : 
+<span class="lineNum">      92 </span>                :            : static ovs_be32 alloc_xid(void);
+<span class="lineNum">      93 </span>                :            : 
+<span class="lineNum">      94 </span>                :            : /* ofphdrs functions. */
+<span class="lineNum">      95 </span>                :            : static uint32_t ofphdrs_hash(const struct ofphdrs *);
+<span class="lineNum">      96 </span>                :            : static bool ofphdrs_equal(const struct ofphdrs *a, const struct ofphdrs *b);
+<span class="lineNum">      97 </span>                :            : static enum ofperr ofphdrs_decode(struct ofphdrs *,
+<span class="lineNum">      98 </span>                :            :                                   const struct ofp_header *oh, size_t length);
+<span class="lineNum">      99 </span>                :            : static void ofphdrs_decode_assert(struct ofphdrs *,
+<span class="lineNum">     100 </span>                :            :                                   const struct ofp_header *oh, size_t length);
+<span class="lineNum">     101 </span>                :            : size_t ofphdrs_len(const struct ofphdrs *);
+<span class="lineNum">     102 </span>                :            : 
+<span class="lineNum">     103 </span>                :            : static const struct raw_info *raw_info_get(enum ofpraw);
+<span class="lineNum">     104 </span>                :            : static struct raw_instance *raw_instance_get(const struct raw_info *,
+<span class="lineNum">     105 </span>                :            :                                              uint8_t version);
+<span class="lineNum">     106 </span>                :            : 
+<span class="lineNum">     107 </span>                :            : static enum ofperr ofpraw_from_ofphdrs(enum ofpraw *, const struct ofphdrs *);
+<span class="lineNum">     108 </span>                :            : 
+<a name="109"><span class="lineNum">     109 </span>                :            : /* Returns a transaction ID to use for an outgoing OpenFlow message. */</a>
+<span class="lineNum">     110 </span>                :            : static ovs_be32
+<span class="lineNum">     111 </span>                :<span class="lineCov">      25949 : alloc_xid(void)</span>
+<span class="lineNum">     112 </span>                :            : {
+<span class="lineNum">     113 </span>                :            :     static atomic_uint32_t next_xid = ATOMIC_VAR_INIT(1);
+<span class="lineNum">     114 </span>                :            :     uint32_t xid;
+<span class="lineNum">     115 </span>                :            : 
+<span class="lineNum">     116 </span>                :<span class="lineCov">      25949 :     atomic_add(&amp;next_xid, 1, &amp;xid);</span>
+<span class="lineNum">     117 </span>                :<span class="lineCov">      25949 :     return htonl(xid);</span>
+<span class="lineNum">     118 </span>                :            : }
+<a name="119"><span class="lineNum">     119 </span>                :            : </a>
+<span class="lineNum">     120 </span>                :            : static uint32_t
+<span class="lineNum">     121 </span>                :<span class="lineCov">    3994781 : ofphdrs_hash(const struct ofphdrs *hdrs)</span>
+<span class="lineNum">     122 </span>                :            : {
+<span class="lineNum">     123 </span>                :            :     BUILD_ASSERT_DECL(sizeof *hdrs == 12);
+<span class="lineNum">     124 </span>                :<span class="lineCov">    3994781 :     return hash_words((const uint32_t *) hdrs, 3, 0);</span>
+<span class="lineNum">     125 </span>                :            : }
+<a name="126"><span class="lineNum">     126 </span>                :            : </a>
+<span class="lineNum">     127 </span>                :            : static bool
+<span class="lineNum">     128 </span>                :<span class="lineCov">     139667 : ofphdrs_equal(const struct ofphdrs *a, const struct ofphdrs *b)</span>
+<span class="lineNum">     129 </span>                :            : {
+<span class="lineNum">     130 </span>                :<span class="lineCov">     139667 :     return !memcmp(a, b, sizeof *a);</span>
+<span class="lineNum">     131 </span>                :            : }
+<a name="132"><span class="lineNum">     132 </span>                :            : </a>
+<span class="lineNum">     133 </span>                :            : static void
+<span class="lineNum">     134 </span>                :<span class="lineNoCov">          0 : log_bad_vendor(uint32_t vendor)</span>
+<span class="lineNum">     135 </span>                :            : {
+<span class="lineNum">     136 </span>                :            :     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 1);
+<span class="lineNum">     137 </span>                :            : 
+<span class="lineNum">     138 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     VLOG_WARN_RL(&amp;rl, &quot;OpenFlow message has unknown vendor %#&quot;PRIx32, vendor);</span>
+<span class="lineNum">     139 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="140"><span class="lineNum">     140 </span>                :            : </a>
+<span class="lineNum">     141 </span>                :            : static enum ofperr
+<span class="lineNum">     142 </span>                :<span class="lineCov">     140276 : ofphdrs_decode(struct ofphdrs *hdrs,</span>
+<span class="lineNum">     143 </span>                :            :                const struct ofp_header *oh, size_t length)
+<span class="lineNum">     144 </span>                :            : {
+<span class="lineNum">     145 </span>                :<span class="lineCov">     140276 :     memset(hdrs, 0, sizeof *hdrs);</span>
+<span class="lineNum">     146 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 140276 times"> + </span>]:<span class="lineCov">     140276 :     if (length &lt; sizeof *oh) {</span>
+<span class="lineNum">     147 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBRC_BAD_LEN;</span>
+<span class="lineNum">     148 </span>                :            :     }
+<span class="lineNum">     149 </span>                :            : 
+<span class="lineNum">     150 </span>                :            :     /* Get base message version and type (OFPT_*). */
+<span class="lineNum">     151 </span>                :<span class="lineCov">     140276 :     hdrs-&gt;version = oh-&gt;version;</span>
+<span class="lineNum">     152 </span>                :<span class="lineCov">     140276 :     hdrs-&gt;type = oh-&gt;type;</span>
+<span class="lineNum">     153 </span>                :            : 
+<span class="lineNum">     154 </span>        [<span class="branchCov" title="Branch 0 was taken 30529 times"> + </span><span class="branchCov" title="Branch 1 was taken 109747 times"> + </span>]:<span class="lineCov">     140276 :     if (hdrs-&gt;type == OFPT_VENDOR) {</span>
+<span class="lineNum">     155 </span>                :            :         /* Get vendor. */
+<span class="lineNum">     156 </span>                :            :         const struct ofp_vendor_header *ovh;
+<span class="lineNum">     157 </span>                :            : 
+<span class="lineNum">     158 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 30529 times"> + </span>]:<span class="lineCov">      30529 :         if (length &lt; sizeof *ovh) {</span>
+<span class="lineNum">     159 </span>                :<span class="lineNoCov">          0 :             return OFPERR_OFPBRC_BAD_LEN;</span>
+<span class="lineNum">     160 </span>                :            :         }
+<span class="lineNum">     161 </span>                :            : 
+<span class="lineNum">     162 </span>                :<span class="lineCov">      30529 :         ovh = (const struct ofp_vendor_header *) oh;</span>
+<span class="lineNum">     163 </span>                :<span class="lineCov">      30529 :         hdrs-&gt;vendor = ntohl(ovh-&gt;vendor);</span>
+<span class="lineNum">     164 </span>        [<span class="branchCov" title="Branch 0 was taken 30529 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      30529 :         if (hdrs-&gt;vendor == NX_VENDOR_ID) {</span>
+<span class="lineNum">     165 </span>                :            :             /* Get Nicira message subtype (NXT_*). */
+<span class="lineNum">     166 </span>                :            :             const struct nicira_header *nh;
+<span class="lineNum">     167 </span>                :            : 
+<span class="lineNum">     168 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 30529 times"> + </span>]:<span class="lineCov">      30529 :             if (length &lt; sizeof *nh) {</span>
+<span class="lineNum">     169 </span>                :<span class="lineNoCov">          0 :                 return OFPERR_OFPBRC_BAD_LEN;</span>
+<span class="lineNum">     170 </span>                :            :             }
+<span class="lineNum">     171 </span>                :<span class="lineCov">      30529 :             nh = (const struct nicira_header *) oh;</span>
+<span class="lineNum">     172 </span>                :<span class="lineCov">      30529 :             hdrs-&gt;subtype = ntohl(nh-&gt;subtype);</span>
+<span class="lineNum">     173 </span>                :            :         } else {
+<span class="lineNum">     174 </span>                :<span class="lineNoCov">          0 :             log_bad_vendor(hdrs-&gt;vendor);</span>
+<span class="lineNum">     175 </span>                :<span class="lineNoCov">          0 :             return OFPERR_OFPBRC_BAD_VENDOR;</span>
+<span class="lineNum">     176 </span>                :            :         }
+<span class="lineNum">     177 </span>        [<span class="branchCov" title="Branch 0 was taken 97893 times"> + </span><span class="branchCov" title="Branch 1 was taken 11854 times"> + </span>]:<span class="lineCov">     109747 :     } else if (hdrs-&gt;version == OFP10_VERSION</span>
+<span class="lineNum">     178 </span>[<span class="branchCov" title="Branch 0 was taken 96959 times"> + </span><span class="branchCov" title="Branch 1 was taken 934 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 44573 times"> + </span><span class="branchCov" title="Branch 3 was taken 52386 times"> + </span>]:<span class="lineCov">      97893 :                &amp;&amp; (hdrs-&gt;type == OFPT10_STATS_REQUEST ||</span>
+<span class="lineNum">     179 </span>                :<span class="lineCov">      45506 :                    hdrs-&gt;type == OFPT10_STATS_REPLY)) {</span>
+<span class="lineNum">     180 </span>                :            :         const struct ofp10_stats_msg *osm;
+<span class="lineNum">     181 </span>                :            : 
+<span class="lineNum">     182 </span>                :            :         /* Get statistic type (OFPST_*). */
+<span class="lineNum">     183 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 45506 times"> + </span>]:<span class="lineCov">      45507 :         if (length &lt; sizeof *osm) {</span>
+<span class="lineNum">     184 </span>                :<span class="lineCov">          1 :             return OFPERR_OFPBRC_BAD_LEN;</span>
+<span class="lineNum">     185 </span>                :            :         }
+<span class="lineNum">     186 </span>                :<span class="lineCov">      45506 :         osm = (const struct ofp10_stats_msg *) oh;</span>
+<span class="lineNum">     187 </span>                :<span class="lineCov">      45506 :         hdrs-&gt;stat = ntohs(osm-&gt;type);</span>
+<span class="lineNum">     188 </span>                :            : 
+<span class="lineNum">     189 </span>        [<span class="branchCov" title="Branch 0 was taken 45072 times"> + </span><span class="branchCov" title="Branch 1 was taken 434 times"> + </span>]:<span class="lineCov">      45506 :         if (hdrs-&gt;stat == OFPST_VENDOR) {</span>
+<span class="lineNum">     190 </span>                :            :             /* Get vendor. */
+<span class="lineNum">     191 </span>                :            :             const struct ofp10_vendor_stats_msg *ovsm;
+<span class="lineNum">     192 </span>                :            : 
+<span class="lineNum">     193 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 45072 times"> + </span>]:<span class="lineCov">      45072 :             if (length &lt; sizeof *ovsm) {</span>
+<span class="lineNum">     194 </span>                :<span class="lineNoCov">          0 :                 return OFPERR_OFPBRC_BAD_LEN;</span>
+<span class="lineNum">     195 </span>                :            :             }
+<span class="lineNum">     196 </span>                :            : 
+<span class="lineNum">     197 </span>                :<span class="lineCov">      45072 :             ovsm = (const struct ofp10_vendor_stats_msg *) oh;</span>
+<span class="lineNum">     198 </span>                :<span class="lineCov">      45072 :             hdrs-&gt;vendor = ntohl(ovsm-&gt;vendor);</span>
+<span class="lineNum">     199 </span>        [<span class="branchCov" title="Branch 0 was taken 45072 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      45072 :             if (hdrs-&gt;vendor == NX_VENDOR_ID) {</span>
+<span class="lineNum">     200 </span>                :            :                 /* Get Nicira statistic type (NXST_*). */
+<span class="lineNum">     201 </span>                :            :                 const struct nicira10_stats_msg *nsm;
+<span class="lineNum">     202 </span>                :            : 
+<span class="lineNum">     203 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 45072 times"> + </span>]:<span class="lineCov">      45072 :                 if (length &lt; sizeof *nsm) {</span>
+<span class="lineNum">     204 </span>                :<span class="lineNoCov">          0 :                     return OFPERR_OFPBRC_BAD_LEN;</span>
+<span class="lineNum">     205 </span>                :            :                 }
+<span class="lineNum">     206 </span>                :<span class="lineCov">      45072 :                 nsm = (const struct nicira10_stats_msg *) oh;</span>
+<span class="lineNum">     207 </span>                :<span class="lineCov">      45072 :                 hdrs-&gt;subtype = ntohl(nsm-&gt;subtype);</span>
+<span class="lineNum">     208 </span>                :            :             } else {
+<span class="lineNum">     209 </span>                :<span class="lineNoCov">          0 :                 log_bad_vendor(hdrs-&gt;vendor);</span>
+<span class="lineNum">     210 </span>                :<span class="lineNoCov">          0 :                 return OFPERR_OFPBRC_BAD_VENDOR;</span>
+<span class="lineNum">     211 </span>                :            :             }
+<span class="lineNum">     212 </span>                :            :         }
+<span class="lineNum">     213 </span>        [<span class="branchCov" title="Branch 0 was taken 11854 times"> + </span><span class="branchCov" title="Branch 1 was taken 52386 times"> + </span>]:<span class="lineCov">      64240 :     } else if (hdrs-&gt;version != OFP10_VERSION</span>
+<span class="lineNum">     214 </span>[<span class="branchCov" title="Branch 0 was taken 11080 times"> + </span><span class="branchCov" title="Branch 1 was taken 774 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 1024 times"> + </span><span class="branchCov" title="Branch 3 was taken 10056 times"> + </span>]:<span class="lineCov">      11854 :                &amp;&amp; (hdrs-&gt;type == OFPT11_STATS_REQUEST ||</span>
+<span class="lineNum">     215 </span>                :<span class="lineCov">      11080 :                    hdrs-&gt;type == OFPT11_STATS_REPLY)) {</span>
+<span class="lineNum">     216 </span>                :            :         const struct ofp11_stats_msg *osm;
+<span class="lineNum">     217 </span>                :            : 
+<span class="lineNum">     218 </span>                :            :         /* Get statistic type (OFPST_*). */
+<span class="lineNum">     219 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1798 times"> + </span>]:<span class="lineCov">       1798 :         if (length &lt; sizeof *osm) {</span>
+<span class="lineNum">     220 </span>                :<span class="lineNoCov">          0 :             return OFPERR_OFPBRC_BAD_LEN;</span>
+<span class="lineNum">     221 </span>                :            :         }
+<span class="lineNum">     222 </span>                :<span class="lineCov">       1798 :         osm = (const struct ofp11_stats_msg *) oh;</span>
+<span class="lineNum">     223 </span>                :<span class="lineCov">       1798 :         hdrs-&gt;stat = ntohs(osm-&gt;type);</span>
+<span class="lineNum">     224 </span>                :            : 
+<span class="lineNum">     225 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1798 times"> + </span>]:<span class="lineCov">       1798 :         if (hdrs-&gt;stat == OFPST_VENDOR) {</span>
+<span class="lineNum">     226 </span>                :            :             /* Get vendor. */
+<span class="lineNum">     227 </span>                :            :             const struct ofp11_vendor_stats_msg *ovsm;
+<span class="lineNum">     228 </span>                :            : 
+<span class="lineNum">     229 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (length &lt; sizeof *ovsm) {</span>
+<span class="lineNum">     230 </span>                :<span class="lineNoCov">          0 :                 return OFPERR_OFPBRC_BAD_LEN;</span>
+<span class="lineNum">     231 </span>                :            :             }
+<span class="lineNum">     232 </span>                :            : 
+<span class="lineNum">     233 </span>                :<span class="lineNoCov">          0 :             ovsm = (const struct ofp11_vendor_stats_msg *) oh;</span>
+<span class="lineNum">     234 </span>                :<span class="lineNoCov">          0 :             hdrs-&gt;vendor = ntohl(ovsm-&gt;vendor);</span>
+<span class="lineNum">     235 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (hdrs-&gt;vendor == NX_VENDOR_ID) {</span>
+<span class="lineNum">     236 </span>                :            :                 /* Get Nicira statistic type (NXST_*). */
+<span class="lineNum">     237 </span>                :            :                 const struct nicira11_stats_msg *nsm;
+<span class="lineNum">     238 </span>                :            : 
+<span class="lineNum">     239 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 if (length &lt; sizeof *nsm) {</span>
+<span class="lineNum">     240 </span>                :<span class="lineNoCov">          0 :                     return OFPERR_OFPBRC_BAD_LEN;</span>
+<span class="lineNum">     241 </span>                :            :                 }
+<span class="lineNum">     242 </span>                :<span class="lineNoCov">          0 :                 nsm = (const struct nicira11_stats_msg *) oh;</span>
+<span class="lineNum">     243 </span>                :<span class="lineNoCov">          0 :                 hdrs-&gt;subtype = ntohl(nsm-&gt;subtype);</span>
+<span class="lineNum">     244 </span>                :            :             } else {
+<span class="lineNum">     245 </span>                :<span class="lineNoCov">          0 :                 log_bad_vendor(hdrs-&gt;vendor);</span>
+<span class="lineNum">     246 </span>                :<span class="lineNoCov">          0 :                 return OFPERR_OFPBRC_BAD_VENDOR;</span>
+<span class="lineNum">     247 </span>                :            :             }
+<span class="lineNum">     248 </span>                :            :         }
+<span class="lineNum">     249 </span>                :            :     }
+<span class="lineNum">     250 </span>                :            : 
+<span class="lineNum">     251 </span>                :<span class="lineCov">     140276 :     return 0;</span>
+<span class="lineNum">     252 </span>                :            : }
+<a name="253"><span class="lineNum">     253 </span>                :            : </a>
+<span class="lineNum">     254 </span>                :            : static void
+<span class="lineNum">     255 </span>                :<span class="lineCov">       1086 : ofphdrs_decode_assert(struct ofphdrs *hdrs,</span>
+<span class="lineNum">     256 </span>                :            :                       const struct ofp_header *oh, size_t length)
+<span class="lineNum">     257 </span>                :            : {
+<span class="lineNum">     258 </span>                :<span class="lineCov">       1086 :     enum ofperr error = ofphdrs_decode(hdrs, oh, length);</span>
+<span class="lineNum">     259 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1086 times"> + </span>]:<span class="lineCov">       1086 :     ovs_assert(!error);</span>
+<span class="lineNum">     260 </span>                :<span class="lineCov">       1086 : }</span>
+<a name="261"><span class="lineNum">     261 </span>                :            : </a>
+<span class="lineNum">     262 </span>                :            : static bool
+<span class="lineNum">     263 </span>                :<span class="lineCov">        263 : ofp_is_stat_request(enum ofp_version version, uint8_t type)</span>
+<span class="lineNum">     264 </span>                :            : {
+<span class="lineNum">     265 </span>     [<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchCov" title="Branch 1 was taken 245 times"> + </span><span class="branchCov" title="Branch 2 was taken 14 times"> + </span>]:<span class="lineCov">        263 :     switch (version) {</span>
+<span class="lineNum">     266 </span>                :            :     case OFP10_VERSION:
+<span class="lineNum">     267 </span>                :<span class="lineCov">          4 :         return type == OFPT10_STATS_REQUEST;</span>
+<span class="lineNum">     268 </span>                :            :     case OFP11_VERSION:
+<span class="lineNum">     269 </span>                :            :     case OFP12_VERSION:
+<span class="lineNum">     270 </span>                :            :     case OFP13_VERSION:
+<span class="lineNum">     271 </span>                :            :     case OFP14_VERSION:
+<span class="lineNum">     272 </span>                :            :     case OFP15_VERSION:
+<span class="lineNum">     273 </span>                :<span class="lineCov">        245 :         return type == OFPT11_STATS_REQUEST;</span>
+<span class="lineNum">     274 </span>                :            :     }
+<span class="lineNum">     275 </span>                :            : 
+<span class="lineNum">     276 </span>                :<span class="lineCov">        263 :     return false;</span>
+<span class="lineNum">     277 </span>                :            : }
+<a name="278"><span class="lineNum">     278 </span>                :            : </a>
+<span class="lineNum">     279 </span>                :            : static bool
+<span class="lineNum">     280 </span>                :<span class="lineCov">         14 : ofp_is_stat_reply(enum ofp_version version, uint8_t type)</span>
+<span class="lineNum">     281 </span>                :            : {
+<span class="lineNum">     282 </span>     [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 14 times"> + </span>]:<span class="lineCov">         14 :     switch (version) {</span>
+<span class="lineNum">     283 </span>                :            :     case OFP10_VERSION:
+<span class="lineNum">     284 </span>                :<span class="lineNoCov">          0 :         return type == OFPT10_STATS_REPLY;</span>
+<span class="lineNum">     285 </span>                :            :     case OFP11_VERSION:
+<span class="lineNum">     286 </span>                :            :     case OFP12_VERSION:
+<span class="lineNum">     287 </span>                :            :     case OFP13_VERSION:
+<span class="lineNum">     288 </span>                :            :     case OFP14_VERSION:
+<span class="lineNum">     289 </span>                :            :     case OFP15_VERSION:
+<span class="lineNum">     290 </span>                :<span class="lineNoCov">          0 :         return type == OFPT11_STATS_REPLY;</span>
+<span class="lineNum">     291 </span>                :            :     }
+<span class="lineNum">     292 </span>                :            : 
+<span class="lineNum">     293 </span>                :<span class="lineCov">         14 :     return false;</span>
+<span class="lineNum">     294 </span>                :            : }
+<a name="295"><span class="lineNum">     295 </span>                :            : </a>
+<span class="lineNum">     296 </span>                :            : static bool
+<span class="lineNum">     297 </span>                :<span class="lineCov">         14 : ofp_is_stat(enum ofp_version version, uint8_t type)</span>
+<span class="lineNum">     298 </span>                :            : {
+<span class="lineNum">     299 </span>  [<span class="branchCov" title="Branch 1 was taken 14 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 14 times"> + </span>]:<span class="lineCov">         28 :     return (ofp_is_stat_request(version, type) ||</span>
+<span class="lineNum">     300 </span>                :<span class="lineCov">         14 :             ofp_is_stat_reply(version, type));</span>
+<span class="lineNum">     301 </span>                :            : }
+<a name="302"><span class="lineNum">     302 </span>                :            : </a>
+<span class="lineNum">     303 </span>                :            : static bool
+<span class="lineNum">     304 </span>                :<span class="lineCov">         14 : ofphdrs_is_stat(const struct ofphdrs *hdrs)</span>
+<span class="lineNum">     305 </span>                :            : {
+<span class="lineNum">     306 </span>                :<span class="lineCov">         14 :     return ofp_is_stat(hdrs-&gt;version, hdrs-&gt;type);</span>
+<span class="lineNum">     307 </span>                :            : }
+<a name="308"><span class="lineNum">     308 </span>                :            : </a>
+<span class="lineNum">     309 </span>                :            : size_t
+<span class="lineNum">     310 </span>                :<span class="lineCov">    3856190 : ofphdrs_len(const struct ofphdrs *hdrs)</span>
+<span class="lineNum">     311 </span>                :            : {
+<span class="lineNum">     312 </span>        [<span class="branchCov" title="Branch 0 was taken 223086 times"> + </span><span class="branchCov" title="Branch 1 was taken 3633104 times"> + </span>]:<span class="lineCov">    3856190 :     if (hdrs-&gt;type == OFPT_VENDOR) {</span>
+<span class="lineNum">     313 </span>                :<span class="lineCov">     223086 :         return sizeof(struct nicira_header);</span>
+<span class="lineNum">     314 </span>                :            :     }
+<span class="lineNum">     315 </span>                :            : 
+<span class="lineNum">     316 </span>     [<span class="branchCov" title="Branch 0 was taken 110127 times"> + </span><span class="branchCov" title="Branch 1 was taken 718241 times"> + </span><span class="branchCov" title="Branch 2 was taken 2804736 times"> + </span>]:<span class="lineCov">    3633104 :     switch ((enum ofp_version) hdrs-&gt;version) {</span>
+<span class="lineNum">     317 </span>                :            :     case OFP10_VERSION:
+<span class="lineNum">     318 </span>[<span class="branchCov" title="Branch 0 was taken 81935 times"> + </span><span class="branchCov" title="Branch 1 was taken 28192 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 28166 times"> + </span><span class="branchCov" title="Branch 3 was taken 53769 times"> + </span>]:<span class="lineCov">     110127 :         if (hdrs-&gt;type == OFPT10_STATS_REQUEST ||</span>
+<span class="lineNum">     319 </span>                :<span class="lineCov">      81935 :             hdrs-&gt;type == OFPT10_STATS_REPLY) {</span>
+<span class="lineNum">     320 </span>                :<span class="lineCov">      56358 :             return (hdrs-&gt;stat == OFPST_VENDOR</span>
+<span class="lineNum">     321 </span>                :            :                     ? sizeof(struct nicira10_stats_msg)
+<span class="lineNum">     322 </span>        [<span class="branchCov" title="Branch 0 was taken 16901 times"> + </span><span class="branchCov" title="Branch 1 was taken 39457 times"> + </span>]:<span class="lineCov">      56358 :                     : sizeof(struct ofp10_stats_msg));</span>
+<span class="lineNum">     323 </span>                :            :         }
+<span class="lineNum">     324 </span>                :<span class="lineCov">      53769 :         break;</span>
+<span class="lineNum">     325 </span>                :            : 
+<span class="lineNum">     326 </span>                :            :     case OFP11_VERSION:
+<span class="lineNum">     327 </span>                :            :     case OFP12_VERSION:
+<span class="lineNum">     328 </span>                :            :     case OFP13_VERSION:
+<span class="lineNum">     329 </span>                :            :     case OFP14_VERSION:
+<span class="lineNum">     330 </span>                :            :     case OFP15_VERSION:
+<span class="lineNum">     331 </span>[<span class="branchCov" title="Branch 0 was taken 540790 times"> + </span><span class="branchCov" title="Branch 1 was taken 177451 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 177412 times"> + </span><span class="branchCov" title="Branch 3 was taken 363378 times"> + </span>]:<span class="lineCov">     718241 :         if (hdrs-&gt;type == OFPT11_STATS_REQUEST ||</span>
+<span class="lineNum">     332 </span>                :<span class="lineCov">     540790 :             hdrs-&gt;type == OFPT11_STATS_REPLY) {</span>
+<span class="lineNum">     333 </span>                :<span class="lineCov">     354863 :             return (hdrs-&gt;stat == OFPST_VENDOR</span>
+<span class="lineNum">     334 </span>                :            :                     ? sizeof(struct nicira11_stats_msg)
+<span class="lineNum">     335 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 354863 times"> + </span>]:<span class="lineCov">     354863 :                     : sizeof(struct ofp11_stats_msg));</span>
+<span class="lineNum">     336 </span>                :            :         }
+<span class="lineNum">     337 </span>                :<span class="lineCov">     363378 :         break;</span>
+<span class="lineNum">     338 </span>                :            :     }
+<span class="lineNum">     339 </span>                :            : 
+<span class="lineNum">     340 </span>                :<span class="lineCov">    3856190 :     return sizeof(struct ofp_header);</span>
+<span class="lineNum">     341 </span>                :            : }
+<span class="lineNum">     342 </span>                :            : 
+<span class="lineNum">     343 </span>                :            : /* Determines the OFPRAW_* type of the OpenFlow message at 'oh', which has
+<span class="lineNum">     344 </span>                :            :  * length 'oh-&gt;length'.  (The caller must ensure that 'oh-&gt;length' bytes of
+<span class="lineNum">     345 </span>                :            :  * data are readable at 'oh'.)  On success, returns 0 and stores the type into
+<span class="lineNum">     346 </span>                :            :  * '*raw'.  On failure, returns an OFPERR_* error code and zeros '*raw'.
+<span class="lineNum">     347 </span>                :            :  *
+<span class="lineNum">     348 </span>                :            :  * This function checks that 'oh' is a valid length for its particular type of
+<a name="349"><span class="lineNum">     349 </span>                :            :  * message, and returns an error if not. */</a>
+<span class="lineNum">     350 </span>                :            : enum ofperr
+<span class="lineNum">     351 </span>                :<span class="lineCov">     100837 : ofpraw_decode(enum ofpraw *raw, const struct ofp_header *oh)</span>
+<span class="lineNum">     352 </span>                :            : {
+<span class="lineNum">     353 </span>                :            :     struct ofpbuf msg;
+<span class="lineNum">     354 </span>                :            : 
+<span class="lineNum">     355 </span>                :<span class="lineCov">     100837 :     ofpbuf_use_const(&amp;msg, oh, ntohs(oh-&gt;length));</span>
+<span class="lineNum">     356 </span>                :<span class="lineCov">     100837 :     return ofpraw_pull(raw, &amp;msg);</span>
+<span class="lineNum">     357 </span>                :            : }
+<span class="lineNum">     358 </span>                :            : 
+<span class="lineNum">     359 </span>                :            : /* Does the same job as ofpraw_decode(), except that it assert-fails if
+<span class="lineNum">     360 </span>                :            :  * ofpraw_decode() would have reported an error.  Thus, it's able to use the
+<span class="lineNum">     361 </span>                :            :  * return value for the OFPRAW_* message type instead of an error code.
+<span class="lineNum">     362 </span>                :            :  *
+<span class="lineNum">     363 </span>                :            :  * (It only makes sense to use this function if you previously called
+<a name="364"><span class="lineNum">     364 </span>                :            :  * ofpraw_decode() on the message and thus know that it's OK.) */</a>
+<span class="lineNum">     365 </span>                :            : enum ofpraw
+<span class="lineNum">     366 </span>                :<span class="lineCov">          9 : ofpraw_decode_assert(const struct ofp_header *oh)</span>
+<span class="lineNum">     367 </span>                :            : {
+<span class="lineNum">     368 </span>                :            :     enum ofperr error;
+<span class="lineNum">     369 </span>                :            :     enum ofpraw raw;
+<span class="lineNum">     370 </span>                :            : 
+<span class="lineNum">     371 </span>                :<span class="lineCov">          9 :     error = ofpraw_decode(&amp;raw, oh);</span>
+<span class="lineNum">     372 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 9 times"> + </span>]:<span class="lineCov">          9 :     ovs_assert(!error);</span>
+<span class="lineNum">     373 </span>                :<span class="lineCov">          9 :     return raw;</span>
+<span class="lineNum">     374 </span>                :            : }
+<span class="lineNum">     375 </span>                :            : 
+<span class="lineNum">     376 </span>                :            : /* Determines the OFPRAW_* type of the OpenFlow message in 'msg', which starts
+<span class="lineNum">     377 </span>                :            :  * at 'ofpbuf_data(msg)' and has length 'ofpbuf_size(msg)' bytes.  On success,
+<span class="lineNum">     378 </span>                :            :  * returns 0 and stores the type into '*rawp'.  On failure, returns an OFPERR_*
+<span class="lineNum">     379 </span>                :            :  * error code and zeros '*rawp'.
+<span class="lineNum">     380 </span>                :            :  *
+<span class="lineNum">     381 </span>                :            :  * This function checks that the message has a valid length for its particular
+<span class="lineNum">     382 </span>                :            :  * type of message, and returns an error if not.
+<span class="lineNum">     383 </span>                :            :  *
+<span class="lineNum">     384 </span>                :            :  * In addition to setting '*rawp', this function pulls off the OpenFlow header
+<span class="lineNum">     385 </span>                :            :  * (including the stats headers, vendor header, and any subtype header) with
+<span class="lineNum">     386 </span>                :            :  * ofpbuf_pull().  It also sets 'msg-&gt;frame' to the start of the OpenFlow
+<span class="lineNum">     387 </span>                :            :  * header and 'msg-&gt;l3' just beyond the headers (that is, to the final value of
+<a name="388"><span class="lineNum">     388 </span>                :            :  * ofpbuf_data(msg)). */</a>
+<span class="lineNum">     389 </span>                :            : enum ofperr
+<span class="lineNum">     390 </span>                :<span class="lineCov">     129653 : ofpraw_pull(enum ofpraw *rawp, struct ofpbuf *msg)</span>
+<span class="lineNum">     391 </span>                :            : {
+<span class="lineNum">     392 </span>                :            :     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     393 </span>                :            : 
+<span class="lineNum">     394 </span>                :            :     const struct raw_instance *instance;
+<span class="lineNum">     395 </span>                :            :     const struct raw_info *info;
+<span class="lineNum">     396 </span>                :            :     struct ofphdrs hdrs;
+<span class="lineNum">     397 </span>                :            : 
+<span class="lineNum">     398 </span>                :            :     unsigned int min_len;
+<span class="lineNum">     399 </span>                :            :     unsigned int len;
+<span class="lineNum">     400 </span>                :            : 
+<span class="lineNum">     401 </span>                :            :     enum ofperr error;
+<span class="lineNum">     402 </span>                :            :     enum ofpraw raw;
+<span class="lineNum">     403 </span>                :            : 
+<span class="lineNum">     404 </span>                :            :     /* Set default outputs. */
+<span class="lineNum">     405 </span>                :<span class="lineCov">     129653 :     msg-&gt;frame = ofpbuf_data(msg);</span>
+<span class="lineNum">     406 </span>                :<span class="lineCov">     129653 :     ofpbuf_set_l3(msg, msg-&gt;frame);</span>
+<span class="lineNum">     407 </span>                :<span class="lineCov">     129653 :     *rawp = 0;</span>
+<span class="lineNum">     408 </span>                :            : 
+<span class="lineNum">     409 </span>                :<span class="lineCov">     129653 :     len = ofpbuf_size(msg);</span>
+<span class="lineNum">     410 </span>                :<span class="lineCov">     129653 :     error = ofphdrs_decode(&amp;hdrs, ofpbuf_data(msg), len);</span>
+<span class="lineNum">     411 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 129653 times"> + </span>]:<span class="lineCov">     129653 :     if (error) {</span>
+<span class="lineNum">     412 </span>                :<span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     413 </span>                :            :     }
+<span class="lineNum">     414 </span>                :            : 
+<span class="lineNum">     415 </span>                :<span class="lineCov">     129653 :     error = ofpraw_from_ofphdrs(&amp;raw, &amp;hdrs);</span>
+<span class="lineNum">     416 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchCov" title="Branch 1 was taken 129643 times"> + </span>]:<span class="lineCov">     129653 :     if (error) {</span>
+<span class="lineNum">     417 </span>                :<span class="lineCov">         10 :         return error;</span>
+<span class="lineNum">     418 </span>                :            :     }
+<span class="lineNum">     419 </span>                :            : 
+<span class="lineNum">     420 </span>                :<span class="lineCov">     129643 :     info = raw_info_get(raw);</span>
+<span class="lineNum">     421 </span>                :<span class="lineCov">     129643 :     instance = raw_instance_get(info, hdrs.version);</span>
+<span class="lineNum">     422 </span>                :<span class="lineCov">     129643 :     msg-&gt;frame = ofpbuf_pull(msg, instance-&gt;hdrs_len);</span>
+<span class="lineNum">     423 </span>                :<span class="lineCov">     129643 :     ofpbuf_set_l3(msg, ofpbuf_data(msg));</span>
+<span class="lineNum">     424 </span>                :            : 
+<span class="lineNum">     425 </span>                :<span class="lineCov">     129643 :     min_len = instance-&gt;hdrs_len + info-&gt;min_body;</span>
+<span class="lineNum">     426 </span>     [<span class="branchCov" title="Branch 0 was taken 33272 times"> + </span><span class="branchCov" title="Branch 1 was taken 33757 times"> + </span><span class="branchCov" title="Branch 2 was taken 62614 times"> + </span>]:<span class="lineCov">     129643 :     switch (info-&gt;extra_multiple) {</span>
+<span class="lineNum">     427 </span>                :            :     case 0:
+<span class="lineNum">     428 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 33272 times"> + </span>]:<span class="lineCov">      33272 :         if (len != min_len) {</span>
+<span class="lineNum">     429 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN_RL(&amp;rl, &quot;received %s with incorrect length %u (expected &quot;</span>
+<span class="lineNum">     430 </span>                :            :                          &quot;length %u)&quot;, info-&gt;name, len, min_len);
+<span class="lineNum">     431 </span>                :<span class="lineNoCov">          0 :             return OFPERR_OFPBRC_BAD_LEN;</span>
+<span class="lineNum">     432 </span>                :            :         }
+<span class="lineNum">     433 </span>                :<span class="lineCov">      33272 :         break;</span>
+<span class="lineNum">     434 </span>                :            : 
+<span class="lineNum">     435 </span>                :            :     case 1:
+<span class="lineNum">     436 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 33757 times"> + </span>]:<span class="lineCov">      33757 :         if (len &lt; min_len) {</span>
+<span class="lineNum">     437 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN_RL(&amp;rl, &quot;received %s with incorrect length %u (expected &quot;</span>
+<span class="lineNum">     438 </span>                :            :                          &quot;length at least %u bytes)&quot;,
+<span class="lineNum">     439 </span>                :            :                          info-&gt;name, len, min_len);
+<span class="lineNum">     440 </span>                :<span class="lineNoCov">          0 :             return OFPERR_OFPBRC_BAD_LEN;</span>
+<span class="lineNum">     441 </span>                :            :         }
+<span class="lineNum">     442 </span>                :<span class="lineCov">      33757 :         break;</span>
+<span class="lineNum">     443 </span>                :            : 
+<span class="lineNum">     444 </span>                :            :     default:
+<span class="lineNum">     445 </span>[<span class="branchCov" title="Branch 0 was taken 62614 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 2 times"> + </span><span class="branchCov" title="Branch 3 was taken 62612 times"> + </span>]:<span class="lineCov">      62614 :         if (len &lt; min_len || (len - min_len) % info-&gt;extra_multiple) {</span>
+<span class="lineNum">     446 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :             VLOG_WARN_RL(&amp;rl, &quot;received %s with incorrect length %u (must be &quot;</span>
+<span class="lineNum">     447 </span>                :            :                          &quot;exactly %u bytes or longer by an integer multiple &quot;
+<span class="lineNum">     448 </span>                :            :                          &quot;of %u bytes)&quot;,
+<span class="lineNum">     449 </span>                :            :                          info-&gt;name, len, min_len, info-&gt;extra_multiple);
+<span class="lineNum">     450 </span>                :<span class="lineCov">          2 :             return OFPERR_OFPBRC_BAD_LEN;</span>
+<span class="lineNum">     451 </span>                :            :         }
+<span class="lineNum">     452 </span>                :<span class="lineCov">      62612 :         break;</span>
+<span class="lineNum">     453 </span>                :            :     }
+<span class="lineNum">     454 </span>                :            : 
+<span class="lineNum">     455 </span>                :<span class="lineCov">     129641 :     *rawp = raw;</span>
+<span class="lineNum">     456 </span>                :<span class="lineCov">     129653 :     return 0;</span>
+<span class="lineNum">     457 </span>                :            : }
+<span class="lineNum">     458 </span>                :            : 
+<span class="lineNum">     459 </span>                :            : /* Does the same job as ofpraw_pull(), except that it assert-fails if
+<span class="lineNum">     460 </span>                :            :  * ofpraw_pull() would have reported an error.  Thus, it's able to use the
+<span class="lineNum">     461 </span>                :            :  * return value for the OFPRAW_* message type instead of an error code.
+<span class="lineNum">     462 </span>                :            :  *
+<span class="lineNum">     463 </span>                :            :  * (It only makes sense to use this function if you previously called
+<a name="464"><span class="lineNum">     464 </span>                :            :  * ofpraw_decode() on the message and thus know that it's OK.) */</a>
+<span class="lineNum">     465 </span>                :            : enum ofpraw
+<span class="lineNum">     466 </span>                :<span class="lineCov">      28127 : ofpraw_pull_assert(struct ofpbuf *msg)</span>
+<span class="lineNum">     467 </span>                :            : {
+<span class="lineNum">     468 </span>                :            :     enum ofperr error;
+<span class="lineNum">     469 </span>                :            :     enum ofpraw raw;
+<span class="lineNum">     470 </span>                :            : 
+<span class="lineNum">     471 </span>                :<span class="lineCov">      28127 :     error = ofpraw_pull(&amp;raw, msg);</span>
+<span class="lineNum">     472 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 28127 times"> + </span>]:<span class="lineCov">      28127 :     ovs_assert(!error);</span>
+<span class="lineNum">     473 </span>                :<span class="lineCov">      28127 :     return raw;</span>
+<span class="lineNum">     474 </span>                :            : }
+<span class="lineNum">     475 </span>                :            : 
+<span class="lineNum">     476 </span>                :            : /* Determines the OFPRAW_* type of the OpenFlow message that starts at 'oh' and
+<span class="lineNum">     477 </span>                :            :  * has length 'length' bytes.  On success, returns 0 and stores the type into
+<span class="lineNum">     478 </span>                :            :  * '*rawp'.  On failure, returns an OFPERR_* error code and zeros '*rawp'.
+<span class="lineNum">     479 </span>                :            :  *
+<span class="lineNum">     480 </span>                :            :  * Unlike other functions for decoding message types, this one is not picky
+<span class="lineNum">     481 </span>                :            :  * about message length.  For example, it will successfully decode a message
+<span class="lineNum">     482 </span>                :            :  * whose body is shorter than the minimum length for a message of its type.
+<span class="lineNum">     483 </span>                :            :  * Thus, this is the correct function to use for decoding the type of a message
+<span class="lineNum">     484 </span>                :            :  * that might have been truncated, such as the payload of an OpenFlow error
+<a name="485"><span class="lineNum">     485 </span>                :            :  * message (which is allowed to be truncated to 64 bytes). */</a>
+<span class="lineNum">     486 </span>                :            : enum ofperr
+<span class="lineNum">     487 </span>                :<span class="lineCov">       9537 : ofpraw_decode_partial(enum ofpraw *raw,</span>
+<span class="lineNum">     488 </span>                :            :                       const struct ofp_header *oh, size_t length)
+<span class="lineNum">     489 </span>                :            : {
+<span class="lineNum">     490 </span>                :            :     struct ofphdrs hdrs;
+<span class="lineNum">     491 </span>                :            :     enum ofperr error;
+<span class="lineNum">     492 </span>                :            : 
+<span class="lineNum">     493 </span>                :<span class="lineCov">       9537 :     error = ofphdrs_decode(&amp;hdrs, oh, length);</span>
+<span class="lineNum">     494 </span>        [<span class="branchCov" title="Branch 0 was taken 9536 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">       9537 :     if (!error) {</span>
+<span class="lineNum">     495 </span>                :<span class="lineCov">       9536 :         error = ofpraw_from_ofphdrs(raw, &amp;hdrs);</span>
+<span class="lineNum">     496 </span>                :            :     }
+<span class="lineNum">     497 </span>                :            : 
+<span class="lineNum">     498 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 9536 times"> + </span>]:<span class="lineCov">       9537 :     if (error) {</span>
+<span class="lineNum">     499 </span>                :<span class="lineCov">          1 :         *raw = 0;</span>
+<span class="lineNum">     500 </span>                :            :     }
+<span class="lineNum">     501 </span>                :<span class="lineCov">       9537 :     return error;</span>
+<span class="lineNum">     502 </span>                :            : }
+<span class="lineNum">     503 </span>                :            : 
+<span class="lineNum">     504 </span>                :            : /* Encoding messages using OFPRAW_* values. */
+<span class="lineNum">     505 </span>                :            : 
+<span class="lineNum">     506 </span>                :            : static void ofpraw_put__(enum ofpraw, uint8_t version, ovs_be32 xid,
+<span class="lineNum">     507 </span>                :            :                          size_t extra_tailroom, struct ofpbuf *);
+<span class="lineNum">     508 </span>                :            : 
+<span class="lineNum">     509 </span>                :            : /* Allocates and returns a new ofpbuf that contains an OpenFlow header for
+<span class="lineNum">     510 </span>                :            :  * 'raw' with OpenFlow version 'version' and a fresh OpenFlow transaction ID.
+<span class="lineNum">     511 </span>                :            :  * The ofpbuf has enough tailroom for the minimum body length of 'raw', plus
+<span class="lineNum">     512 </span>                :            :  * 'extra_tailroom' additional bytes.
+<span class="lineNum">     513 </span>                :            :  *
+<span class="lineNum">     514 </span>                :            :  * Each 'raw' value is valid only for certain OpenFlow versions.  The caller
+<span class="lineNum">     515 </span>                :            :  * must specify a valid (raw, version) pair.
+<span class="lineNum">     516 </span>                :            :  *
+<span class="lineNum">     517 </span>                :            :  * In the returned ofpbuf, 'frame' points to the beginning of the
+<span class="lineNum">     518 </span>                :            :  * OpenFlow header and 'l3' points just after it, to where the
+<span class="lineNum">     519 </span>                :            :  * message's body will start.  The caller must actually allocate the
+<span class="lineNum">     520 </span>                :            :  * body into the space reserved for it, e.g. with ofpbuf_put_uninit().
+<span class="lineNum">     521 </span>                :            :  *
+<span class="lineNum">     522 </span>                :            :  * The caller owns the returned ofpbuf and must free it when it is no longer
+<a name="523"><span class="lineNum">     523 </span>                :            :  * needed, e.g. with ofpbuf_delete(). */</a>
+<span class="lineNum">     524 </span>                :            : struct ofpbuf *
+<span class="lineNum">     525 </span>                :<span class="lineCov">      25941 : ofpraw_alloc(enum ofpraw raw, uint8_t version, size_t extra_tailroom)</span>
+<span class="lineNum">     526 </span>                :            : {
+<span class="lineNum">     527 </span>                :<span class="lineCov">      25941 :     return ofpraw_alloc_xid(raw, version, alloc_xid(), extra_tailroom);</span>
+<span class="lineNum">     528 </span>                :            : }
+<span class="lineNum">     529 </span>                :            : 
+<a name="530"><span class="lineNum">     530 </span>                :            : /* Same as ofpraw_alloc() but the caller provides the transaction ID. */</a>
+<span class="lineNum">     531 </span>                :            : struct ofpbuf *
+<span class="lineNum">     532 </span>                :<span class="lineCov">      39443 : ofpraw_alloc_xid(enum ofpraw raw, uint8_t version, ovs_be32 xid,</span>
+<span class="lineNum">     533 </span>                :            :                  size_t extra_tailroom)
+<span class="lineNum">     534 </span>                :            : {
+<span class="lineNum">     535 </span>                :<span class="lineCov">      39443 :     struct ofpbuf *buf = ofpbuf_new(0);</span>
+<span class="lineNum">     536 </span>                :<span class="lineCov">      39443 :     ofpraw_put__(raw, version, xid, extra_tailroom, buf);</span>
+<span class="lineNum">     537 </span>                :<span class="lineCov">      39443 :     return buf;</span>
+<span class="lineNum">     538 </span>                :            : }
+<span class="lineNum">     539 </span>                :            : 
+<span class="lineNum">     540 </span>                :            : /* Same as ofpraw_alloc(), but obtains the OpenFlow version and transaction ID
+<span class="lineNum">     541 </span>                :            :  * from 'request-&gt;version' and 'request-&gt;xid', respectively.
+<span class="lineNum">     542 </span>                :            :  *
+<span class="lineNum">     543 </span>                :            :  * Even though the version comes from 'request-&gt;version', the caller must still
+<span class="lineNum">     544 </span>                :            :  * know what it is doing, by specifying a valid pairing of 'raw' and
+<a name="545"><span class="lineNum">     545 </span>                :            :  * 'request-&gt;version', just like ofpraw_alloc(). */</a>
+<span class="lineNum">     546 </span>                :            : struct ofpbuf *
+<span class="lineNum">     547 </span>                :<span class="lineCov">      10418 : ofpraw_alloc_reply(enum ofpraw raw, const struct ofp_header *request,</span>
+<span class="lineNum">     548 </span>                :            :                    size_t extra_tailroom)
+<span class="lineNum">     549 </span>                :            : {
+<span class="lineNum">     550 </span>                :<span class="lineCov">      10418 :     return ofpraw_alloc_xid(raw, request-&gt;version, request-&gt;xid,</span>
+<span class="lineNum">     551 </span>                :            :                             extra_tailroom);
+<span class="lineNum">     552 </span>                :            : }
+<span class="lineNum">     553 </span>                :            : 
+<span class="lineNum">     554 </span>                :            : /* Allocates and returns a new ofpbuf that contains an OpenFlow header that is
+<span class="lineNum">     555 </span>                :            :  * a stats reply to the stats request in 'request', using the same OpenFlow
+<span class="lineNum">     556 </span>                :            :  * version and transaction ID as 'request'.  The ofpbuf has enough tailroom for
+<span class="lineNum">     557 </span>                :            :  * the stats reply's minimum body length, plus 'extra_tailroom' additional
+<span class="lineNum">     558 </span>                :            :  * bytes.
+<span class="lineNum">     559 </span>                :            :  *
+<span class="lineNum">     560 </span>                :            :  * 'request' must be a stats request, that is, an OFPRAW_OFPST* or OFPRAW_NXST*
+<span class="lineNum">     561 </span>                :            :  * value.  Every stats request has a corresponding reply, so the (raw, version)
+<span class="lineNum">     562 </span>                :            :  * pairing pitfalls of the other ofpraw_alloc_*() functions don't apply here.
+<span class="lineNum">     563 </span>                :            :  *
+<span class="lineNum">     564 </span>                :            :  * In the returned ofpbuf, 'frame' points to the beginning of the
+<span class="lineNum">     565 </span>                :            :  * OpenFlow header and 'l3' points just after it, to where the
+<span class="lineNum">     566 </span>                :            :  * message's body will start.  The caller must actually allocate the
+<span class="lineNum">     567 </span>                :            :  * body into the space reserved for it, e.g. with ofpbuf_put_uninit().
+<span class="lineNum">     568 </span>                :            :  *
+<span class="lineNum">     569 </span>                :            :  * The caller owns the returned ofpbuf and must free it when it is no longer
+<a name="570"><span class="lineNum">     570 </span>                :            :  * needed, e.g. with ofpbuf_delete(). */</a>
+<span class="lineNum">     571 </span>                :            : struct ofpbuf *
+<span class="lineNum">     572 </span>                :<span class="lineCov">        253 : ofpraw_alloc_stats_reply(const struct ofp_header *request,</span>
+<span class="lineNum">     573 </span>                :            :                          size_t extra_tailroom)
+<span class="lineNum">     574 </span>                :            : {
+<span class="lineNum">     575 </span>                :            :     enum ofpraw request_raw;
+<span class="lineNum">     576 </span>                :            :     enum ofpraw reply_raw;
+<span class="lineNum">     577 </span>                :            :     enum ofperr error;
+<span class="lineNum">     578 </span>                :            : 
+<span class="lineNum">     579 </span>                :<span class="lineCov">        253 :     error = ofpraw_decode_partial(&amp;request_raw, request,</span>
+<span class="lineNum">     580 </span>                :<span class="lineCov">        253 :                                   ntohs(request-&gt;length));</span>
+<span class="lineNum">     581 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 253 times"> + </span>]:<span class="lineCov">        253 :     ovs_assert(!error);</span>
+<span class="lineNum">     582 </span>                :            : 
+<span class="lineNum">     583 </span>                :<span class="lineCov">        253 :     reply_raw = ofpraw_stats_request_to_reply(request_raw, request-&gt;version);</span>
+<span class="lineNum">     584 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 253 times"> + </span>]:<span class="lineCov">        253 :     ovs_assert(reply_raw);</span>
+<span class="lineNum">     585 </span>                :            : 
+<span class="lineNum">     586 </span>                :<span class="lineCov">        253 :     return ofpraw_alloc_reply(reply_raw, request, extra_tailroom);</span>
+<span class="lineNum">     587 </span>                :            : }
+<span class="lineNum">     588 </span>                :            : 
+<span class="lineNum">     589 </span>                :            : /* Appends to 'buf' an OpenFlow header for 'raw' with OpenFlow version
+<span class="lineNum">     590 </span>                :            :  * 'version' and a fresh OpenFlow transaction ID.  Preallocates enough tailroom
+<span class="lineNum">     591 </span>                :            :  * in 'buf' for the minimum body length of 'raw', plus 'extra_tailroom'
+<span class="lineNum">     592 </span>                :            :  * additional bytes.
+<span class="lineNum">     593 </span>                :            :  *
+<span class="lineNum">     594 </span>                :            :  * Each 'raw' value is valid only for certain OpenFlow versions.  The caller
+<span class="lineNum">     595 </span>                :            :  * must specify a valid (raw, version) pair.
+<span class="lineNum">     596 </span>                :            :  *
+<span class="lineNum">     597 </span>                :            :  * Upon return, 'buf-&gt;frame' points to the beginning of the OpenFlow header and
+<span class="lineNum">     598 </span>                :            :  * 'buf-&gt;l3' points just after it, to where the message's body will start.  The
+<span class="lineNum">     599 </span>                :            :  * caller must actually allocating the body into the space reserved for it,
+<a name="600"><span class="lineNum">     600 </span>                :            :  * e.g. with ofpbuf_put_uninit(). */</a>
+<span class="lineNum">     601 </span>                :            : void
+<span class="lineNum">     602 </span>                :<span class="lineCov">          8 : ofpraw_put(enum ofpraw raw, uint8_t version, struct ofpbuf *buf)</span>
+<span class="lineNum">     603 </span>                :            : {
+<span class="lineNum">     604 </span>                :<span class="lineCov">          8 :     ofpraw_put__(raw, version, alloc_xid(), 0, buf);</span>
+<span class="lineNum">     605 </span>                :<span class="lineCov">          8 : }</span>
+<span class="lineNum">     606 </span>                :            : 
+<a name="607"><span class="lineNum">     607 </span>                :            : /* Same as ofpraw_put() but the caller provides the transaction ID. */</a>
+<span class="lineNum">     608 </span>                :            : void
+<span class="lineNum">     609 </span>                :<span class="lineNoCov">          0 : ofpraw_put_xid(enum ofpraw raw, uint8_t version, ovs_be32 xid,</span>
+<span class="lineNum">     610 </span>                :            :                struct ofpbuf *buf)
+<span class="lineNum">     611 </span>                :            : {
+<span class="lineNum">     612 </span>                :<span class="lineNoCov">          0 :     ofpraw_put__(raw, version, xid, 0, buf);</span>
+<span class="lineNum">     613 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     614 </span>                :            : 
+<span class="lineNum">     615 </span>                :            : /* Same as ofpraw_put(), but obtains the OpenFlow version and transaction ID
+<span class="lineNum">     616 </span>                :            :  * from 'request-&gt;version' and 'request-&gt;xid', respectively.
+<span class="lineNum">     617 </span>                :            :  *
+<span class="lineNum">     618 </span>                :            :  * Even though the version comes from 'request-&gt;version', the caller must still
+<span class="lineNum">     619 </span>                :            :  * know what it is doing, by specifying a valid pairing of 'raw' and
+<a name="620"><span class="lineNum">     620 </span>                :            :  * 'request-&gt;version', just like ofpraw_put(). */</a>
+<span class="lineNum">     621 </span>                :            : void
+<span class="lineNum">     622 </span>                :<span class="lineNoCov">          0 : ofpraw_put_reply(enum ofpraw raw, const struct ofp_header *request,</span>
+<span class="lineNum">     623 </span>                :            :                  struct ofpbuf *buf)
+<span class="lineNum">     624 </span>                :            : {
+<span class="lineNum">     625 </span>                :<span class="lineNoCov">          0 :     ofpraw_put__(raw, request-&gt;version, request-&gt;xid, 0, buf);</span>
+<span class="lineNum">     626 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     627 </span>                :            : 
+<span class="lineNum">     628 </span>                :            : /* Appends to 'buf' an OpenFlow header that is a stats reply to the stats
+<span class="lineNum">     629 </span>                :            :  * request in 'request', using the same OpenFlow version and transaction ID as
+<span class="lineNum">     630 </span>                :            :  * 'request'.  Preallocate enough tailroom in 'buf for the stats reply's
+<span class="lineNum">     631 </span>                :            :  * minimum body length, plus 'extra_tailroom' additional bytes.
+<span class="lineNum">     632 </span>                :            :  *
+<span class="lineNum">     633 </span>                :            :  * 'request' must be a stats request, that is, an OFPRAW_OFPST* or OFPRAW_NXST*
+<span class="lineNum">     634 </span>                :            :  * value.  Every stats request has a corresponding reply, so the (raw, version)
+<span class="lineNum">     635 </span>                :            :  * pairing pitfalls of the other ofpraw_alloc_*() functions don't apply here.
+<span class="lineNum">     636 </span>                :            :  *
+<span class="lineNum">     637 </span>                :            :  * In the returned ofpbuf, 'frame' points to the beginning of the
+<span class="lineNum">     638 </span>                :            :  * OpenFlow header and 'l3' points just after it, to where the
+<span class="lineNum">     639 </span>                :            :  * message's body will start.  The caller must actually allocate the
+<span class="lineNum">     640 </span>                :            :  * body into the space reserved for it, e.g. with ofpbuf_put_uninit().
+<span class="lineNum">     641 </span>                :            :  *
+<span class="lineNum">     642 </span>                :            :  * The caller owns the returned ofpbuf and must free it when it is no longer
+<a name="643"><span class="lineNum">     643 </span>                :            :  * needed, e.g. with ofpbuf_delete(). */</a>
+<span class="lineNum">     644 </span>                :            : void
+<span class="lineNum">     645 </span>                :<span class="lineNoCov">          0 : ofpraw_put_stats_reply(const struct ofp_header *request, struct ofpbuf *buf)</span>
+<span class="lineNum">     646 </span>                :            : {
+<span class="lineNum">     647 </span>                :            :     enum ofperr error;
+<span class="lineNum">     648 </span>                :            :     enum ofpraw raw;
+<span class="lineNum">     649 </span>                :            : 
+<span class="lineNum">     650 </span>                :<span class="lineNoCov">          0 :     error = ofpraw_decode_partial(&amp;raw, request, ntohs(request-&gt;length));</span>
+<span class="lineNum">     651 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     ovs_assert(!error);</span>
+<span class="lineNum">     652 </span>                :            : 
+<span class="lineNum">     653 </span>                :<span class="lineNoCov">          0 :     raw = ofpraw_stats_request_to_reply(raw, request-&gt;version);</span>
+<span class="lineNum">     654 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     ovs_assert(raw);</span>
+<span class="lineNum">     655 </span>                :            : 
+<span class="lineNum">     656 </span>                :<span class="lineNoCov">          0 :     ofpraw_put__(raw, request-&gt;version, request-&gt;xid, 0, buf);</span>
+<span class="lineNum">     657 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="658"><span class="lineNum">     658 </span>                :            : </a>
+<span class="lineNum">     659 </span>                :            : static void
+<span class="lineNum">     660 </span>                :<span class="lineCov">      39451 : ofpraw_put__(enum ofpraw raw, uint8_t version, ovs_be32 xid,</span>
+<span class="lineNum">     661 </span>                :            :              size_t extra_tailroom, struct ofpbuf *buf)
+<span class="lineNum">     662 </span>                :            : {
+<span class="lineNum">     663 </span>                :<span class="lineCov">      39451 :     const struct raw_info *info = raw_info_get(raw);</span>
+<span class="lineNum">     664 </span>                :<span class="lineCov">      39451 :     const struct raw_instance *instance = raw_instance_get(info, version);</span>
+<span class="lineNum">     665 </span>                :<span class="lineCov">      39451 :     const struct ofphdrs *hdrs = &amp;instance-&gt;hdrs;</span>
+<span class="lineNum">     666 </span>                :            :     struct ofp_header *oh;
+<span class="lineNum">     667 </span>                :            : 
+<span class="lineNum">     668 </span>                :<span class="lineCov">      39451 :     ofpbuf_prealloc_tailroom(buf, (instance-&gt;hdrs_len + info-&gt;min_body</span>
+<span class="lineNum">     669 </span>                :            :                                    + extra_tailroom));
+<span class="lineNum">     670 </span>                :<span class="lineCov">      39451 :     buf-&gt;frame = ofpbuf_put_uninit(buf, instance-&gt;hdrs_len);</span>
+<span class="lineNum">     671 </span>                :<span class="lineCov">      39451 :     ofpbuf_set_l3(buf, ofpbuf_tail(buf));</span>
+<span class="lineNum">     672 </span>                :            : 
+<span class="lineNum">     673 </span>                :<span class="lineCov">      39451 :     oh = buf-&gt;frame;</span>
+<span class="lineNum">     674 </span>                :<span class="lineCov">      39451 :     oh-&gt;version = version;</span>
+<span class="lineNum">     675 </span>                :<span class="lineCov">      39451 :     oh-&gt;type = hdrs-&gt;type;</span>
+<span class="lineNum">     676 </span>                :<span class="lineCov">      39451 :     oh-&gt;length = htons(ofpbuf_size(buf));</span>
+<span class="lineNum">     677 </span>                :<span class="lineCov">      39451 :     oh-&gt;xid = xid;</span>
+<span class="lineNum">     678 </span>                :            : 
+<span class="lineNum">     679 </span>        [<span class="branchCov" title="Branch 0 was taken 6254 times"> + </span><span class="branchCov" title="Branch 1 was taken 33197 times"> + </span>]:<span class="lineCov">      39451 :     if (hdrs-&gt;type == OFPT_VENDOR) {</span>
+<span class="lineNum">     680 </span>                :<span class="lineCov">       6254 :         struct nicira_header *nh = buf-&gt;frame;</span>
+<span class="lineNum">     681 </span>                :            : 
+<span class="lineNum">     682 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 6254 times"> + </span>]:<span class="lineCov">       6254 :         ovs_assert(hdrs-&gt;vendor == NX_VENDOR_ID);</span>
+<span class="lineNum">     683 </span>                :<span class="lineCov">       6254 :         nh-&gt;vendor = htonl(hdrs-&gt;vendor);</span>
+<span class="lineNum">     684 </span>                :<span class="lineCov">       6254 :         nh-&gt;subtype = htonl(hdrs-&gt;subtype);</span>
+<span class="lineNum">     685 </span>        [<span class="branchCov" title="Branch 0 was taken 29080 times"> + </span><span class="branchCov" title="Branch 1 was taken 4117 times"> + </span>]:<span class="lineCov">      33197 :     } else if (version == OFP10_VERSION</span>
+<span class="lineNum">     686 </span>[<span class="branchCov" title="Branch 0 was taken 28928 times"> + </span><span class="branchCov" title="Branch 1 was taken 152 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 2825 times"> + </span><span class="branchCov" title="Branch 3 was taken 26103 times"> + </span>]:<span class="lineCov">      29080 :                &amp;&amp; (hdrs-&gt;type == OFPT10_STATS_REQUEST ||</span>
+<span class="lineNum">     687 </span>                :<span class="lineCov">       2977 :                    hdrs-&gt;type == OFPT10_STATS_REPLY)) {</span>
+<span class="lineNum">     688 </span>                :<span class="lineCov">       2977 :         struct ofp10_stats_msg *osm = buf-&gt;frame;</span>
+<span class="lineNum">     689 </span>                :            : 
+<span class="lineNum">     690 </span>                :<span class="lineCov">       2977 :         osm-&gt;type = htons(hdrs-&gt;stat);</span>
+<span class="lineNum">     691 </span>                :<span class="lineCov">       2977 :         osm-&gt;flags = htons(0);</span>
+<span class="lineNum">     692 </span>                :            : 
+<span class="lineNum">     693 </span>        [<span class="branchCov" title="Branch 0 was taken 2931 times"> + </span><span class="branchCov" title="Branch 1 was taken 46 times"> + </span>]:<span class="lineCov">       2977 :         if (hdrs-&gt;stat == OFPST_VENDOR) {</span>
+<span class="lineNum">     694 </span>                :<span class="lineCov">       2931 :             struct ofp10_vendor_stats_msg *ovsm = buf-&gt;frame;</span>
+<span class="lineNum">     695 </span>                :            : 
+<span class="lineNum">     696 </span>                :<span class="lineCov">       2931 :             ovsm-&gt;vendor = htonl(hdrs-&gt;vendor);</span>
+<span class="lineNum">     697 </span>        [<span class="branchCov" title="Branch 0 was taken 2931 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       2931 :             if (hdrs-&gt;vendor == NX_VENDOR_ID) {</span>
+<span class="lineNum">     698 </span>                :<span class="lineCov">       2931 :                 struct nicira10_stats_msg *nsm = buf-&gt;frame;</span>
+<span class="lineNum">     699 </span>                :            : 
+<span class="lineNum">     700 </span>                :<span class="lineCov">       2931 :                 nsm-&gt;subtype = htonl(hdrs-&gt;subtype);</span>
+<span class="lineNum">     701 </span>                :<span class="lineCov">       2931 :                 memset(nsm-&gt;pad, 0, sizeof nsm-&gt;pad);</span>
+<span class="lineNum">     702 </span>                :            :             } else {
+<span class="lineNum">     703 </span>                :<span class="lineNoCov">          0 :                 OVS_NOT_REACHED();</span>
+<span class="lineNum">     704 </span>                :            :             }
+<span class="lineNum">     705 </span>                :            :         }
+<span class="lineNum">     706 </span>        [<span class="branchCov" title="Branch 0 was taken 4117 times"> + </span><span class="branchCov" title="Branch 1 was taken 26103 times"> + </span>]:<span class="lineCov">      30220 :     } else if (version != OFP10_VERSION</span>
+<span class="lineNum">     707 </span>[<span class="branchCov" title="Branch 0 was taken 4011 times"> + </span><span class="branchCov" title="Branch 1 was taken 106 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 106 times"> + </span><span class="branchCov" title="Branch 3 was taken 3905 times"> + </span>]:<span class="lineCov">       4117 :                &amp;&amp; (hdrs-&gt;type == OFPT11_STATS_REQUEST ||</span>
+<span class="lineNum">     708 </span>                :<span class="lineCov">       4011 :                    hdrs-&gt;type == OFPT11_STATS_REPLY)) {</span>
+<span class="lineNum">     709 </span>                :<span class="lineCov">        212 :         struct ofp11_stats_msg *osm = buf-&gt;frame;</span>
+<span class="lineNum">     710 </span>                :            : 
+<span class="lineNum">     711 </span>                :<span class="lineCov">        212 :         osm-&gt;type = htons(hdrs-&gt;stat);</span>
+<span class="lineNum">     712 </span>                :<span class="lineCov">        212 :         osm-&gt;flags = htons(0);</span>
+<span class="lineNum">     713 </span>                :<span class="lineCov">        212 :         memset(osm-&gt;pad, 0, sizeof osm-&gt;pad);</span>
+<span class="lineNum">     714 </span>                :            : 
+<span class="lineNum">     715 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 212 times"> + </span>]:<span class="lineCov">        212 :         if (hdrs-&gt;stat == OFPST_VENDOR) {</span>
+<span class="lineNum">     716 </span>                :<span class="lineNoCov">          0 :             struct ofp11_vendor_stats_msg *ovsm = buf-&gt;frame;</span>
+<span class="lineNum">     717 </span>                :            : 
+<span class="lineNum">     718 </span>                :<span class="lineNoCov">          0 :             ovsm-&gt;vendor = htonl(hdrs-&gt;vendor);</span>
+<span class="lineNum">     719 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (hdrs-&gt;vendor == NX_VENDOR_ID) {</span>
+<span class="lineNum">     720 </span>                :<span class="lineNoCov">          0 :                 struct nicira11_stats_msg *nsm = buf-&gt;frame;</span>
+<span class="lineNum">     721 </span>                :            : 
+<span class="lineNum">     722 </span>                :<span class="lineNoCov">          0 :                 nsm-&gt;subtype = htonl(hdrs-&gt;subtype);</span>
+<span class="lineNum">     723 </span>                :            :             } else {
+<span class="lineNum">     724 </span>                :<span class="lineNoCov">          0 :                 OVS_NOT_REACHED();</span>
+<span class="lineNum">     725 </span>                :            :             }
+<span class="lineNum">     726 </span>                :            :         }
+<span class="lineNum">     727 </span>                :            :     }
+<span class="lineNum">     728 </span>                :<span class="lineCov">      39451 : }</span>
+<span class="lineNum">     729 </span>                :            : 
+<span class="lineNum">     730 </span>                :            : /* Returns 'raw''s name.
+<span class="lineNum">     731 </span>                :            :  *
+<span class="lineNum">     732 </span>                :            :  * The name is the name used for 'raw' in the OpenFlow specification.  For
+<span class="lineNum">     733 </span>                :            :  * example, ofpraw_get_name(OFPRAW_OFPT10_FEATURES_REPLY) is
+<span class="lineNum">     734 </span>                :            :  * &quot;OFPT_FEATURES_REPLY&quot;.
+<span class="lineNum">     735 </span>                :            :  *
+<a name="736"><span class="lineNum">     736 </span>                :            :  * The caller must not modify or free the returned string. */</a>
+<span class="lineNum">     737 </span>                :            : const char *
+<span class="lineNum">     738 </span>                :<span class="lineCov">      43762 : ofpraw_get_name(enum ofpraw raw)</span>
+<span class="lineNum">     739 </span>                :            : {
+<span class="lineNum">     740 </span>                :<span class="lineCov">      43762 :     return raw_info_get(raw)-&gt;name;</span>
+<span class="lineNum">     741 </span>                :            : }
+<span class="lineNum">     742 </span>                :            : 
+<span class="lineNum">     743 </span>                :            : /* Returns the stats reply that corresponds to 'raw' in the given OpenFlow
+<a name="744"><span class="lineNum">     744 </span>                :            :  * 'version'. */</a>
+<span class="lineNum">     745 </span>                :            : enum ofpraw
+<span class="lineNum">     746 </span>                :<span class="lineCov">        488 : ofpraw_stats_request_to_reply(enum ofpraw raw, uint8_t version)</span>
+<span class="lineNum">     747 </span>                :            : {
+<span class="lineNum">     748 </span>                :<span class="lineCov">        488 :     const struct raw_info *info = raw_info_get(raw);</span>
+<span class="lineNum">     749 </span>                :<span class="lineCov">        488 :     const struct raw_instance *instance = raw_instance_get(info, version);</span>
+<span class="lineNum">     750 </span>                :            :     enum ofpraw reply_raw;
+<span class="lineNum">     751 </span>                :            :     struct ofphdrs hdrs;
+<span class="lineNum">     752 </span>                :            :     enum ofperr error;
+<span class="lineNum">     753 </span>                :            : 
+<span class="lineNum">     754 </span>                :<span class="lineCov">        488 :     hdrs = instance-&gt;hdrs;</span>
+<span class="lineNum">     755 </span>     [<span class="branchCov" title="Branch 0 was taken 286 times"> + </span><span class="branchCov" title="Branch 1 was taken 202 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        488 :     switch ((enum ofp_version)hdrs.version) {</span>
+<span class="lineNum">     756 </span>                :            :     case OFP10_VERSION:
+<span class="lineNum">     757 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 286 times"> + </span>]:<span class="lineCov">        286 :         ovs_assert(hdrs.type == OFPT10_STATS_REQUEST);</span>
+<span class="lineNum">     758 </span>                :<span class="lineCov">        286 :         hdrs.type = OFPT10_STATS_REPLY;</span>
+<span class="lineNum">     759 </span>                :<span class="lineCov">        286 :         break;</span>
+<span class="lineNum">     760 </span>                :            :     case OFP11_VERSION:
+<span class="lineNum">     761 </span>                :            :     case OFP12_VERSION:
+<span class="lineNum">     762 </span>                :            :     case OFP13_VERSION:
+<span class="lineNum">     763 </span>                :            :     case OFP14_VERSION:
+<span class="lineNum">     764 </span>                :            :     case OFP15_VERSION:
+<span class="lineNum">     765 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 202 times"> + </span>]:<span class="lineCov">        202 :         ovs_assert(hdrs.type == OFPT11_STATS_REQUEST);</span>
+<span class="lineNum">     766 </span>                :<span class="lineCov">        202 :         hdrs.type = OFPT11_STATS_REPLY;</span>
+<span class="lineNum">     767 </span>                :<span class="lineCov">        202 :         break;</span>
+<span class="lineNum">     768 </span>                :            :     default:
+<span class="lineNum">     769 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     770 </span>                :            :     }
+<span class="lineNum">     771 </span>                :            : 
+<span class="lineNum">     772 </span>                :<span class="lineCov">        488 :     error = ofpraw_from_ofphdrs(&amp;reply_raw, &amp;hdrs);</span>
+<span class="lineNum">     773 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 488 times"> + </span>]:<span class="lineCov">        488 :     ovs_assert(!error);</span>
+<span class="lineNum">     774 </span>                :            : 
+<span class="lineNum">     775 </span>                :<span class="lineCov">        488 :     return reply_raw;</span>
+<span class="lineNum">     776 </span>                :            : }
+<span class="lineNum">     777 </span>                :            : 
+<span class="lineNum">     778 </span>                :            : /* Determines the OFPTYPE_* type of the OpenFlow message at 'oh', which has
+<span class="lineNum">     779 </span>                :            :  * length 'oh-&gt;length'.  (The caller must ensure that 'oh-&gt;length' bytes of
+<span class="lineNum">     780 </span>                :            :  * data are readable at 'oh'.)  On success, returns 0 and stores the type into
+<span class="lineNum">     781 </span>                :            :  * '*typep'.  On failure, returns an OFPERR_* error code and zeros '*typep'.
+<span class="lineNum">     782 </span>                :            :  *
+<span class="lineNum">     783 </span>                :            :  * This function checks that 'oh' is a valid length for its particular type of
+<a name="784"><span class="lineNum">     784 </span>                :            :  * message, and returns an error if not. */</a>
+<span class="lineNum">     785 </span>                :            : enum ofperr
+<span class="lineNum">     786 </span>                :<span class="lineCov">      29894 : ofptype_decode(enum ofptype *typep, const struct ofp_header *oh)</span>
+<span class="lineNum">     787 </span>                :            : {
+<span class="lineNum">     788 </span>                :            :     enum ofperr error;
+<span class="lineNum">     789 </span>                :            :     enum ofpraw raw;
+<span class="lineNum">     790 </span>                :            : 
+<span class="lineNum">     791 </span>                :<span class="lineCov">      29894 :     error = ofpraw_decode(&amp;raw, oh);</span>
+<span class="lineNum">     792 </span>        [<span class="branchCov" title="Branch 0 was taken 29891 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">      29894 :     *typep = error ? 0 : ofptype_from_ofpraw(raw);</span>
+<span class="lineNum">     793 </span>                :<span class="lineCov">      29894 :     return error;</span>
+<span class="lineNum">     794 </span>                :            : }
+<span class="lineNum">     795 </span>                :            : 
+<span class="lineNum">     796 </span>                :            : /* Determines the OFPTYPE_* type of the OpenFlow message in 'msg', which starts
+<span class="lineNum">     797 </span>                :            :  * at 'ofpbuf_data(msg)' and has length 'ofpbuf_size(msg)' bytes.  On success,
+<span class="lineNum">     798 </span>                :            :  * returns 0 and stores the type into '*typep'.  On failure, returns an
+<span class="lineNum">     799 </span>                :            :  * OFPERR_* error code and zeros '*typep'.
+<span class="lineNum">     800 </span>                :            :  *
+<span class="lineNum">     801 </span>                :            :  * This function checks that the message has a valid length for its particular
+<span class="lineNum">     802 </span>                :            :  * type of message, and returns an error if not.
+<span class="lineNum">     803 </span>                :            :  *
+<span class="lineNum">     804 </span>                :            :  * In addition to setting '*typep', this function pulls off the OpenFlow header
+<span class="lineNum">     805 </span>                :            :  * (including the stats headers, vendor header, and any subtype header) with
+<span class="lineNum">     806 </span>                :            :  * ofpbuf_pull().  It also sets 'msg-&gt;frame' to the start of the OpenFlow
+<span class="lineNum">     807 </span>                :            :  * header and 'msg-&gt;l3' just beyond the headers (that is, to the final value of
+<a name="808"><span class="lineNum">     808 </span>                :            :  * ofpbuf_data(msg)). */</a>
+<span class="lineNum">     809 </span>                :            : enum ofperr
+<span class="lineNum">     810 </span>                :<span class="lineCov">        198 : ofptype_pull(enum ofptype *typep, struct ofpbuf *buf)</span>
+<span class="lineNum">     811 </span>                :            : {
+<span class="lineNum">     812 </span>                :            :     enum ofperr error;
+<span class="lineNum">     813 </span>                :            :     enum ofpraw raw;
+<span class="lineNum">     814 </span>                :            : 
+<span class="lineNum">     815 </span>                :<span class="lineCov">        198 :     error = ofpraw_pull(&amp;raw, buf);</span>
+<span class="lineNum">     816 </span>        [<span class="branchCov" title="Branch 0 was taken 198 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        198 :     *typep = error ? 0 : ofptype_from_ofpraw(raw);</span>
+<span class="lineNum">     817 </span>                :<span class="lineCov">        198 :     return error;</span>
+<span class="lineNum">     818 </span>                :            : }
+<span class="lineNum">     819 </span>                :            : 
+<span class="lineNum">     820 </span>                :            : /* Returns the OFPTYPE_* type that corresponds to 'raw'.
+<span class="lineNum">     821 </span>                :            :  *
+<span class="lineNum">     822 </span>                :            :  * (This is a one-way trip, because the mapping from ofpraw to ofptype is
+<a name="823"><span class="lineNum">     823 </span>                :            :  * many-to-one.)  */</a>
+<span class="lineNum">     824 </span>                :            : enum ofptype
+<span class="lineNum">     825 </span>                :<span class="lineCov">      74047 : ofptype_from_ofpraw(enum ofpraw raw)</span>
+<span class="lineNum">     826 </span>                :            : {
+<span class="lineNum">     827 </span>                :<span class="lineCov">      74047 :     return raw_info_get(raw)-&gt;type;</span>
+<span class="lineNum">     828 </span>                :            : }
+<span class="lineNum">     829 </span>                :            : 
+<span class="lineNum">     830 </span>                :            : /* Updates the 'length' field of the OpenFlow message in 'buf' to
+<a name="831"><span class="lineNum">     831 </span>                :            :  * 'ofpbuf_size(buf)'. */</a>
+<span class="lineNum">     832 </span>                :            : void
+<span class="lineNum">     833 </span>                :<span class="lineCov">      75571 : ofpmsg_update_length(struct ofpbuf *buf)</span>
+<span class="lineNum">     834 </span>                :            : {
+<span class="lineNum">     835 </span>                :<span class="lineCov">      75571 :     struct ofp_header *oh = ofpbuf_at_assert(buf, 0, sizeof *oh);</span>
+<span class="lineNum">     836 </span>                :<span class="lineCov">      75571 :     oh-&gt;length = htons(ofpbuf_size(buf));</span>
+<span class="lineNum">     837 </span>                :<span class="lineCov">      75571 : }</span>
+<span class="lineNum">     838 </span>                :            : 
+<span class="lineNum">     839 </span>                :            : /* Returns just past the Openflow header (including the stats headers, vendor
+<a name="840"><span class="lineNum">     840 </span>                :            :  * header, and any subtype header) in 'oh'. */</a>
+<span class="lineNum">     841 </span>                :            : const void *
+<span class="lineNum">     842 </span>                :<span class="lineCov">       1081 : ofpmsg_body(const struct ofp_header *oh)</span>
+<span class="lineNum">     843 </span>                :            : {
+<span class="lineNum">     844 </span>                :            :     struct ofphdrs hdrs;
+<span class="lineNum">     845 </span>                :            : 
+<span class="lineNum">     846 </span>                :<span class="lineCov">       1081 :     ofphdrs_decode_assert(&amp;hdrs, oh, ntohs(oh-&gt;length));</span>
+<span class="lineNum">     847 </span>                :<span class="lineCov">       1081 :     return (const uint8_t *) oh + ofphdrs_len(&amp;hdrs);</span>
+<span class="lineNum">     848 </span>                :            : }
+<span class="lineNum">     849 </span>                :            : 
+<a name="850"><span class="lineNum">     850 </span>                :            : /* Return if it's a stat/multipart (OFPST) request message. */</a>
+<span class="lineNum">     851 </span>                :            : bool
+<span class="lineNum">     852 </span>                :<span class="lineCov">        249 : ofpmsg_is_stat_request(const struct ofp_header *oh)</span>
+<span class="lineNum">     853 </span>                :            : {
+<span class="lineNum">     854 </span>                :<span class="lineCov">        249 :     return ofp_is_stat_request(oh-&gt;version, oh-&gt;type);</span>
+<span class="lineNum">     855 </span>                :            : }
+<span class="lineNum">     856 </span>                :            : 
+<span class="lineNum">     857 </span>                :            : static ovs_be16 *ofpmp_flags__(const struct ofp_header *);
+<span class="lineNum">     858 </span>                :            : 
+<span class="lineNum">     859 </span>                :            : /* Initializes 'replies' as a new list of stats messages that reply to
+<span class="lineNum">     860 </span>                :            :  * 'request', which must be a stats request message.  Initially the list will
+<span class="lineNum">     861 </span>                :            :  * consist of only a single reply part without any body.  The caller should
+<span class="lineNum">     862 </span>                :            :  * use calls to the other ofpmp_*() functions to add to the body and split the
+<a name="863"><span class="lineNum">     863 </span>                :            :  * message into multiple parts, if necessary. */</a>
+<span class="lineNum">     864 </span>                :            : void
+<span class="lineNum">     865 </span>                :<span class="lineCov">        239 : ofpmp_init(struct list *replies, const struct ofp_header *request)</span>
+<span class="lineNum">     866 </span>                :            : {
+<span class="lineNum">     867 </span>                :            :     struct ofpbuf *msg;
+<span class="lineNum">     868 </span>                :            : 
+<span class="lineNum">     869 </span>                :<span class="lineCov">        239 :     list_init(replies);</span>
+<span class="lineNum">     870 </span>                :            : 
+<span class="lineNum">     871 </span>                :<span class="lineCov">        239 :     msg = ofpraw_alloc_stats_reply(request, 1000);</span>
+<span class="lineNum">     872 </span>                :<span class="lineCov">        239 :     list_push_back(replies, &amp;msg-&gt;list_node);</span>
+<span class="lineNum">     873 </span>                :<span class="lineCov">        239 : }</span>
+<span class="lineNum">     874 </span>                :            : 
+<span class="lineNum">     875 </span>                :            : /* Prepares to append up to 'len' bytes to the series of statistics replies in
+<span class="lineNum">     876 </span>                :            :  * 'replies', which should have been initialized with ofpmp_init(), if
+<span class="lineNum">     877 </span>                :            :  * necessary adding a new reply to the list.
+<span class="lineNum">     878 </span>                :            :  *
+<span class="lineNum">     879 </span>                :            :  * Returns an ofpbuf with at least 'len' bytes of tailroom.  The 'len' bytes
+<span class="lineNum">     880 </span>                :            :  * have not actually been allocated, so the caller must do so with
+<a name="881"><span class="lineNum">     881 </span>                :            :  * e.g. ofpbuf_put_uninit(). */</a>
+<span class="lineNum">     882 </span>                :            : struct ofpbuf *
+<span class="lineNum">     883 </span>                :<span class="lineCov">         26 : ofpmp_reserve(struct list *replies, size_t len)</span>
+<span class="lineNum">     884 </span>                :            : {
+<span class="lineNum">     885 </span>                :<span class="lineCov">         26 :     struct ofpbuf *msg = ofpbuf_from_list(list_back(replies));</span>
+<span class="lineNum">     886 </span>                :            : 
+<span class="lineNum">     887 </span>        [<span class="branchCov" title="Branch 1 was taken 21 times"> + </span><span class="branchCov" title="Branch 2 was taken 5 times"> + </span>]:<span class="lineCov">         26 :     if (ofpbuf_size(msg) + len &lt;= UINT16_MAX) {</span>
+<span class="lineNum">     888 </span>                :<span class="lineCov">         21 :         ofpbuf_prealloc_tailroom(msg, len);</span>
+<span class="lineNum">     889 </span>                :<span class="lineCov">         21 :         return msg;</span>
+<span class="lineNum">     890 </span>                :            :     } else {
+<span class="lineNum">     891 </span>                :            :         unsigned int hdrs_len;
+<span class="lineNum">     892 </span>                :            :         struct ofpbuf *next;
+<span class="lineNum">     893 </span>                :            :         struct ofphdrs hdrs;
+<span class="lineNum">     894 </span>                :            : 
+<span class="lineNum">     895 </span>                :<span class="lineCov">          5 :         ofphdrs_decode_assert(&amp;hdrs, ofpbuf_data(msg), ofpbuf_size(msg));</span>
+<span class="lineNum">     896 </span>                :<span class="lineCov">          5 :         hdrs_len = ofphdrs_len(&amp;hdrs);</span>
+<span class="lineNum">     897 </span>                :            : 
+<span class="lineNum">     898 </span>                :<span class="lineCov">          5 :         next = ofpbuf_new(MAX(1024, hdrs_len + len));</span>
+<span class="lineNum">     899 </span>                :<span class="lineCov">          5 :         ofpbuf_put(next, ofpbuf_data(msg), hdrs_len);</span>
+<span class="lineNum">     900 </span>                :<span class="lineCov">          5 :         next-&gt;frame = ofpbuf_data(next);</span>
+<span class="lineNum">     901 </span>                :<span class="lineCov">          5 :         ofpbuf_set_l3(next, ofpbuf_tail(next));</span>
+<span class="lineNum">     902 </span>                :<span class="lineCov">          5 :         list_push_back(replies, &amp;next-&gt;list_node);</span>
+<span class="lineNum">     903 </span>                :            : 
+<span class="lineNum">     904 </span>                :<span class="lineCov">          5 :         *ofpmp_flags__(ofpbuf_data(msg)) |= htons(OFPSF_REPLY_MORE);</span>
+<span class="lineNum">     905 </span>                :            : 
+<span class="lineNum">     906 </span>                :<span class="lineCov">         26 :         return next;</span>
+<span class="lineNum">     907 </span>                :            :     }
+<span class="lineNum">     908 </span>                :            : }
+<span class="lineNum">     909 </span>                :            : 
+<span class="lineNum">     910 </span>                :            : /* Appends 'len' bytes to the series of statistics replies in 'replies', and
+<a name="911"><span class="lineNum">     911 </span>                :            :  * returns the first byte. */</a>
+<span class="lineNum">     912 </span>                :            : void *
+<span class="lineNum">     913 </span>                :<span class="lineCov">         25 : ofpmp_append(struct list *replies, size_t len)</span>
+<span class="lineNum">     914 </span>                :            : {
+<span class="lineNum">     915 </span>                :<span class="lineCov">         25 :     return ofpbuf_put_uninit(ofpmp_reserve(replies, len), len);</span>
+<span class="lineNum">     916 </span>                :            : }
+<span class="lineNum">     917 </span>                :            : 
+<span class="lineNum">     918 </span>                :            : /* Sometimes, when composing stats replies, it's difficult to predict how long
+<span class="lineNum">     919 </span>                :            :  * an individual reply chunk will be before actually encoding it into the reply
+<span class="lineNum">     920 </span>                :            :  * buffer.  This function allows easy handling of this case: just encode the
+<span class="lineNum">     921 </span>                :            :  * reply, then use this function to break the message into two pieces if it
+<span class="lineNum">     922 </span>                :            :  * exceeds the OpenFlow message limit.
+<span class="lineNum">     923 </span>                :            :  *
+<span class="lineNum">     924 </span>                :            :  * In detail, if the final stats message in 'replies' is too long for OpenFlow,
+<span class="lineNum">     925 </span>                :            :  * this function breaks it into two separate stats replies, the first one with
+<span class="lineNum">     926 </span>                :            :  * the first 'start_ofs' bytes, the second one containing the bytes from that
+<a name="927"><span class="lineNum">     927 </span>                :            :  * offset onward. */</a>
+<span class="lineNum">     928 </span>                :            : void
+<span class="lineNum">     929 </span>                :<span class="lineCov">      14361 : ofpmp_postappend(struct list *replies, size_t start_ofs)</span>
+<span class="lineNum">     930 </span>                :            : {
+<span class="lineNum">     931 </span>                :<span class="lineCov">      14361 :     struct ofpbuf *msg = ofpbuf_from_list(list_back(replies));</span>
+<span class="lineNum">     932 </span>                :            : 
+<span class="lineNum">     933 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 14361 times"> + </span>]:<span class="lineCov">      14361 :     ovs_assert(start_ofs &lt;= UINT16_MAX);</span>
+<span class="lineNum">     934 </span>        [<span class="branchCov" title="Branch 1 was taken 5 times"> + </span><span class="branchCov" title="Branch 2 was taken 14356 times"> + </span>]:<span class="lineCov">      14361 :     if (ofpbuf_size(msg) &gt; UINT16_MAX) {</span>
+<span class="lineNum">     935 </span>                :<span class="lineCov">          5 :         size_t len = ofpbuf_size(msg) - start_ofs;</span>
+<span class="lineNum">     936 </span>                :<span class="lineCov">          5 :         memcpy(ofpmp_append(replies, len),</span>
+<span class="lineNum">     937 </span>                :<span class="lineCov">          5 :                (const uint8_t *) ofpbuf_data(msg) + start_ofs, len);</span>
+<span class="lineNum">     938 </span>                :<span class="lineCov">          5 :         ofpbuf_set_size(msg, start_ofs);</span>
+<span class="lineNum">     939 </span>                :            :     }
+<span class="lineNum">     940 </span>                :<span class="lineCov">      14361 : }</span>
+<span class="lineNum">     941 </span>                :            : 
+<span class="lineNum">     942 </span>                :            : /* Returns the OpenFlow version of the replies being constructed in 'replies',
+<a name="943"><span class="lineNum">     943 </span>                :            :  * which should have been initialized by ofpmp_init(). */</a>
+<span class="lineNum">     944 </span>                :            : enum ofp_version
+<span class="lineNum">     945 </span>                :<span class="lineCov">      14382 : ofpmp_version(struct list *replies)</span>
+<span class="lineNum">     946 </span>                :            : {
+<span class="lineNum">     947 </span>                :<span class="lineCov">      14382 :     struct ofpbuf *msg = ofpbuf_from_list(list_back(replies));</span>
+<span class="lineNum">     948 </span>                :<span class="lineCov">      14382 :     const struct ofp_header *oh = ofpbuf_data(msg);</span>
+<span class="lineNum">     949 </span>                :            : 
+<span class="lineNum">     950 </span>                :<span class="lineCov">      14382 :     return oh-&gt;version;</span>
+<span class="lineNum">     951 </span>                :            : }
+<span class="lineNum">     952 </span>                :            : 
+<span class="lineNum">     953 </span>                :            : /* Determines the OFPRAW_* type of the OpenFlow messages in 'replies', which
+<a name="954"><span class="lineNum">     954 </span>                :            :  * should have been initialized by ofpmp_init(). */</a>
+<span class="lineNum">     955 </span>                :            : enum ofpraw
+<span class="lineNum">     956 </span>                :<span class="lineCov">       8994 : ofpmp_decode_raw(struct list *replies)</span>
+<span class="lineNum">     957 </span>                :            : {
+<span class="lineNum">     958 </span>                :<span class="lineCov">       8994 :     struct ofpbuf *msg = ofpbuf_from_list(list_back(replies));</span>
+<span class="lineNum">     959 </span>                :            :     enum ofperr error;
+<span class="lineNum">     960 </span>                :            :     enum ofpraw raw;
+<span class="lineNum">     961 </span>                :            : 
+<span class="lineNum">     962 </span>                :<span class="lineCov">       8994 :     error = ofpraw_decode_partial(&amp;raw, ofpbuf_data(msg), ofpbuf_size(msg));</span>
+<span class="lineNum">     963 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 8994 times"> + </span>]:<span class="lineCov">       8994 :     ovs_assert(!error);</span>
+<span class="lineNum">     964 </span>                :<span class="lineCov">       8994 :     return raw;</span>
+<span class="lineNum">     965 </span>                :            : }
+<a name="966"><span class="lineNum">     966 </span>                :            : </a>
+<span class="lineNum">     967 </span>                :            : static ovs_be16 *
+<span class="lineNum">     968 </span>                :<span class="lineCov">       1064 : ofpmp_flags__(const struct ofp_header *oh)</span>
+<span class="lineNum">     969 </span>                :            : {
+<span class="lineNum">     970 </span>     [<span class="branchCov" title="Branch 0 was taken 599 times"> + </span><span class="branchCov" title="Branch 1 was taken 465 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">       1064 :     switch ((enum ofp_version)oh-&gt;version) {</span>
+<span class="lineNum">     971 </span>                :            :     case OFP10_VERSION:
+<span class="lineNum">     972 </span>                :<span class="lineCov">        599 :         return &amp;((struct ofp10_stats_msg *) oh)-&gt;flags;</span>
+<span class="lineNum">     973 </span>                :            :     case OFP11_VERSION:
+<span class="lineNum">     974 </span>                :            :     case OFP12_VERSION:
+<span class="lineNum">     975 </span>                :            :     case OFP13_VERSION:
+<span class="lineNum">     976 </span>                :            :     case OFP14_VERSION:
+<span class="lineNum">     977 </span>                :            :     case OFP15_VERSION:
+<span class="lineNum">     978 </span>                :<span class="lineCov">        465 :         return &amp;((struct ofp11_stats_msg *) oh)-&gt;flags;</span>
+<span class="lineNum">     979 </span>                :            :     default:
+<span class="lineNum">     980 </span>                :<span class="lineCov">       1064 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     981 </span>                :            :     }
+<span class="lineNum">     982 </span>                :            : }
+<span class="lineNum">     983 </span>                :            : 
+<span class="lineNum">     984 </span>                :            : /* Returns the OFPSF_* flags found in the OpenFlow stats header of 'oh', which
+<span class="lineNum">     985 </span>                :            :  * must be an OpenFlow stats request or reply.
+<span class="lineNum">     986 </span>                :            :  *
+<a name="987"><span class="lineNum">     987 </span>                :            :  * (OFPSF_REPLY_MORE is the only defined flag.) */</a>
+<span class="lineNum">     988 </span>                :            : uint16_t
+<span class="lineNum">     989 </span>                :<span class="lineCov">       1059 : ofpmp_flags(const struct ofp_header *oh)</span>
+<span class="lineNum">     990 </span>                :            : {
+<span class="lineNum">     991 </span>                :<span class="lineCov">       1059 :     return ntohs(*ofpmp_flags__(oh));</span>
+<span class="lineNum">     992 </span>                :            : }
+<span class="lineNum">     993 </span>                :            : 
+<span class="lineNum">     994 </span>                :            : /* Returns true if the OFPSF_REPLY_MORE flag is set in the OpenFlow stats
+<span class="lineNum">     995 </span>                :            :  * header of 'oh', which must be an OpenFlow stats request or reply, false if
+<a name="996"><span class="lineNum">     996 </span>                :            :  * it is not set. */</a>
+<span class="lineNum">     997 </span>                :            : bool
+<span class="lineNum">     998 </span>                :<span class="lineCov">        282 : ofpmp_more(const struct ofp_header *oh)</span>
+<span class="lineNum">     999 </span>                :            : {
+<span class="lineNum">    1000 </span>                :<span class="lineCov">        282 :     return (ofpmp_flags(oh) &amp; OFPSF_REPLY_MORE) != 0;</span>
+<span class="lineNum">    1001 </span>                :            : }
+<span class="lineNum">    1002 </span>                :            : 
+<span class="lineNum">    1003 </span>                :            : static void ofpmsgs_init(void);
+<a name="1004"><span class="lineNum">    1004 </span>                :            : </a>
+<span class="lineNum">    1005 </span>                :            : static const struct raw_info *
+<span class="lineNum">    1006 </span>                :<span class="lineCov">     287391 : raw_info_get(enum ofpraw raw)</span>
+<span class="lineNum">    1007 </span>                :            : {
+<span class="lineNum">    1008 </span>                :<span class="lineCov">     287391 :     ofpmsgs_init();</span>
+<span class="lineNum">    1009 </span>                :            : 
+<span class="lineNum">    1010 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 287391 times"> + </span>]:<span class="lineCov">     287391 :     ovs_assert(raw &lt; ARRAY_SIZE(raw_infos));</span>
+<span class="lineNum">    1011 </span>                :<span class="lineCov">     287391 :     return &amp;raw_infos[raw];</span>
+<span class="lineNum">    1012 </span>                :            : }
+<a name="1013"><span class="lineNum">    1013 </span>                :            : </a>
+<span class="lineNum">    1014 </span>                :            : static struct raw_instance *
+<span class="lineNum">    1015 </span>                :<span class="lineCov">     169582 : raw_instance_get(const struct raw_info *info, uint8_t version)</span>
+<span class="lineNum">    1016 </span>                :            : {
+<span class="lineNum">    1017 </span>[<span class="branchCov" title="Branch 0 was taken 169582 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 169582 times"> + </span>]:<span class="lineCov">     169582 :     ovs_assert(version &gt;= info-&gt;min_version &amp;&amp; version &lt;= info-&gt;max_version);</span>
+<span class="lineNum">    1018 </span>                :<span class="lineCov">     169582 :     return &amp;info-&gt;instances[version - info-&gt;min_version];</span>
+<span class="lineNum">    1019 </span>                :            : }
+<a name="1020"><span class="lineNum">    1020 </span>                :            : </a>
+<span class="lineNum">    1021 </span>                :            : static enum ofperr
+<span class="lineNum">    1022 </span>                :<span class="lineCov">     139677 : ofpraw_from_ofphdrs(enum ofpraw *raw, const struct ofphdrs *hdrs)</span>
+<span class="lineNum">    1023 </span>                :            : {
+<span class="lineNum">    1024 </span>                :            :     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 1);
+<span class="lineNum">    1025 </span>                :            : 
+<span class="lineNum">    1026 </span>                :            :     struct raw_instance *raw_hdrs;
+<span class="lineNum">    1027 </span>                :            :     uint32_t hash;
+<span class="lineNum">    1028 </span>                :            : 
+<span class="lineNum">    1029 </span>                :<span class="lineCov">     139677 :     ofpmsgs_init();</span>
+<span class="lineNum">    1030 </span>                :            : 
+<span class="lineNum">    1031 </span>                :<span class="lineCov">     139677 :     hash = ofphdrs_hash(hdrs);</span>
+<span class="lineNum">    1032 </span>        [<span class="branchCov" title="Branch 2 was taken 139667 times"> + </span><span class="branchCov" title="Branch 3 was taken 10 times"> + </span>]:<span class="lineCov">     139677 :     HMAP_FOR_EACH_WITH_HASH (raw_hdrs, hmap_node, hash, &amp;raw_instance_map) {</span>
+<span class="lineNum">    1033 </span>        [<span class="branchCov" title="Branch 1 was taken 139667 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">     139667 :         if (ofphdrs_equal(hdrs, &amp;raw_hdrs-&gt;hdrs)) {</span>
+<span class="lineNum">    1034 </span>                :<span class="lineCov">     139667 :             *raw = raw_hdrs-&gt;raw;</span>
+<span class="lineNum">    1035 </span>                :<span class="lineCov">     139667 :             return 0;</span>
+<span class="lineNum">    1036 </span>                :            :         }
+<span class="lineNum">    1037 </span>                :            :     }
+<span class="lineNum">    1038 </span>                :            : 
+<span class="lineNum">    1039 </span>        [<span class="branchCov" title="Branch 1 was taken 4 times"> + </span><span class="branchCov" title="Branch 2 was taken 6 times"> + </span>]:<span class="lineCov">         10 :     if (!VLOG_DROP_WARN(&amp;rl)) {</span>
+<span class="lineNum">    1040 </span>                :            :         struct ds s;
+<span class="lineNum">    1041 </span>                :            : 
+<span class="lineNum">    1042 </span>                :<span class="lineCov">          4 :         ds_init(&amp;s);</span>
+<span class="lineNum">    1043 </span>                :<span class="lineCov">          4 :         ds_put_format(&amp;s, &quot;version %&quot;PRIu8&quot;, type %&quot;PRIu8,</span>
+<span class="lineNum">    1044 </span>                :<span class="lineCov">          8 :                       hdrs-&gt;version, hdrs-&gt;type);</span>
+<span class="lineNum">    1045 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 4 times"> + </span>]:<span class="lineCov">          4 :         if (ofphdrs_is_stat(hdrs)) {</span>
+<span class="lineNum">    1046 </span>                :<span class="lineNoCov">          0 :             ds_put_format(&amp;s, &quot;, stat %&quot;PRIu16, hdrs-&gt;stat);</span>
+<span class="lineNum">    1047 </span>                :            :         }
+<span class="lineNum">    1048 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 4 times"> + </span>]:<span class="lineCov">          4 :         if (hdrs-&gt;vendor) {</span>
+<span class="lineNum">    1049 </span>                :<span class="lineNoCov">          0 :             ds_put_format(&amp;s, &quot;, vendor 0x%&quot;PRIx32&quot;, subtype %&quot;PRIu32,</span>
+<span class="lineNum">    1050 </span>                :            :                           hdrs-&gt;vendor, hdrs-&gt;subtype);
+<span class="lineNum">    1051 </span>                :            :         }
+<span class="lineNum">    1052 </span>        [<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          4 :         VLOG_WARN(&quot;unknown OpenFlow message (%s)&quot;, ds_cstr(&amp;s));</span>
+<span class="lineNum">    1053 </span>                :<span class="lineCov">          4 :         ds_destroy(&amp;s);</span>
+<span class="lineNum">    1054 </span>                :            :     }
+<span class="lineNum">    1055 </span>                :            : 
+<span class="lineNum">    1056 </span>  [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 10 times"> + </span>]:<span class="lineCov">     139687 :     return (hdrs-&gt;vendor ? OFPERR_OFPBRC_BAD_SUBTYPE</span>
+<span class="lineNum">    1057 </span>                :<span class="lineCov">         10 :             : ofphdrs_is_stat(hdrs) ? OFPERR_OFPBRC_BAD_STAT</span>
+<span class="lineNum">    1058 </span>                :            :             : OFPERR_OFPBRC_BAD_TYPE);
+<span class="lineNum">    1059 </span>                :            : }
+<a name="1060"><span class="lineNum">    1060 </span>                :            : </a>
+<span class="lineNum">    1061 </span>                :            : static void
+<span class="lineNum">    1062 </span>                :<span class="lineCov">     427068 : ofpmsgs_init(void)</span>
+<span class="lineNum">    1063 </span>                :            : {
+<span class="lineNum">    1064 </span>                :            :     static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
+<span class="lineNum">    1065 </span>                :            :     const struct raw_info *info;
+<span class="lineNum">    1066 </span>                :            : 
+<span class="lineNum">    1067 </span>        [<span class="branchCov" title="Branch 1 was taken 424252 times"> + </span><span class="branchCov" title="Branch 2 was taken 2816 times"> + </span>]:<span class="lineCov">     427068 :     if (!ovsthread_once_start(&amp;once)) {</span>
+<span class="lineNum">    1068 </span>                :<span class="lineCov">     427068 :         return;</span>
+<span class="lineNum">    1069 </span>                :            :     }
+<span class="lineNum">    1070 </span>                :            : 
+<span class="lineNum">    1071 </span>                :<span class="lineCov">       2816 :     hmap_init(&amp;raw_instance_map);</span>
+<span class="lineNum">    1072 </span>        [<span class="branchCov" title="Branch 0 was taken 329472 times"> + </span><span class="branchCov" title="Branch 1 was taken 2816 times"> + </span>]:<span class="lineCov">     332288 :     for (info = raw_infos; info &lt; &amp;raw_infos[ARRAY_SIZE(raw_infos)]; info++)</span>
+<span class="lineNum">    1073 </span>                :            :     {
+<span class="lineNum">    1074 </span>                :<span class="lineCov">     329472 :         int n_instances = info-&gt;max_version - info-&gt;min_version + 1;</span>
+<span class="lineNum">    1075 </span>                :            :         struct raw_instance *inst;
+<span class="lineNum">    1076 </span>                :            : 
+<span class="lineNum">    1077 </span>        [<span class="branchCov" title="Branch 0 was taken 3855104 times"> + </span><span class="branchCov" title="Branch 1 was taken 329472 times"> + </span>]:<span class="lineCov">    4184576 :         for (inst = info-&gt;instances;</span>
+<span class="lineNum">    1078 </span>                :<span class="lineCov">    4184576 :              inst &lt; &amp;info-&gt;instances[n_instances];</span>
+<span class="lineNum">    1079 </span>                :<span class="lineCov">    3855104 :              inst++) {</span>
+<span class="lineNum">    1080 </span>                :<span class="lineCov">    3855104 :             inst-&gt;hdrs_len = ofphdrs_len(&amp;inst-&gt;hdrs);</span>
+<span class="lineNum">    1081 </span>                :<span class="lineCov">    3855104 :             hmap_insert(&amp;raw_instance_map, &amp;inst-&gt;hmap_node,</span>
+<span class="lineNum">    1082 </span>                :            :                         ofphdrs_hash(&amp;inst-&gt;hdrs));
+<span class="lineNum">    1083 </span>                :            :         }
+<span class="lineNum">    1084 </span>                :            :     }
+<span class="lineNum">    1085 </span>                :            : 
+<span class="lineNum">    1086 </span>                :<span class="lineCov">       2816 :     ovsthread_once_done(&amp;once);</span>
+<span class="lineNum">    1087 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

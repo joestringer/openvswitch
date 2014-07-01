@@ -1,0 +1,364 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/seq.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - seq.c<span style="font-size: 80%;"> (source / <a href="seq.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">98</td>
+            <td class="headerCovTableEntry">99</td>
+            <td class="headerCovTableEntryHi">99.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">13</td>
+            <td class="headerCovTableEntry">13</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">24</td>
+            <td class="headerCovTableEntry">26</td>
+            <td class="headerCovTableEntryHi">92.3 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &quot;seq.h&quot;
+<span class="lineNum">      20 </span>                :            : 
+<span class="lineNum">      21 </span>                :            : #include &lt;stdbool.h&gt;
+<span class="lineNum">      22 </span>                :            : 
+<span class="lineNum">      23 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;hmap.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;latch.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;list.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;ovs-thread.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      29 </span>                :            : 
+<span class="lineNum">      30 </span>                :            : /* A sequence number object. */
+<span class="lineNum">      31 </span>                :            : struct seq {
+<span class="lineNum">      32 </span>                :            :     uint64_t value OVS_GUARDED;
+<span class="lineNum">      33 </span>                :            :     struct hmap waiters OVS_GUARDED; /* Contains 'struct seq_waiter's. */
+<span class="lineNum">      34 </span>                :            : };
+<span class="lineNum">      35 </span>                :            : 
+<span class="lineNum">      36 </span>                :            : /* A thread waiting on a particular seq. */
+<span class="lineNum">      37 </span>                :            : struct seq_waiter {
+<span class="lineNum">      38 </span>                :            :     struct seq *seq OVS_GUARDED;            /* Seq being waited for. */
+<span class="lineNum">      39 </span>                :            :     struct hmap_node hmap_node OVS_GUARDED; /* In 'seq-&gt;waiters'. */
+<span class="lineNum">      40 </span>                :            :     unsigned int ovsthread_id OVS_GUARDED;  /* Key in 'waiters' hmap. */
+<span class="lineNum">      41 </span>                :            : 
+<span class="lineNum">      42 </span>                :            :     struct seq_thread *thread OVS_GUARDED; /* Thread preparing to wait. */
+<span class="lineNum">      43 </span>                :            :     struct list list_node OVS_GUARDED;     /* In 'thread-&gt;waiters'. */
+<span class="lineNum">      44 </span>                :            : 
+<span class="lineNum">      45 </span>                :            :     uint64_t value OVS_GUARDED; /* seq-&gt;value we're waiting to change. */
+<span class="lineNum">      46 </span>                :            : };
+<span class="lineNum">      47 </span>                :            : 
+<span class="lineNum">      48 </span>                :            : /* A thread that might be waiting on one or more seqs. */
+<span class="lineNum">      49 </span>                :            : struct seq_thread {
+<span class="lineNum">      50 </span>                :            :     struct list waiters OVS_GUARDED; /* Contains 'struct seq_waiter's. */
+<span class="lineNum">      51 </span>                :            :     struct latch latch OVS_GUARDED;  /* Wakeup latch for this thread. */
+<span class="lineNum">      52 </span>                :            :     bool waiting OVS_GUARDED;        /* True if latch_wait() already called. */
+<span class="lineNum">      53 </span>                :            : };
+<span class="lineNum">      54 </span>                :            : 
+<span class="lineNum">      55 </span>                :            : static struct ovs_mutex seq_mutex = OVS_MUTEX_INITIALIZER;
+<span class="lineNum">      56 </span>                :            : 
+<span class="lineNum">      57 </span>                :            : static uint64_t seq_next OVS_GUARDED_BY(seq_mutex) = 1;
+<span class="lineNum">      58 </span>                :            : 
+<span class="lineNum">      59 </span>                :            : static pthread_key_t seq_thread_key;
+<span class="lineNum">      60 </span>                :            : 
+<span class="lineNum">      61 </span>                :            : static void seq_init(void);
+<span class="lineNum">      62 </span>                :            : static struct seq_thread *seq_thread_get(void) OVS_REQUIRES(seq_mutex);
+<span class="lineNum">      63 </span>                :            : static void seq_thread_exit(void *thread_) OVS_EXCLUDED(seq_mutex);
+<span class="lineNum">      64 </span>                :            : static void seq_thread_woke(struct seq_thread *) OVS_REQUIRES(seq_mutex);
+<span class="lineNum">      65 </span>                :            : static void seq_waiter_destroy(struct seq_waiter *) OVS_REQUIRES(seq_mutex);
+<span class="lineNum">      66 </span>                :            : static void seq_wake_waiters(struct seq *) OVS_REQUIRES(seq_mutex);
+<span class="lineNum">      67 </span>                :            : 
+<a name="68"><span class="lineNum">      68 </span>                :            : /* Creates and returns a new 'seq' object. */</a>
+<span class="lineNum">      69 </span>                :            : struct seq * OVS_EXCLUDED(seq_mutex)
+<span class="lineNum">      70 </span>                :<span class="lineCov">      51120 : seq_create(void)</span>
+<span class="lineNum">      71 </span>                :            : {
+<span class="lineNum">      72 </span>                :            :     struct seq *seq;
+<span class="lineNum">      73 </span>                :            : 
+<span class="lineNum">      74 </span>                :<span class="lineCov">      51120 :     seq_init();</span>
+<span class="lineNum">      75 </span>                :            : 
+<span class="lineNum">      76 </span>                :<span class="lineCov">      51120 :     seq = xmalloc(sizeof *seq);</span>
+<span class="lineNum">      77 </span>                :<span class="lineCov">      51120 :     ovs_mutex_lock(&amp;seq_mutex);</span>
+<span class="lineNum">      78 </span>                :<span class="lineCov">      51120 :     seq-&gt;value = seq_next++;</span>
+<span class="lineNum">      79 </span>                :<span class="lineCov">      51120 :     hmap_init(&amp;seq-&gt;waiters);</span>
+<span class="lineNum">      80 </span>                :<span class="lineCov">      51120 :     ovs_mutex_unlock(&amp;seq_mutex);</span>
+<span class="lineNum">      81 </span>                :            : 
+<span class="lineNum">      82 </span>                :<span class="lineCov">      51120 :     return seq;</span>
+<span class="lineNum">      83 </span>                :            : }
+<span class="lineNum">      84 </span>                :            : 
+<a name="85"><span class="lineNum">      85 </span>                :            : /* Destroys 'seq', waking up threads that were waiting on it, if any. */</a>
+<span class="lineNum">      86 </span>                :            : void
+<span class="lineNum">      87 </span>                :<span class="lineCov">       2808 : seq_destroy(struct seq *seq)</span>
+<span class="lineNum">      88 </span>                :            :      OVS_EXCLUDED(seq_mutex)
+<span class="lineNum">      89 </span>                :            : {
+<span class="lineNum">      90 </span>                :<span class="lineCov">       2808 :     ovs_mutex_lock(&amp;seq_mutex);</span>
+<span class="lineNum">      91 </span>                :<span class="lineCov">       2808 :     seq_wake_waiters(seq);</span>
+<span class="lineNum">      92 </span>                :<span class="lineCov">       2808 :     hmap_destroy(&amp;seq-&gt;waiters);</span>
+<span class="lineNum">      93 </span>                :<span class="lineCov">       2808 :     free(seq);</span>
+<span class="lineNum">      94 </span>                :<span class="lineCov">       2808 :     ovs_mutex_unlock(&amp;seq_mutex);</span>
+<span class="lineNum">      95 </span>                :<span class="lineCov">       2808 : }</span>
+<span class="lineNum">      96 </span>                :            : 
+<span class="lineNum">      97 </span>                :            : /* Increments 'seq''s sequence number, waking up any threads that are waiting
+<a name="98"><span class="lineNum">      98 </span>                :            :  * on 'seq'. */</a>
+<span class="lineNum">      99 </span>                :            : void
+<span class="lineNum">     100 </span>                :<span class="lineCov">     199174 : seq_change(struct seq *seq)</span>
+<span class="lineNum">     101 </span>                :            :     OVS_EXCLUDED(seq_mutex)
+<span class="lineNum">     102 </span>                :            : {
+<span class="lineNum">     103 </span>                :<span class="lineCov">     199174 :     ovs_mutex_lock(&amp;seq_mutex);</span>
+<span class="lineNum">     104 </span>                :<span class="lineCov">     199188 :     seq-&gt;value = seq_next++;</span>
+<span class="lineNum">     105 </span>                :<span class="lineCov">     199188 :     seq_wake_waiters(seq);</span>
+<span class="lineNum">     106 </span>                :<span class="lineCov">     199188 :     ovs_mutex_unlock(&amp;seq_mutex);</span>
+<span class="lineNum">     107 </span>                :<span class="lineCov">     199188 : }</span>
+<span class="lineNum">     108 </span>                :            : 
+<span class="lineNum">     109 </span>                :            : /* Returns 'seq''s current sequence number (which could change immediately).
+<span class="lineNum">     110 </span>                :            :  *
+<span class="lineNum">     111 </span>                :            :  * seq_read() and seq_wait() can be used together to yield a race-free wakeup
+<span class="lineNum">     112 </span>                :            :  * when an object changes, even without an ability to lock the object.  See
+<a name="113"><span class="lineNum">     113 </span>                :            :  * Usage in seq.h for details. */</a>
+<span class="lineNum">     114 </span>                :            : uint64_t
+<span class="lineNum">     115 </span>                :<span class="lineCov">     682813 : seq_read(const struct seq *seq)</span>
+<span class="lineNum">     116 </span>                :            :     OVS_EXCLUDED(seq_mutex)
+<span class="lineNum">     117 </span>                :            : {
+<span class="lineNum">     118 </span>                :            :     uint64_t value;
+<span class="lineNum">     119 </span>                :            : 
+<span class="lineNum">     120 </span>                :<span class="lineCov">     682813 :     ovs_mutex_lock(&amp;seq_mutex);</span>
+<span class="lineNum">     121 </span>                :<span class="lineCov">     683020 :     value = seq-&gt;value;</span>
+<span class="lineNum">     122 </span>                :<span class="lineCov">     683020 :     ovs_mutex_unlock(&amp;seq_mutex);</span>
+<span class="lineNum">     123 </span>                :            : 
+<span class="lineNum">     124 </span>                :<span class="lineCov">     682959 :     return value;</span>
+<span class="lineNum">     125 </span>                :            : }
+<a name="126"><span class="lineNum">     126 </span>                :            : </a>
+<span class="lineNum">     127 </span>                :            : static void
+<span class="lineNum">     128 </span>                :<span class="lineCov">     378857 : seq_wait__(struct seq *seq, uint64_t value, const char *where)</span>
+<span class="lineNum">     129 </span>                :            :     OVS_REQUIRES(seq_mutex)
+<span class="lineNum">     130 </span>                :            : {
+<span class="lineNum">     131 </span>                :<span class="lineCov">     378857 :     unsigned int id = ovsthread_id_self();</span>
+<span class="lineNum">     132 </span>                :<span class="lineCov">     378857 :     uint32_t hash = hash_int(id, 0);</span>
+<span class="lineNum">     133 </span>                :            :     struct seq_waiter *waiter;
+<span class="lineNum">     134 </span>                :            : 
+<span class="lineNum">     135 </span>        [<span class="branchCov" title="Branch 2 was taken 126641 times"> + </span><span class="branchCov" title="Branch 3 was taken 317267 times"> + </span>]:<span class="lineCov">     443908 :     HMAP_FOR_EACH_IN_BUCKET (waiter, hmap_node, hash, &amp;seq-&gt;waiters) {</span>
+<span class="lineNum">     136 </span>        [<span class="branchCov" title="Branch 0 was taken 61590 times"> + </span><span class="branchCov" title="Branch 1 was taken 65051 times"> + </span>]:<span class="lineCov">     126641 :         if (waiter-&gt;ovsthread_id == id) {</span>
+<span class="lineNum">     137 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 61590 times"> + </span>]:<span class="lineCov">      61590 :             if (waiter-&gt;value != value) {</span>
+<span class="lineNum">     138 </span>                :            :                 /* The current value is different from the value we've already
+<span class="lineNum">     139 </span>                :            :                  * waited for, */
+<span class="lineNum">     140 </span>                :<span class="lineNoCov">          0 :                 poll_immediate_wake_at(where);</span>
+<span class="lineNum">     141 </span>                :            :             } else {
+<span class="lineNum">     142 </span>                :            :                 /* Already waiting on 'value', nothing more to do. */
+<span class="lineNum">     143 </span>                :            :             }
+<span class="lineNum">     144 </span>                :<span class="lineCov">     378857 :             return;</span>
+<span class="lineNum">     145 </span>                :            :         }
+<span class="lineNum">     146 </span>                :            :     }
+<span class="lineNum">     147 </span>                :            : 
+<span class="lineNum">     148 </span>                :<span class="lineCov">     317267 :     waiter = xmalloc(sizeof *waiter);</span>
+<span class="lineNum">     149 </span>                :<span class="lineCov">     317267 :     waiter-&gt;seq = seq;</span>
+<span class="lineNum">     150 </span>                :<span class="lineCov">     317267 :     hmap_insert(&amp;seq-&gt;waiters, &amp;waiter-&gt;hmap_node, hash);</span>
+<span class="lineNum">     151 </span>                :<span class="lineCov">     317267 :     waiter-&gt;ovsthread_id = id;</span>
+<span class="lineNum">     152 </span>                :<span class="lineCov">     317267 :     waiter-&gt;value = value;</span>
+<span class="lineNum">     153 </span>                :<span class="lineCov">     317267 :     waiter-&gt;thread = seq_thread_get();</span>
+<span class="lineNum">     154 </span>                :<span class="lineCov">     317267 :     list_push_back(&amp;waiter-&gt;thread-&gt;waiters, &amp;waiter-&gt;list_node);</span>
+<span class="lineNum">     155 </span>                :            : 
+<span class="lineNum">     156 </span>        [<span class="branchCov" title="Branch 0 was taken 91073 times"> + </span><span class="branchCov" title="Branch 1 was taken 226194 times"> + </span>]:<span class="lineCov">     317267 :     if (!waiter-&gt;thread-&gt;waiting) {</span>
+<span class="lineNum">     157 </span>                :<span class="lineCov">      91073 :         latch_wait_at(&amp;waiter-&gt;thread-&gt;latch, where);</span>
+<span class="lineNum">     158 </span>                :<span class="lineCov">      91073 :         waiter-&gt;thread-&gt;waiting = true;</span>
+<span class="lineNum">     159 </span>                :            :     }
+<span class="lineNum">     160 </span>                :            : }
+<span class="lineNum">     161 </span>                :            : 
+<span class="lineNum">     162 </span>                :            : /* Causes the following poll_block() to wake up when 'seq''s sequence number
+<span class="lineNum">     163 </span>                :            :  * changes from 'value'.  (If 'seq''s sequence number isn't 'value', then
+<span class="lineNum">     164 </span>                :            :  * poll_block() won't block at all.)
+<span class="lineNum">     165 </span>                :            :  *
+<span class="lineNum">     166 </span>                :            :  * seq_read() and seq_wait() can be used together to yield a race-free wakeup
+<span class="lineNum">     167 </span>                :            :  * when an object changes, even without an ability to lock the object.  See
+<span class="lineNum">     168 </span>                :            :  * Usage in seq.h for details.
+<span class="lineNum">     169 </span>                :            :  *
+<span class="lineNum">     170 </span>                :            :  * ('where' is used in debug logging.  Commonly one would use seq_wait() to
+<span class="lineNum">     171 </span>                :            :  * automatically provide the caller's source file and line number for
+<a name="172"><span class="lineNum">     172 </span>                :            :  * 'where'.) */</a>
+<span class="lineNum">     173 </span>                :            : void
+<span class="lineNum">     174 </span>                :<span class="lineCov">     389785 : seq_wait_at(const struct seq *seq_, uint64_t value, const char *where)</span>
+<span class="lineNum">     175 </span>                :            :     OVS_EXCLUDED(seq_mutex)
+<span class="lineNum">     176 </span>                :            : {
+<span class="lineNum">     177 </span>                :<span class="lineCov">     389785 :     struct seq *seq = CONST_CAST(struct seq *, seq_);</span>
+<span class="lineNum">     178 </span>                :            : 
+<span class="lineNum">     179 </span>                :<span class="lineCov">     389785 :     ovs_mutex_lock(&amp;seq_mutex);</span>
+<span class="lineNum">     180 </span>        [<span class="branchCov" title="Branch 0 was taken 378857 times"> + </span><span class="branchCov" title="Branch 1 was taken 10939 times"> + </span>]:<span class="lineCov">     389796 :     if (value == seq-&gt;value) {</span>
+<span class="lineNum">     181 </span>                :<span class="lineCov">     378857 :         seq_wait__(seq, value, where);</span>
+<span class="lineNum">     182 </span>                :            :     } else {
+<span class="lineNum">     183 </span>                :<span class="lineCov">      10939 :         poll_immediate_wake_at(where);</span>
+<span class="lineNum">     184 </span>                :            :     }
+<span class="lineNum">     185 </span>                :<span class="lineCov">     389796 :     ovs_mutex_unlock(&amp;seq_mutex);</span>
+<span class="lineNum">     186 </span>                :<span class="lineCov">     389795 : }</span>
+<span class="lineNum">     187 </span>                :            : 
+<span class="lineNum">     188 </span>                :            : /* Called by poll_block() just before it returns, this function destroys any
+<a name="189"><span class="lineNum">     189 </span>                :            :  * seq_waiter objects associated with the current thread. */</a>
+<span class="lineNum">     190 </span>                :            : void
+<span class="lineNum">     191 </span>                :<span class="lineCov">     152580 : seq_woke(void)</span>
+<span class="lineNum">     192 </span>                :            :     OVS_EXCLUDED(seq_mutex)
+<span class="lineNum">     193 </span>                :            : {
+<span class="lineNum">     194 </span>                :            :     struct seq_thread *thread;
+<span class="lineNum">     195 </span>                :            : 
+<span class="lineNum">     196 </span>                :<span class="lineCov">     152580 :     seq_init();</span>
+<span class="lineNum">     197 </span>                :            : 
+<span class="lineNum">     198 </span>                :<span class="lineCov">     152578 :     thread = pthread_getspecific(seq_thread_key);</span>
+<span class="lineNum">     199 </span>        [<span class="branchCov" title="Branch 0 was taken 90793 times"> + </span><span class="branchCov" title="Branch 1 was taken 61784 times"> + </span>]:<span class="lineCov">     152577 :     if (thread) {</span>
+<span class="lineNum">     200 </span>                :<span class="lineCov">      90793 :         ovs_mutex_lock(&amp;seq_mutex);</span>
+<span class="lineNum">     201 </span>                :<span class="lineCov">      90816 :         seq_thread_woke(thread);</span>
+<span class="lineNum">     202 </span>                :<span class="lineCov">      90816 :         thread-&gt;waiting = false;</span>
+<span class="lineNum">     203 </span>                :<span class="lineCov">      90816 :         ovs_mutex_unlock(&amp;seq_mutex);</span>
+<span class="lineNum">     204 </span>                :            :     }
+<span class="lineNum">     205 </span>                :<span class="lineCov">     152595 : }</span>
+<a name="206"><span class="lineNum">     206 </span>                :            : </a>
+<span class="lineNum">     207 </span>                :            : static void
+<span class="lineNum">     208 </span>                :<span class="lineCov">     203700 : seq_init(void)</span>
+<span class="lineNum">     209 </span>                :            : {
+<span class="lineNum">     210 </span>                :            :     static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
+<span class="lineNum">     211 </span>                :            : 
+<span class="lineNum">     212 </span>        [<span class="branchCov" title="Branch 1 was taken 12244 times"> + </span><span class="branchCov" title="Branch 2 was taken 191455 times"> + </span>]:<span class="lineCov">     203700 :     if (ovsthread_once_start(&amp;once)) {</span>
+<span class="lineNum">     213 </span>                :<span class="lineCov">      12244 :         xpthread_key_create(&amp;seq_thread_key, seq_thread_exit);</span>
+<span class="lineNum">     214 </span>                :<span class="lineCov">      12244 :         ovsthread_once_done(&amp;once);</span>
+<span class="lineNum">     215 </span>                :            :     }
+<span class="lineNum">     216 </span>                :<span class="lineCov">     203699 : }</span>
+<a name="217"><span class="lineNum">     217 </span>                :            : </a>
+<span class="lineNum">     218 </span>                :            : static struct seq_thread *
+<span class="lineNum">     219 </span>                :<span class="lineCov">     317267 : seq_thread_get(void)</span>
+<span class="lineNum">     220 </span>                :            :     OVS_REQUIRES(seq_mutex)
+<span class="lineNum">     221 </span>                :            : {
+<span class="lineNum">     222 </span>                :<span class="lineCov">     317267 :     struct seq_thread *thread = pthread_getspecific(seq_thread_key);</span>
+<span class="lineNum">     223 </span>        [<span class="branchCov" title="Branch 0 was taken 2977 times"> + </span><span class="branchCov" title="Branch 1 was taken 314290 times"> + </span>]:<span class="lineCov">     317267 :     if (!thread) {</span>
+<span class="lineNum">     224 </span>                :<span class="lineCov">       2977 :         thread = xmalloc(sizeof *thread);</span>
+<span class="lineNum">     225 </span>                :<span class="lineCov">       2977 :         list_init(&amp;thread-&gt;waiters);</span>
+<span class="lineNum">     226 </span>                :<span class="lineCov">       2977 :         latch_init(&amp;thread-&gt;latch);</span>
+<span class="lineNum">     227 </span>                :<span class="lineCov">       2977 :         thread-&gt;waiting = false;</span>
+<span class="lineNum">     228 </span>                :            : 
+<span class="lineNum">     229 </span>                :<span class="lineCov">       2977 :         xpthread_setspecific(seq_thread_key, thread);</span>
+<span class="lineNum">     230 </span>                :            :     }
+<span class="lineNum">     231 </span>                :<span class="lineCov">     317267 :     return thread;</span>
+<span class="lineNum">     232 </span>                :            : }
+<a name="233"><span class="lineNum">     233 </span>                :            : </a>
+<span class="lineNum">     234 </span>                :            : static void
+<span class="lineNum">     235 </span>                :<span class="lineCov">       2463 : seq_thread_exit(void *thread_)</span>
+<span class="lineNum">     236 </span>                :            :     OVS_EXCLUDED(seq_mutex)
+<span class="lineNum">     237 </span>                :            : {
+<span class="lineNum">     238 </span>                :<span class="lineCov">       2463 :     struct seq_thread *thread = thread_;</span>
+<span class="lineNum">     239 </span>                :            : 
+<span class="lineNum">     240 </span>                :<span class="lineCov">       2463 :     ovs_mutex_lock(&amp;seq_mutex);</span>
+<span class="lineNum">     241 </span>                :<span class="lineCov">       2463 :     seq_thread_woke(thread);</span>
+<span class="lineNum">     242 </span>                :<span class="lineCov">       2463 :     latch_destroy(&amp;thread-&gt;latch);</span>
+<span class="lineNum">     243 </span>                :<span class="lineCov">       2463 :     free(thread);</span>
+<span class="lineNum">     244 </span>                :<span class="lineCov">       2463 :     ovs_mutex_unlock(&amp;seq_mutex);</span>
+<span class="lineNum">     245 </span>                :<span class="lineCov">       2463 : }</span>
+<a name="246"><span class="lineNum">     246 </span>                :            : </a>
+<span class="lineNum">     247 </span>                :            : static void
+<span class="lineNum">     248 </span>                :<span class="lineCov">      93279 : seq_thread_woke(struct seq_thread *thread)</span>
+<span class="lineNum">     249 </span>                :            :     OVS_REQUIRES(seq_mutex)
+<span class="lineNum">     250 </span>                :            : {
+<span class="lineNum">     251 </span>                :            :     struct seq_waiter *waiter, *next_waiter;
+<span class="lineNum">     252 </span>                :            : 
+<span class="lineNum">     253 </span>[<span class="branchCov" title="Branch 0 was taken 250741 times"> + </span><span class="branchCov" title="Branch 1 was taken 93279 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 250741 times"> + </span><span class="branchCov" title="Branch 3 was taken 93279 times"> + </span>]:<span class="lineCov">     344020 :     LIST_FOR_EACH_SAFE (waiter, next_waiter, list_node, &amp;thread-&gt;waiters) {</span>
+<span class="lineNum">     254 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 250741 times"> + </span>]:<span class="lineCov">     250741 :         ovs_assert(waiter-&gt;thread == thread);</span>
+<span class="lineNum">     255 </span>                :<span class="lineCov">     250741 :         seq_waiter_destroy(waiter);</span>
+<span class="lineNum">     256 </span>                :            :     }
+<span class="lineNum">     257 </span>                :<span class="lineCov">      93279 :     latch_poll(&amp;thread-&gt;latch);</span>
+<span class="lineNum">     258 </span>                :<span class="lineCov">      93279 : }</span>
+<a name="259"><span class="lineNum">     259 </span>                :            : </a>
+<span class="lineNum">     260 </span>                :            : static void
+<span class="lineNum">     261 </span>                :<span class="lineCov">     316753 : seq_waiter_destroy(struct seq_waiter *waiter)</span>
+<span class="lineNum">     262 </span>                :            :     OVS_REQUIRES(seq_mutex)
+<span class="lineNum">     263 </span>                :            : {
+<span class="lineNum">     264 </span>                :<span class="lineCov">     316753 :     hmap_remove(&amp;waiter-&gt;seq-&gt;waiters, &amp;waiter-&gt;hmap_node);</span>
+<span class="lineNum">     265 </span>                :<span class="lineCov">     316753 :     list_remove(&amp;waiter-&gt;list_node);</span>
+<span class="lineNum">     266 </span>                :<span class="lineCov">     316753 :     free(waiter);</span>
+<span class="lineNum">     267 </span>                :<span class="lineCov">     316753 : }</span>
+<a name="268"><span class="lineNum">     268 </span>                :            : </a>
+<span class="lineNum">     269 </span>                :            : static void
+<span class="lineNum">     270 </span>                :<span class="lineCov">     201996 : seq_wake_waiters(struct seq *seq)</span>
+<span class="lineNum">     271 </span>                :            :     OVS_REQUIRES(seq_mutex)
+<span class="lineNum">     272 </span>                :            : {
+<span class="lineNum">     273 </span>                :            :     struct seq_waiter *waiter, *next_waiter;
+<span class="lineNum">     274 </span>                :            : 
+<span class="lineNum">     275 </span>[<span class="branchCov" title="Branch 1 was taken 66012 times"> + </span><span class="branchCov" title="Branch 2 was taken 201996 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 66012 times"> + </span><span class="branchCov" title="Branch 5 was taken 201996 times"> + </span>]:<span class="lineCov">     268008 :     HMAP_FOR_EACH_SAFE (waiter, next_waiter, hmap_node, &amp;seq-&gt;waiters) {</span>
+<span class="lineNum">     276 </span>                :<span class="lineCov">      66012 :         latch_set(&amp;waiter-&gt;thread-&gt;latch);</span>
+<span class="lineNum">     277 </span>                :<span class="lineCov">      66012 :         seq_waiter_destroy(waiter);</span>
+<span class="lineNum">     278 </span>                :            :     }
+<span class="lineNum">     279 </span>                :<span class="lineCov">     201996 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

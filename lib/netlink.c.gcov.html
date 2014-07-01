@@ -1,0 +1,903 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/netlink.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - netlink.c<span style="font-size: 80%;"> (source / <a href="netlink.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">164</td>
+            <td class="headerCovTableEntry">282</td>
+            <td class="headerCovTableEntryLo">58.2 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">39</td>
+            <td class="headerCovTableEntry">63</td>
+            <td class="headerCovTableEntryLo">61.9 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">51</td>
+            <td class="headerCovTableEntry">116</td>
+            <td class="headerCovTableEntryLo">44.0 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2008, 2009, 2010, 2011, 2012, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;netlink.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &lt;inttypes.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;sys/types.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;unistd.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &quot;coverage.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;flow.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;netlink-protocol.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;unaligned.h&quot;
+<a name="29"><span class="lineNum">      29 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      30 </span>                :            : 
+<span class="lineNum">      31 </span>                :<span class="lineCov">       7479 : VLOG_DEFINE_THIS_MODULE(netlink);</span>
+<span class="lineNum">      32 </span>                :            : 
+<span class="lineNum">      33 </span>                :            : /* A single (bad) Netlink message can in theory dump out many, many log
+<span class="lineNum">      34 </span>                :            :  * messages, so the burst size is set quite high here to avoid missing useful
+<span class="lineNum">      35 </span>                :            :  * information.  Also, at high logging levels we log *all* Netlink messages. */
+<span class="lineNum">      36 </span>                :            : static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(60, 600);
+<span class="lineNum">      37 </span>                :            : 
+<span class="lineNum">      38 </span>                :            : /* Returns the nlmsghdr at the head of 'msg'.
+<span class="lineNum">      39 </span>                :            :  *
+<a name="40"><span class="lineNum">      40 </span>                :            :  * 'msg' must be at least as large as a nlmsghdr. */</a>
+<span class="lineNum">      41 </span>                :            : struct nlmsghdr *
+<span class="lineNum">      42 </span>                :<span class="lineCov">        833 : nl_msg_nlmsghdr(const struct ofpbuf *msg)</span>
+<span class="lineNum">      43 </span>                :            : {
+<span class="lineNum">      44 </span>                :<span class="lineCov">        833 :     return ofpbuf_at_assert(msg, 0, NLMSG_HDRLEN);</span>
+<span class="lineNum">      45 </span>                :            : }
+<span class="lineNum">      46 </span>                :            : 
+<span class="lineNum">      47 </span>                :            : /* Returns the genlmsghdr just past 'msg''s nlmsghdr.
+<span class="lineNum">      48 </span>                :            :  *
+<span class="lineNum">      49 </span>                :            :  * Returns a null pointer if 'msg' is not large enough to contain an nlmsghdr
+<a name="50"><span class="lineNum">      50 </span>                :            :  * and a genlmsghdr. */</a>
+<span class="lineNum">      51 </span>                :            : struct genlmsghdr *
+<span class="lineNum">      52 </span>                :<span class="lineNoCov">          0 : nl_msg_genlmsghdr(const struct ofpbuf *msg)</span>
+<span class="lineNum">      53 </span>                :            : {
+<span class="lineNum">      54 </span>                :<span class="lineNoCov">          0 :     return ofpbuf_at(msg, NLMSG_HDRLEN, GENL_HDRLEN);</span>
+<span class="lineNum">      55 </span>                :            : }
+<span class="lineNum">      56 </span>                :            : 
+<span class="lineNum">      57 </span>                :            : /* If 'buffer' is a NLMSG_ERROR message, stores 0 in '*errorp' if it is an ACK
+<span class="lineNum">      58 </span>                :            :  * message, otherwise a positive errno value, and returns true.  If 'buffer' is
+<span class="lineNum">      59 </span>                :            :  * not an NLMSG_ERROR message, returns false.
+<span class="lineNum">      60 </span>                :            :  *
+<a name="61"><span class="lineNum">      61 </span>                :            :  * 'msg' must be at least as large as a nlmsghdr. */</a>
+<span class="lineNum">      62 </span>                :            : bool
+<span class="lineNum">      63 </span>                :<span class="lineCov">        119 : nl_msg_nlmsgerr(const struct ofpbuf *msg, int *errorp)</span>
+<span class="lineNum">      64 </span>                :            : {
+<span class="lineNum">      65 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 119 times"> + </span>]:<span class="lineCov">        119 :     if (nl_msg_nlmsghdr(msg)-&gt;nlmsg_type == NLMSG_ERROR) {</span>
+<span class="lineNum">      66 </span>                :<span class="lineNoCov">          0 :         struct nlmsgerr *err = ofpbuf_at(msg, NLMSG_HDRLEN, sizeof *err);</span>
+<span class="lineNum">      67 </span>                :<span class="lineNoCov">          0 :         int code = EPROTO;</span>
+<span class="lineNum">      68 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!err) {</span>
+<span class="lineNum">      69 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_ERR_RL(&amp;rl, &quot;received invalid nlmsgerr (%&quot;PRIu32&quot; bytes &lt; %&quot;PRIuSIZE&quot;)&quot;,</span>
+<span class="lineNum">      70 </span>                :            :                         ofpbuf_size(msg), NLMSG_HDRLEN + sizeof *err);
+<span class="lineNum">      71 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         } else if (err-&gt;error &lt;= 0 &amp;&amp; err-&gt;error &gt; INT_MIN) {</span>
+<span class="lineNum">      72 </span>                :<span class="lineNoCov">          0 :             code = -err-&gt;error;</span>
+<span class="lineNum">      73 </span>                :            :         }
+<span class="lineNum">      74 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (errorp) {</span>
+<span class="lineNum">      75 </span>                :<span class="lineNoCov">          0 :             *errorp = code;</span>
+<span class="lineNum">      76 </span>                :            :         }
+<span class="lineNum">      77 </span>                :<span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">      78 </span>                :            :     } else {
+<span class="lineNum">      79 </span>                :<span class="lineCov">        119 :         return false;</span>
+<span class="lineNum">      80 </span>                :            :     }
+<span class="lineNum">      81 </span>                :            : }
+<span class="lineNum">      82 </span>                :            : 
+<span class="lineNum">      83 </span>                :            : /* Ensures that 'b' has room for at least 'size' bytes plus netlink padding at
+<a name="84"><span class="lineNum">      84 </span>                :            :  * its tail end, reallocating and copying its data if necessary. */</a>
+<span class="lineNum">      85 </span>                :            : void
+<span class="lineNum">      86 </span>                :<span class="lineCov">         51 : nl_msg_reserve(struct ofpbuf *msg, size_t size)</span>
+<span class="lineNum">      87 </span>                :            : {
+<span class="lineNum">      88 </span>                :<span class="lineCov">         51 :     ofpbuf_prealloc_tailroom(msg, NLMSG_ALIGN(size));</span>
+<span class="lineNum">      89 </span>                :<span class="lineCov">         51 : }</span>
+<span class="lineNum">      90 </span>                :            : 
+<span class="lineNum">      91 </span>                :            : /* Puts a nlmsghdr at the beginning of 'msg', which must be initially empty.
+<span class="lineNum">      92 </span>                :            :  * Uses the given 'type' and 'flags'.  'expected_payload' should be
+<span class="lineNum">      93 </span>                :            :  * an estimate of the number of payload bytes to be supplied; if the size of
+<span class="lineNum">      94 </span>                :            :  * the payload is unknown a value of 0 is acceptable.
+<span class="lineNum">      95 </span>                :            :  *
+<span class="lineNum">      96 </span>                :            :  * 'type' is ordinarily an enumerated value specific to the Netlink protocol
+<span class="lineNum">      97 </span>                :            :  * (e.g. RTM_NEWLINK, for NETLINK_ROUTE protocol).  For Generic Netlink, 'type'
+<span class="lineNum">      98 </span>                :            :  * is the family number obtained via nl_lookup_genl_family().
+<span class="lineNum">      99 </span>                :            :  *
+<span class="lineNum">     100 </span>                :            :  * 'flags' is a bit-mask that indicates what kind of request is being made.  It
+<span class="lineNum">     101 </span>                :            :  * is often NLM_F_REQUEST indicating that a request is being made, commonly
+<span class="lineNum">     102 </span>                :            :  * or'd with NLM_F_ACK to request an acknowledgement.
+<span class="lineNum">     103 </span>                :            :  *
+<span class="lineNum">     104 </span>                :            :  * Sets the new nlmsghdr's nlmsg_len, nlmsg_seq, and nlmsg_pid fields to 0 for
+<span class="lineNum">     105 </span>                :            :  * now.  Functions that send Netlink messages will fill these in just before
+<span class="lineNum">     106 </span>                :            :  * sending the message.
+<span class="lineNum">     107 </span>                :            :  *
+<span class="lineNum">     108 </span>                :            :  * nl_msg_put_genlmsghdr() is more convenient for composing a Generic Netlink
+<a name="109"><span class="lineNum">     109 </span>                :            :  * message. */</a>
+<span class="lineNum">     110 </span>                :            : void
+<span class="lineNum">     111 </span>                :<span class="lineCov">         51 : nl_msg_put_nlmsghdr(struct ofpbuf *msg,</span>
+<span class="lineNum">     112 </span>                :            :                     size_t expected_payload, uint32_t type, uint32_t flags)
+<span class="lineNum">     113 </span>                :            : {
+<span class="lineNum">     114 </span>                :            :     struct nlmsghdr *nlmsghdr;
+<span class="lineNum">     115 </span>                :            : 
+<span class="lineNum">     116 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 51 times"> + </span>]:<span class="lineCov">         51 :     ovs_assert(ofpbuf_size(msg) == 0);</span>
+<span class="lineNum">     117 </span>                :            : 
+<span class="lineNum">     118 </span>                :<span class="lineCov">         51 :     nl_msg_reserve(msg, NLMSG_HDRLEN + expected_payload);</span>
+<span class="lineNum">     119 </span>                :<span class="lineCov">         51 :     nlmsghdr = nl_msg_put_uninit(msg, NLMSG_HDRLEN);</span>
+<span class="lineNum">     120 </span>                :<span class="lineCov">         51 :     nlmsghdr-&gt;nlmsg_len = 0;</span>
+<span class="lineNum">     121 </span>                :<span class="lineCov">         51 :     nlmsghdr-&gt;nlmsg_type = type;</span>
+<span class="lineNum">     122 </span>                :<span class="lineCov">         51 :     nlmsghdr-&gt;nlmsg_flags = flags;</span>
+<span class="lineNum">     123 </span>                :<span class="lineCov">         51 :     nlmsghdr-&gt;nlmsg_seq = 0;</span>
+<span class="lineNum">     124 </span>                :<span class="lineCov">         51 :     nlmsghdr-&gt;nlmsg_pid = 0;</span>
+<span class="lineNum">     125 </span>                :<span class="lineCov">         51 : }</span>
+<span class="lineNum">     126 </span>                :            : 
+<span class="lineNum">     127 </span>                :            : /* Puts a nlmsghdr and genlmsghdr at the beginning of 'msg', which must be
+<span class="lineNum">     128 </span>                :            :  * initially empty.  'expected_payload' should be an estimate of the number of
+<span class="lineNum">     129 </span>                :            :  * payload bytes to be supplied; if the size of the payload is unknown a value
+<span class="lineNum">     130 </span>                :            :  * of 0 is acceptable.
+<span class="lineNum">     131 </span>                :            :  *
+<span class="lineNum">     132 </span>                :            :  * 'family' is the family number obtained via nl_lookup_genl_family().
+<span class="lineNum">     133 </span>                :            :  *
+<span class="lineNum">     134 </span>                :            :  * 'flags' is a bit-mask that indicates what kind of request is being made.  It
+<span class="lineNum">     135 </span>                :            :  * is often NLM_F_REQUEST indicating that a request is being made, commonly
+<span class="lineNum">     136 </span>                :            :  * or'd with NLM_F_ACK to request an acknowledgement.
+<span class="lineNum">     137 </span>                :            :  *
+<span class="lineNum">     138 </span>                :            :  * 'cmd' is an enumerated value specific to the Generic Netlink family
+<span class="lineNum">     139 </span>                :            :  * (e.g. CTRL_CMD_NEWFAMILY for the GENL_ID_CTRL family).
+<span class="lineNum">     140 </span>                :            :  *
+<span class="lineNum">     141 </span>                :            :  * 'version' is a version number specific to the family and command (often 1).
+<span class="lineNum">     142 </span>                :            :  *
+<span class="lineNum">     143 </span>                :            :  * Sets the new nlmsghdr's nlmsg_pid field to 0 for now.  nl_sock_send() will
+<span class="lineNum">     144 </span>                :            :  * fill it in just before sending the message.
+<span class="lineNum">     145 </span>                :            :  *
+<span class="lineNum">     146 </span>                :            :  * nl_msg_put_nlmsghdr() should be used to compose Netlink messages that are
+<a name="147"><span class="lineNum">     147 </span>                :            :  * not Generic Netlink messages. */</a>
+<span class="lineNum">     148 </span>                :            : void
+<span class="lineNum">     149 </span>                :<span class="lineNoCov">          0 : nl_msg_put_genlmsghdr(struct ofpbuf *msg, size_t expected_payload,</span>
+<span class="lineNum">     150 </span>                :            :                       int family, uint32_t flags, uint8_t cmd, uint8_t version)
+<span class="lineNum">     151 </span>                :            : {
+<span class="lineNum">     152 </span>                :            :     struct genlmsghdr *genlmsghdr;
+<span class="lineNum">     153 </span>                :            : 
+<span class="lineNum">     154 </span>                :<span class="lineNoCov">          0 :     nl_msg_put_nlmsghdr(msg, GENL_HDRLEN + expected_payload, family, flags);</span>
+<span class="lineNum">     155 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     ovs_assert(ofpbuf_size(msg) == NLMSG_HDRLEN);</span>
+<span class="lineNum">     156 </span>                :<span class="lineNoCov">          0 :     genlmsghdr = nl_msg_put_uninit(msg, GENL_HDRLEN);</span>
+<span class="lineNum">     157 </span>                :<span class="lineNoCov">          0 :     genlmsghdr-&gt;cmd = cmd;</span>
+<span class="lineNum">     158 </span>                :<span class="lineNoCov">          0 :     genlmsghdr-&gt;version = version;</span>
+<span class="lineNum">     159 </span>                :<span class="lineNoCov">          0 :     genlmsghdr-&gt;reserved = 0;</span>
+<span class="lineNum">     160 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     161 </span>                :            : 
+<span class="lineNum">     162 </span>                :            : /* Appends the 'size' bytes of data in 'p', plus Netlink padding if needed, to
+<span class="lineNum">     163 </span>                :            :  * the tail end of 'msg'.  Data in 'msg' is reallocated and copied if
+<a name="164"><span class="lineNum">     164 </span>                :            :  * necessary. */</a>
+<span class="lineNum">     165 </span>                :            : void
+<span class="lineNum">     166 </span>                :<span class="lineNoCov">          0 : nl_msg_put(struct ofpbuf *msg, const void *data, size_t size)</span>
+<span class="lineNum">     167 </span>                :            : {
+<span class="lineNum">     168 </span>                :<span class="lineNoCov">          0 :     memcpy(nl_msg_put_uninit(msg, size), data, size);</span>
+<span class="lineNum">     169 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>                :            : /* Appends 'size' bytes of data, plus Netlink padding if needed, to the tail
+<span class="lineNum">     172 </span>                :            :  * end of 'msg', reallocating and copying its data if necessary.  Returns a
+<a name="173"><span class="lineNum">     173 </span>                :            :  * pointer to the first byte of the new data, which is left uninitialized. */</a>
+<span class="lineNum">     174 </span>                :            : void *
+<span class="lineNum">     175 </span>                :<span class="lineCov">     233823 : nl_msg_put_uninit(struct ofpbuf *msg, size_t size)</span>
+<span class="lineNum">     176 </span>                :            : {
+<span class="lineNum">     177 </span>                :<span class="lineCov">     233823 :     size_t pad = PAD_SIZE(size, NLMSG_ALIGNTO);</span>
+<span class="lineNum">     178 </span>                :<span class="lineCov">     233823 :     char *p = ofpbuf_put_uninit(msg, size + pad);</span>
+<span class="lineNum">     179 </span>        [<span class="branchCov" title="Branch 0 was taken 46432 times"> + </span><span class="branchCov" title="Branch 1 was taken 187078 times"> + </span>]:<span class="lineCov">     233510 :     if (pad) {</span>
+<span class="lineNum">     180 </span>                :<span class="lineCov">      46432 :         memset(p + size, 0, pad);</span>
+<span class="lineNum">     181 </span>                :            :     }
+<span class="lineNum">     182 </span>                :<span class="lineCov">     233510 :     return p;</span>
+<span class="lineNum">     183 </span>                :            : }
+<span class="lineNum">     184 </span>                :            : 
+<span class="lineNum">     185 </span>                :            : /* Prepends the 'size' bytes of data in 'p', plus Netlink padding if needed, to
+<span class="lineNum">     186 </span>                :            :  * the head end of 'msg'.  Data in 'msg' is reallocated and copied if
+<a name="187"><span class="lineNum">     187 </span>                :            :  * necessary. */</a>
+<span class="lineNum">     188 </span>                :            : void
+<span class="lineNum">     189 </span>                :<span class="lineNoCov">          0 : nl_msg_push(struct ofpbuf *msg, const void *data, size_t size)</span>
+<span class="lineNum">     190 </span>                :            : {
+<span class="lineNum">     191 </span>                :<span class="lineNoCov">          0 :     memcpy(nl_msg_push_uninit(msg, size), data, size);</span>
+<span class="lineNum">     192 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     193 </span>                :            : 
+<span class="lineNum">     194 </span>                :            : /* Prepends 'size' bytes of data, plus Netlink padding if needed, to the head
+<span class="lineNum">     195 </span>                :            :  * end of 'msg', reallocating and copying its data if necessary.  Returns a
+<a name="196"><span class="lineNum">     196 </span>                :            :  * pointer to the first byte of the new data, which is left uninitialized. */</a>
+<span class="lineNum">     197 </span>                :            : void *
+<span class="lineNum">     198 </span>                :<span class="lineNoCov">          0 : nl_msg_push_uninit(struct ofpbuf *msg, size_t size)</span>
+<span class="lineNum">     199 </span>                :            : {
+<span class="lineNum">     200 </span>                :<span class="lineNoCov">          0 :     size_t pad = PAD_SIZE(size, NLMSG_ALIGNTO);</span>
+<span class="lineNum">     201 </span>                :<span class="lineNoCov">          0 :     char *p = ofpbuf_push_uninit(msg, size + pad);</span>
+<span class="lineNum">     202 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (pad) {</span>
+<span class="lineNum">     203 </span>                :<span class="lineNoCov">          0 :         memset(p + size, 0, pad);</span>
+<span class="lineNum">     204 </span>                :            :     }
+<span class="lineNum">     205 </span>                :<span class="lineNoCov">          0 :     return p;</span>
+<span class="lineNum">     206 </span>                :            : }
+<span class="lineNum">     207 </span>                :            : 
+<span class="lineNum">     208 </span>                :            : /* Appends a Netlink attribute of the given 'type' and room for 'size' bytes of
+<span class="lineNum">     209 </span>                :            :  * data as its payload, plus Netlink padding if needed, to the tail end of
+<span class="lineNum">     210 </span>                :            :  * 'msg', reallocating and copying its data if necessary.  Returns a pointer to
+<a name="211"><span class="lineNum">     211 </span>                :            :  * the first byte of data in the attribute, which is left uninitialized. */</a>
+<span class="lineNum">     212 </span>                :            : void *
+<span class="lineNum">     213 </span>                :<span class="lineCov">     233340 : nl_msg_put_unspec_uninit(struct ofpbuf *msg, uint16_t type, size_t size)</span>
+<span class="lineNum">     214 </span>                :            : {
+<span class="lineNum">     215 </span>                :<span class="lineCov">     233340 :     size_t total_size = NLA_HDRLEN + size;</span>
+<span class="lineNum">     216 </span>                :<span class="lineCov">     233340 :     struct nlattr* nla = nl_msg_put_uninit(msg, total_size);</span>
+<span class="lineNum">     217 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 233517 times"> + </span>]:<span class="lineCov">     233517 :     ovs_assert(NLA_ALIGN(total_size) &lt;= UINT16_MAX);</span>
+<span class="lineNum">     218 </span>                :<span class="lineCov">     233517 :     nla-&gt;nla_len = total_size;</span>
+<span class="lineNum">     219 </span>                :<span class="lineCov">     233517 :     nla-&gt;nla_type = type;</span>
+<span class="lineNum">     220 </span>                :<span class="lineCov">     233517 :     return nla + 1;</span>
+<span class="lineNum">     221 </span>                :            : }
+<span class="lineNum">     222 </span>                :            : 
+<span class="lineNum">     223 </span>                :            : /* Appends a Netlink attribute of the given 'type' and room for 'size' bytes of
+<span class="lineNum">     224 </span>                :            :  * data as its payload, plus Netlink padding if needed, to the tail end of
+<span class="lineNum">     225 </span>                :            :  * 'msg', reallocating and copying its data if necessary.  Returns a pointer to
+<a name="226"><span class="lineNum">     226 </span>                :            :  * the first byte of data in the attribute, which is zeroed. */</a>
+<span class="lineNum">     227 </span>                :            : void *
+<span class="lineNum">     228 </span>                :<span class="lineCov">        739 : nl_msg_put_unspec_zero(struct ofpbuf *msg, uint16_t type, size_t size)</span>
+<span class="lineNum">     229 </span>                :            : {
+<span class="lineNum">     230 </span>                :<span class="lineCov">        739 :     void *data = nl_msg_put_unspec_uninit(msg, type, size);</span>
+<span class="lineNum">     231 </span>                :<span class="lineCov">        739 :     memset(data, 0, size);</span>
+<span class="lineNum">     232 </span>                :<span class="lineCov">        739 :     return data;</span>
+<span class="lineNum">     233 </span>                :            : }
+<span class="lineNum">     234 </span>                :            : 
+<span class="lineNum">     235 </span>                :            : /* Appends a Netlink attribute of the given 'type' and the 'size' bytes of
+<span class="lineNum">     236 </span>                :            :  * 'data' as its payload, to the tail end of 'msg', reallocating and copying
+<span class="lineNum">     237 </span>                :            :  * its data if necessary.  Returns a pointer to the first byte of data in the
+<a name="238"><span class="lineNum">     238 </span>                :            :  * attribute, which is left uninitialized. */</a>
+<span class="lineNum">     239 </span>                :            : void
+<span class="lineNum">     240 </span>                :<span class="lineCov">     190540 : nl_msg_put_unspec(struct ofpbuf *msg, uint16_t type,</span>
+<span class="lineNum">     241 </span>                :            :                   const void *data, size_t size)
+<span class="lineNum">     242 </span>                :            : {
+<span class="lineNum">     243 </span>                :<span class="lineCov">     190540 :     memcpy(nl_msg_put_unspec_uninit(msg, type, size), data, size);</span>
+<span class="lineNum">     244 </span>                :<span class="lineCov">     190488 : }</span>
+<span class="lineNum">     245 </span>                :            : 
+<span class="lineNum">     246 </span>                :            : /* Appends a Netlink attribute of the given 'type' and no payload to 'msg'.
+<span class="lineNum">     247 </span>                :            :  * (Some Netlink protocols use the presence or absence of an attribute as a
+<a name="248"><span class="lineNum">     248 </span>                :            :  * Boolean flag.) */</a>
+<span class="lineNum">     249 </span>                :            : void
+<span class="lineNum">     250 </span>                :<span class="lineCov">      17643 : nl_msg_put_flag(struct ofpbuf *msg, uint16_t type)</span>
+<span class="lineNum">     251 </span>                :            : {
+<span class="lineNum">     252 </span>                :<span class="lineCov">      17643 :     nl_msg_put_unspec(msg, type, NULL, 0);</span>
+<span class="lineNum">     253 </span>                :<span class="lineCov">      17634 : }</span>
+<span class="lineNum">     254 </span>                :            : 
+<span class="lineNum">     255 </span>                :            : /* Appends a Netlink attribute of the given 'type' and the given 8-bit 'value'
+<a name="256"><span class="lineNum">     256 </span>                :            :  * to 'msg'. */</a>
+<span class="lineNum">     257 </span>                :            : void
+<span class="lineNum">     258 </span>                :<span class="lineCov">      13255 : nl_msg_put_u8(struct ofpbuf *msg, uint16_t type, uint8_t value)</span>
+<span class="lineNum">     259 </span>                :            : {
+<span class="lineNum">     260 </span>                :<span class="lineCov">      13255 :     nl_msg_put_unspec(msg, type, &amp;value, sizeof value);</span>
+<span class="lineNum">     261 </span>                :<span class="lineCov">      13245 : }</span>
+<span class="lineNum">     262 </span>                :            : 
+<span class="lineNum">     263 </span>                :            : /* Appends a Netlink attribute of the given 'type' and the given 16-bit host
+<a name="264"><span class="lineNum">     264 </span>                :            :  * byte order 'value' to 'msg'. */</a>
+<span class="lineNum">     265 </span>                :            : void
+<span class="lineNum">     266 </span>                :<span class="lineNoCov">          0 : nl_msg_put_u16(struct ofpbuf *msg, uint16_t type, uint16_t value)</span>
+<span class="lineNum">     267 </span>                :            : {
+<span class="lineNum">     268 </span>                :<span class="lineNoCov">          0 :     nl_msg_put_unspec(msg, type, &amp;value, sizeof value);</span>
+<span class="lineNum">     269 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     270 </span>                :            : 
+<span class="lineNum">     271 </span>                :            : /* Appends a Netlink attribute of the given 'type' and the given 32-bit host
+<a name="272"><span class="lineNum">     272 </span>                :            :  * byte order 'value' to 'msg'. */</a>
+<span class="lineNum">     273 </span>                :            : void
+<span class="lineNum">     274 </span>                :<span class="lineCov">      99370 : nl_msg_put_u32(struct ofpbuf *msg, uint16_t type, uint32_t value)</span>
+<span class="lineNum">     275 </span>                :            : {
+<span class="lineNum">     276 </span>                :<span class="lineCov">      99370 :     nl_msg_put_unspec(msg, type, &amp;value, sizeof value);</span>
+<span class="lineNum">     277 </span>                :<span class="lineCov">      99250 : }</span>
+<span class="lineNum">     278 </span>                :            : 
+<span class="lineNum">     279 </span>                :            : /* Appends a Netlink attribute of the given 'type' and the given 64-bit host
+<a name="280"><span class="lineNum">     280 </span>                :            :  * byte order 'value' to 'msg'. */</a>
+<span class="lineNum">     281 </span>                :            : void
+<span class="lineNum">     282 </span>                :<span class="lineNoCov">          0 : nl_msg_put_u64(struct ofpbuf *msg, uint16_t type, uint64_t value)</span>
+<span class="lineNum">     283 </span>                :            : {
+<span class="lineNum">     284 </span>                :<span class="lineNoCov">          0 :     nl_msg_put_unspec(msg, type, &amp;value, sizeof value);</span>
+<span class="lineNum">     285 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     286 </span>                :            : 
+<span class="lineNum">     287 </span>                :            : /* Appends a Netlink attribute of the given 'type' and the given 16-bit network
+<a name="288"><span class="lineNum">     288 </span>                :            :  * byte order 'value' to 'msg'. */</a>
+<span class="lineNum">     289 </span>                :            : void
+<span class="lineNum">     290 </span>                :<span class="lineCov">      32128 : nl_msg_put_be16(struct ofpbuf *msg, uint16_t type, ovs_be16 value)</span>
+<span class="lineNum">     291 </span>                :            : {
+<span class="lineNum">     292 </span>                :<span class="lineCov">      32128 :     nl_msg_put_unspec(msg, type, &amp;value, sizeof value);</span>
+<span class="lineNum">     293 </span>                :<span class="lineCov">      32103 : }</span>
+<span class="lineNum">     294 </span>                :            : 
+<span class="lineNum">     295 </span>                :            : /* Appends a Netlink attribute of the given 'type' and the given 32-bit network
+<a name="296"><span class="lineNum">     296 </span>                :            :  * byte order 'value' to 'msg'. */</a>
+<span class="lineNum">     297 </span>                :            : void
+<span class="lineNum">     298 </span>                :<span class="lineCov">      12034 : nl_msg_put_be32(struct ofpbuf *msg, uint16_t type, ovs_be32 value)</span>
+<span class="lineNum">     299 </span>                :            : {
+<span class="lineNum">     300 </span>                :<span class="lineCov">      12034 :     nl_msg_put_unspec(msg, type, &amp;value, sizeof value);</span>
+<span class="lineNum">     301 </span>                :<span class="lineCov">      12052 : }</span>
+<span class="lineNum">     302 </span>                :            : 
+<span class="lineNum">     303 </span>                :            : /* Appends a Netlink attribute of the given 'type' and the given 64-bit network
+<a name="304"><span class="lineNum">     304 </span>                :            :  * byte order 'value' to 'msg'. */</a>
+<span class="lineNum">     305 </span>                :            : void
+<span class="lineNum">     306 </span>                :<span class="lineCov">       6026 : nl_msg_put_be64(struct ofpbuf *msg, uint16_t type, ovs_be64 value)</span>
+<span class="lineNum">     307 </span>                :            : {
+<span class="lineNum">     308 </span>                :<span class="lineCov">       6026 :     nl_msg_put_unspec(msg, type, &amp;value, sizeof value);</span>
+<span class="lineNum">     309 </span>                :<span class="lineCov">       6020 : }</span>
+<span class="lineNum">     310 </span>                :            : 
+<span class="lineNum">     311 </span>                :            : /* Appends a Netlink attribute of the given 'type' and the given odp_port_t
+<a name="312"><span class="lineNum">     312 </span>                :            :  * 'value' to 'msg'. */</a>
+<span class="lineNum">     313 </span>                :            : void
+<span class="lineNum">     314 </span>                :<span class="lineCov">      31394 : nl_msg_put_odp_port(struct ofpbuf *msg, uint16_t type, odp_port_t value)</span>
+<span class="lineNum">     315 </span>                :            : {
+<span class="lineNum">     316 </span>                :<span class="lineCov">      31394 :     nl_msg_put_u32(msg, type, odp_to_u32(value));</span>
+<span class="lineNum">     317 </span>                :<span class="lineCov">      31402 : }</span>
+<span class="lineNum">     318 </span>                :            : 
+<span class="lineNum">     319 </span>                :            : 
+<span class="lineNum">     320 </span>                :            : /* Appends a Netlink attribute of the given 'type' and the given
+<a name="321"><span class="lineNum">     321 </span>                :            :  * null-terminated string 'value' to 'msg'. */</a>
+<span class="lineNum">     322 </span>                :            : void
+<span class="lineNum">     323 </span>                :<span class="lineNoCov">          0 : nl_msg_put_string(struct ofpbuf *msg, uint16_t type, const char *value)</span>
+<span class="lineNum">     324 </span>                :            : {
+<span class="lineNum">     325 </span>                :<span class="lineNoCov">          0 :     nl_msg_put_unspec(msg, type, value, strlen(value) + 1);</span>
+<span class="lineNum">     326 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     327 </span>                :            : 
+<span class="lineNum">     328 </span>                :            : /* Prepends a Netlink attribute of the given 'type' and room for 'size' bytes
+<span class="lineNum">     329 </span>                :            :  * of data as its payload, plus Netlink padding if needed, to the head end of
+<span class="lineNum">     330 </span>                :            :  * 'msg', reallocating and copying its data if necessary.  Returns a pointer to
+<a name="331"><span class="lineNum">     331 </span>                :            :  * the first byte of data in the attribute, which is left uninitialized. */</a>
+<span class="lineNum">     332 </span>                :            : void *
+<span class="lineNum">     333 </span>                :<span class="lineNoCov">          0 : nl_msg_push_unspec_uninit(struct ofpbuf *msg, uint16_t type, size_t size)</span>
+<span class="lineNum">     334 </span>                :            : {
+<span class="lineNum">     335 </span>                :<span class="lineNoCov">          0 :     size_t total_size = NLA_HDRLEN + size;</span>
+<span class="lineNum">     336 </span>                :<span class="lineNoCov">          0 :     struct nlattr* nla = nl_msg_push_uninit(msg, total_size);</span>
+<span class="lineNum">     337 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     ovs_assert(!nl_attr_oversized(size));</span>
+<span class="lineNum">     338 </span>                :<span class="lineNoCov">          0 :     nla-&gt;nla_len = total_size;</span>
+<span class="lineNum">     339 </span>                :<span class="lineNoCov">          0 :     nla-&gt;nla_type = type;</span>
+<span class="lineNum">     340 </span>                :<span class="lineNoCov">          0 :     return nla + 1;</span>
+<span class="lineNum">     341 </span>                :            : }
+<span class="lineNum">     342 </span>                :            : 
+<span class="lineNum">     343 </span>                :            : /* Prepends a Netlink attribute of the given 'type' and the 'size' bytes of
+<span class="lineNum">     344 </span>                :            :  * 'data' as its payload, to the head end of 'msg', reallocating and copying
+<span class="lineNum">     345 </span>                :            :  * its data if necessary.  Returns a pointer to the first byte of data in the
+<a name="346"><span class="lineNum">     346 </span>                :            :  * attribute, which is left uninitialized. */</a>
+<span class="lineNum">     347 </span>                :            : void
+<span class="lineNum">     348 </span>                :<span class="lineNoCov">          0 : nl_msg_push_unspec(struct ofpbuf *msg, uint16_t type,</span>
+<span class="lineNum">     349 </span>                :            :                   const void *data, size_t size)
+<span class="lineNum">     350 </span>                :            : {
+<span class="lineNum">     351 </span>                :<span class="lineNoCov">          0 :     memcpy(nl_msg_push_unspec_uninit(msg, type, size), data, size);</span>
+<span class="lineNum">     352 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     353 </span>                :            : 
+<span class="lineNum">     354 </span>                :            : /* Prepends a Netlink attribute of the given 'type' and no payload to 'msg'.
+<span class="lineNum">     355 </span>                :            :  * (Some Netlink protocols use the presence or absence of an attribute as a
+<a name="356"><span class="lineNum">     356 </span>                :            :  * Boolean flag.) */</a>
+<span class="lineNum">     357 </span>                :            : void
+<span class="lineNum">     358 </span>                :<span class="lineNoCov">          0 : nl_msg_push_flag(struct ofpbuf *msg, uint16_t type)</span>
+<span class="lineNum">     359 </span>                :            : {
+<span class="lineNum">     360 </span>                :<span class="lineNoCov">          0 :     nl_msg_push_unspec(msg, type, NULL, 0);</span>
+<span class="lineNum">     361 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     362 </span>                :            : 
+<span class="lineNum">     363 </span>                :            : /* Prepends a Netlink attribute of the given 'type' and the given 8-bit 'value'
+<a name="364"><span class="lineNum">     364 </span>                :            :  * to 'msg'. */</a>
+<span class="lineNum">     365 </span>                :            : void
+<span class="lineNum">     366 </span>                :<span class="lineNoCov">          0 : nl_msg_push_u8(struct ofpbuf *msg, uint16_t type, uint8_t value)</span>
+<span class="lineNum">     367 </span>                :            : {
+<span class="lineNum">     368 </span>                :<span class="lineNoCov">          0 :     nl_msg_push_unspec(msg, type, &amp;value, sizeof value);</span>
+<span class="lineNum">     369 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     370 </span>                :            : 
+<span class="lineNum">     371 </span>                :            : /* Prepends a Netlink attribute of the given 'type' and the given 16-bit host
+<a name="372"><span class="lineNum">     372 </span>                :            :  * byte order 'value' to 'msg'. */</a>
+<span class="lineNum">     373 </span>                :            : void
+<span class="lineNum">     374 </span>                :<span class="lineNoCov">          0 : nl_msg_push_u16(struct ofpbuf *msg, uint16_t type, uint16_t value)</span>
+<span class="lineNum">     375 </span>                :            : {
+<span class="lineNum">     376 </span>                :<span class="lineNoCov">          0 :     nl_msg_push_unspec(msg, type, &amp;value, sizeof value);</span>
+<span class="lineNum">     377 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     378 </span>                :            : 
+<span class="lineNum">     379 </span>                :            : /* Prepends a Netlink attribute of the given 'type' and the given 32-bit host
+<a name="380"><span class="lineNum">     380 </span>                :            :  * byte order 'value' to 'msg'. */</a>
+<span class="lineNum">     381 </span>                :            : void
+<span class="lineNum">     382 </span>                :<span class="lineNoCov">          0 : nl_msg_push_u32(struct ofpbuf *msg, uint16_t type, uint32_t value)</span>
+<span class="lineNum">     383 </span>                :            : {
+<span class="lineNum">     384 </span>                :<span class="lineNoCov">          0 :     nl_msg_push_unspec(msg, type, &amp;value, sizeof value);</span>
+<span class="lineNum">     385 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     386 </span>                :            : 
+<span class="lineNum">     387 </span>                :            : /* Prepends a Netlink attribute of the given 'type' and the given 64-bit host
+<a name="388"><span class="lineNum">     388 </span>                :            :  * byte order 'value' to 'msg'. */</a>
+<span class="lineNum">     389 </span>                :            : void
+<span class="lineNum">     390 </span>                :<span class="lineNoCov">          0 : nl_msg_push_u64(struct ofpbuf *msg, uint16_t type, uint64_t value)</span>
+<span class="lineNum">     391 </span>                :            : {
+<span class="lineNum">     392 </span>                :<span class="lineNoCov">          0 :     nl_msg_push_unspec(msg, type, &amp;value, sizeof value);</span>
+<span class="lineNum">     393 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     394 </span>                :            : 
+<span class="lineNum">     395 </span>                :            : /* Prepends a Netlink attribute of the given 'type' and the given 16-bit
+<a name="396"><span class="lineNum">     396 </span>                :            :  * network byte order 'value' to 'msg'. */</a>
+<span class="lineNum">     397 </span>                :            : void
+<span class="lineNum">     398 </span>                :<span class="lineNoCov">          0 : nl_msg_push_be16(struct ofpbuf *msg, uint16_t type, ovs_be16 value)</span>
+<span class="lineNum">     399 </span>                :            : {
+<span class="lineNum">     400 </span>                :<span class="lineNoCov">          0 :     nl_msg_push_unspec(msg, type, &amp;value, sizeof value);</span>
+<span class="lineNum">     401 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     402 </span>                :            : 
+<span class="lineNum">     403 </span>                :            : /* Prepends a Netlink attribute of the given 'type' and the given 32-bit
+<a name="404"><span class="lineNum">     404 </span>                :            :  * network byte order 'value' to 'msg'. */</a>
+<span class="lineNum">     405 </span>                :            : void
+<span class="lineNum">     406 </span>                :<span class="lineNoCov">          0 : nl_msg_push_be32(struct ofpbuf *msg, uint16_t type, ovs_be32 value)</span>
+<span class="lineNum">     407 </span>                :            : {
+<span class="lineNum">     408 </span>                :<span class="lineNoCov">          0 :     nl_msg_push_unspec(msg, type, &amp;value, sizeof value);</span>
+<span class="lineNum">     409 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     410 </span>                :            : 
+<span class="lineNum">     411 </span>                :            : /* Prepends a Netlink attribute of the given 'type' and the given 64-bit
+<a name="412"><span class="lineNum">     412 </span>                :            :  * network byte order 'value' to 'msg'. */</a>
+<span class="lineNum">     413 </span>                :            : void
+<span class="lineNum">     414 </span>                :<span class="lineNoCov">          0 : nl_msg_push_be64(struct ofpbuf *msg, uint16_t type, ovs_be64 value)</span>
+<span class="lineNum">     415 </span>                :            : {
+<span class="lineNum">     416 </span>                :<span class="lineNoCov">          0 :     nl_msg_push_unspec(msg, type, &amp;value, sizeof value);</span>
+<span class="lineNum">     417 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     418 </span>                :            : 
+<span class="lineNum">     419 </span>                :            : /* Prepends a Netlink attribute of the given 'type' and the given
+<a name="420"><span class="lineNum">     420 </span>                :            :  * null-terminated string 'value' to 'msg'. */</a>
+<span class="lineNum">     421 </span>                :            : void
+<span class="lineNum">     422 </span>                :<span class="lineNoCov">          0 : nl_msg_push_string(struct ofpbuf *msg, uint16_t type, const char *value)</span>
+<span class="lineNum">     423 </span>                :            : {
+<span class="lineNum">     424 </span>                :<span class="lineNoCov">          0 :     nl_msg_push_unspec(msg, type, value, strlen(value) + 1);</span>
+<span class="lineNum">     425 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     426 </span>                :            : 
+<span class="lineNum">     427 </span>                :            : /* Adds the header for nested Netlink attributes to 'msg', with the specified
+<span class="lineNum">     428 </span>                :            :  * 'type', and returns the header's offset within 'msg'.  The caller should add
+<span class="lineNum">     429 </span>                :            :  * the content for the nested Netlink attribute to 'msg' (e.g. using the other
+<span class="lineNum">     430 </span>                :            :  * nl_msg_*() functions), and then pass the returned offset to
+<a name="431"><span class="lineNum">     431 </span>                :            :  * nl_msg_end_nested() to finish up the nested attributes. */</a>
+<span class="lineNum">     432 </span>                :            : size_t
+<span class="lineNum">     433 </span>                :<span class="lineCov">       8657 : nl_msg_start_nested(struct ofpbuf *msg, uint16_t type)</span>
+<span class="lineNum">     434 </span>                :            : {
+<span class="lineNum">     435 </span>                :<span class="lineCov">       8657 :     size_t offset = ofpbuf_size(msg);</span>
+<span class="lineNum">     436 </span>                :<span class="lineCov">       8657 :     nl_msg_put_unspec(msg, type, NULL, 0);</span>
+<span class="lineNum">     437 </span>                :<span class="lineCov">       8656 :     return offset;</span>
+<span class="lineNum">     438 </span>                :            : }
+<span class="lineNum">     439 </span>                :            : 
+<span class="lineNum">     440 </span>                :            : /* Finalizes a nested Netlink attribute in 'msg'.  'offset' should be the value
+<a name="441"><span class="lineNum">     441 </span>                :            :  * returned by nl_msg_start_nested(). */</a>
+<span class="lineNum">     442 </span>                :            : void
+<span class="lineNum">     443 </span>                :<span class="lineCov">       8661 : nl_msg_end_nested(struct ofpbuf *msg, size_t offset)</span>
+<span class="lineNum">     444 </span>                :            : {
+<span class="lineNum">     445 </span>                :<span class="lineCov">       8661 :     struct nlattr *attr = ofpbuf_at_assert(msg, offset, sizeof *attr);</span>
+<span class="lineNum">     446 </span>                :<span class="lineCov">       8661 :     attr-&gt;nla_len = ofpbuf_size(msg) - offset;</span>
+<span class="lineNum">     447 </span>                :<span class="lineCov">       8662 : }</span>
+<span class="lineNum">     448 </span>                :            : 
+<span class="lineNum">     449 </span>                :            : /* Appends a nested Netlink attribute of the given 'type', with the 'size'
+<a name="450"><span class="lineNum">     450 </span>                :            :  * bytes of content starting at 'data', to 'msg'. */</a>
+<span class="lineNum">     451 </span>                :            : void
+<span class="lineNum">     452 </span>                :<span class="lineNoCov">          0 : nl_msg_put_nested(struct ofpbuf *msg,</span>
+<span class="lineNum">     453 </span>                :            :                   uint16_t type, const void *data, size_t size)
+<span class="lineNum">     454 </span>                :            : {
+<span class="lineNum">     455 </span>                :<span class="lineNoCov">          0 :     size_t offset = nl_msg_start_nested(msg, type);</span>
+<span class="lineNum">     456 </span>                :<span class="lineNoCov">          0 :     nl_msg_put(msg, data, size);</span>
+<span class="lineNum">     457 </span>                :<span class="lineNoCov">          0 :     nl_msg_end_nested(msg, offset);</span>
+<span class="lineNum">     458 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     459 </span>                :            : 
+<span class="lineNum">     460 </span>                :            : /* If 'buffer' begins with a valid &quot;struct nlmsghdr&quot;, pulls the header and its
+<span class="lineNum">     461 </span>                :            :  * payload off 'buffer', stores header and payload in 'msg-&gt;data' and
+<span class="lineNum">     462 </span>                :            :  * 'ofpbuf_size(msg)', and returns a pointer to the header.
+<span class="lineNum">     463 </span>                :            :  *
+<span class="lineNum">     464 </span>                :            :  * If 'buffer' does not begin with a &quot;struct nlmsghdr&quot; or begins with one that
+<a name="465"><span class="lineNum">     465 </span>                :            :  * is invalid, returns NULL without modifying 'buffer'. */</a>
+<span class="lineNum">     466 </span>                :            : struct nlmsghdr *
+<span class="lineNum">     467 </span>                :<span class="lineCov">        442 : nl_msg_next(struct ofpbuf *buffer, struct ofpbuf *msg)</span>
+<span class="lineNum">     468 </span>                :            : {
+<span class="lineNum">     469 </span>        [<span class="branchCov" title="Branch 1 was taken 442 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        442 :     if (ofpbuf_size(buffer) &gt;= sizeof(struct nlmsghdr)) {</span>
+<span class="lineNum">     470 </span>                :<span class="lineCov">        442 :         struct nlmsghdr *nlmsghdr = nl_msg_nlmsghdr(buffer);</span>
+<span class="lineNum">     471 </span>                :<span class="lineCov">        442 :         size_t len = nlmsghdr-&gt;nlmsg_len;</span>
+<span class="lineNum">     472 </span>[<span class="branchCov" title="Branch 0 was taken 442 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 3 was taken 442 times"> + </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span>]:<span class="lineCov">        442 :         if (len &gt;= sizeof *nlmsghdr &amp;&amp; len &lt;= ofpbuf_size(buffer)) {</span>
+<span class="lineNum">     473 </span>                :<span class="lineCov">        442 :             ofpbuf_use_const(msg, nlmsghdr, len);</span>
+<span class="lineNum">     474 </span>                :<span class="lineCov">        442 :             ofpbuf_pull(buffer, len);</span>
+<span class="lineNum">     475 </span>                :<span class="lineCov">        442 :             return nlmsghdr;</span>
+<span class="lineNum">     476 </span>                :            :         }
+<span class="lineNum">     477 </span>                :            :     }
+<span class="lineNum">     478 </span>                :            : 
+<span class="lineNum">     479 </span>                :<span class="lineNoCov">          0 :     ofpbuf_set_data(msg, NULL);</span>
+<span class="lineNum">     480 </span>                :<span class="lineNoCov">          0 :     ofpbuf_set_size(msg, 0);</span>
+<span class="lineNum">     481 </span>                :<span class="lineCov">        442 :     return NULL;</span>
+<span class="lineNum">     482 </span>                :            : }
+<span class="lineNum">     483 </span>                :            : 
+<span class="lineNum">     484 </span>                :            : /* Returns true if a Netlink attribute with a payload that is 'payload_size'
+<span class="lineNum">     485 </span>                :            :  * bytes long would be oversized, that is, if it's not possible to create an
+<span class="lineNum">     486 </span>                :            :  * nlattr of that size because its size wouldn't fit in the 16-bit nla_len
+<a name="487"><span class="lineNum">     487 </span>                :            :  * field. */</a>
+<span class="lineNum">     488 </span>                :            : bool
+<span class="lineNum">     489 </span>                :<span class="lineCov">       6641 : nl_attr_oversized(size_t payload_size)</span>
+<span class="lineNum">     490 </span>                :            : {
+<span class="lineNum">     491 </span>                :<span class="lineCov">       6641 :     return NL_ATTR_SIZE(payload_size) &gt; UINT16_MAX;</span>
+<span class="lineNum">     492 </span>                :            : }
+<span class="lineNum">     493 </span>                :            : 
+<span class="lineNum">     494 </span>                :            : /* Attributes. */
+<span class="lineNum">     495 </span>                :            : 
+<span class="lineNum">     496 </span>                :            : /* Returns the bits of 'nla-&gt;nla_type' that are significant for determining its
+<a name="497"><span class="lineNum">     497 </span>                :            :  * type. */</a>
+<span class="lineNum">     498 </span>                :            : int
+<span class="lineNum">     499 </span>                :<span class="lineCov">   31946664 : nl_attr_type(const struct nlattr *nla)</span>
+<span class="lineNum">     500 </span>                :            : {
+<span class="lineNum">     501 </span>                :<span class="lineCov">   31946664 :     return nla-&gt;nla_type &amp; NLA_TYPE_MASK;</span>
+<span class="lineNum">     502 </span>                :            : }
+<span class="lineNum">     503 </span>                :            : 
+<a name="504"><span class="lineNum">     504 </span>                :            : /* Returns the first byte in the payload of attribute 'nla'. */</a>
+<span class="lineNum">     505 </span>                :            : const void *
+<span class="lineNum">     506 </span>                :<span class="lineCov">      55817 : nl_attr_get(const struct nlattr *nla)</span>
+<span class="lineNum">     507 </span>                :            : {
+<span class="lineNum">     508 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 55817 times"> + </span>]:<span class="lineCov">      55817 :     ovs_assert(nla-&gt;nla_len &gt;= NLA_HDRLEN);</span>
+<span class="lineNum">     509 </span>                :<span class="lineCov">      55817 :     return nla + 1;</span>
+<span class="lineNum">     510 </span>                :            : }
+<span class="lineNum">     511 </span>                :            : 
+<a name="512"><span class="lineNum">     512 </span>                :            : /* Returns the number of bytes in the payload of attribute 'nla'. */</a>
+<span class="lineNum">     513 </span>                :            : size_t
+<span class="lineNum">     514 </span>                :<span class="lineCov">   15995708 : nl_attr_get_size(const struct nlattr *nla)</span>
+<span class="lineNum">     515 </span>                :            : {
+<span class="lineNum">     516 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 15995708 times"> + </span>]:<span class="lineCov">   15995708 :     ovs_assert(nla-&gt;nla_len &gt;= NLA_HDRLEN);</span>
+<span class="lineNum">     517 </span>                :<span class="lineCov">   15995708 :     return nla-&gt;nla_len - NLA_HDRLEN;</span>
+<span class="lineNum">     518 </span>                :            : }
+<span class="lineNum">     519 </span>                :            : 
+<span class="lineNum">     520 </span>                :            : /* Asserts that 'nla''s payload is at least 'size' bytes long, and returns the
+<a name="521"><span class="lineNum">     521 </span>                :            :  * first byte of the payload. */</a>
+<span class="lineNum">     522 </span>                :            : const void *
+<span class="lineNum">     523 </span>                :<span class="lineCov">   15926550 : nl_attr_get_unspec(const struct nlattr *nla, size_t size)</span>
+<span class="lineNum">     524 </span>                :            : {
+<span class="lineNum">     525 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 15926550 times"> + </span>]:<span class="lineCov">   15926550 :     ovs_assert(nla-&gt;nla_len &gt;= NLA_HDRLEN + size);</span>
+<span class="lineNum">     526 </span>                :<span class="lineCov">   15926550 :     return nla + 1;</span>
+<span class="lineNum">     527 </span>                :            : }
+<span class="lineNum">     528 </span>                :            : 
+<span class="lineNum">     529 </span>                :            : /* Returns true if 'nla' is nonnull.  (Some Netlink protocols use the presence
+<a name="530"><span class="lineNum">     530 </span>                :            :  * or absence of an attribute as a Boolean flag.) */</a>
+<span class="lineNum">     531 </span>                :            : bool
+<span class="lineNum">     532 </span>                :<span class="lineNoCov">          0 : nl_attr_get_flag(const struct nlattr *nla)</span>
+<span class="lineNum">     533 </span>                :            : {
+<span class="lineNum">     534 </span>                :<span class="lineNoCov">          0 :     return nla != NULL;</span>
+<span class="lineNum">     535 </span>                :            : }
+<span class="lineNum">     536 </span>                :            : 
+<span class="lineNum">     537 </span>                :            : #define NL_ATTR_GET_AS(NLA, TYPE) \
+<span class="lineNum">     538 </span>                :            :         (*(TYPE*) nl_attr_get_unspec(nla, sizeof(TYPE)))
+<span class="lineNum">     539 </span>                :            : 
+<span class="lineNum">     540 </span>                :            : /* Returns the 8-bit value in 'nla''s payload.
+<span class="lineNum">     541 </span>                :            :  *
+<a name="542"><span class="lineNum">     542 </span>                :            :  * Asserts that 'nla''s payload is at least 1 byte long. */</a>
+<span class="lineNum">     543 </span>                :            : uint8_t
+<span class="lineNum">     544 </span>                :<span class="lineCov">        930 : nl_attr_get_u8(const struct nlattr *nla)</span>
+<span class="lineNum">     545 </span>                :            : {
+<span class="lineNum">     546 </span>                :<span class="lineCov">        930 :     return NL_ATTR_GET_AS(nla, uint8_t);</span>
+<span class="lineNum">     547 </span>                :            : }
+<span class="lineNum">     548 </span>                :            : 
+<span class="lineNum">     549 </span>                :            : /* Returns the 16-bit host byte order value in 'nla''s payload.
+<span class="lineNum">     550 </span>                :            :  *
+<a name="551"><span class="lineNum">     551 </span>                :            :  * Asserts that 'nla''s payload is at least 2 bytes long. */</a>
+<span class="lineNum">     552 </span>                :            : uint16_t
+<span class="lineNum">     553 </span>                :<span class="lineNoCov">          0 : nl_attr_get_u16(const struct nlattr *nla)</span>
+<span class="lineNum">     554 </span>                :            : {
+<span class="lineNum">     555 </span>                :<span class="lineNoCov">          0 :     return NL_ATTR_GET_AS(nla, uint16_t);</span>
+<span class="lineNum">     556 </span>                :            : }
+<span class="lineNum">     557 </span>                :            : 
+<span class="lineNum">     558 </span>                :            : /* Returns the 32-bit host byte order value in 'nla''s payload.
+<span class="lineNum">     559 </span>                :            :  *
+<a name="560"><span class="lineNum">     560 </span>                :            :  * Asserts that 'nla''s payload is at least 4 bytes long. */</a>
+<span class="lineNum">     561 </span>                :            : uint32_t
+<span class="lineNum">     562 </span>                :<span class="lineCov">   15907245 : nl_attr_get_u32(const struct nlattr *nla)</span>
+<span class="lineNum">     563 </span>                :            : {
+<span class="lineNum">     564 </span>                :<span class="lineCov">   15907245 :     return NL_ATTR_GET_AS(nla, uint32_t);</span>
+<span class="lineNum">     565 </span>                :            : }
+<span class="lineNum">     566 </span>                :            : 
+<span class="lineNum">     567 </span>                :            : /* Returns the 64-bit host byte order value in 'nla''s payload.
+<span class="lineNum">     568 </span>                :            :  *
+<a name="569"><span class="lineNum">     569 </span>                :            :  * Asserts that 'nla''s payload is at least 8 bytes long. */</a>
+<span class="lineNum">     570 </span>                :            : uint64_t
+<span class="lineNum">     571 </span>                :<span class="lineNoCov">          0 : nl_attr_get_u64(const struct nlattr *nla)</span>
+<span class="lineNum">     572 </span>                :            : {
+<span class="lineNum">     573 </span>                :<span class="lineNoCov">          0 :     const ovs_32aligned_u64 *x = nl_attr_get_unspec(nla, sizeof *x);</span>
+<span class="lineNum">     574 </span>                :<span class="lineNoCov">          0 :     return get_32aligned_u64(x);</span>
+<span class="lineNum">     575 </span>                :            : }
+<span class="lineNum">     576 </span>                :            : 
+<span class="lineNum">     577 </span>                :            : /* Returns the 16-bit network byte order value in 'nla''s payload.
+<span class="lineNum">     578 </span>                :            :  *
+<a name="579"><span class="lineNum">     579 </span>                :            :  * Asserts that 'nla''s payload is at least 2 bytes long. */</a>
+<span class="lineNum">     580 </span>                :            : ovs_be16
+<span class="lineNum">     581 </span>                :<span class="lineCov">      16773 : nl_attr_get_be16(const struct nlattr *nla)</span>
+<span class="lineNum">     582 </span>                :            : {
+<span class="lineNum">     583 </span>                :<span class="lineCov">      16773 :     return NL_ATTR_GET_AS(nla, ovs_be16);</span>
+<span class="lineNum">     584 </span>                :            : }
+<span class="lineNum">     585 </span>                :            : 
+<span class="lineNum">     586 </span>                :            : /* Returns the 32-bit network byte order value in 'nla''s payload.
+<span class="lineNum">     587 </span>                :            :  *
+<a name="588"><span class="lineNum">     588 </span>                :            :  * Asserts that 'nla''s payload is at least 4 bytes long. */</a>
+<span class="lineNum">     589 </span>                :            : ovs_be32
+<span class="lineNum">     590 </span>                :<span class="lineCov">        948 : nl_attr_get_be32(const struct nlattr *nla)</span>
+<span class="lineNum">     591 </span>                :            : {
+<span class="lineNum">     592 </span>                :<span class="lineCov">        948 :     return NL_ATTR_GET_AS(nla, ovs_be32);</span>
+<span class="lineNum">     593 </span>                :            : }
+<span class="lineNum">     594 </span>                :            : 
+<span class="lineNum">     595 </span>                :            : /* Returns the 64-bit network byte order value in 'nla''s payload.
+<span class="lineNum">     596 </span>                :            :  *
+<a name="597"><span class="lineNum">     597 </span>                :            :  * Asserts that 'nla''s payload is at least 8 bytes long. */</a>
+<span class="lineNum">     598 </span>                :            : ovs_be64
+<span class="lineNum">     599 </span>                :<span class="lineCov">        324 : nl_attr_get_be64(const struct nlattr *nla)</span>
+<span class="lineNum">     600 </span>                :            : {
+<span class="lineNum">     601 </span>                :<span class="lineCov">        324 :     const ovs_32aligned_be64 *x = nl_attr_get_unspec(nla, sizeof *x);</span>
+<span class="lineNum">     602 </span>                :<span class="lineCov">        324 :     return get_32aligned_be64(x);</span>
+<span class="lineNum">     603 </span>                :            : }
+<span class="lineNum">     604 </span>                :            : 
+<span class="lineNum">     605 </span>                :            : /* Returns the 32-bit odp_port_t value in 'nla''s payload.
+<span class="lineNum">     606 </span>                :            :  *
+<a name="607"><span class="lineNum">     607 </span>                :            :  * Asserts that 'nla''s payload is at least 4 bytes long. */</a>
+<span class="lineNum">     608 </span>                :            : odp_port_t
+<span class="lineNum">     609 </span>                :<span class="lineCov">      10079 : nl_attr_get_odp_port(const struct nlattr *nla)</span>
+<span class="lineNum">     610 </span>                :            : {
+<span class="lineNum">     611 </span>                :<span class="lineCov">      10079 :     return u32_to_odp(nl_attr_get_u32(nla));</span>
+<span class="lineNum">     612 </span>                :            : }
+<span class="lineNum">     613 </span>                :            : 
+<span class="lineNum">     614 </span>                :            : /* Returns the null-terminated string value in 'nla''s payload.
+<span class="lineNum">     615 </span>                :            :  *
+<a name="616"><span class="lineNum">     616 </span>                :            :  * Asserts that 'nla''s payload contains a null-terminated string. */</a>
+<span class="lineNum">     617 </span>                :            : const char *
+<span class="lineNum">     618 </span>                :<span class="lineCov">         85 : nl_attr_get_string(const struct nlattr *nla)</span>
+<span class="lineNum">     619 </span>                :            : {
+<span class="lineNum">     620 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 85 times"> + </span>]:<span class="lineCov">         85 :     ovs_assert(nla-&gt;nla_len &gt; NLA_HDRLEN);</span>
+<span class="lineNum">     621 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 85 times"> + </span>]:<span class="lineCov">         85 :     ovs_assert(memchr(nl_attr_get(nla), '\0', nla-&gt;nla_len - NLA_HDRLEN));</span>
+<span class="lineNum">     622 </span>                :<span class="lineCov">         85 :     return nl_attr_get(nla);</span>
+<span class="lineNum">     623 </span>                :            : }
+<span class="lineNum">     624 </span>                :            : 
+<a name="625"><span class="lineNum">     625 </span>                :            : /* Initializes 'nested' to the payload of 'nla'. */</a>
+<span class="lineNum">     626 </span>                :            : void
+<span class="lineNum">     627 </span>                :<span class="lineCov">         20 : nl_attr_get_nested(const struct nlattr *nla, struct ofpbuf *nested)</span>
+<span class="lineNum">     628 </span>                :            : {
+<span class="lineNum">     629 </span>                :<span class="lineCov">         20 :     ofpbuf_use_const(nested, nl_attr_get(nla), nl_attr_get_size(nla));</span>
+<span class="lineNum">     630 </span>                :<span class="lineCov">         20 : }</span>
+<span class="lineNum">     631 </span>                :            : 
+<a name="632"><span class="lineNum">     632 </span>                :            : /* Default minimum payload size for each type of attribute. */</a>
+<span class="lineNum">     633 </span>                :            : static size_t
+<span class="lineNum">     634 </span>                :<span class="lineCov">        872 : min_attr_len(enum nl_attr_type type)</span>
+<span class="lineNum">     635 </span>                :            : {
+<span class="lineNum">     636 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 103 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span> :<span class="lineCov">        872 :     switch (type) {</span>
+<span class="lineNum">         </span><span class="branchCov" title="Branch 4 was taken 683 times"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchCov" title="Branch 6 was taken 85 times"> + </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span><span class="branchCov" title="Branch 8 was taken 1 time"> + </span> 
+<span class="lineNum">         </span>            <span class="branchNoCov" title="Branch 9 was not taken"> - </span>]
+<span class="lineNum">     637 </span>                :<span class="lineNoCov">          0 :     case NL_A_NO_ATTR: return 0;</span>
+<span class="lineNum">     638 </span>                :<span class="lineCov">        103 :     case NL_A_UNSPEC: return 0;</span>
+<span class="lineNum">     639 </span>                :<span class="lineNoCov">          0 :     case NL_A_U8: return 1;</span>
+<span class="lineNum">     640 </span>                :<span class="lineNoCov">          0 :     case NL_A_U16: return 2;</span>
+<span class="lineNum">     641 </span>                :<span class="lineCov">        683 :     case NL_A_U32: return 4;</span>
+<span class="lineNum">     642 </span>                :<span class="lineNoCov">          0 :     case NL_A_U64: return 8;</span>
+<span class="lineNum">     643 </span>                :<span class="lineCov">         85 :     case NL_A_STRING: return 1;</span>
+<span class="lineNum">     644 </span>                :<span class="lineNoCov">          0 :     case NL_A_FLAG: return 0;</span>
+<span class="lineNum">     645 </span>                :<span class="lineCov">          1 :     case NL_A_NESTED: return 0;</span>
+<span class="lineNum">     646 </span>                :<span class="lineCov">        872 :     case N_NL_ATTR_TYPES: default: OVS_NOT_REACHED();</span>
+<span class="lineNum">     647 </span>                :            :     }
+<span class="lineNum">     648 </span>                :            : }
+<span class="lineNum">     649 </span>                :            : 
+<a name="650"><span class="lineNum">     650 </span>                :            : /* Default maximum payload size for each type of attribute. */</a>
+<span class="lineNum">     651 </span>                :            : static size_t
+<span class="lineNum">     652 </span>                :<span class="lineCov">        872 : max_attr_len(enum nl_attr_type type)</span>
+<span class="lineNum">     653 </span>                :            : {
+<span class="lineNum">     654 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 103 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span> :<span class="lineCov">        872 :     switch (type) {</span>
+<span class="lineNum">         </span><span class="branchCov" title="Branch 4 was taken 683 times"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchCov" title="Branch 6 was taken 85 times"> + </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span><span class="branchCov" title="Branch 8 was taken 1 time"> + </span> 
+<span class="lineNum">         </span>            <span class="branchNoCov" title="Branch 9 was not taken"> - </span>]
+<span class="lineNum">     655 </span>                :<span class="lineNoCov">          0 :     case NL_A_NO_ATTR: return SIZE_MAX;</span>
+<span class="lineNum">     656 </span>                :<span class="lineCov">        103 :     case NL_A_UNSPEC: return SIZE_MAX;</span>
+<span class="lineNum">     657 </span>                :<span class="lineNoCov">          0 :     case NL_A_U8: return 1;</span>
+<span class="lineNum">     658 </span>                :<span class="lineNoCov">          0 :     case NL_A_U16: return 2;</span>
+<span class="lineNum">     659 </span>                :<span class="lineCov">        683 :     case NL_A_U32: return 4;</span>
+<span class="lineNum">     660 </span>                :<span class="lineNoCov">          0 :     case NL_A_U64: return 8;</span>
+<span class="lineNum">     661 </span>                :<span class="lineCov">         85 :     case NL_A_STRING: return SIZE_MAX;</span>
+<span class="lineNum">     662 </span>                :<span class="lineNoCov">          0 :     case NL_A_FLAG: return SIZE_MAX;</span>
+<span class="lineNum">     663 </span>                :<span class="lineCov">          1 :     case NL_A_NESTED: return SIZE_MAX;</span>
+<span class="lineNum">     664 </span>                :<span class="lineCov">        872 :     case N_NL_ATTR_TYPES: default: OVS_NOT_REACHED();</span>
+<span class="lineNum">     665 </span>                :            :     }
+<span class="lineNum">     666 </span>                :            : }
+<a name="667"><span class="lineNum">     667 </span>                :            : </a>
+<span class="lineNum">     668 </span>                :            : bool
+<span class="lineNum">     669 </span>                :<span class="lineCov">        872 : nl_attr_validate(const struct nlattr *nla, const struct nl_policy *policy)</span>
+<span class="lineNum">     670 </span>                :            : {
+<span class="lineNum">     671 </span>                :<span class="lineCov">        872 :     uint16_t type = nl_attr_type(nla);</span>
+<span class="lineNum">     672 </span>                :            :     size_t min_len;
+<span class="lineNum">     673 </span>                :            :     size_t max_len;
+<span class="lineNum">     674 </span>                :            :     size_t len;
+<span class="lineNum">     675 </span>                :            : 
+<span class="lineNum">     676 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 872 times"> + </span>]:<span class="lineCov">        872 :     if (policy-&gt;type == NL_A_NO_ATTR) {</span>
+<span class="lineNum">     677 </span>                :<span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">     678 </span>                :            :     }
+<span class="lineNum">     679 </span>                :            : 
+<span class="lineNum">     680 </span>                :            :     /* Figure out min and max length. */
+<span class="lineNum">     681 </span>                :<span class="lineCov">        872 :     min_len = policy-&gt;min_len;</span>
+<span class="lineNum">     682 </span>        [<span class="branchCov" title="Branch 0 was taken 872 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        872 :     if (!min_len) {</span>
+<span class="lineNum">     683 </span>                :<span class="lineCov">        872 :         min_len = min_attr_len(policy-&gt;type);</span>
+<span class="lineNum">     684 </span>                :            :     }
+<span class="lineNum">     685 </span>                :<span class="lineCov">        872 :     max_len = policy-&gt;max_len;</span>
+<span class="lineNum">     686 </span>        [<span class="branchCov" title="Branch 0 was taken 872 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        872 :     if (!max_len) {</span>
+<span class="lineNum">     687 </span>                :<span class="lineCov">        872 :         max_len = max_attr_len(policy-&gt;type);</span>
+<span class="lineNum">     688 </span>                :            :     }
+<span class="lineNum">     689 </span>                :            : 
+<span class="lineNum">     690 </span>                :            :     /* Verify length. */
+<span class="lineNum">     691 </span>                :<span class="lineCov">        872 :     len = nl_attr_get_size(nla);</span>
+<span class="lineNum">     692 </span>[<span class="branchCov" title="Branch 0 was taken 872 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 872 times"> + </span>]:<span class="lineCov">        872 :     if (len &lt; min_len || len &gt; max_len) {</span>
+<span class="lineNum">     693 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_DBG_RL(&amp;rl, &quot;attr %&quot;PRIu16&quot; length %&quot;PRIuSIZE&quot; not in &quot;</span>
+<span class="lineNum">     694 </span>                :            :                     &quot;allowed range %&quot;PRIuSIZE&quot;...%&quot;PRIuSIZE, type, len, min_len, max_len);
+<span class="lineNum">     695 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     696 </span>                :            :     }
+<span class="lineNum">     697 </span>                :            : 
+<span class="lineNum">     698 </span>                :            :     /* Strings must be null terminated and must not have embedded nulls. */
+<span class="lineNum">     699 </span>        [<span class="branchCov" title="Branch 0 was taken 85 times"> + </span><span class="branchCov" title="Branch 1 was taken 787 times"> + </span>]:<span class="lineCov">        872 :     if (policy-&gt;type == NL_A_STRING) {</span>
+<span class="lineNum">     700 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 85 times"> + </span>]:<span class="lineCov">         85 :         if (((char *) nla)[nla-&gt;nla_len - 1]) {</span>
+<span class="lineNum">     701 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_DBG_RL(&amp;rl, &quot;attr %&quot;PRIu16&quot; lacks null at end&quot;, type);</span>
+<span class="lineNum">     702 </span>                :<span class="lineNoCov">          0 :             return false;</span>
+<span class="lineNum">     703 </span>                :            :         }
+<span class="lineNum">     704 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 85 times"> + </span>]:<span class="lineCov">         85 :         if (memchr(nla + 1, '\0', len - 1) != NULL) {</span>
+<span class="lineNum">     705 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_DBG_RL(&amp;rl, &quot;attr %&quot;PRIu16&quot; has bad length&quot;, type);</span>
+<span class="lineNum">     706 </span>                :<span class="lineNoCov">          0 :             return false;</span>
+<span class="lineNum">     707 </span>                :            :         }
+<span class="lineNum">     708 </span>                :            :     }
+<span class="lineNum">     709 </span>                :            : 
+<span class="lineNum">     710 </span>                :<span class="lineCov">        872 :     return true;</span>
+<span class="lineNum">     711 </span>                :            : }
+<span class="lineNum">     712 </span>                :            : 
+<span class="lineNum">     713 </span>                :            : /* Parses the 'msg' starting at the given 'nla_offset' as a sequence of Netlink
+<span class="lineNum">     714 </span>                :            :  * attributes.  'policy[i]', for 0 &lt;= i &lt; n_attrs, specifies how the attribute
+<span class="lineNum">     715 </span>                :            :  * with nla_type == i is parsed; a pointer to attribute i is stored in
+<span class="lineNum">     716 </span>                :            :  * attrs[i].  Returns true if successful, false on failure.
+<span class="lineNum">     717 </span>                :            :  *
+<span class="lineNum">     718 </span>                :            :  * If the Netlink attributes in 'msg' follow a Netlink header and a Generic
+<a name="719"><span class="lineNum">     719 </span>                :            :  * Netlink header, then 'nla_offset' should be NLMSG_HDRLEN + GENL_HDRLEN. */</a>
+<span class="lineNum">     720 </span>                :            : bool
+<span class="lineNum">     721 </span>                :<span class="lineCov">        411 : nl_policy_parse(const struct ofpbuf *msg, size_t nla_offset,</span>
+<span class="lineNum">     722 </span>                :            :                 const struct nl_policy policy[],
+<span class="lineNum">     723 </span>                :            :                 struct nlattr *attrs[], size_t n_attrs)
+<span class="lineNum">     724 </span>                :            : {
+<span class="lineNum">     725 </span>                :            :     struct nlattr *nla;
+<span class="lineNum">     726 </span>                :            :     size_t left;
+<span class="lineNum">     727 </span>                :            :     size_t i;
+<span class="lineNum">     728 </span>                :            : 
+<span class="lineNum">     729 </span>                :<span class="lineCov">        411 :     memset(attrs, 0, n_attrs * sizeof *attrs);</span>
+<span class="lineNum">     730 </span>                :            : 
+<span class="lineNum">     731 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 411 times"> + </span>]:<span class="lineCov">        411 :     if (ofpbuf_size(msg) &lt; nla_offset) {</span>
+<span class="lineNum">     732 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_DBG_RL(&amp;rl, &quot;missing headers in nl_policy_parse&quot;);</span>
+<span class="lineNum">     733 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     734 </span>                :            :     }
+<span class="lineNum">     735 </span>                :            : 
+<span class="lineNum">     736 </span>        [<span class="branchCov" title="Branch 5 was taken 2334 times"> + </span><span class="branchCov" title="Branch 6 was taken 411 times"> + </span>]:<span class="lineCov">       2745 :     NL_ATTR_FOR_EACH (nla, left, ofpbuf_at(msg, nla_offset, 0),</span>
+<span class="lineNum">     737 </span>                :            :                       ofpbuf_size(msg) - nla_offset)
+<span class="lineNum">     738 </span>                :            :     {
+<span class="lineNum">     739 </span>                :<span class="lineCov">       2334 :         uint16_t type = nl_attr_type(nla);</span>
+<span class="lineNum">     740 </span>[<span class="branchCov" title="Branch 0 was taken 1127 times"> + </span><span class="branchCov" title="Branch 1 was taken 1207 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 872 times"> + </span><span class="branchCov" title="Branch 3 was taken 255 times"> + </span>]:<span class="lineCov">       2334 :         if (type &lt; n_attrs &amp;&amp; policy[type].type != NL_A_NO_ATTR) {</span>
+<span class="lineNum">     741 </span>                :<span class="lineCov">        872 :             const struct nl_policy *e = &amp;policy[type];</span>
+<span class="lineNum">     742 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 872 times"> + </span>]:<span class="lineCov">        872 :             if (!nl_attr_validate(nla, e)) {</span>
+<span class="lineNum">     743 </span>                :<span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     744 </span>                :            :             }
+<span class="lineNum">     745 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 872 times"> + </span>]:<span class="lineCov">        872 :             if (attrs[type]) {</span>
+<span class="lineNum">     746 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_DBG_RL(&amp;rl, &quot;duplicate attr %&quot;PRIu16, type);</span>
+<span class="lineNum">     747 </span>                :            :             }
+<span class="lineNum">     748 </span>                :<span class="lineCov">        872 :             attrs[type] = nla;</span>
+<span class="lineNum">     749 </span>                :            :         }
+<span class="lineNum">     750 </span>                :            :     }
+<span class="lineNum">     751 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 411 times"> + </span>]:<span class="lineCov">        411 :     if (left) {</span>
+<span class="lineNum">     752 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_DBG_RL(&amp;rl, &quot;attributes followed by garbage&quot;);</span>
+<span class="lineNum">     753 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     754 </span>                :            :     }
+<span class="lineNum">     755 </span>                :            : 
+<span class="lineNum">     756 </span>        [<span class="branchCov" title="Branch 0 was taken 2525 times"> + </span><span class="branchCov" title="Branch 1 was taken 411 times"> + </span>]:<span class="lineCov">       2936 :     for (i = 0; i &lt; n_attrs; i++) {</span>
+<span class="lineNum">     757 </span>                :<span class="lineCov">       2525 :         const struct nl_policy *e = &amp;policy[i];</span>
+<span class="lineNum">     758 </span>[<span class="branchCov" title="Branch 0 was taken 1945 times"> + </span><span class="branchCov" title="Branch 1 was taken 580 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 412 times"> + </span><span class="branchCov" title="Branch 3 was taken 1533 times"> + </span>]:<span class="lineCov">       2525 :         if (!e-&gt;optional &amp;&amp; e-&gt;type != NL_A_NO_ATTR &amp;&amp; !attrs[i]) {</span>
+<span class="lineNum">         </span>        [<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 412 times"> + </span>]
+<span class="lineNum">     759 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_DBG_RL(&amp;rl, &quot;required attr %&quot;PRIuSIZE&quot; missing&quot;, i);</span>
+<span class="lineNum">     760 </span>                :<span class="lineNoCov">          0 :             return false;</span>
+<span class="lineNum">     761 </span>                :            :         }
+<span class="lineNum">     762 </span>                :            :     }
+<span class="lineNum">     763 </span>                :<span class="lineCov">        411 :     return true;</span>
+<span class="lineNum">     764 </span>                :            : }
+<span class="lineNum">     765 </span>                :            : 
+<span class="lineNum">     766 </span>                :            : /* Parses the Netlink attributes within 'nla'.  'policy[i]', for 0 &lt;= i &lt;
+<span class="lineNum">     767 </span>                :            :  * n_attrs, specifies how the attribute with nla_type == i is parsed; a pointer
+<span class="lineNum">     768 </span>                :            :  * to attribute i is stored in attrs[i].  Returns true if successful, false on
+<a name="769"><span class="lineNum">     769 </span>                :            :  * failure. */</a>
+<span class="lineNum">     770 </span>                :            : bool
+<span class="lineNum">     771 </span>                :<span class="lineCov">         20 : nl_parse_nested(const struct nlattr *nla, const struct nl_policy policy[],</span>
+<span class="lineNum">     772 </span>                :            :                 struct nlattr *attrs[], size_t n_attrs)
+<span class="lineNum">     773 </span>                :            : {
+<span class="lineNum">     774 </span>                :            :     struct ofpbuf buf;
+<span class="lineNum">     775 </span>                :            : 
+<span class="lineNum">     776 </span>                :<span class="lineCov">         20 :     nl_attr_get_nested(nla, &amp;buf);</span>
+<span class="lineNum">     777 </span>                :<span class="lineCov">         20 :     return nl_policy_parse(&amp;buf, 0, policy, attrs, n_attrs);</span>
+<span class="lineNum">     778 </span>                :            : }
+<a name="779"><span class="lineNum">     779 </span>                :            : </a>
+<span class="lineNum">     780 </span>                :            : const struct nlattr *
+<span class="lineNum">     781 </span>                :<span class="lineCov">      11894 : nl_attr_find__(const struct nlattr *attrs, size_t size, uint16_t type)</span>
+<span class="lineNum">     782 </span>                :            : {
+<span class="lineNum">     783 </span>                :            :     const struct nlattr *nla;
+<span class="lineNum">     784 </span>                :            :     size_t left;
+<span class="lineNum">     785 </span>                :            : 
+<span class="lineNum">     786 </span>        [<span class="branchCov" title="Branch 3 was taken 69805 times"> + </span><span class="branchCov" title="Branch 4 was taken 7 times"> + </span>]:<span class="lineCov">      69812 :     NL_ATTR_FOR_EACH (nla, left, attrs, size) {</span>
+<span class="lineNum">     787 </span>        [<span class="branchCov" title="Branch 1 was taken 11887 times"> + </span><span class="branchCov" title="Branch 2 was taken 57918 times"> + </span>]:<span class="lineCov">      69805 :         if (nl_attr_type(nla) == type) {</span>
+<span class="lineNum">     788 </span>                :<span class="lineCov">      11887 :             return nla;</span>
+<span class="lineNum">     789 </span>                :            :         }
+<span class="lineNum">     790 </span>                :            :     }
+<span class="lineNum">     791 </span>                :<span class="lineCov">      11894 :     return NULL;</span>
+<span class="lineNum">     792 </span>                :            : }
+<span class="lineNum">     793 </span>                :            : 
+<span class="lineNum">     794 </span>                :            : /* Returns the first Netlink attribute within 'buf' with the specified 'type',
+<span class="lineNum">     795 </span>                :            :  * skipping a header of 'hdr_len' bytes at the beginning of 'buf'.
+<span class="lineNum">     796 </span>                :            :  *
+<a name="797"><span class="lineNum">     797 </span>                :            :  * This function does not validate the attribute's length. */</a>
+<span class="lineNum">     798 </span>                :            : const struct nlattr *
+<span class="lineNum">     799 </span>                :<span class="lineNoCov">          0 : nl_attr_find(const struct ofpbuf *buf, size_t hdr_len, uint16_t type)</span>
+<span class="lineNum">     800 </span>                :            : {
+<span class="lineNum">     801 </span>                :<span class="lineNoCov">          0 :     return nl_attr_find__(ofpbuf_at(buf, hdr_len, 0), ofpbuf_size(buf) - hdr_len,</span>
+<span class="lineNum">     802 </span>                :            :                           type);
+<span class="lineNum">     803 </span>                :            : }
+<span class="lineNum">     804 </span>                :            : 
+<span class="lineNum">     805 </span>                :            : /* Returns the first Netlink attribute within 'nla' with the specified
+<span class="lineNum">     806 </span>                :            :  * 'type'.
+<span class="lineNum">     807 </span>                :            :  *
+<a name="808"><span class="lineNum">     808 </span>                :            :  * This function does not validate the attribute's length. */</a>
+<span class="lineNum">     809 </span>                :            : const struct nlattr *
+<span class="lineNum">     810 </span>                :<span class="lineCov">        402 : nl_attr_find_nested(const struct nlattr *nla, uint16_t type)</span>
+<span class="lineNum">     811 </span>                :            : {
+<span class="lineNum">     812 </span>                :<span class="lineCov">        402 :     return nl_attr_find__(nl_attr_get(nla), nl_attr_get_size(nla), type);</span>
+<span class="lineNum">     813 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

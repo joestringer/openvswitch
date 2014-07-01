@@ -1,0 +1,792 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/ovsdb-types.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - ovsdb-types.c<span style="font-size: 80%;"> (source / <a href="ovsdb-types.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">296</td>
+            <td class="headerCovTableEntry">319</td>
+            <td class="headerCovTableEntryHi">92.8 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">21</td>
+            <td class="headerCovTableEntry">21</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">193</td>
+            <td class="headerCovTableEntry">231</td>
+            <td class="headerCovTableEntryMed">83.5 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (c) 2009, 2010, 2011, 2013 Nicira, Inc.</a>
+<span class="lineNum">       2 </span>                :            :  *
+<span class="lineNum">       3 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       4 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       5 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       6 </span>                :            :  *
+<span class="lineNum">       7 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       8 </span>                :            :  *
+<span class="lineNum">       9 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      10 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      11 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      12 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      13 </span>                :            :  * limitations under the License.
+<span class="lineNum">      14 </span>                :            :  */
+<span class="lineNum">      15 </span>                :            : 
+<span class="lineNum">      16 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      17 </span>                :            : 
+<span class="lineNum">      18 </span>                :            : #include &quot;ovsdb-types.h&quot;
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &lt;float.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;limits.h&gt;
+<span class="lineNum">      22 </span>                :            : 
+<span class="lineNum">      23 </span>                :            : #include &quot;dynamic-string.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;json.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;ovs-thread.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;ovsdb-data.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;ovsdb-error.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;ovsdb-parser.h&quot;
+<span class="lineNum">      29 </span>                :            : 
+<span class="lineNum">      30 </span>                :            : const struct ovsdb_type ovsdb_type_integer =
+<span class="lineNum">      31 </span>                :            :     OVSDB_TYPE_SCALAR_INITIALIZER(OVSDB_BASE_INTEGER_INIT);
+<span class="lineNum">      32 </span>                :            : const struct ovsdb_type ovsdb_type_real =
+<span class="lineNum">      33 </span>                :            :     OVSDB_TYPE_SCALAR_INITIALIZER(OVSDB_BASE_REAL_INIT);
+<span class="lineNum">      34 </span>                :            : const struct ovsdb_type ovsdb_type_boolean =
+<span class="lineNum">      35 </span>                :            :     OVSDB_TYPE_SCALAR_INITIALIZER(OVSDB_BASE_BOOLEAN_INIT);
+<span class="lineNum">      36 </span>                :            : const struct ovsdb_type ovsdb_type_string =
+<span class="lineNum">      37 </span>                :            :     OVSDB_TYPE_SCALAR_INITIALIZER(OVSDB_BASE_STRING_INIT);
+<span class="lineNum">      38 </span>                :            : const struct ovsdb_type ovsdb_type_uuid =
+<span class="lineNum">      39 </span>                :            :     OVSDB_TYPE_SCALAR_INITIALIZER(OVSDB_BASE_UUID_INIT);
+<span class="lineNum">      40 </span>                :            : 
+<a name="41"><span class="lineNum">      41 </span>                :            : /* ovsdb_atomic_type */</a>
+<span class="lineNum">      42 </span>                :            : const char *
+<span class="lineNum">      43 </span>                :<span class="lineCov">      62810 : ovsdb_atomic_type_to_string(enum ovsdb_atomic_type type)</span>
+<span class="lineNum">      44 </span>                :            : {
+<span class="lineNum">      45 </span>  [<span class="branchCov" title="Branch 0 was taken 57 times"> + </span><span class="branchCov" title="Branch 1 was taken 15211 times"> + </span><span class="branchCov" title="Branch 2 was taken 138 times"> + </span><span class="branchCov" title="Branch 3 was taken 3932 times"> + </span> :<span class="lineCov">      62810 :     switch (type) {</span>
+<span class="lineNum">         </span>      <span class="branchCov" title="Branch 4 was taken 36691 times"> + </span><span class="branchCov" title="Branch 5 was taken 6781 times"> + </span><span class="branchNoCov" title="Branch 6 was not taken"> - </span>]
+<span class="lineNum">      46 </span>                :            :     case OVSDB_TYPE_VOID:
+<span class="lineNum">      47 </span>                :<span class="lineCov">         57 :         return &quot;void&quot;;</span>
+<span class="lineNum">      48 </span>                :            : 
+<span class="lineNum">      49 </span>                :            :     case OVSDB_TYPE_INTEGER:
+<span class="lineNum">      50 </span>                :<span class="lineCov">      15211 :         return &quot;integer&quot;;</span>
+<span class="lineNum">      51 </span>                :            : 
+<span class="lineNum">      52 </span>                :            :     case OVSDB_TYPE_REAL:
+<span class="lineNum">      53 </span>                :<span class="lineCov">        138 :         return &quot;real&quot;;</span>
+<span class="lineNum">      54 </span>                :            : 
+<span class="lineNum">      55 </span>                :            :     case OVSDB_TYPE_BOOLEAN:
+<span class="lineNum">      56 </span>                :<span class="lineCov">       3932 :         return &quot;boolean&quot;;</span>
+<span class="lineNum">      57 </span>                :            : 
+<span class="lineNum">      58 </span>                :            :     case OVSDB_TYPE_STRING:
+<span class="lineNum">      59 </span>                :<span class="lineCov">      36691 :         return &quot;string&quot;;</span>
+<span class="lineNum">      60 </span>                :            : 
+<span class="lineNum">      61 </span>                :            :     case OVSDB_TYPE_UUID:
+<span class="lineNum">      62 </span>                :<span class="lineCov">       6781 :         return &quot;uuid&quot;;</span>
+<span class="lineNum">      63 </span>                :            : 
+<span class="lineNum">      64 </span>                :            :     case OVSDB_N_TYPES:
+<span class="lineNum">      65 </span>                :            :     default:
+<span class="lineNum">      66 </span>                :<span class="lineCov">      62810 :         return &quot;&lt;invalid&gt;&quot;;</span>
+<span class="lineNum">      67 </span>                :            :     }
+<span class="lineNum">      68 </span>                :            : }
+<a name="69"><span class="lineNum">      69 </span>                :            : </a>
+<span class="lineNum">      70 </span>                :            : struct json *
+<span class="lineNum">      71 </span>                :<span class="lineCov">          5 : ovsdb_atomic_type_to_json(enum ovsdb_atomic_type type)</span>
+<span class="lineNum">      72 </span>                :            : {
+<span class="lineNum">      73 </span>                :<span class="lineCov">          5 :     return json_string_create(ovsdb_atomic_type_to_string(type));</span>
+<span class="lineNum">      74 </span>                :            : }
+<a name="75"><span class="lineNum">      75 </span>                :            : </a>
+<span class="lineNum">      76 </span>                :            : bool
+<span class="lineNum">      77 </span>                :<span class="lineCov">     135020 : ovsdb_atomic_type_from_string(const char *string, enum ovsdb_atomic_type *type)</span>
+<span class="lineNum">      78 </span>                :            : {
+<span class="lineNum">      79 </span>        [<span class="branchCov" title="Branch 0 was taken 32663 times"> + </span><span class="branchCov" title="Branch 1 was taken 102357 times"> + </span>]:<span class="lineCov">     135020 :     if (!strcmp(string, &quot;integer&quot;)) {</span>
+<span class="lineNum">      80 </span>                :<span class="lineCov">      32663 :         *type = OVSDB_TYPE_INTEGER;</span>
+<span class="lineNum">      81 </span>        [<span class="branchCov" title="Branch 0 was taken 249 times"> + </span><span class="branchCov" title="Branch 1 was taken 102108 times"> + </span>]:<span class="lineCov">     102357 :     } else if (!strcmp(string, &quot;real&quot;)) {</span>
+<span class="lineNum">      82 </span>                :<span class="lineCov">        249 :         *type = OVSDB_TYPE_REAL;</span>
+<span class="lineNum">      83 </span>        [<span class="branchCov" title="Branch 0 was taken 8268 times"> + </span><span class="branchCov" title="Branch 1 was taken 93840 times"> + </span>]:<span class="lineCov">     102108 :     } else if (!strcmp(string, &quot;boolean&quot;)) {</span>
+<span class="lineNum">      84 </span>                :<span class="lineCov">       8268 :         *type = OVSDB_TYPE_BOOLEAN;</span>
+<span class="lineNum">      85 </span>        [<span class="branchCov" title="Branch 0 was taken 78552 times"> + </span><span class="branchCov" title="Branch 1 was taken 15288 times"> + </span>]:<span class="lineCov">      93840 :     } else if (!strcmp(string, &quot;string&quot;)) {</span>
+<span class="lineNum">      86 </span>                :<span class="lineCov">      78552 :         *type = OVSDB_TYPE_STRING;</span>
+<span class="lineNum">      87 </span>        [<span class="branchCov" title="Branch 0 was taken 15285 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">      15288 :     } else if (!strcmp(string, &quot;uuid&quot;)) {</span>
+<span class="lineNum">      88 </span>                :<span class="lineCov">      15285 :         *type = OVSDB_TYPE_UUID;</span>
+<span class="lineNum">      89 </span>                :            :     } else {
+<span class="lineNum">      90 </span>                :<span class="lineCov">          3 :         return false;</span>
+<span class="lineNum">      91 </span>                :            :     }
+<span class="lineNum">      92 </span>                :<span class="lineCov">     135020 :     return true;</span>
+<span class="lineNum">      93 </span>                :            : }
+<a name="94"><span class="lineNum">      94 </span>                :            : </a>
+<span class="lineNum">      95 </span>                :            : struct ovsdb_error *
+<span class="lineNum">      96 </span>                :<span class="lineCov">     135020 : ovsdb_atomic_type_from_json(enum ovsdb_atomic_type *type,</span>
+<span class="lineNum">      97 </span>                :            :                             const struct json *json)
+<span class="lineNum">      98 </span>                :            : {
+<span class="lineNum">      99 </span>        [<span class="branchCov" title="Branch 0 was taken 135020 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">     135020 :     if (json-&gt;type == JSON_STRING) {</span>
+<span class="lineNum">     100 </span>        [<span class="branchCov" title="Branch 2 was taken 135017 times"> + </span><span class="branchCov" title="Branch 3 was taken 3 times"> + </span>]:<span class="lineCov">     135020 :         if (ovsdb_atomic_type_from_string(json_string(json), type)) {</span>
+<span class="lineNum">     101 </span>                :<span class="lineCov">     135017 :             return NULL;</span>
+<span class="lineNum">     102 </span>                :            :         } else {
+<span class="lineNum">     103 </span>                :<span class="lineCov">          3 :             *type = OVSDB_TYPE_VOID;</span>
+<span class="lineNum">     104 </span>                :<span class="lineCov">          3 :             return ovsdb_syntax_error(json, NULL,</span>
+<span class="lineNum">     105 </span>                :            :                                       &quot;\&quot;%s\&quot; is not an atomic-type&quot;,
+<span class="lineNum">     106 </span>                :            :                                       json_string(json));
+<span class="lineNum">     107 </span>                :            :         }
+<span class="lineNum">     108 </span>                :            :     } else {
+<span class="lineNum">     109 </span>                :<span class="lineNoCov">          0 :         *type = OVSDB_TYPE_VOID;</span>
+<span class="lineNum">     110 </span>                :<span class="lineCov">     135020 :         return ovsdb_syntax_error(json, NULL, &quot;atomic-type expected&quot;);</span>
+<span class="lineNum">     111 </span>                :            :     }
+<span class="lineNum">     112 </span>                :            : }
+<span class="lineNum">     113 </span>                :            : 
+<span class="lineNum">     114 </span>                :            : /* ovsdb_base_type */
+<a name="115"><span class="lineNum">     115 </span>                :            : </a>
+<span class="lineNum">     116 </span>                :            : void
+<span class="lineNum">     117 </span>                :<span class="lineCov">    1210065 : ovsdb_base_type_init(struct ovsdb_base_type *base, enum ovsdb_atomic_type type)</span>
+<span class="lineNum">     118 </span>                :            : {
+<span class="lineNum">     119 </span>                :<span class="lineCov">    1210065 :     base-&gt;type = type;</span>
+<span class="lineNum">     120 </span>                :<span class="lineCov">    1210065 :     base-&gt;enum_ = NULL;</span>
+<span class="lineNum">     121 </span>                :            : 
+<span class="lineNum">     122 </span>  [<span class="branchCov" title="Branch 0 was taken 477055 times"> + </span><span class="branchCov" title="Branch 1 was taken 176891 times"> + </span><span class="branchCov" title="Branch 2 was taken 1091 times"> + </span><span class="branchCov" title="Branch 3 was taken 45793 times"> + </span> :<span class="lineCov">    1210065 :     switch (base-&gt;type) {</span>
+<span class="lineNum">         </span>   <span class="branchCov" title="Branch 4 was taken 431991 times"> + </span><span class="branchCov" title="Branch 5 was taken 77244 times"> + </span><span class="branchNoCov" title="Branch 6 was not taken"> - </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span>]
+<span class="lineNum">     123 </span>                :            :     case OVSDB_TYPE_VOID:
+<span class="lineNum">     124 </span>                :<span class="lineCov">     477055 :         break;</span>
+<span class="lineNum">     125 </span>                :            : 
+<span class="lineNum">     126 </span>                :            :     case OVSDB_TYPE_INTEGER:
+<span class="lineNum">     127 </span>                :<span class="lineCov">     176891 :         base-&gt;u.integer.min = INT64_MIN;</span>
+<span class="lineNum">     128 </span>                :<span class="lineCov">     176891 :         base-&gt;u.integer.max = INT64_MAX;</span>
+<span class="lineNum">     129 </span>                :<span class="lineCov">     176891 :         break;</span>
+<span class="lineNum">     130 </span>                :            : 
+<span class="lineNum">     131 </span>                :            :     case OVSDB_TYPE_REAL:
+<span class="lineNum">     132 </span>                :<span class="lineCov">       1091 :         base-&gt;u.real.min = -DBL_MAX;</span>
+<span class="lineNum">     133 </span>                :<span class="lineCov">       1091 :         base-&gt;u.real.max = DBL_MAX;</span>
+<span class="lineNum">     134 </span>                :<span class="lineCov">       1091 :         break;</span>
+<span class="lineNum">     135 </span>                :            : 
+<span class="lineNum">     136 </span>                :            :     case OVSDB_TYPE_BOOLEAN:
+<span class="lineNum">     137 </span>                :<span class="lineCov">      45793 :         break;</span>
+<span class="lineNum">     138 </span>                :            : 
+<span class="lineNum">     139 </span>                :            :     case OVSDB_TYPE_STRING:
+<span class="lineNum">     140 </span>                :<span class="lineCov">     431991 :         base-&gt;u.string.minLen = 0;</span>
+<span class="lineNum">     141 </span>                :<span class="lineCov">     431991 :         base-&gt;u.string.maxLen = UINT_MAX;</span>
+<span class="lineNum">     142 </span>                :<span class="lineCov">     431991 :         break;</span>
+<span class="lineNum">     143 </span>                :            : 
+<span class="lineNum">     144 </span>                :            :     case OVSDB_TYPE_UUID:
+<span class="lineNum">     145 </span>                :<span class="lineCov">      77244 :         base-&gt;u.uuid.refTableName = NULL;</span>
+<span class="lineNum">     146 </span>                :<span class="lineCov">      77244 :         base-&gt;u.uuid.refTable = NULL;</span>
+<span class="lineNum">     147 </span>                :<span class="lineCov">      77244 :         break;</span>
+<span class="lineNum">     148 </span>                :            : 
+<span class="lineNum">     149 </span>                :            :     case OVSDB_N_TYPES:
+<span class="lineNum">     150 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     151 </span>                :            : 
+<span class="lineNum">     152 </span>                :            :     default:
+<span class="lineNum">     153 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     154 </span>                :            :     }
+<span class="lineNum">     155 </span>                :<span class="lineCov">    1210065 : }</span>
+<span class="lineNum">     156 </span>                :            : 
+<span class="lineNum">     157 </span>                :            : /* Returns the type of the 'enum_' member for an ovsdb_base_type whose 'type'
+<a name="158"><span class="lineNum">     158 </span>                :            :  * is 'atomic_type'. */</a>
+<span class="lineNum">     159 </span>                :            : const struct ovsdb_type *
+<span class="lineNum">     160 </span>                :<span class="lineCov">      38822 : ovsdb_base_type_get_enum_type(enum ovsdb_atomic_type atomic_type)</span>
+<span class="lineNum">     161 </span>                :            : {
+<span class="lineNum">     162 </span>                :            :     static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
+<span class="lineNum">     163 </span>                :            :     static struct ovsdb_type *types[OVSDB_N_TYPES];
+<span class="lineNum">     164 </span>                :            : 
+<span class="lineNum">     165 </span>        [<span class="branchCov" title="Branch 1 was taken 770 times"> + </span><span class="branchCov" title="Branch 2 was taken 38052 times"> + </span>]:<span class="lineCov">      38822 :     if (ovsthread_once_start(&amp;once)) {</span>
+<span class="lineNum">     166 </span>                :            :         enum ovsdb_atomic_type i;
+<span class="lineNum">     167 </span>                :            : 
+<span class="lineNum">     168 </span>        [<span class="branchCov" title="Branch 0 was taken 4620 times"> + </span><span class="branchCov" title="Branch 1 was taken 770 times"> + </span>]:<span class="lineCov">       5390 :         for (i = 0; i &lt; OVSDB_N_TYPES; i++) {</span>
+<span class="lineNum">     169 </span>                :            :             struct ovsdb_type *type;
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>                :<span class="lineCov">       4620 :             types[i] = type = xmalloc(sizeof *type);</span>
+<span class="lineNum">     172 </span>                :<span class="lineCov">       4620 :             ovsdb_base_type_init(&amp;type-&gt;key, i);</span>
+<span class="lineNum">     173 </span>                :<span class="lineCov">       4620 :             ovsdb_base_type_init(&amp;type-&gt;value, OVSDB_TYPE_VOID);</span>
+<span class="lineNum">     174 </span>                :<span class="lineCov">       4620 :             type-&gt;n_min = 1;</span>
+<span class="lineNum">     175 </span>                :<span class="lineCov">       4620 :             type-&gt;n_max = UINT_MAX;</span>
+<span class="lineNum">     176 </span>                :            :         }
+<span class="lineNum">     177 </span>                :            : 
+<span class="lineNum">     178 </span>                :<span class="lineCov">        770 :         ovsthread_once_done(&amp;once);</span>
+<span class="lineNum">     179 </span>                :            :     }
+<span class="lineNum">     180 </span>                :<span class="lineCov">      38822 :     return types[atomic_type];</span>
+<span class="lineNum">     181 </span>                :            : }
+<a name="182"><span class="lineNum">     182 </span>                :            : </a>
+<span class="lineNum">     183 </span>                :            : void
+<span class="lineNum">     184 </span>                :<span class="lineCov">     272076 : ovsdb_base_type_clone(struct ovsdb_base_type *dst,</span>
+<span class="lineNum">     185 </span>                :            :                       const struct ovsdb_base_type *src)
+<span class="lineNum">     186 </span>                :            : {
+<span class="lineNum">     187 </span>                :<span class="lineCov">     272076 :     *dst = *src;</span>
+<span class="lineNum">     188 </span>                :            : 
+<span class="lineNum">     189 </span>        [<span class="branchCov" title="Branch 0 was taken 8679 times"> + </span><span class="branchCov" title="Branch 1 was taken 263397 times"> + </span>]:<span class="lineCov">     272076 :     if (src-&gt;enum_) {</span>
+<span class="lineNum">     190 </span>                :<span class="lineCov">       8679 :         dst-&gt;enum_ = xmalloc(sizeof *dst-&gt;enum_);</span>
+<span class="lineNum">     191 </span>                :<span class="lineCov">       8679 :         ovsdb_datum_clone(dst-&gt;enum_, src-&gt;enum_,</span>
+<span class="lineNum">     192 </span>                :            :                           ovsdb_base_type_get_enum_type(dst-&gt;type));
+<span class="lineNum">     193 </span>                :            :     }
+<span class="lineNum">     194 </span>                :            : 
+<span class="lineNum">     195 </span>  [<span class="branchCov" title="Branch 0 was taken 152768 times"> + </span><span class="branchCov" title="Branch 1 was taken 78536 times"> + </span><span class="branchCov" title="Branch 2 was taken 40772 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">     272076 :     switch (dst-&gt;type) {</span>
+<span class="lineNum">     196 </span>                :            :     case OVSDB_TYPE_VOID:
+<span class="lineNum">     197 </span>                :            :     case OVSDB_TYPE_INTEGER:
+<span class="lineNum">     198 </span>                :            :     case OVSDB_TYPE_REAL:
+<span class="lineNum">     199 </span>                :            :     case OVSDB_TYPE_BOOLEAN:
+<span class="lineNum">     200 </span>                :<span class="lineCov">     152768 :         break;</span>
+<span class="lineNum">     201 </span>                :            : 
+<span class="lineNum">     202 </span>                :            :     case OVSDB_TYPE_STRING:
+<span class="lineNum">     203 </span>                :<span class="lineCov">      78536 :         break;</span>
+<span class="lineNum">     204 </span>                :            : 
+<span class="lineNum">     205 </span>                :            :     case OVSDB_TYPE_UUID:
+<span class="lineNum">     206 </span>        [<span class="branchCov" title="Branch 0 was taken 15042 times"> + </span><span class="branchCov" title="Branch 1 was taken 25730 times"> + </span>]:<span class="lineCov">      40772 :         if (dst-&gt;u.uuid.refTableName) {</span>
+<span class="lineNum">     207 </span>                :<span class="lineCov">      15042 :             dst-&gt;u.uuid.refTableName = xstrdup(dst-&gt;u.uuid.refTableName);</span>
+<span class="lineNum">     208 </span>                :            :         }
+<span class="lineNum">     209 </span>                :<span class="lineCov">      40772 :         break;</span>
+<span class="lineNum">     210 </span>                :            : 
+<span class="lineNum">     211 </span>                :            :     case OVSDB_N_TYPES:
+<span class="lineNum">     212 </span>                :            :     default:
+<span class="lineNum">     213 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     214 </span>                :            :     }
+<span class="lineNum">     215 </span>                :<span class="lineCov">     272076 : }</span>
+<a name="216"><span class="lineNum">     216 </span>                :            : </a>
+<span class="lineNum">     217 </span>                :            : void
+<span class="lineNum">     218 </span>                :<span class="lineCov">     490987 : ovsdb_base_type_destroy(struct ovsdb_base_type *base)</span>
+<span class="lineNum">     219 </span>                :            : {
+<span class="lineNum">     220 </span>        [<span class="branchCov" title="Branch 0 was taken 490987 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">     490987 :     if (base) {</span>
+<span class="lineNum">     221 </span>        [<span class="branchCov" title="Branch 0 was taken 17329 times"> + </span><span class="branchCov" title="Branch 1 was taken 473658 times"> + </span>]:<span class="lineCov">     490987 :         if (base-&gt;enum_) {</span>
+<span class="lineNum">     222 </span>                :<span class="lineCov">      17329 :             ovsdb_datum_destroy(base-&gt;enum_,</span>
+<span class="lineNum">     223 </span>                :            :                                 ovsdb_base_type_get_enum_type(base-&gt;type));
+<span class="lineNum">     224 </span>                :<span class="lineCov">      17329 :             free(base-&gt;enum_);</span>
+<span class="lineNum">     225 </span>                :            :         }
+<span class="lineNum">     226 </span>                :            : 
+<span class="lineNum">     227 </span>  [<span class="branchCov" title="Branch 0 was taken 278349 times"> + </span><span class="branchCov" title="Branch 1 was taken 156749 times"> + </span><span class="branchCov" title="Branch 2 was taken 55889 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span> :<span class="lineCov">     490987 :         switch (base-&gt;type) {</span>
+<span class="lineNum">         </span>            <span class="branchNoCov" title="Branch 4 was not taken"> - </span>]
+<span class="lineNum">     228 </span>                :            :         case OVSDB_TYPE_VOID:
+<span class="lineNum">     229 </span>                :            :         case OVSDB_TYPE_INTEGER:
+<span class="lineNum">     230 </span>                :            :         case OVSDB_TYPE_REAL:
+<span class="lineNum">     231 </span>                :            :         case OVSDB_TYPE_BOOLEAN:
+<span class="lineNum">     232 </span>                :<span class="lineCov">     278349 :             break;</span>
+<span class="lineNum">     233 </span>                :            : 
+<span class="lineNum">     234 </span>                :            :         case OVSDB_TYPE_STRING:
+<span class="lineNum">     235 </span>                :<span class="lineCov">     156749 :             break;</span>
+<span class="lineNum">     236 </span>                :            : 
+<span class="lineNum">     237 </span>                :            :         case OVSDB_TYPE_UUID:
+<span class="lineNum">     238 </span>                :<span class="lineCov">      55889 :             free(base-&gt;u.uuid.refTableName);</span>
+<span class="lineNum">     239 </span>                :<span class="lineCov">      55889 :             break;</span>
+<span class="lineNum">     240 </span>                :            : 
+<span class="lineNum">     241 </span>                :            :         case OVSDB_N_TYPES:
+<span class="lineNum">     242 </span>                :<span class="lineNoCov">          0 :             OVS_NOT_REACHED();</span>
+<span class="lineNum">     243 </span>                :            : 
+<span class="lineNum">     244 </span>                :            :         default:
+<span class="lineNum">     245 </span>                :<span class="lineNoCov">          0 :             OVS_NOT_REACHED();</span>
+<span class="lineNum">     246 </span>                :            :         }
+<span class="lineNum">     247 </span>                :            :     }
+<span class="lineNum">     248 </span>                :<span class="lineCov">     490987 : }</span>
+<a name="249"><span class="lineNum">     249 </span>                :            : </a>
+<span class="lineNum">     250 </span>                :            : bool
+<span class="lineNum">     251 </span>                :<span class="lineCov">     177290 : ovsdb_base_type_is_valid(const struct ovsdb_base_type *base)</span>
+<span class="lineNum">     252 </span>                :            : {
+<span class="lineNum">     253 </span>  [<span class="branchCov" title="Branch 0 was taken 63130 times"> + </span><span class="branchCov" title="Branch 1 was taken 28538 times"> + </span><span class="branchCov" title="Branch 2 was taken 151 times"> + </span><span class="branchCov" title="Branch 3 was taken 2142 times"> + </span> :<span class="lineCov">     177290 :     switch (base-&gt;type) {</span>
+<span class="lineNum">         </span>      <span class="branchCov" title="Branch 4 was taken 68135 times"> + </span><span class="branchCov" title="Branch 5 was taken 15194 times"> + </span><span class="branchNoCov" title="Branch 6 was not taken"> - </span>]
+<span class="lineNum">     254 </span>                :            :     case OVSDB_TYPE_VOID:
+<span class="lineNum">     255 </span>                :<span class="lineCov">      63130 :         return true;</span>
+<span class="lineNum">     256 </span>                :            : 
+<span class="lineNum">     257 </span>                :            :     case OVSDB_TYPE_INTEGER:
+<span class="lineNum">     258 </span>                :<span class="lineCov">      28538 :         return base-&gt;u.integer.min &lt;= base-&gt;u.integer.max;</span>
+<span class="lineNum">     259 </span>                :            : 
+<span class="lineNum">     260 </span>                :            :     case OVSDB_TYPE_REAL:
+<span class="lineNum">     261 </span>                :<span class="lineCov">        151 :         return base-&gt;u.real.min &lt;= base-&gt;u.real.max;</span>
+<span class="lineNum">     262 </span>                :            : 
+<span class="lineNum">     263 </span>                :            :     case OVSDB_TYPE_BOOLEAN:
+<span class="lineNum">     264 </span>                :<span class="lineCov">       2142 :         return true;</span>
+<span class="lineNum">     265 </span>                :            : 
+<span class="lineNum">     266 </span>                :            :     case OVSDB_TYPE_STRING:
+<span class="lineNum">     267 </span>                :<span class="lineCov">      68135 :         return base-&gt;u.string.minLen &lt;= base-&gt;u.string.maxLen;</span>
+<span class="lineNum">     268 </span>                :            : 
+<span class="lineNum">     269 </span>                :            :     case OVSDB_TYPE_UUID:
+<span class="lineNum">     270 </span>                :<span class="lineCov">      15194 :         return true;</span>
+<span class="lineNum">     271 </span>                :            : 
+<span class="lineNum">     272 </span>                :            :     case OVSDB_N_TYPES:
+<span class="lineNum">     273 </span>                :            :     default:
+<span class="lineNum">     274 </span>                :<span class="lineCov">     177290 :         return false;</span>
+<span class="lineNum">     275 </span>                :            :     }
+<span class="lineNum">     276 </span>                :            : }
+<a name="277"><span class="lineNum">     277 </span>                :            : </a>
+<span class="lineNum">     278 </span>                :            : bool
+<span class="lineNum">     279 </span>                :<span class="lineCov">      74074 : ovsdb_base_type_has_constraints(const struct ovsdb_base_type *base)</span>
+<span class="lineNum">     280 </span>                :            : {
+<span class="lineNum">     281 </span>        [<span class="branchCov" title="Branch 0 was taken 4140 times"> + </span><span class="branchCov" title="Branch 1 was taken 69934 times"> + </span>]:<span class="lineCov">      74074 :     if (base-&gt;enum_) {</span>
+<span class="lineNum">     282 </span>                :<span class="lineCov">       4140 :         return true;</span>
+<span class="lineNum">     283 </span>                :            :     }
+<span class="lineNum">     284 </span>                :            : 
+<span class="lineNum">     285 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 18212 times"> + </span><span class="branchCov" title="Branch 2 was taken 163 times"> + </span><span class="branchCov" title="Branch 3 was taken 6796 times"> + </span> :<span class="lineCov">      69934 :     switch (base-&gt;type) {</span>
+<span class="lineNum">         </span>   <span class="branchCov" title="Branch 4 was taken 37188 times"> + </span><span class="branchCov" title="Branch 5 was taken 7575 times"> + </span><span class="branchNoCov" title="Branch 6 was not taken"> - </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span>]
+<span class="lineNum">     286 </span>                :            :     case OVSDB_TYPE_VOID:
+<span class="lineNum">     287 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     288 </span>                :            : 
+<span class="lineNum">     289 </span>                :            :     case OVSDB_TYPE_INTEGER:
+<span class="lineNum">     290 </span>                :<span class="lineCov">      18212 :         return (base-&gt;u.integer.min != INT64_MIN</span>
+<span class="lineNum">     291 </span>[<span class="branchCov" title="Branch 0 was taken 8370 times"> + </span><span class="branchCov" title="Branch 1 was taken 9842 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchCov" title="Branch 3 was taken 8369 times"> + </span>]:<span class="lineCov">      18212 :                 || base-&gt;u.integer.max != INT64_MAX);</span>
+<span class="lineNum">     292 </span>                :            : 
+<span class="lineNum">     293 </span>                :            :     case OVSDB_TYPE_REAL:
+<span class="lineNum">     294 </span>                :<span class="lineCov">        163 :         return (base-&gt;u.real.min != -DBL_MAX</span>
+<span class="lineNum">     295 </span>[<span class="branchCov" title="Branch 0 was taken 161 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchCov" title="Branch 3 was taken 160 times"> + </span>]:<span class="lineCov">        163 :                 || base-&gt;u.real.max != DBL_MAX);</span>
+<span class="lineNum">     296 </span>                :            : 
+<span class="lineNum">     297 </span>                :            :     case OVSDB_TYPE_BOOLEAN:
+<span class="lineNum">     298 </span>                :<span class="lineCov">       6796 :         return false;</span>
+<span class="lineNum">     299 </span>                :            : 
+<span class="lineNum">     300 </span>                :            :     case OVSDB_TYPE_STRING:
+<span class="lineNum">     301 </span>[<span class="branchCov" title="Branch 0 was taken 37186 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchCov" title="Branch 3 was taken 37185 times"> + </span>]:<span class="lineCov">      37188 :         return base-&gt;u.string.minLen != 0 || base-&gt;u.string.maxLen != UINT_MAX;</span>
+<span class="lineNum">     302 </span>                :            : 
+<span class="lineNum">     303 </span>                :            :     case OVSDB_TYPE_UUID:
+<span class="lineNum">     304 </span>                :<span class="lineCov">       7575 :         return base-&gt;u.uuid.refTableName != NULL;</span>
+<span class="lineNum">     305 </span>                :            : 
+<span class="lineNum">     306 </span>                :            :     case OVSDB_N_TYPES:
+<span class="lineNum">     307 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     308 </span>                :            : 
+<span class="lineNum">     309 </span>                :            :     default:
+<span class="lineNum">     310 </span>                :<span class="lineCov">      74074 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     311 </span>                :            :     }
+<span class="lineNum">     312 </span>                :            : }
+<a name="313"><span class="lineNum">     313 </span>                :            : </a>
+<span class="lineNum">     314 </span>                :            : void
+<span class="lineNum">     315 </span>                :<span class="lineCov">       1010 : ovsdb_base_type_clear_constraints(struct ovsdb_base_type *base)</span>
+<span class="lineNum">     316 </span>                :            : {
+<span class="lineNum">     317 </span>                :<span class="lineCov">       1010 :     enum ovsdb_atomic_type type = base-&gt;type;</span>
+<span class="lineNum">     318 </span>                :<span class="lineCov">       1010 :     ovsdb_base_type_destroy(base);</span>
+<span class="lineNum">     319 </span>                :<span class="lineCov">       1010 :     ovsdb_base_type_init(base, type);</span>
+<span class="lineNum">     320 </span>                :<span class="lineCov">       1010 : }</span>
+<a name="321"><span class="lineNum">     321 </span>                :            : </a>
+<span class="lineNum">     322 </span>                :            : static struct ovsdb_error *
+<span class="lineNum">     323 </span>                :<span class="lineCov">       7230 : parse_optional_uint(struct ovsdb_parser *parser, const char *member,</span>
+<span class="lineNum">     324 </span>                :            :                     unsigned int *uint)
+<span class="lineNum">     325 </span>                :            : {
+<span class="lineNum">     326 </span>                :            :     const struct json *json;
+<span class="lineNum">     327 </span>                :            : 
+<span class="lineNum">     328 </span>                :<span class="lineCov">       7230 :     json = ovsdb_parser_member(parser, member, OP_INTEGER | OP_OPTIONAL);</span>
+<span class="lineNum">     329 </span>        [<span class="branchCov" title="Branch 0 was taken 9 times"> + </span><span class="branchCov" title="Branch 1 was taken 7221 times"> + </span>]:<span class="lineCov">       7230 :     if (json) {</span>
+<span class="lineNum">     330 </span>[<span class="branchCov" title="Branch 0 was taken 8 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 8 times"> + </span>]:<span class="lineCov">          9 :         if (json-&gt;u.integer &lt; 0 || json-&gt;u.integer &gt; UINT_MAX) {</span>
+<span class="lineNum">     331 </span>                :<span class="lineCov">          1 :             return ovsdb_syntax_error(json, NULL,</span>
+<span class="lineNum">     332 </span>                :            :                                       &quot;%s out of valid range 0 to %u&quot;,
+<span class="lineNum">     333 </span>                :            :                                       member, UINT_MAX);
+<span class="lineNum">     334 </span>                :            :         }
+<span class="lineNum">     335 </span>                :<span class="lineCov">          8 :         *uint = json-&gt;u.integer;</span>
+<span class="lineNum">     336 </span>                :            :     }
+<span class="lineNum">     337 </span>                :<span class="lineCov">       7230 :     return NULL;</span>
+<span class="lineNum">     338 </span>                :            : }
+<a name="339"><span class="lineNum">     339 </span>                :            : </a>
+<span class="lineNum">     340 </span>                :            : struct ovsdb_error *
+<span class="lineNum">     341 </span>                :<span class="lineCov">     135015 : ovsdb_base_type_from_json(struct ovsdb_base_type *base,</span>
+<span class="lineNum">     342 </span>                :            :                           const struct json *json)
+<span class="lineNum">     343 </span>                :            : {
+<span class="lineNum">     344 </span>                :            :     struct ovsdb_parser parser;
+<span class="lineNum">     345 </span>                :            :     struct ovsdb_error *error;
+<span class="lineNum">     346 </span>                :            :     const struct json *type, *enum_;
+<span class="lineNum">     347 </span>                :            : 
+<span class="lineNum">     348 </span>        [<span class="branchCov" title="Branch 0 was taken 87261 times"> + </span><span class="branchCov" title="Branch 1 was taken 47754 times"> + </span>]:<span class="lineCov">     135015 :     if (json-&gt;type == JSON_STRING) {</span>
+<span class="lineNum">     349 </span>                :<span class="lineCov">      87261 :         error = ovsdb_atomic_type_from_json(&amp;base-&gt;type, json);</span>
+<span class="lineNum">     350 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 87259 times"> + </span>]:<span class="lineCov">      87261 :         if (error) {</span>
+<span class="lineNum">     351 </span>                :<span class="lineCov">          2 :             return error;</span>
+<span class="lineNum">     352 </span>                :            :         }
+<span class="lineNum">     353 </span>                :<span class="lineCov">      87259 :         ovsdb_base_type_init(base, base-&gt;type);</span>
+<span class="lineNum">     354 </span>                :<span class="lineCov">      87259 :         return NULL;</span>
+<span class="lineNum">     355 </span>                :            :     }
+<span class="lineNum">     356 </span>                :            : 
+<span class="lineNum">     357 </span>                :<span class="lineCov">      47754 :     ovsdb_parser_init(&amp;parser, json, &quot;ovsdb type&quot;);</span>
+<span class="lineNum">     358 </span>                :<span class="lineCov">      47754 :     type = ovsdb_parser_member(&amp;parser, &quot;type&quot;, OP_STRING);</span>
+<span class="lineNum">     359 </span>        [<span class="branchCov" title="Branch 1 was taken 1 time"> + </span><span class="branchCov" title="Branch 2 was taken 47753 times"> + </span>]:<span class="lineCov">      47754 :     if (ovsdb_parser_has_error(&amp;parser)) {</span>
+<span class="lineNum">     360 </span>                :<span class="lineCov">          1 :         base-&gt;type = OVSDB_TYPE_VOID;</span>
+<span class="lineNum">     361 </span>                :<span class="lineCov">          1 :         return ovsdb_parser_finish(&amp;parser);</span>
+<span class="lineNum">     362 </span>                :            :     }
+<span class="lineNum">     363 </span>                :            : 
+<span class="lineNum">     364 </span>                :<span class="lineCov">      47753 :     error = ovsdb_atomic_type_from_json(&amp;base-&gt;type, type);</span>
+<span class="lineNum">     365 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 47753 times"> + </span>]:<span class="lineCov">      47753 :     if (error) {</span>
+<span class="lineNum">     366 </span>                :<span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     367 </span>                :            :     }
+<span class="lineNum">     368 </span>                :            : 
+<span class="lineNum">     369 </span>                :<span class="lineCov">      47753 :     ovsdb_base_type_init(base, base-&gt;type);</span>
+<span class="lineNum">     370 </span>                :            : 
+<span class="lineNum">     371 </span>                :<span class="lineCov">      47753 :     enum_ = ovsdb_parser_member(&amp;parser, &quot;enum&quot;, OP_ANY | OP_OPTIONAL);</span>
+<span class="lineNum">     372 </span>        [<span class="branchCov" title="Branch 0 was taken 8689 times"> + </span><span class="branchCov" title="Branch 1 was taken 39064 times"> + </span>]:<span class="lineCov">      47753 :     if (enum_) {</span>
+<span class="lineNum">     373 </span>                :<span class="lineCov">       8689 :         base-&gt;enum_ = xmalloc(sizeof *base-&gt;enum_);</span>
+<span class="lineNum">     374 </span>                :<span class="lineCov">       8689 :         error = ovsdb_datum_from_json(</span>
+<span class="lineNum">     375 </span>                :            :             base-&gt;enum_, ovsdb_base_type_get_enum_type(base-&gt;type),
+<span class="lineNum">     376 </span>                :            :             enum_, NULL);
+<span class="lineNum">     377 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 8689 times"> + </span>]:<span class="lineCov">       8689 :         if (error) {</span>
+<span class="lineNum">     378 </span>                :<span class="lineNoCov">          0 :             free(base-&gt;enum_);</span>
+<span class="lineNum">     379 </span>                :<span class="lineNoCov">          0 :             base-&gt;enum_ = NULL;</span>
+<span class="lineNum">     380 </span>                :            :         }
+<span class="lineNum">     381 </span>        [<span class="branchCov" title="Branch 0 was taken 19456 times"> + </span><span class="branchCov" title="Branch 1 was taken 19608 times"> + </span>]:<span class="lineCov">      39064 :     } else if (base-&gt;type == OVSDB_TYPE_INTEGER) {</span>
+<span class="lineNum">     382 </span>                :            :         const struct json *min, *max;
+<span class="lineNum">     383 </span>                :            : 
+<span class="lineNum">     384 </span>                :<span class="lineCov">      19456 :         min = ovsdb_parser_member(&amp;parser, &quot;minInteger&quot;,</span>
+<span class="lineNum">     385 </span>                :            :                                   OP_INTEGER | OP_OPTIONAL);
+<span class="lineNum">     386 </span>                :<span class="lineCov">      19456 :         max = ovsdb_parser_member(&amp;parser, &quot;maxInteger&quot;,</span>
+<span class="lineNum">     387 </span>                :            :                                   OP_INTEGER | OP_OPTIONAL);
+<span class="lineNum">     388 </span>        [<span class="branchCov" title="Branch 0 was taken 18201 times"> + </span><span class="branchCov" title="Branch 1 was taken 1255 times"> + </span>]:<span class="lineCov">      19456 :         base-&gt;u.integer.min = min ? min-&gt;u.integer : INT64_MIN;</span>
+<span class="lineNum">     389 </span>        [<span class="branchCov" title="Branch 0 was taken 12745 times"> + </span><span class="branchCov" title="Branch 1 was taken 6711 times"> + </span>]:<span class="lineCov">      19456 :         base-&gt;u.integer.max = max ? max-&gt;u.integer : INT64_MAX;</span>
+<span class="lineNum">     390 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 19455 times"> + </span>]:<span class="lineCov">      19456 :         if (base-&gt;u.integer.min &gt; base-&gt;u.integer.max) {</span>
+<span class="lineNum">     391 </span>                :<span class="lineCov">          1 :             error = ovsdb_syntax_error(json, NULL,</span>
+<span class="lineNum">     392 </span>                :            :                                        &quot;minInteger exceeds maxInteger&quot;);
+<span class="lineNum">     393 </span>                :            :         }
+<span class="lineNum">     394 </span>        [<span class="branchCov" title="Branch 0 was taken 9 times"> + </span><span class="branchCov" title="Branch 1 was taken 19599 times"> + </span>]:<span class="lineCov">      19608 :     } else if (base-&gt;type == OVSDB_TYPE_REAL) {</span>
+<span class="lineNum">     395 </span>                :            :         const struct json *min, *max;
+<span class="lineNum">     396 </span>                :            : 
+<span class="lineNum">     397 </span>                :<span class="lineCov">          9 :         min = ovsdb_parser_member(&amp;parser, &quot;minReal&quot;, OP_NUMBER | OP_OPTIONAL);</span>
+<span class="lineNum">     398 </span>                :<span class="lineCov">          9 :         max = ovsdb_parser_member(&amp;parser, &quot;maxReal&quot;, OP_NUMBER | OP_OPTIONAL);</span>
+<span class="lineNum">     399 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">          9 :         base-&gt;u.real.min = min ? json_real(min) : -DBL_MAX;</span>
+<span class="lineNum">     400 </span>        [<span class="branchCov" title="Branch 0 was taken 7 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          9 :         base-&gt;u.real.max = max ? json_real(max) : DBL_MAX;</span>
+<span class="lineNum">     401 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>]:<span class="lineCov">          9 :         if (base-&gt;u.real.min &gt; base-&gt;u.real.max) {</span>
+<span class="lineNum">     402 </span>                :<span class="lineCov">          1 :             error = ovsdb_syntax_error(json, NULL, &quot;minReal exceeds maxReal&quot;);</span>
+<span class="lineNum">     403 </span>                :            :         }
+<span class="lineNum">     404 </span>        [<span class="branchCov" title="Branch 0 was taken 3615 times"> + </span><span class="branchCov" title="Branch 1 was taken 15984 times"> + </span>]:<span class="lineCov">      19599 :     } else if (base-&gt;type == OVSDB_TYPE_STRING) {</span>
+<span class="lineNum">     405 </span>        [<span class="branchCov" title="Branch 0 was taken 3615 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       3615 :         if (!error) {</span>
+<span class="lineNum">     406 </span>                :<span class="lineCov">       3615 :             error = parse_optional_uint(&amp;parser, &quot;minLength&quot;,</span>
+<span class="lineNum">     407 </span>                :            :                                         &amp;base-&gt;u.string.minLen);
+<span class="lineNum">     408 </span>                :            :         }
+<span class="lineNum">     409 </span>        [<span class="branchCov" title="Branch 0 was taken 3615 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       3615 :         if (!error) {</span>
+<span class="lineNum">     410 </span>                :<span class="lineCov">       3615 :             error = parse_optional_uint(&amp;parser, &quot;maxLength&quot;,</span>
+<span class="lineNum">     411 </span>                :            :                                         &amp;base-&gt;u.string.maxLen);
+<span class="lineNum">     412 </span>                :            :         }
+<span class="lineNum">     413 </span>[<span class="branchCov" title="Branch 0 was taken 3614 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>][<span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchCov" title="Branch 3 was taken 3613 times"> + </span>]:<span class="lineCov">       3615 :         if (!error &amp;&amp; base-&gt;u.string.minLen &gt; base-&gt;u.string.maxLen) {</span>
+<span class="lineNum">     414 </span>                :<span class="lineCov">          1 :             error = ovsdb_syntax_error(json, NULL,</span>
+<span class="lineNum">     415 </span>                :            :                                        &quot;minLength exceeds maxLength&quot;);
+<span class="lineNum">     416 </span>                :            :         }
+<span class="lineNum">     417 </span>        [<span class="branchCov" title="Branch 0 was taken 15044 times"> + </span><span class="branchCov" title="Branch 1 was taken 940 times"> + </span>]:<span class="lineCov">      15984 :     } else if (base-&gt;type == OVSDB_TYPE_UUID) {</span>
+<span class="lineNum">     418 </span>                :            :         const struct json *refTable;
+<span class="lineNum">     419 </span>                :            : 
+<span class="lineNum">     420 </span>                :<span class="lineCov">      15044 :         refTable = ovsdb_parser_member(&amp;parser, &quot;refTable&quot;,</span>
+<span class="lineNum">     421 </span>                :            :                                        OP_ID | OP_OPTIONAL);
+<span class="lineNum">     422 </span>        [<span class="branchCov" title="Branch 0 was taken 15043 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">      15044 :         if (refTable) {</span>
+<span class="lineNum">     423 </span>                :            :             const struct json *refType;
+<span class="lineNum">     424 </span>                :            : 
+<span class="lineNum">     425 </span>                :<span class="lineCov">      15043 :             base-&gt;u.uuid.refTableName = xstrdup(refTable-&gt;u.string);</span>
+<span class="lineNum">     426 </span>                :            : 
+<span class="lineNum">     427 </span>                :            :             /* We can't set base-&gt;u.uuid.refTable here because we don't have
+<span class="lineNum">     428 </span>                :            :              * enough context (we might not even be running in ovsdb-server).
+<span class="lineNum">     429 </span>                :            :              * ovsdb_create() will set refTable later. */
+<span class="lineNum">     430 </span>                :            : 
+<span class="lineNum">     431 </span>                :<span class="lineCov">      15043 :             refType = ovsdb_parser_member(&amp;parser, &quot;refType&quot;,</span>
+<span class="lineNum">     432 </span>                :            :                                           OP_ID | OP_OPTIONAL);
+<span class="lineNum">     433 </span>        [<span class="branchCov" title="Branch 0 was taken 2275 times"> + </span><span class="branchCov" title="Branch 1 was taken 12768 times"> + </span>]:<span class="lineCov">      15043 :             if (refType) {</span>
+<span class="lineNum">     434 </span>                :<span class="lineCov">       2275 :                 const char *refType_s = json_string(refType);</span>
+<span class="lineNum">     435 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2275 times"> + </span>]:<span class="lineCov">       2275 :                 if (!strcmp(refType_s, &quot;strong&quot;)) {</span>
+<span class="lineNum">     436 </span>                :<span class="lineNoCov">          0 :                     base-&gt;u.uuid.refType = OVSDB_REF_STRONG;</span>
+<span class="lineNum">     437 </span>        [<span class="branchCov" title="Branch 0 was taken 2275 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       2275 :                 } else if (!strcmp(refType_s, &quot;weak&quot;)) {</span>
+<span class="lineNum">     438 </span>                :<span class="lineCov">       2275 :                     base-&gt;u.uuid.refType = OVSDB_REF_WEAK;</span>
+<span class="lineNum">     439 </span>                :            :                 } else {
+<span class="lineNum">     440 </span>                :<span class="lineNoCov">          0 :                     error = ovsdb_syntax_error(json, NULL, &quot;refType must be &quot;</span>
+<span class="lineNum">     441 </span>                :            :                                                &quot;\&quot;strong\&quot; or \&quot;weak\&quot; (not &quot;
+<span class="lineNum">     442 </span>                :            :                                                &quot;\&quot;%s\&quot;)&quot;, refType_s);
+<span class="lineNum">     443 </span>                :            :                 }
+<span class="lineNum">     444 </span>                :            :             } else {
+<span class="lineNum">     445 </span>                :<span class="lineCov">      12768 :                 base-&gt;u.uuid.refType = OVSDB_REF_STRONG;</span>
+<span class="lineNum">     446 </span>                :            :             }
+<span class="lineNum">     447 </span>                :            :         }
+<span class="lineNum">     448 </span>                :            :     }
+<span class="lineNum">     449 </span>                :            : 
+<span class="lineNum">     450 </span>        [<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchCov" title="Branch 1 was taken 47749 times"> + </span>]:<span class="lineCov">      47753 :     if (error) {</span>
+<span class="lineNum">     451 </span>                :<span class="lineCov">          4 :         ovsdb_error_destroy(ovsdb_parser_finish(&amp;parser));</span>
+<span class="lineNum">     452 </span>                :            :     } else {
+<span class="lineNum">     453 </span>                :<span class="lineCov">      47749 :         error = ovsdb_parser_finish(&amp;parser);</span>
+<span class="lineNum">     454 </span>                :            :     }
+<span class="lineNum">     455 </span>        [<span class="branchCov" title="Branch 0 was taken 5 times"> + </span><span class="branchCov" title="Branch 1 was taken 47748 times"> + </span>]:<span class="lineCov">      47753 :     if (error) {</span>
+<span class="lineNum">     456 </span>                :<span class="lineCov">          5 :         ovsdb_base_type_destroy(base);</span>
+<span class="lineNum">     457 </span>                :<span class="lineCov">          5 :         base-&gt;type = OVSDB_TYPE_VOID;</span>
+<span class="lineNum">     458 </span>                :            :     }
+<span class="lineNum">     459 </span>                :<span class="lineCov">     135015 :     return error;</span>
+<span class="lineNum">     460 </span>                :            : }
+<a name="461"><span class="lineNum">     461 </span>                :            : </a>
+<span class="lineNum">     462 </span>                :            : struct json *
+<span class="lineNum">     463 </span>                :<span class="lineCov">      62583 : ovsdb_base_type_to_json(const struct ovsdb_base_type *base)</span>
+<span class="lineNum">     464 </span>                :            : {
+<span class="lineNum">     465 </span>                :            :     struct json *json;
+<span class="lineNum">     466 </span>                :            : 
+<span class="lineNum">     467 </span>        [<span class="branchCov" title="Branch 1 was taken 43257 times"> + </span><span class="branchCov" title="Branch 2 was taken 19326 times"> + </span>]:<span class="lineCov">      62583 :     if (!ovsdb_base_type_has_constraints(base)) {</span>
+<span class="lineNum">     468 </span>                :<span class="lineCov">      43257 :         return json_string_create(ovsdb_atomic_type_to_string(base-&gt;type));</span>
+<span class="lineNum">     469 </span>                :            :     }
+<span class="lineNum">     470 </span>                :            : 
+<span class="lineNum">     471 </span>                :<span class="lineCov">      19326 :     json = json_object_create();</span>
+<span class="lineNum">     472 </span>                :<span class="lineCov">      19326 :     json_object_put_string(json, &quot;type&quot;,</span>
+<span class="lineNum">     473 </span>                :            :                            ovsdb_atomic_type_to_string(base-&gt;type));
+<span class="lineNum">     474 </span>                :            : 
+<span class="lineNum">     475 </span>        [<span class="branchCov" title="Branch 0 was taken 4107 times"> + </span><span class="branchCov" title="Branch 1 was taken 15219 times"> + </span>]:<span class="lineCov">      19326 :     if (base-&gt;enum_) {</span>
+<span class="lineNum">     476 </span>                :            :         const struct ovsdb_type *type;
+<span class="lineNum">     477 </span>                :            : 
+<span class="lineNum">     478 </span>                :<span class="lineCov">       4107 :         type = ovsdb_base_type_get_enum_type(base-&gt;type);</span>
+<span class="lineNum">     479 </span>                :<span class="lineCov">       4107 :         json_object_put(json, &quot;enum&quot;, ovsdb_datum_to_json(base-&gt;enum_, type));</span>
+<span class="lineNum">     480 </span>                :            :     }
+<span class="lineNum">     481 </span>                :            : 
+<span class="lineNum">     482 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 8573 times"> + </span><span class="branchCov" title="Branch 2 was taken 4 times"> + </span><span class="branchCov" title="Branch 3 was taken 1 time"> + </span> :<span class="lineCov">      19326 :     switch (base-&gt;type) {</span>
+<span class="lineNum">         </span>   <span class="branchCov" title="Branch 4 was taken 4106 times"> + </span><span class="branchCov" title="Branch 5 was taken 6642 times"> + </span><span class="branchNoCov" title="Branch 6 was not taken"> - </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span>]
+<span class="lineNum">     483 </span>                :            :     case OVSDB_TYPE_VOID:
+<span class="lineNum">     484 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     485 </span>                :            : 
+<span class="lineNum">     486 </span>                :            :     case OVSDB_TYPE_INTEGER:
+<span class="lineNum">     487 </span>        [<span class="branchCov" title="Branch 0 was taken 8571 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">       8573 :         if (base-&gt;u.integer.min != INT64_MIN) {</span>
+<span class="lineNum">     488 </span>                :<span class="lineCov">       8571 :             json_object_put(json, &quot;minInteger&quot;,</span>
+<span class="lineNum">     489 </span>                :<span class="lineCov">       8571 :                             json_integer_create(base-&gt;u.integer.min));</span>
+<span class="lineNum">     490 </span>                :            :         }
+<span class="lineNum">     491 </span>        [<span class="branchCov" title="Branch 0 was taken 6015 times"> + </span><span class="branchCov" title="Branch 1 was taken 2558 times"> + </span>]:<span class="lineCov">       8573 :         if (base-&gt;u.integer.max != INT64_MAX) {</span>
+<span class="lineNum">     492 </span>                :<span class="lineCov">       6015 :             json_object_put(json, &quot;maxInteger&quot;,</span>
+<span class="lineNum">     493 </span>                :<span class="lineCov">       6015 :                             json_integer_create(base-&gt;u.integer.max));</span>
+<span class="lineNum">     494 </span>                :            :         }
+<span class="lineNum">     495 </span>                :<span class="lineCov">       8573 :         break;</span>
+<span class="lineNum">     496 </span>                :            : 
+<span class="lineNum">     497 </span>                :            :     case OVSDB_TYPE_REAL:
+<span class="lineNum">     498 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          4 :         if (base-&gt;u.real.min != -DBL_MAX) {</span>
+<span class="lineNum">     499 </span>                :<span class="lineCov">          2 :             json_object_put(json, &quot;minReal&quot;,</span>
+<span class="lineNum">     500 </span>                :            :                             json_real_create(base-&gt;u.real.min));
+<span class="lineNum">     501 </span>                :            :         }
+<span class="lineNum">     502 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          4 :         if (base-&gt;u.real.max != DBL_MAX) {</span>
+<span class="lineNum">     503 </span>                :<span class="lineCov">          2 :             json_object_put(json, &quot;maxReal&quot;,</span>
+<span class="lineNum">     504 </span>                :            :                             json_real_create(base-&gt;u.real.max));
+<span class="lineNum">     505 </span>                :            :         }
+<span class="lineNum">     506 </span>                :<span class="lineCov">          4 :         break;</span>
+<span class="lineNum">     507 </span>                :            : 
+<span class="lineNum">     508 </span>                :            :     case OVSDB_TYPE_BOOLEAN:
+<span class="lineNum">     509 </span>                :<span class="lineCov">          1 :         break;</span>
+<span class="lineNum">     510 </span>                :            : 
+<span class="lineNum">     511 </span>                :            :     case OVSDB_TYPE_STRING:
+<span class="lineNum">     512 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 4104 times"> + </span>]:<span class="lineCov">       4106 :         if (base-&gt;u.string.minLen != 0) {</span>
+<span class="lineNum">     513 </span>                :<span class="lineCov">          2 :             json_object_put(json, &quot;minLength&quot;,</span>
+<span class="lineNum">     514 </span>                :<span class="lineCov">          2 :                             json_integer_create(base-&gt;u.string.minLen));</span>
+<span class="lineNum">     515 </span>                :            :         }
+<span class="lineNum">     516 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 4104 times"> + </span>]:<span class="lineCov">       4106 :         if (base-&gt;u.string.maxLen != UINT_MAX) {</span>
+<span class="lineNum">     517 </span>                :<span class="lineCov">          2 :             json_object_put(json, &quot;maxLength&quot;,</span>
+<span class="lineNum">     518 </span>                :<span class="lineCov">          2 :                             json_integer_create(base-&gt;u.string.maxLen));</span>
+<span class="lineNum">     519 </span>                :            :         }
+<span class="lineNum">     520 </span>                :<span class="lineCov">       4106 :         break;</span>
+<span class="lineNum">     521 </span>                :            : 
+<span class="lineNum">     522 </span>                :            :     case OVSDB_TYPE_UUID:
+<span class="lineNum">     523 </span>        [<span class="branchCov" title="Branch 0 was taken 6641 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">       6642 :         if (base-&gt;u.uuid.refTableName) {</span>
+<span class="lineNum">     524 </span>                :<span class="lineCov">       6641 :             json_object_put_string(json, &quot;refTable&quot;,</span>
+<span class="lineNum">     525 </span>                :<span class="lineCov">       6641 :                                    base-&gt;u.uuid.refTableName);</span>
+<span class="lineNum">     526 </span>        [<span class="branchCov" title="Branch 0 was taken 982 times"> + </span><span class="branchCov" title="Branch 1 was taken 5659 times"> + </span>]:<span class="lineCov">       6641 :             if (base-&gt;u.uuid.refType == OVSDB_REF_WEAK) {</span>
+<span class="lineNum">     527 </span>                :<span class="lineCov">        982 :                 json_object_put_string(json, &quot;refType&quot;, &quot;weak&quot;);</span>
+<span class="lineNum">     528 </span>                :            :             }
+<span class="lineNum">     529 </span>                :            :         }
+<span class="lineNum">     530 </span>                :<span class="lineCov">       6642 :         break;</span>
+<span class="lineNum">     531 </span>                :            : 
+<span class="lineNum">     532 </span>                :            :     case OVSDB_N_TYPES:
+<span class="lineNum">     533 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     534 </span>                :            : 
+<span class="lineNum">     535 </span>                :            :     default:
+<span class="lineNum">     536 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     537 </span>                :            :     }
+<span class="lineNum">     538 </span>                :            : 
+<span class="lineNum">     539 </span>                :<span class="lineCov">      62583 :     return json;</span>
+<span class="lineNum">     540 </span>                :            : }
+<span class="lineNum">     541 </span>                :            : 
+<span class="lineNum">     542 </span>                :            : /* ovsdb_type */
+<a name="543"><span class="lineNum">     543 </span>                :            : </a>
+<span class="lineNum">     544 </span>                :            : void
+<span class="lineNum">     545 </span>                :<span class="lineCov">     136038 : ovsdb_type_clone(struct ovsdb_type *dst, const struct ovsdb_type *src)</span>
+<span class="lineNum">     546 </span>                :            : {
+<span class="lineNum">     547 </span>                :<span class="lineCov">     136038 :     ovsdb_base_type_clone(&amp;dst-&gt;key, &amp;src-&gt;key);</span>
+<span class="lineNum">     548 </span>                :<span class="lineCov">     136038 :     ovsdb_base_type_clone(&amp;dst-&gt;value, &amp;src-&gt;value);</span>
+<span class="lineNum">     549 </span>                :<span class="lineCov">     136038 :     dst-&gt;n_min = src-&gt;n_min;</span>
+<span class="lineNum">     550 </span>                :<span class="lineCov">     136038 :     dst-&gt;n_max = src-&gt;n_max;</span>
+<span class="lineNum">     551 </span>                :<span class="lineCov">     136038 : }</span>
+<a name="552"><span class="lineNum">     552 </span>                :            : </a>
+<span class="lineNum">     553 </span>                :            : void
+<span class="lineNum">     554 </span>                :<span class="lineCov">     244961 : ovsdb_type_destroy(struct ovsdb_type *type)</span>
+<span class="lineNum">     555 </span>                :            : {
+<span class="lineNum">     556 </span>                :<span class="lineCov">     244961 :     ovsdb_base_type_destroy(&amp;type-&gt;key);</span>
+<span class="lineNum">     557 </span>                :<span class="lineCov">     244961 :     ovsdb_base_type_destroy(&amp;type-&gt;value);</span>
+<span class="lineNum">     558 </span>                :<span class="lineCov">     244961 : }</span>
+<a name="559"><span class="lineNum">     559 </span>                :            : </a>
+<span class="lineNum">     560 </span>                :            : bool
+<span class="lineNum">     561 </span>                :<span class="lineCov">      88645 : ovsdb_type_is_valid(const struct ovsdb_type *type)</span>
+<span class="lineNum">     562 </span>                :            : {
+<span class="lineNum">     563 </span>                :<span class="lineCov">      88645 :     return (type-&gt;key.type != OVSDB_TYPE_VOID</span>
+<span class="lineNum">     564 </span>        [<span class="branchCov" title="Branch 1 was taken 88645 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">      88645 :             &amp;&amp; ovsdb_base_type_is_valid(&amp;type-&gt;key)</span>
+<span class="lineNum">     565 </span>        [<span class="branchCov" title="Branch 1 was taken 88645 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">      88645 :             &amp;&amp; ovsdb_base_type_is_valid(&amp;type-&gt;value)</span>
+<span class="lineNum">     566 </span>        [<span class="branchCov" title="Branch 0 was taken 88643 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">      88645 :             &amp;&amp; type-&gt;n_min &lt;= 1</span>
+<span class="lineNum">     567 </span>[<span class="branchCov" title="Branch 0 was taken 88645 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 88643 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">     177290 :             &amp;&amp; type-&gt;n_max &gt;= 1);</span>
+<span class="lineNum">     568 </span>                :            : }
+<a name="569"><span class="lineNum">     569 </span>                :            : </a>
+<span class="lineNum">     570 </span>                :            : static struct ovsdb_error *
+<span class="lineNum">     571 </span>                :<span class="lineCov">     139674 : n_from_json(const struct json *json, unsigned int *n)</span>
+<span class="lineNum">     572 </span>                :            : {
+<span class="lineNum">     573 </span>        [<span class="branchCov" title="Branch 0 was taken 32665 times"> + </span><span class="branchCov" title="Branch 1 was taken 107009 times"> + </span>]:<span class="lineCov">     139674 :     if (!json) {</span>
+<span class="lineNum">     574 </span>                :<span class="lineCov">      32665 :         return NULL;</span>
+<span class="lineNum">     575 </span>        [<span class="branchCov" title="Branch 0 was taken 107009 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">     107009 :     } else if (json-&gt;type == JSON_INTEGER</span>
+<span class="lineNum">     576 </span>[<span class="branchCov" title="Branch 0 was taken 107007 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 107007 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">     107009 :                &amp;&amp; json-&gt;u.integer &gt;= 0 &amp;&amp; json-&gt;u.integer &lt; UINT_MAX) {</span>
+<span class="lineNum">     577 </span>                :<span class="lineCov">     107007 :         *n = json-&gt;u.integer;</span>
+<span class="lineNum">     578 </span>                :<span class="lineCov">     107007 :         return NULL;</span>
+<span class="lineNum">     579 </span>                :            :     } else {
+<span class="lineNum">     580 </span>                :<span class="lineCov">     139674 :         return ovsdb_syntax_error(json, NULL, &quot;bad min or max value&quot;);</span>
+<span class="lineNum">     581 </span>                :            :     }
+<span class="lineNum">     582 </span>                :            : }
+<a name="583"><span class="lineNum">     583 </span>                :            : </a>
+<span class="lineNum">     584 </span>                :            : char *
+<span class="lineNum">     585 </span>                :<span class="lineCov">         47 : ovsdb_type_to_english(const struct ovsdb_type *type)</span>
+<span class="lineNum">     586 </span>                :            : {
+<span class="lineNum">     587 </span>                :<span class="lineCov">         47 :     const char *key = ovsdb_atomic_type_to_string(type-&gt;key.type);</span>
+<span class="lineNum">     588 </span>                :<span class="lineCov">         47 :     const char *value = ovsdb_atomic_type_to_string(type-&gt;value.type);</span>
+<span class="lineNum">     589 </span>        [<span class="branchCov" title="Branch 1 was taken 37 times"> + </span><span class="branchCov" title="Branch 2 was taken 10 times"> + </span>]:<span class="lineCov">         47 :     if (ovsdb_type_is_scalar(type)) {</span>
+<span class="lineNum">     590 </span>                :<span class="lineCov">         37 :         return xstrdup(key);</span>
+<span class="lineNum">     591 </span>                :            :     } else {
+<span class="lineNum">     592 </span>                :<span class="lineCov">         10 :         struct ds s = DS_EMPTY_INITIALIZER;</span>
+<span class="lineNum">     593 </span>        [<span class="branchCov" title="Branch 1 was taken 10 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">         10 :         ds_put_cstr(&amp;s, ovsdb_type_is_set(type) ? &quot;set&quot; : &quot;map&quot;);</span>
+<span class="lineNum">     594 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 10 times"> + </span>]:<span class="lineCov">         10 :         if (type-&gt;n_max == UINT_MAX) {</span>
+<span class="lineNum">     595 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (type-&gt;n_min) {</span>
+<span class="lineNum">     596 </span>                :<span class="lineNoCov">          0 :                 ds_put_format(&amp;s, &quot; of %u or more&quot;, type-&gt;n_min);</span>
+<span class="lineNum">     597 </span>                :            :             } else {
+<span class="lineNum">     598 </span>                :<span class="lineNoCov">          0 :                 ds_put_cstr(&amp;s, &quot; of&quot;);</span>
+<span class="lineNum">     599 </span>                :            :             }
+<span class="lineNum">     600 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         10 :         } else if (type-&gt;n_min) {</span>
+<span class="lineNum">     601 </span>                :<span class="lineCov">         10 :             ds_put_format(&amp;s, &quot; of %u to %u&quot;, type-&gt;n_min, type-&gt;n_max);</span>
+<span class="lineNum">     602 </span>                :            :         } else {
+<span class="lineNum">     603 </span>                :<span class="lineNoCov">          0 :             ds_put_format(&amp;s, &quot; of up to %u&quot;, type-&gt;n_max);</span>
+<span class="lineNum">     604 </span>                :            :         }
+<span class="lineNum">     605 </span>        [<span class="branchCov" title="Branch 1 was taken 10 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">         10 :         if (ovsdb_type_is_set(type)) {</span>
+<span class="lineNum">     606 </span>                :<span class="lineCov">         10 :             ds_put_format(&amp;s, &quot; %ss&quot;, key);</span>
+<span class="lineNum">     607 </span>                :            :         } else {
+<span class="lineNum">     608 </span>                :<span class="lineNoCov">          0 :             ds_put_format(&amp;s, &quot; (%s, %s) pairs&quot;, key, value);</span>
+<span class="lineNum">     609 </span>                :            :         }
+<span class="lineNum">     610 </span>                :<span class="lineCov">         47 :         return ds_cstr(&amp;s);</span>
+<span class="lineNum">     611 </span>                :            :     }
+<span class="lineNum">     612 </span>                :            : }
+<a name="613"><span class="lineNum">     613 </span>                :            : </a>
+<span class="lineNum">     614 </span>                :            : struct ovsdb_error *
+<span class="lineNum">     615 </span>                :<span class="lineCov">     109515 : ovsdb_type_from_json(struct ovsdb_type *type, const struct json *json)</span>
+<span class="lineNum">     616 </span>                :            : {
+<span class="lineNum">     617 </span>                :<span class="lineCov">     109515 :     ovsdb_base_type_init(&amp;type-&gt;value, OVSDB_TYPE_VOID);</span>
+<span class="lineNum">     618 </span>                :<span class="lineCov">     109515 :     type-&gt;n_min = 1;</span>
+<span class="lineNum">     619 </span>                :<span class="lineCov">     109515 :     type-&gt;n_max = 1;</span>
+<span class="lineNum">     620 </span>                :            : 
+<span class="lineNum">     621 </span>        [<span class="branchCov" title="Branch 0 was taken 20959 times"> + </span><span class="branchCov" title="Branch 1 was taken 88556 times"> + </span>]:<span class="lineCov">     109515 :     if (json-&gt;type == JSON_STRING) {</span>
+<span class="lineNum">     622 </span>                :<span class="lineCov">      20959 :         return ovsdb_base_type_from_json(&amp;type-&gt;key, json);</span>
+<span class="lineNum">     623 </span>        [<span class="branchCov" title="Branch 0 was taken 88556 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      88556 :     } else if (json-&gt;type == JSON_OBJECT) {</span>
+<span class="lineNum">     624 </span>                :            :         const struct json *key, *value, *min, *max;
+<span class="lineNum">     625 </span>                :            :         struct ovsdb_error *error;
+<span class="lineNum">     626 </span>                :            :         struct ovsdb_parser parser;
+<span class="lineNum">     627 </span>                :            : 
+<span class="lineNum">     628 </span>                :<span class="lineCov">      88556 :         ovsdb_parser_init(&amp;parser, json, &quot;ovsdb type&quot;);</span>
+<span class="lineNum">     629 </span>                :<span class="lineCov">      88556 :         key = ovsdb_parser_member(&amp;parser, &quot;key&quot;, OP_STRING | OP_OBJECT);</span>
+<span class="lineNum">     630 </span>                :<span class="lineCov">      88556 :         value = ovsdb_parser_member(&amp;parser, &quot;value&quot;,</span>
+<span class="lineNum">     631 </span>                :            :                                     OP_STRING | OP_OBJECT | OP_OPTIONAL);
+<span class="lineNum">     632 </span>                :<span class="lineCov">      88556 :         min = ovsdb_parser_member(&amp;parser, &quot;min&quot;, OP_INTEGER | OP_OPTIONAL);</span>
+<span class="lineNum">     633 </span>                :<span class="lineCov">      88556 :         max = ovsdb_parser_member(&amp;parser, &quot;max&quot;,</span>
+<span class="lineNum">     634 </span>                :            :                                   OP_INTEGER | OP_STRING | OP_OPTIONAL);
+<span class="lineNum">     635 </span>                :<span class="lineCov">      88556 :         error = ovsdb_parser_finish(&amp;parser);</span>
+<span class="lineNum">     636 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 88554 times"> + </span>]:<span class="lineCov">      88556 :         if (error) {</span>
+<span class="lineNum">     637 </span>                :<span class="lineCov">          2 :             return error;</span>
+<span class="lineNum">     638 </span>                :            :         }
+<span class="lineNum">     639 </span>                :            : 
+<span class="lineNum">     640 </span>                :<span class="lineCov">      88554 :         error = ovsdb_base_type_from_json(&amp;type-&gt;key, key);</span>
+<span class="lineNum">     641 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 88554 times"> + </span>]:<span class="lineCov">      88554 :         if (error) {</span>
+<span class="lineNum">     642 </span>                :<span class="lineNoCov">          0 :             return error;</span>
+<span class="lineNum">     643 </span>                :            :         }
+<span class="lineNum">     644 </span>                :            : 
+<span class="lineNum">     645 </span>        [<span class="branchCov" title="Branch 0 was taken 25440 times"> + </span><span class="branchCov" title="Branch 1 was taken 63114 times"> + </span>]:<span class="lineCov">      88554 :         if (value) {</span>
+<span class="lineNum">     646 </span>                :<span class="lineCov">      25440 :             error = ovsdb_base_type_from_json(&amp;type-&gt;value, value);</span>
+<span class="lineNum">     647 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 25440 times"> + </span>]:<span class="lineCov">      25440 :             if (error) {</span>
+<span class="lineNum">     648 </span>                :<span class="lineNoCov">          0 :                 return error;</span>
+<span class="lineNum">     649 </span>                :            :             }
+<span class="lineNum">     650 </span>                :            :         }
+<span class="lineNum">     651 </span>                :            : 
+<span class="lineNum">     652 </span>                :<span class="lineCov">      88554 :         error = n_from_json(min, &amp;type-&gt;n_min);</span>
+<span class="lineNum">     653 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 88553 times"> + </span>]:<span class="lineCov">      88554 :         if (error) {</span>
+<span class="lineNum">     654 </span>                :<span class="lineCov">          1 :             return error;</span>
+<span class="lineNum">     655 </span>                :            :         }
+<span class="lineNum">     656 </span>                :            : 
+<span class="lineNum">     657 </span>[<span class="branchCov" title="Branch 0 was taken 61304 times"> + </span><span class="branchCov" title="Branch 1 was taken 27249 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 37433 times"> + </span><span class="branchCov" title="Branch 3 was taken 23871 times"> + </span>]:<span class="lineCov">      88553 :         if (max &amp;&amp; max-&gt;type == JSON_STRING</span>
+<span class="lineNum">     658 </span>        [<span class="branchCov" title="Branch 0 was taken 37433 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      37433 :             &amp;&amp; !strcmp(max-&gt;u.string, &quot;unlimited&quot;)) {</span>
+<span class="lineNum">     659 </span>                :<span class="lineCov">      37433 :             type-&gt;n_max = UINT_MAX;</span>
+<span class="lineNum">     660 </span>                :            :         } else {
+<span class="lineNum">     661 </span>                :<span class="lineCov">      51120 :             error = n_from_json(max, &amp;type-&gt;n_max);</span>
+<span class="lineNum">     662 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 51119 times"> + </span>]:<span class="lineCov">      51120 :             if (error) {</span>
+<span class="lineNum">     663 </span>                :<span class="lineCov">          1 :                 return error;</span>
+<span class="lineNum">     664 </span>                :            :             }
+<span class="lineNum">     665 </span>                :            :         }
+<span class="lineNum">     666 </span>                :            : 
+<span class="lineNum">     667 </span>        [<span class="branchCov" title="Branch 1 was taken 2 times"> + </span><span class="branchCov" title="Branch 2 was taken 88550 times"> + </span>]:<span class="lineCov">      88552 :         if (!ovsdb_type_is_valid(type)) {</span>
+<span class="lineNum">     668 </span>                :<span class="lineCov">          2 :             return ovsdb_syntax_error(json, NULL,</span>
+<span class="lineNum">     669 </span>                :            :                                       &quot;ovsdb type fails constraint checks&quot;);
+<span class="lineNum">     670 </span>                :            :         }
+<span class="lineNum">     671 </span>                :            : 
+<span class="lineNum">     672 </span>                :<span class="lineCov">      88556 :         return NULL;</span>
+<span class="lineNum">     673 </span>                :            :     } else {
+<span class="lineNum">     674 </span>                :<span class="lineCov">     109515 :         return ovsdb_syntax_error(json, NULL, &quot;ovsdb type expected&quot;);</span>
+<span class="lineNum">     675 </span>                :            :     }
+<span class="lineNum">     676 </span>                :            : }
+<a name="677"><span class="lineNum">     677 </span>                :            : </a>
+<span class="lineNum">     678 </span>                :            : struct json *
+<span class="lineNum">     679 </span>                :<span class="lineCov">      50649 : ovsdb_type_to_json(const struct ovsdb_type *type)</span>
+<span class="lineNum">     680 </span>                :            : {
+<span class="lineNum">     681 </span>        [<span class="branchCov" title="Branch 1 was taken 11491 times"> + </span><span class="branchCov" title="Branch 2 was taken 39158 times"> + </span>]:<span class="lineCov">      50649 :     if (ovsdb_type_is_scalar(type)</span>
+<span class="lineNum">     682 </span>        [<span class="branchCov" title="Branch 1 was taken 9410 times"> + </span><span class="branchCov" title="Branch 2 was taken 2081 times"> + </span>]:<span class="lineCov">      11491 :         &amp;&amp; !ovsdb_base_type_has_constraints(&amp;type-&gt;key)) {</span>
+<span class="lineNum">     683 </span>                :<span class="lineCov">       9410 :         return ovsdb_base_type_to_json(&amp;type-&gt;key);</span>
+<span class="lineNum">     684 </span>                :            :     } else {
+<span class="lineNum">     685 </span>                :<span class="lineCov">      41239 :         struct json *json = json_object_create();</span>
+<span class="lineNum">     686 </span>                :<span class="lineCov">      41239 :         json_object_put(json, &quot;key&quot;, ovsdb_base_type_to_json(&amp;type-&gt;key));</span>
+<span class="lineNum">     687 </span>        [<span class="branchCov" title="Branch 0 was taken 11918 times"> + </span><span class="branchCov" title="Branch 1 was taken 29321 times"> + </span>]:<span class="lineCov">      41239 :         if (type-&gt;value.type != OVSDB_TYPE_VOID) {</span>
+<span class="lineNum">     688 </span>                :<span class="lineCov">      11918 :             json_object_put(json, &quot;value&quot;,</span>
+<span class="lineNum">     689 </span>                :            :                             ovsdb_base_type_to_json(&amp;type-&gt;value));
+<span class="lineNum">     690 </span>                :            :         }
+<span class="lineNum">     691 </span>        [<span class="branchCov" title="Branch 0 was taken 38160 times"> + </span><span class="branchCov" title="Branch 1 was taken 3079 times"> + </span>]:<span class="lineCov">      41239 :         if (type-&gt;n_min != 1) {</span>
+<span class="lineNum">     692 </span>                :<span class="lineCov">      38160 :             json_object_put(json, &quot;min&quot;, json_integer_create(type-&gt;n_min));</span>
+<span class="lineNum">     693 </span>                :            :         }
+<span class="lineNum">     694 </span>        [<span class="branchCov" title="Branch 0 was taken 17283 times"> + </span><span class="branchCov" title="Branch 1 was taken 23956 times"> + </span>]:<span class="lineCov">      41239 :         if (type-&gt;n_max == UINT_MAX) {</span>
+<span class="lineNum">     695 </span>                :<span class="lineCov">      17283 :             json_object_put_string(json, &quot;max&quot;, &quot;unlimited&quot;);</span>
+<span class="lineNum">     696 </span>        [<span class="branchCov" title="Branch 0 was taken 1276 times"> + </span><span class="branchCov" title="Branch 1 was taken 22680 times"> + </span>]:<span class="lineCov">      23956 :         } else if (type-&gt;n_max != 1) {</span>
+<span class="lineNum">     697 </span>                :<span class="lineCov">       1276 :             json_object_put(json, &quot;max&quot;, json_integer_create(type-&gt;n_max));</span>
+<span class="lineNum">     698 </span>                :            :         }
+<span class="lineNum">     699 </span>                :<span class="lineCov">      50649 :         return json;</span>
+<span class="lineNum">     700 </span>                :            :     }
+<span class="lineNum">     701 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

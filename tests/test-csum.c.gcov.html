@@ -1,0 +1,372 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - tests/test-csum.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">tests</a> - test-csum.c<span style="font-size: 80%;"> (source / <a href="test-csum.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">87</td>
+            <td class="headerCovTableEntry">87</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">5</td>
+            <td class="headerCovTableEntry">5</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">46</td>
+            <td class="headerCovTableEntry">62</td>
+            <td class="headerCovTableEntryLo">74.2 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2009, 2010, 2011, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;csum.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &quot;crc32c.h&quot;
+<span class="lineNum">      20 </span>                :            : #include &lt;inttypes.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;stdio.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      25 </span>                :            : #include &quot;random.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;unaligned.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;ovstest.h&quot;
+<span class="lineNum">      29 </span>                :            : 
+<span class="lineNum">      30 </span>                :            : #undef NDEBUG
+<span class="lineNum">      31 </span>                :            : #include &lt;assert.h&gt;
+<span class="lineNum">      32 </span>                :            : 
+<span class="lineNum">      33 </span>                :            : struct test_case {
+<span class="lineNum">      34 </span>                :            :     char *data;
+<span class="lineNum">      35 </span>                :            :     size_t size;                /* Test requires a multiple of 4. */
+<span class="lineNum">      36 </span>                :            :     uint16_t csum;
+<span class="lineNum">      37 </span>                :            : };
+<span class="lineNum">      38 </span>                :            : 
+<span class="lineNum">      39 </span>                :            : #define TEST_CASE(DATA, CSUM) { DATA, (sizeof DATA) - 1, CSUM }
+<span class="lineNum">      40 </span>                :            : 
+<span class="lineNum">      41 </span>                :            : static const struct test_case test_cases[] = {
+<span class="lineNum">      42 </span>                :            :     /* RFC 1071 section 3. */
+<span class="lineNum">      43 </span>                :            :     TEST_CASE(&quot;\x00\x01\xf2\x03&quot;
+<span class="lineNum">      44 </span>                :            :               &quot;\xf4\xf5\xf6\xf7&quot;,
+<span class="lineNum">      45 </span>                :            :               0xffff - 0xddf2 /* ~0xddf2 */),
+<span class="lineNum">      46 </span>                :            : 
+<span class="lineNum">      47 </span>                :            :     /* http://www.sbprojects.com/projects/tcpip/theory/theory14.htm */
+<span class="lineNum">      48 </span>                :            :     TEST_CASE(&quot;\x45\x00\x00\x28&quot;
+<span class="lineNum">      49 </span>                :            :               &quot;\x1F\xFD\x40\x00&quot;
+<span class="lineNum">      50 </span>                :            :               &quot;\x80\x06\x00\x00&quot;
+<span class="lineNum">      51 </span>                :            :               &quot;\xC0\xA8\x3B\x0A&quot;
+<span class="lineNum">      52 </span>                :            :               &quot;\xC0\xA8\x3B\x32&quot;,
+<span class="lineNum">      53 </span>                :            :               0xe345),
+<span class="lineNum">      54 </span>                :            : 
+<span class="lineNum">      55 </span>                :            :     /* http://mathforum.org/library/drmath/view/54379.html */
+<span class="lineNum">      56 </span>                :            :     TEST_CASE(&quot;\x86\x5e\xac\x60&quot;
+<span class="lineNum">      57 </span>                :            :               &quot;\x71\x2a\x81\xb5&quot;,
+<span class="lineNum">      58 </span>                :            :               0xda60),
+<span class="lineNum">      59 </span>                :            : };
+<a name="60"><span class="lineNum">      60 </span>                :            : </a>
+<span class="lineNum">      61 </span>                :            : static void
+<span class="lineNum">      62 </span>                :<span class="lineCov">         83 : mark(char c)</span>
+<span class="lineNum">      63 </span>                :            : {
+<span class="lineNum">      64 </span>                :<span class="lineCov">         83 :     putchar(c);</span>
+<span class="lineNum">      65 </span>                :<span class="lineCov">         83 :     fflush(stdout);</span>
+<span class="lineNum">      66 </span>                :<span class="lineCov">         83 : }</span>
+<span class="lineNum">      67 </span>                :            : 
+<span class="lineNum">      68 </span>                :            : #if 0
+<span class="lineNum">      69 </span>                :            : /* This code is useful for generating new test cases for RFC 1624 section 4. */
+<span class="lineNum">      70 </span>                :            : static void
+<span class="lineNum">      71 </span>                :            : generate_rfc1624_test_case(void)
+<span class="lineNum">      72 </span>                :            : {
+<span class="lineNum">      73 </span>                :            :     int i;
+<span class="lineNum">      74 </span>                :            : 
+<span class="lineNum">      75 </span>                :            :     for (i = 0; i &lt; 10000000; i++) {
+<span class="lineNum">      76 </span>                :            :         uint32_t data[8];
+<span class="lineNum">      77 </span>                :            :         int j;
+<span class="lineNum">      78 </span>                :            : 
+<span class="lineNum">      79 </span>                :            :         for (j = 0; j &lt; 8; j++) {
+<span class="lineNum">      80 </span>                :            :             data[j] = random_uint32();
+<span class="lineNum">      81 </span>                :            :         }
+<span class="lineNum">      82 </span>                :            :         data[7] &amp;= 0x0000ffff;
+<span class="lineNum">      83 </span>                :            :         data[7] |= 0x55550000;
+<span class="lineNum">      84 </span>                :            :         if (ntohs(~csum(data, sizeof data - 2)) == 0xcd7a) {
+<span class="lineNum">      85 </span>                :            :             ovs_hex_dump(stdout, data, sizeof data, 0, false);
+<span class="lineNum">      86 </span>                :            :             exit(0);
+<span class="lineNum">      87 </span>                :            :         }
+<span class="lineNum">      88 </span>                :            :     }
+<span class="lineNum">      89 </span>                :            : }
+<span class="lineNum">      90 </span>                :            : #endif
+<span class="lineNum">      91 </span>                :            : 
+<span class="lineNum">      92 </span>                :            : 
+<span class="lineNum">      93 </span>                :            : 
+<a name="94"><span class="lineNum">      94 </span>                :            : /* Make sure we get the calculation in RFC 1624 section 4 correct. */</a>
+<span class="lineNum">      95 </span>                :            : static void
+<span class="lineNum">      96 </span>                :<span class="lineCov">          1 : test_rfc1624(void)</span>
+<span class="lineNum">      97 </span>                :            : {
+<span class="lineNum">      98 </span>                :            :     /* &quot;...an IP packet header in which a 16-bit field m = 0x5555...&quot; */
+<span class="lineNum">      99 </span>                :<span class="lineCov">          1 :     uint8_t data[32] = {</span>
+<span class="lineNum">     100 </span>                :            :         0xfe, 0x8f, 0xc1, 0x14, 0x4b, 0x6f, 0x70, 0x2a,
+<span class="lineNum">     101 </span>                :            :         0x80, 0x29, 0x78, 0xc0, 0x58, 0x81, 0x77, 0xaa,
+<span class="lineNum">     102 </span>                :            :         0x66, 0x64, 0xfc, 0x96, 0x63, 0x97, 0x64, 0xee,
+<span class="lineNum">     103 </span>                :            :         0x12, 0x53, 0x1d, 0xa9, 0x2d, 0xa9, 0x55, 0x55
+<span class="lineNum">     104 </span>                :            :     };
+<span class="lineNum">     105 </span>                :            : 
+<span class="lineNum">     106 </span>                :            :     /* &quot;...the one's complement sum of all other header octets is 0xCD7A.&quot; */
+<span class="lineNum">     107 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     assert(ntohs(csum(data, sizeof data - 2)) == 0xffff - 0xcd7a);</span>
+<span class="lineNum">     108 </span>                :            : 
+<span class="lineNum">     109 </span>                :            :     /* &quot;...the header checksum would be:
+<span class="lineNum">     110 </span>                :            : 
+<span class="lineNum">     111 </span>                :            :           HC = ~(0xCD7A + 0x5555)
+<span class="lineNum">     112 </span>                :            :              = ~0x22D0
+<span class="lineNum">     113 </span>                :            :              =  0xDD2F&quot;
+<span class="lineNum">     114 </span>                :            :     */
+<span class="lineNum">     115 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     assert(ntohs(csum(data, sizeof data)) == 0xdd2f);</span>
+<span class="lineNum">     116 </span>                :            : 
+<span class="lineNum">     117 </span>                :            :     /* &quot;a 16-bit field m = 0x5555 changes to m' = 0x3285...&quot; */
+<span class="lineNum">     118 </span>                :<span class="lineCov">          1 :     data[30] = 0x32;</span>
+<span class="lineNum">     119 </span>                :<span class="lineCov">          1 :     data[31] = 0x85;</span>
+<span class="lineNum">     120 </span>                :            : 
+<span class="lineNum">     121 </span>                :            :     /* &quot;The new checksum via recomputation is:
+<span class="lineNum">     122 </span>                :            : 
+<span class="lineNum">     123 </span>                :            :           HC' = ~(0xCD7A + 0x3285)
+<span class="lineNum">     124 </span>                :            :               = ~0xFFFF
+<span class="lineNum">     125 </span>                :            :               =  0x0000&quot;
+<span class="lineNum">     126 </span>                :            :     */
+<span class="lineNum">     127 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     assert(ntohs(csum(data, sizeof data)) == 0x0000);</span>
+<span class="lineNum">     128 </span>                :            : 
+<span class="lineNum">     129 </span>                :            :     /* &quot;Applying [Eqn. 3] to the example above, we get the correct result:
+<span class="lineNum">     130 </span>                :            : 
+<span class="lineNum">     131 </span>                :            :           HC' = ~(C + (-m) + m')
+<span class="lineNum">     132 </span>                :            :               = ~(0x22D0 + ~0x5555 + 0x3285)
+<span class="lineNum">     133 </span>                :            :               = ~0xFFFF
+<span class="lineNum">     134 </span>                :            :               =  0x0000&quot; */
+<span class="lineNum">     135 </span>        [<span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchCov" title="Branch 6 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     assert(recalc_csum16(htons(0xdd2f), htons(0x5555), htons(0x3285))</span>
+<span class="lineNum">     136 </span>                :            :            == htons(0x0000));
+<span class="lineNum">     137 </span>                :            : 
+<span class="lineNum">     138 </span>                :<span class="lineCov">          1 :     mark('#');</span>
+<span class="lineNum">     139 </span>                :<span class="lineCov">          1 : }</span>
+<span class="lineNum">     140 </span>                :            : 
+<span class="lineNum">     141 </span>                :            : /* CRC32C checksum tests, based on Intel IPPs, Chapter 13,
+<span class="lineNum">     142 </span>                :            :  * ippsCRC32C_8u() example, found at the following location:
+<a name="143"><span class="lineNum">     143 </span>                :            :  * http://software.intel.com/sites/products/documentation/hpc/ipp/ipps/ */</a>
+<span class="lineNum">     144 </span>                :            : static void
+<span class="lineNum">     145 </span>                :<span class="lineCov">          1 : test_crc32c(void)</span>
+<span class="lineNum">     146 </span>                :            : {
+<span class="lineNum">     147 </span>                :            :     int i;
+<span class="lineNum">     148 </span>                :<span class="lineCov">          1 :     uint8_t data[48] = {</span>
+<span class="lineNum">     149 </span>                :            :         0x01, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+<span class="lineNum">     150 </span>                :            :         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+<span class="lineNum">     151 </span>                :            :         0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
+<span class="lineNum">     152 </span>                :            :         0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00, 0x18,
+<span class="lineNum">     153 </span>                :            :         0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+<span class="lineNum">     154 </span>                :            :         0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+<span class="lineNum">     155 </span>                :            :     };
+<span class="lineNum">     156 </span>                :            : 
+<span class="lineNum">     157 </span>                :            :     /* iSCSI Read PDU */
+<span class="lineNum">     158 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     assert(ntohl(crc32c(data, 48)) == 0x563a96d9L);</span>
+<span class="lineNum">     159 </span>                :            : 
+<span class="lineNum">     160 </span>                :            :     /* 32 bytes of all zeroes */
+<span class="lineNum">     161 </span>        [<span class="branchCov" title="Branch 0 was taken 32 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">         33 :     for (i = 0; i &lt; 32; i++) data[i] = 0x00;</span>
+<span class="lineNum">     162 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     assert(ntohl(crc32c(data, 32)) == 0xaa36918aL);</span>
+<span class="lineNum">     163 </span>                :            : 
+<span class="lineNum">     164 </span>                :            :     /* 32 bytes of all ones */
+<span class="lineNum">     165 </span>        [<span class="branchCov" title="Branch 0 was taken 32 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">         33 :     for (i = 0; i &lt; 32; i++) data[i] = 0xff;</span>
+<span class="lineNum">     166 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     assert(ntohl(crc32c(data, 32)) == 0x43aba862L);</span>
+<span class="lineNum">     167 </span>                :            : 
+<span class="lineNum">     168 </span>                :            :     /* 32 bytes of incrementing 00..1f */
+<span class="lineNum">     169 </span>        [<span class="branchCov" title="Branch 0 was taken 32 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">         33 :     for (i = 0; i &lt; 32; i++) data[i] = i;</span>
+<span class="lineNum">     170 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     assert(ntohl(crc32c(data, 32)) == 0x4e79dd46L);</span>
+<span class="lineNum">     171 </span>                :            : 
+<span class="lineNum">     172 </span>                :            :     /* 32 bytes of decrementing 1f..00 */
+<span class="lineNum">     173 </span>        [<span class="branchCov" title="Branch 0 was taken 32 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">         33 :     for (i  = 0; i &lt; 32; i++) data[i] = 31 - i;</span>
+<span class="lineNum">     174 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     assert(ntohl(crc32c(data, 32)) == 0x5cdb3f11L);</span>
+<span class="lineNum">     175 </span>                :            : 
+<span class="lineNum">     176 </span>                :<span class="lineCov">          1 :     mark('#');</span>
+<span class="lineNum">     177 </span>                :<span class="lineCov">          1 : }</span>
+<span class="lineNum">     178 </span>                :            : 
+<a name="179"><span class="lineNum">     179 </span>                :            : </a>
+<span class="lineNum">     180 </span>                :            : static void
+<span class="lineNum">     181 </span>                :<span class="lineCov">          1 : test_csum_main(int argc OVS_UNUSED, char *argv[] OVS_UNUSED)</span>
+<span class="lineNum">     182 </span>                :            : {
+<span class="lineNum">     183 </span>                :            :     const struct test_case *tc;
+<span class="lineNum">     184 </span>                :            :     int i;
+<span class="lineNum">     185 </span>                :            : 
+<span class="lineNum">     186 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          4 :     for (tc = test_cases; tc &lt; &amp;test_cases[ARRAY_SIZE(test_cases)]; tc++) {</span>
+<span class="lineNum">     187 </span>                :<span class="lineCov">          3 :         const void *data = tc-&gt;data;</span>
+<span class="lineNum">     188 </span>                :<span class="lineCov">          3 :         const ovs_be16 *data16 = (OVS_FORCE const ovs_be16 *) data;</span>
+<span class="lineNum">     189 </span>                :<span class="lineCov">          3 :         const ovs_be32 *data32 = (OVS_FORCE const ovs_be32 *) data;</span>
+<span class="lineNum">     190 </span>                :            :         uint32_t partial;
+<span class="lineNum">     191 </span>                :            : 
+<span class="lineNum">     192 </span>                :            :         /* Test csum(). */
+<span class="lineNum">     193 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 3 times"> + </span>]:<span class="lineCov">          3 :         assert(ntohs(csum(tc-&gt;data, tc-&gt;size)) == tc-&gt;csum);</span>
+<span class="lineNum">     194 </span>                :<span class="lineCov">          3 :         mark('.');</span>
+<span class="lineNum">     195 </span>                :            : 
+<span class="lineNum">     196 </span>                :            :         /* Test csum_add16(). */
+<span class="lineNum">     197 </span>                :<span class="lineCov">          3 :         partial = 0;</span>
+<span class="lineNum">     198 </span>        [<span class="branchCov" title="Branch 0 was taken 18 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">         21 :         for (i = 0; i &lt; tc-&gt;size / 2; i++) {</span>
+<span class="lineNum">     199 </span>                :<span class="lineCov">         18 :             partial = csum_add16(partial, get_unaligned_be16(&amp;data16[i]));</span>
+<span class="lineNum">     200 </span>                :            :         }
+<span class="lineNum">     201 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 3 times"> + </span>]:<span class="lineCov">          3 :         assert(ntohs(csum_finish(partial)) == tc-&gt;csum);</span>
+<span class="lineNum">     202 </span>                :<span class="lineCov">          3 :         mark('.');</span>
+<span class="lineNum">     203 </span>                :            : 
+<span class="lineNum">     204 </span>                :            :         /* Test csum_add32(). */
+<span class="lineNum">     205 </span>                :<span class="lineCov">          3 :         partial = 0;</span>
+<span class="lineNum">     206 </span>        [<span class="branchCov" title="Branch 0 was taken 9 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">         12 :         for (i = 0; i &lt; tc-&gt;size / 4; i++) {</span>
+<span class="lineNum">     207 </span>                :<span class="lineCov">          9 :             partial = csum_add32(partial, get_unaligned_be32(&amp;data32[i]));</span>
+<span class="lineNum">     208 </span>                :            :         }
+<span class="lineNum">     209 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 3 times"> + </span>]:<span class="lineCov">          3 :         assert(ntohs(csum_finish(partial)) == tc-&gt;csum);</span>
+<span class="lineNum">     210 </span>                :<span class="lineCov">          3 :         mark('.');</span>
+<span class="lineNum">     211 </span>                :            : 
+<span class="lineNum">     212 </span>                :            :         /* Test alternating csum_add16() and csum_add32(). */
+<span class="lineNum">     213 </span>                :<span class="lineCov">          3 :         partial = 0;</span>
+<span class="lineNum">     214 </span>        [<span class="branchCov" title="Branch 0 was taken 9 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">         12 :         for (i = 0; i &lt; tc-&gt;size / 4; i++) {</span>
+<span class="lineNum">     215 </span>        [<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchCov" title="Branch 1 was taken 5 times"> + </span>]:<span class="lineCov">          9 :             if (i % 2) {</span>
+<span class="lineNum">     216 </span>                :<span class="lineCov">          4 :                 partial = csum_add32(partial, get_unaligned_be32(&amp;data32[i]));</span>
+<span class="lineNum">     217 </span>                :            :             } else {
+<span class="lineNum">     218 </span>                :<span class="lineCov">          5 :                 ovs_be16 u0 = get_unaligned_be16(&amp;data16[i * 2]);</span>
+<span class="lineNum">     219 </span>                :<span class="lineCov">          5 :                 ovs_be16 u1 = get_unaligned_be16(&amp;data16[i * 2 + 1]);</span>
+<span class="lineNum">     220 </span>                :<span class="lineCov">          5 :                 partial = csum_add16(partial, u0);</span>
+<span class="lineNum">     221 </span>                :<span class="lineCov">          5 :                 partial = csum_add16(partial, u1);</span>
+<span class="lineNum">     222 </span>                :            :             }
+<span class="lineNum">     223 </span>                :            :         }
+<span class="lineNum">     224 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 3 times"> + </span>]:<span class="lineCov">          3 :         assert(ntohs(csum_finish(partial)) == tc-&gt;csum);</span>
+<span class="lineNum">     225 </span>                :<span class="lineCov">          3 :         mark('.');</span>
+<span class="lineNum">     226 </span>                :            : 
+<span class="lineNum">     227 </span>                :            :         /* Test csum_continue(). */
+<span class="lineNum">     228 </span>                :<span class="lineCov">          3 :         partial = 0;</span>
+<span class="lineNum">     229 </span>        [<span class="branchCov" title="Branch 0 was taken 9 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">         12 :         for (i = 0; i &lt; tc-&gt;size / 4; i++) {</span>
+<span class="lineNum">     230 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">          9 :             if (i) {</span>
+<span class="lineNum">     231 </span>                :<span class="lineCov">          6 :                 partial = csum_continue(partial, &amp;data32[i], 4);</span>
+<span class="lineNum">     232 </span>                :            :             } else {
+<span class="lineNum">     233 </span>                :<span class="lineCov">          3 :                 partial = csum_continue(partial, &amp;data16[i * 2], 2);</span>
+<span class="lineNum">     234 </span>                :<span class="lineCov">          3 :                 partial = csum_continue(partial, &amp;data16[i * 2 + 1], 2);</span>
+<span class="lineNum">     235 </span>                :            :             }
+<span class="lineNum">     236 </span>                :            :         }
+<span class="lineNum">     237 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 3 times"> + </span>]:<span class="lineCov">          3 :         assert(ntohs(csum_finish(partial)) == tc-&gt;csum);</span>
+<span class="lineNum">     238 </span>                :<span class="lineCov">          3 :         mark('#');</span>
+<span class="lineNum">     239 </span>                :            :     }
+<span class="lineNum">     240 </span>                :            : 
+<span class="lineNum">     241 </span>                :<span class="lineCov">          1 :     test_rfc1624();</span>
+<span class="lineNum">     242 </span>                :<span class="lineCov">          1 :     test_crc32c();</span>
+<span class="lineNum">     243 </span>                :            : 
+<span class="lineNum">     244 </span>                :            :     /* Test recalc_csum16(). */
+<span class="lineNum">     245 </span>        [<span class="branchCov" title="Branch 0 was taken 32 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">         33 :     for (i = 0; i &lt; 32; i++) {</span>
+<span class="lineNum">     246 </span>                :            :         ovs_be16 old_u16, new_u16;
+<span class="lineNum">     247 </span>                :            :         ovs_be16 old_csum;
+<span class="lineNum">     248 </span>                :            :         ovs_be16 data[16];
+<span class="lineNum">     249 </span>                :            :         int j, index;
+<span class="lineNum">     250 </span>                :            : 
+<span class="lineNum">     251 </span>        [<span class="branchCov" title="Branch 0 was taken 512 times"> + </span><span class="branchCov" title="Branch 1 was taken 32 times"> + </span>]:<span class="lineCov">        544 :         for (j = 0; j &lt; ARRAY_SIZE(data); j++) {</span>
+<span class="lineNum">     252 </span>                :<span class="lineCov">        512 :             data[j] = (OVS_FORCE ovs_be16) random_uint32();</span>
+<span class="lineNum">     253 </span>                :            :         }
+<span class="lineNum">     254 </span>                :<span class="lineCov">         32 :         old_csum = csum(data, sizeof data);</span>
+<span class="lineNum">     255 </span>                :<span class="lineCov">         32 :         index = random_range(ARRAY_SIZE(data));</span>
+<span class="lineNum">     256 </span>                :<span class="lineCov">         32 :         old_u16 = data[index];</span>
+<span class="lineNum">     257 </span>                :<span class="lineCov">         32 :         new_u16 = data[index] = (OVS_FORCE ovs_be16) random_uint32();</span>
+<span class="lineNum">     258 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 32 times"> + </span>]:<span class="lineCov">         32 :         assert(csum(data, sizeof data)</span>
+<span class="lineNum">     259 </span>                :            :                == recalc_csum16(old_csum, old_u16, new_u16));
+<span class="lineNum">     260 </span>                :<span class="lineCov">         32 :         mark('.');</span>
+<span class="lineNum">     261 </span>                :            :     }
+<span class="lineNum">     262 </span>                :<span class="lineCov">          1 :     mark('#');</span>
+<span class="lineNum">     263 </span>                :            : 
+<span class="lineNum">     264 </span>                :            :     /* Test recalc_csum32(). */
+<span class="lineNum">     265 </span>        [<span class="branchCov" title="Branch 0 was taken 32 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">         33 :     for (i = 0; i &lt; 32; i++) {</span>
+<span class="lineNum">     266 </span>                :            :         ovs_be32 old_u32, new_u32;
+<span class="lineNum">     267 </span>                :            :         ovs_be16 old_csum;
+<span class="lineNum">     268 </span>                :            :         ovs_be32 data[16];
+<span class="lineNum">     269 </span>                :            :         int j, index;
+<span class="lineNum">     270 </span>                :            : 
+<span class="lineNum">     271 </span>        [<span class="branchCov" title="Branch 0 was taken 512 times"> + </span><span class="branchCov" title="Branch 1 was taken 32 times"> + </span>]:<span class="lineCov">        544 :         for (j = 0; j &lt; ARRAY_SIZE(data); j++) {</span>
+<span class="lineNum">     272 </span>                :<span class="lineCov">        512 :             data[j] = (OVS_FORCE ovs_be32) random_uint32();</span>
+<span class="lineNum">     273 </span>                :            :         }
+<span class="lineNum">     274 </span>                :<span class="lineCov">         32 :         old_csum = csum(data, sizeof data);</span>
+<span class="lineNum">     275 </span>                :<span class="lineCov">         32 :         index = random_range(ARRAY_SIZE(data));</span>
+<span class="lineNum">     276 </span>                :<span class="lineCov">         32 :         old_u32 = data[index];</span>
+<span class="lineNum">     277 </span>                :<span class="lineCov">         32 :         new_u32 = data[index] = (OVS_FORCE ovs_be32) random_uint32();</span>
+<span class="lineNum">     278 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 32 times"> + </span>]:<span class="lineCov">         32 :         assert(csum(data, sizeof data)</span>
+<span class="lineNum">     279 </span>                :            :                == recalc_csum32(old_csum, old_u32, new_u32));
+<span class="lineNum">     280 </span>                :<span class="lineCov">         32 :         mark('.');</span>
+<span class="lineNum">     281 </span>                :            :     }
+<span class="lineNum">     282 </span>                :<span class="lineCov">          1 :     mark('#');</span>
+<span class="lineNum">     283 </span>                :            : 
+<span class="lineNum">     284 </span>                :<span class="lineCov">          1 :     putchar('\n');</span>
+<a name="285"><span class="lineNum">     285 </span>                :<span class="lineCov">          1 : }</span></a>
+<span class="lineNum">     286 </span>                :            : 
+<span class="lineNum">     287 </span>                :<span class="lineCov">        478 : OVSTEST_REGISTER(&quot;test-csum&quot;, test_csum_main);</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,415 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/smap.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - smap.c<span style="font-size: 80%;"> (source / <a href="smap.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">94</td>
+            <td class="headerCovTableEntry">120</td>
+            <td class="headerCovTableEntryMed">78.3 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">19</td>
+            <td class="headerCovTableEntry">23</td>
+            <td class="headerCovTableEntryMed">82.6 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">26</td>
+            <td class="headerCovTableEntry">42</td>
+            <td class="headerCovTableEntryLo">61.9 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (c) 2012 Nicira, Inc.</a>
+<span class="lineNum">       2 </span>                :            :  *
+<span class="lineNum">       3 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       4 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       5 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       6 </span>                :            :  *
+<span class="lineNum">       7 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       8 </span>                :            :  *
+<span class="lineNum">       9 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      10 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      11 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      12 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      13 </span>                :            :  * limitations under the License. */
+<span class="lineNum">      14 </span>                :            : 
+<span class="lineNum">      15 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      16 </span>                :            : #include &quot;smap.h&quot;
+<span class="lineNum">      17 </span>                :            : 
+<span class="lineNum">      18 </span>                :            : #include &lt;strings.h&gt;
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      21 </span>                :            : #include &quot;json.h&quot;
+<span class="lineNum">      22 </span>                :            : 
+<span class="lineNum">      23 </span>                :            : static struct smap_node *smap_add__(struct smap *, char *, void *,
+<span class="lineNum">      24 </span>                :            :                                     size_t hash);
+<span class="lineNum">      25 </span>                :            : static struct smap_node *smap_find__(const struct smap *, const char *key,
+<span class="lineNum">      26 </span>                :            :                                      size_t key_len, size_t hash);
+<span class="lineNum">      27 </span>                :            : static int compare_nodes_by_key(const void *, const void *);
+<span class="lineNum">      28 </span>                :            : 
+<span class="lineNum">      29 </span>                :            : /* Public Functions. */
+<a name="30"><span class="lineNum">      30 </span>                :            : </a>
+<span class="lineNum">      31 </span>                :            : void
+<span class="lineNum">      32 </span>                :<span class="lineCov">     774705 : smap_init(struct smap *smap)</span>
+<span class="lineNum">      33 </span>                :            : {
+<span class="lineNum">      34 </span>                :<span class="lineCov">     774705 :     hmap_init(&amp;smap-&gt;map);</span>
+<span class="lineNum">      35 </span>                :<span class="lineCov">     774705 : }</span>
+<a name="36"><span class="lineNum">      36 </span>                :            : </a>
+<span class="lineNum">      37 </span>                :            : void
+<span class="lineNum">      38 </span>                :<span class="lineCov">     426116 : smap_destroy(struct smap *smap)</span>
+<span class="lineNum">      39 </span>                :            : {
+<span class="lineNum">      40 </span>        [<span class="branchCov" title="Branch 0 was taken 426116 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">     426116 :     if (smap) {</span>
+<span class="lineNum">      41 </span>                :<span class="lineCov">     426116 :         smap_clear(smap);</span>
+<span class="lineNum">      42 </span>                :<span class="lineCov">     426116 :         hmap_destroy(&amp;smap-&gt;map);</span>
+<span class="lineNum">      43 </span>                :            :     }
+<span class="lineNum">      44 </span>                :<span class="lineCov">     426116 : }</span>
+<span class="lineNum">      45 </span>                :            : 
+<span class="lineNum">      46 </span>                :            : /* Adds 'key' paired with 'value' to 'smap'.  It is the caller's responsibility
+<a name="47"><span class="lineNum">      47 </span>                :            :  * to avoid duplicate keys if desirable. */</a>
+<span class="lineNum">      48 </span>                :            : struct smap_node *
+<span class="lineNum">      49 </span>                :<span class="lineCov">      73714 : smap_add(struct smap *smap, const char *key, const char *value)</span>
+<span class="lineNum">      50 </span>                :            : {
+<span class="lineNum">      51 </span>                :<span class="lineCov">      73714 :     size_t key_len = strlen(key);</span>
+<span class="lineNum">      52 </span>                :<span class="lineCov">      73714 :     return smap_add__(smap, xmemdup0(key, key_len), xstrdup(value),</span>
+<span class="lineNum">      53 </span>                :<span class="lineCov">      73714 :                       hash_bytes(key, key_len, 0));</span>
+<span class="lineNum">      54 </span>                :            : }
+<span class="lineNum">      55 </span>                :            : 
+<span class="lineNum">      56 </span>                :            : /* Attempts to add 'key' to 'smap' associated with 'value'.  If 'key' already
+<span class="lineNum">      57 </span>                :            :  * exists in 'smap', does nothing and returns false.  Otherwise, performs the
+<a name="58"><span class="lineNum">      58 </span>                :            :  * addition and returns true. */</a>
+<span class="lineNum">      59 </span>                :            : bool
+<span class="lineNum">      60 </span>                :<span class="lineNoCov">          0 : smap_add_once(struct smap *smap, const char *key, const char *value)</span>
+<span class="lineNum">      61 </span>                :            : {
+<span class="lineNum">      62 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!smap_get(smap, key)) {</span>
+<span class="lineNum">      63 </span>                :<span class="lineNoCov">          0 :         smap_add(smap, key, value);</span>
+<span class="lineNum">      64 </span>                :<span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">      65 </span>                :            :     } else {
+<span class="lineNum">      66 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">      67 </span>                :            :     }
+<span class="lineNum">      68 </span>                :            : }
+<span class="lineNum">      69 </span>                :            : 
+<span class="lineNum">      70 </span>                :            : /* Adds 'key' paired with a value derived from 'format' (similar to printf).
+<a name="71"><span class="lineNum">      71 </span>                :            :  * It is the caller's responsibility to avoid duplicate keys if desirable. */</a>
+<span class="lineNum">      72 </span>                :            : void
+<span class="lineNum">      73 </span>                :<span class="lineCov">        163 : smap_add_format(struct smap *smap, const char *key, const char *format, ...)</span>
+<span class="lineNum">      74 </span>                :            : {
+<span class="lineNum">      75 </span>                :            :     size_t key_len;
+<span class="lineNum">      76 </span>                :            :     va_list args;
+<span class="lineNum">      77 </span>                :            :     char *value;
+<span class="lineNum">      78 </span>                :            : 
+<span class="lineNum">      79 </span>                :<span class="lineCov">        163 :     va_start(args, format);</span>
+<span class="lineNum">      80 </span>                :<span class="lineCov">        163 :     value = xvasprintf(format, args);</span>
+<span class="lineNum">      81 </span>                :<span class="lineCov">        163 :     va_end(args);</span>
+<span class="lineNum">      82 </span>                :            : 
+<span class="lineNum">      83 </span>                :<span class="lineCov">        163 :     key_len = strlen(key);</span>
+<span class="lineNum">      84 </span>                :<span class="lineCov">        163 :     smap_add__(smap, xmemdup0(key, key_len), value,</span>
+<span class="lineNum">      85 </span>                :<span class="lineCov">        163 :                hash_bytes(key, key_len, 0));</span>
+<span class="lineNum">      86 </span>                :<span class="lineCov">        163 : }</span>
+<span class="lineNum">      87 </span>                :            : 
+<span class="lineNum">      88 </span>                :            : /* Searches for 'key' in 'smap'.  If it does not already exists, adds it.
+<a name="89"><span class="lineNum">      89 </span>                :            :  * Otherwise, changes its value to 'value'. */</a>
+<span class="lineNum">      90 </span>                :            : void
+<span class="lineNum">      91 </span>                :<span class="lineCov">          6 : smap_replace(struct smap *smap, const char *key, const char *value)</span>
+<span class="lineNum">      92 </span>                :            : {
+<span class="lineNum">      93 </span>                :<span class="lineCov">          6 :     size_t  key_len = strlen(key);</span>
+<span class="lineNum">      94 </span>                :<span class="lineCov">          6 :     size_t hash = hash_bytes(key, key_len, 0);</span>
+<span class="lineNum">      95 </span>                :            : 
+<span class="lineNum">      96 </span>                :            :     struct smap_node *node;
+<span class="lineNum">      97 </span>                :            : 
+<span class="lineNum">      98 </span>                :<span class="lineCov">          6 :     node = smap_find__(smap, key, key_len, hash);</span>
+<span class="lineNum">      99 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 5 times"> + </span>]:<span class="lineCov">          6 :     if (node) {</span>
+<span class="lineNum">     100 </span>                :<span class="lineCov">          1 :         free(node-&gt;value);</span>
+<span class="lineNum">     101 </span>                :<span class="lineCov">          1 :         node-&gt;value = xstrdup(value);</span>
+<span class="lineNum">     102 </span>                :            :     } else {
+<span class="lineNum">     103 </span>                :<span class="lineCov">          5 :         smap_add__(smap, xmemdup0(key, key_len), xstrdup(value), hash);</span>
+<span class="lineNum">     104 </span>                :            :     }
+<span class="lineNum">     105 </span>                :<span class="lineCov">          6 : }</span>
+<span class="lineNum">     106 </span>                :            : 
+<a name="107"><span class="lineNum">     107 </span>                :            : /* If 'key' is in 'smap', removes it.  Otherwise does nothing. */</a>
+<span class="lineNum">     108 </span>                :            : void
+<span class="lineNum">     109 </span>                :<span class="lineCov">          1 : smap_remove(struct smap *smap, const char *key)</span>
+<span class="lineNum">     110 </span>                :            : {
+<span class="lineNum">     111 </span>                :<span class="lineCov">          1 :     struct smap_node *node = smap_get_node(smap, key);</span>
+<span class="lineNum">     112 </span>                :            : 
+<span class="lineNum">     113 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          1 :     if (node) {</span>
+<span class="lineNum">     114 </span>                :<span class="lineCov">          1 :         smap_remove_node(smap, node);</span>
+<span class="lineNum">     115 </span>                :            :     }
+<span class="lineNum">     116 </span>                :<span class="lineCov">          1 : }</span>
+<span class="lineNum">     117 </span>                :            : 
+<a name="118"><span class="lineNum">     118 </span>                :            : /* Removes 'node' from 'smap'. */</a>
+<span class="lineNum">     119 </span>                :            : void
+<span class="lineNum">     120 </span>                :<span class="lineCov">      73881 : smap_remove_node(struct smap *smap, struct smap_node *node)</span>
+<span class="lineNum">     121 </span>                :            : {
+<span class="lineNum">     122 </span>                :<span class="lineCov">      73881 :     hmap_remove(&amp;smap-&gt;map, &amp;node-&gt;node);</span>
+<span class="lineNum">     123 </span>                :<span class="lineCov">      73881 :     free(node-&gt;key);</span>
+<span class="lineNum">     124 </span>                :<span class="lineCov">      73881 :     free(node-&gt;value);</span>
+<span class="lineNum">     125 </span>                :<span class="lineCov">      73881 :     free(node);</span>
+<span class="lineNum">     126 </span>                :<span class="lineCov">      73881 : }</span>
+<span class="lineNum">     127 </span>                :            : 
+<span class="lineNum">     128 </span>                :            : /* Deletes 'node' from 'smap'.
+<span class="lineNum">     129 </span>                :            :  *
+<span class="lineNum">     130 </span>                :            :  * If 'keyp' is nonnull, stores the node's key in '*keyp' and transfers
+<span class="lineNum">     131 </span>                :            :  * ownership to the caller.  Otherwise, frees the node's key.  Similarly for
+<a name="132"><span class="lineNum">     132 </span>                :            :  * 'valuep' and the node's value. */</a>
+<span class="lineNum">     133 </span>                :            : void
+<span class="lineNum">     134 </span>                :<span class="lineNoCov">          0 : smap_steal(struct smap *smap, struct smap_node *node,</span>
+<span class="lineNum">     135 </span>                :            :            char **keyp, char **valuep)
+<span class="lineNum">     136 </span>                :            : {
+<span class="lineNum">     137 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (keyp) {</span>
+<span class="lineNum">     138 </span>                :<span class="lineNoCov">          0 :         *keyp = node-&gt;key;</span>
+<span class="lineNum">     139 </span>                :            :     } else {
+<span class="lineNum">     140 </span>                :<span class="lineNoCov">          0 :         free(node-&gt;key);</span>
+<span class="lineNum">     141 </span>                :            :     }
+<span class="lineNum">     142 </span>                :            : 
+<span class="lineNum">     143 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (valuep) {</span>
+<span class="lineNum">     144 </span>                :<span class="lineNoCov">          0 :         *valuep = node-&gt;value;</span>
+<span class="lineNum">     145 </span>                :            :     } else {
+<span class="lineNum">     146 </span>                :<span class="lineNoCov">          0 :         free(node-&gt;value);</span>
+<span class="lineNum">     147 </span>                :            :     }
+<span class="lineNum">     148 </span>                :            : 
+<span class="lineNum">     149 </span>                :<span class="lineNoCov">          0 :     hmap_remove(&amp;smap-&gt;map, &amp;node-&gt;node);</span>
+<span class="lineNum">     150 </span>                :<span class="lineNoCov">          0 :     free(node);</span>
+<span class="lineNum">     151 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     152 </span>                :            : 
+<a name="153"><span class="lineNum">     153 </span>                :            : /* Removes all key-value pairs from 'smap'. */</a>
+<span class="lineNum">     154 </span>                :            : void
+<span class="lineNum">     155 </span>                :<span class="lineCov">     426214 : smap_clear(struct smap *smap)</span>
+<span class="lineNum">     156 </span>                :            : {
+<span class="lineNum">     157 </span>                :            :     struct smap_node *node, *next;
+<span class="lineNum">     158 </span>                :            : 
+<span class="lineNum">     159 </span>[<span class="branchCov" title="Branch 1 was taken 73880 times"> + </span><span class="branchCov" title="Branch 2 was taken 426214 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 73880 times"> + </span><span class="branchCov" title="Branch 5 was taken 426214 times"> + </span>]:<span class="lineCov">     500094 :     SMAP_FOR_EACH_SAFE (node, next, smap) {</span>
+<span class="lineNum">     160 </span>                :<span class="lineCov">      73880 :         smap_remove_node(smap, node);</span>
+<span class="lineNum">     161 </span>                :            :     }
+<span class="lineNum">     162 </span>                :<span class="lineCov">     426214 : }</span>
+<span class="lineNum">     163 </span>                :            : 
+<a name="164"><span class="lineNum">     164 </span>                :            : /* Returns the value associated with 'key' in 'smap', or NULL. */</a>
+<span class="lineNum">     165 </span>                :            : const char *
+<span class="lineNum">     166 </span>                :<span class="lineCov">      55474 : smap_get(const struct smap *smap, const char *key)</span>
+<span class="lineNum">     167 </span>                :            : {
+<span class="lineNum">     168 </span>                :<span class="lineCov">      55474 :     struct smap_node *node = smap_get_node(smap, key);</span>
+<span class="lineNum">     169 </span>        [<span class="branchCov" title="Branch 0 was taken 2402 times"> + </span><span class="branchCov" title="Branch 1 was taken 53072 times"> + </span>]:<span class="lineCov">      55474 :     return node ? node-&gt;value : NULL;</span>
+<span class="lineNum">     170 </span>                :            : }
+<span class="lineNum">     171 </span>                :            : 
+<a name="172"><span class="lineNum">     172 </span>                :            : /* Returns the node associated with 'key' in 'smap', or NULL. */</a>
+<span class="lineNum">     173 </span>                :            : struct smap_node *
+<span class="lineNum">     174 </span>                :<span class="lineCov">      55475 : smap_get_node(const struct smap *smap, const char *key)</span>
+<span class="lineNum">     175 </span>                :            : {
+<span class="lineNum">     176 </span>                :<span class="lineCov">      55475 :     size_t key_len = strlen(key);</span>
+<span class="lineNum">     177 </span>                :<span class="lineCov">      55475 :     return smap_find__(smap, key, key_len, hash_bytes(key, key_len, 0));</span>
+<span class="lineNum">     178 </span>                :            : }
+<span class="lineNum">     179 </span>                :            : 
+<span class="lineNum">     180 </span>                :            : /* Gets the value associated with 'key' in 'smap' and converts it to a boolean.
+<span class="lineNum">     181 </span>                :            :  * If 'key' is not in 'smap', or its value is neither &quot;true&quot; nor &quot;false&quot;,
+<a name="182"><span class="lineNum">     182 </span>                :            :  * returns 'def'. */</a>
+<span class="lineNum">     183 </span>                :            : bool
+<span class="lineNum">     184 </span>                :<span class="lineCov">       9047 : smap_get_bool(const struct smap *smap, const char *key, bool def)</span>
+<span class="lineNum">     185 </span>                :            : {
+<span class="lineNum">     186 </span>                :<span class="lineCov">       9047 :     const char *value = smap_get(smap, key);</span>
+<span class="lineNum">     187 </span>                :            : 
+<span class="lineNum">     188 </span>        [<span class="branchCov" title="Branch 0 was taken 8930 times"> + </span><span class="branchCov" title="Branch 1 was taken 117 times"> + </span>]:<span class="lineCov">       9047 :     if (!value) {</span>
+<span class="lineNum">     189 </span>                :<span class="lineCov">       8930 :         return def;</span>
+<span class="lineNum">     190 </span>                :            :     }
+<span class="lineNum">     191 </span>                :            : 
+<span class="lineNum">     192 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 117 times"> + </span>]:<span class="lineCov">        117 :     if (def) {</span>
+<span class="lineNum">     193 </span>                :<span class="lineNoCov">          0 :         return strcasecmp(&quot;false&quot;, value) != 0;</span>
+<span class="lineNum">     194 </span>                :            :     } else {
+<span class="lineNum">     195 </span>                :<span class="lineCov">       9047 :         return !strcasecmp(&quot;true&quot;, value);</span>
+<span class="lineNum">     196 </span>                :            :     }
+<span class="lineNum">     197 </span>                :            : }
+<span class="lineNum">     198 </span>                :            : 
+<span class="lineNum">     199 </span>                :            : /* Gets the value associated with 'key' in 'smap' and converts it to an int
+<a name="200"><span class="lineNum">     200 </span>                :            :  * using atoi().  If 'key' is not in 'smap', returns 'def'. */</a>
+<span class="lineNum">     201 </span>                :            : int
+<span class="lineNum">     202 </span>                :<span class="lineCov">      32114 : smap_get_int(const struct smap *smap, const char *key, int def)</span>
+<span class="lineNum">     203 </span>                :            : {
+<span class="lineNum">     204 </span>                :<span class="lineCov">      32114 :     const char *value = smap_get(smap, key);</span>
+<span class="lineNum">     205 </span>                :            : 
+<span class="lineNum">     206 </span>        [<span class="branchCov" title="Branch 0 was taken 549 times"> + </span><span class="branchCov" title="Branch 1 was taken 31565 times"> + </span>]:<span class="lineCov">      32114 :     return value ? atoi(value) : def;</span>
+<span class="lineNum">     207 </span>                :            : }
+<span class="lineNum">     208 </span>                :            : 
+<a name="209"><span class="lineNum">     209 </span>                :            : /* Returns true of there are no elements in 'smap'. */</a>
+<span class="lineNum">     210 </span>                :            : bool
+<span class="lineNum">     211 </span>                :<span class="lineCov">         74 : smap_is_empty(const struct smap *smap)</span>
+<span class="lineNum">     212 </span>                :            : {
+<span class="lineNum">     213 </span>                :<span class="lineCov">         74 :     return hmap_is_empty(&amp;smap-&gt;map);</span>
+<span class="lineNum">     214 </span>                :            : }
+<span class="lineNum">     215 </span>                :            : 
+<a name="216"><span class="lineNum">     216 </span>                :            : /* Returns the number of elements in 'smap'. */</a>
+<span class="lineNum">     217 </span>                :            : size_t
+<span class="lineNum">     218 </span>                :<span class="lineCov">       3386 : smap_count(const struct smap *smap)</span>
+<span class="lineNum">     219 </span>                :            : {
+<span class="lineNum">     220 </span>                :<span class="lineCov">       3386 :     return hmap_count(&amp;smap-&gt;map);</span>
+<span class="lineNum">     221 </span>                :            : }
+<span class="lineNum">     222 </span>                :            : 
+<a name="223"><span class="lineNum">     223 </span>                :            : /* Initializes 'dst' as a clone of 'src. */</a>
+<span class="lineNum">     224 </span>                :            : void
+<span class="lineNum">     225 </span>                :<span class="lineCov">          7 : smap_clone(struct smap *dst, const struct smap *src)</span>
+<span class="lineNum">     226 </span>                :            : {
+<span class="lineNum">     227 </span>                :            :     const struct smap_node *node;
+<span class="lineNum">     228 </span>                :            : 
+<span class="lineNum">     229 </span>                :<span class="lineCov">          7 :     smap_init(dst);</span>
+<span class="lineNum">     230 </span>        [<span class="branchCov" title="Branch 2 was taken 2 times"> + </span><span class="branchCov" title="Branch 3 was taken 7 times"> + </span>]:<span class="lineCov">          9 :     SMAP_FOR_EACH (node, src) {</span>
+<span class="lineNum">     231 </span>                :<span class="lineCov">          2 :         smap_add__(dst, xstrdup(node-&gt;key), xstrdup(node-&gt;value),</span>
+<span class="lineNum">     232 </span>                :            :                    node-&gt;node.hash);
+<span class="lineNum">     233 </span>                :            :     }
+<span class="lineNum">     234 </span>                :<span class="lineCov">          7 : }</span>
+<span class="lineNum">     235 </span>                :            : 
+<span class="lineNum">     236 </span>                :            : /* Returns an array of nodes sorted on key or NULL if 'smap' is empty.  The
+<a name="237"><span class="lineNum">     237 </span>                :            :  * caller is responsible for freeing this array. */</a>
+<span class="lineNum">     238 </span>                :            : const struct smap_node **
+<span class="lineNum">     239 </span>                :<span class="lineCov">         74 : smap_sort(const struct smap *smap)</span>
+<span class="lineNum">     240 </span>                :            : {
+<span class="lineNum">     241 </span>        [<span class="branchCov" title="Branch 1 was taken 42 times"> + </span><span class="branchCov" title="Branch 2 was taken 32 times"> + </span>]:<span class="lineCov">         74 :     if (smap_is_empty(smap)) {</span>
+<span class="lineNum">     242 </span>                :<span class="lineCov">         42 :         return NULL;</span>
+<span class="lineNum">     243 </span>                :            :     } else {
+<span class="lineNum">     244 </span>                :            :         const struct smap_node **nodes;
+<span class="lineNum">     245 </span>                :            :         struct smap_node *node;
+<span class="lineNum">     246 </span>                :            :         size_t i, n;
+<span class="lineNum">     247 </span>                :            : 
+<span class="lineNum">     248 </span>                :<span class="lineCov">         32 :         n = smap_count(smap);</span>
+<span class="lineNum">     249 </span>                :<span class="lineCov">         32 :         nodes = xmalloc(n * sizeof *nodes);</span>
+<span class="lineNum">     250 </span>                :<span class="lineCov">         32 :         i = 0;</span>
+<span class="lineNum">     251 </span>        [<span class="branchCov" title="Branch 2 was taken 54 times"> + </span><span class="branchCov" title="Branch 3 was taken 32 times"> + </span>]:<span class="lineCov">         86 :         SMAP_FOR_EACH (node, smap) {</span>
+<span class="lineNum">     252 </span>                :<span class="lineCov">         54 :             nodes[i++] = node;</span>
+<span class="lineNum">     253 </span>                :            :         }
+<span class="lineNum">     254 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 32 times"> + </span>]:<span class="lineCov">         32 :         ovs_assert(i == n);</span>
+<span class="lineNum">     255 </span>                :            : 
+<span class="lineNum">     256 </span>                :<span class="lineCov">         32 :         qsort(nodes, n, sizeof *nodes, compare_nodes_by_key);</span>
+<span class="lineNum">     257 </span>                :            : 
+<span class="lineNum">     258 </span>                :<span class="lineCov">         74 :         return nodes;</span>
+<span class="lineNum">     259 </span>                :            :     }
+<span class="lineNum">     260 </span>                :            : }
+<span class="lineNum">     261 </span>                :            : 
+<span class="lineNum">     262 </span>                :            : /* Adds each of the key-value pairs from 'json' (which must be a JSON object
+<span class="lineNum">     263 </span>                :            :  * whose values are strings) to 'smap'.
+<span class="lineNum">     264 </span>                :            :  *
+<span class="lineNum">     265 </span>                :            :  * The caller must have initialized 'smap'.
+<span class="lineNum">     266 </span>                :            :  *
+<a name="267"><span class="lineNum">     267 </span>                :            :  * The caller retains ownership of 'json' and everything in it. */</a>
+<span class="lineNum">     268 </span>                :            : void
+<span class="lineNum">     269 </span>                :<span class="lineNoCov">          0 : smap_from_json(struct smap *smap, const struct json *json)</span>
+<span class="lineNum">     270 </span>                :            : {
+<span class="lineNum">     271 </span>                :            :     const struct shash_node *node;
+<span class="lineNum">     272 </span>                :            : 
+<span class="lineNum">     273 </span>        [<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]:<span class="lineNoCov">          0 :     SHASH_FOR_EACH (node, json_object(json)) {</span>
+<span class="lineNum">     274 </span>                :<span class="lineNoCov">          0 :         const struct json *value = node-&gt;data;</span>
+<span class="lineNum">     275 </span>                :<span class="lineNoCov">          0 :         smap_add(smap, node-&gt;name, json_string(value));</span>
+<span class="lineNum">     276 </span>                :            :     }
+<span class="lineNum">     277 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     278 </span>                :            : 
+<span class="lineNum">     279 </span>                :            : /* Returns a JSON object that maps from the keys in 'smap' to their values.
+<span class="lineNum">     280 </span>                :            :  *
+<span class="lineNum">     281 </span>                :            :  * The caller owns the returned value and must eventually json_destroy() it.
+<span class="lineNum">     282 </span>                :            :  *
+<a name="283"><span class="lineNum">     283 </span>                :            :  * The caller retains ownership of 'smap' and everything in it. */</a>
+<span class="lineNum">     284 </span>                :            : struct json *
+<span class="lineNum">     285 </span>                :<span class="lineNoCov">          0 : smap_to_json(const struct smap *smap)</span>
+<span class="lineNum">     286 </span>                :            : {
+<span class="lineNum">     287 </span>                :            :     const struct smap_node *node;
+<span class="lineNum">     288 </span>                :            :     struct json *json;
+<span class="lineNum">     289 </span>                :            : 
+<span class="lineNum">     290 </span>                :<span class="lineNoCov">          0 :     json = json_object_create();</span>
+<span class="lineNum">     291 </span>        [<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     SMAP_FOR_EACH (node, smap) {</span>
+<span class="lineNum">     292 </span>                :<span class="lineNoCov">          0 :         json_object_put_string(json, node-&gt;key, node-&gt;value);</span>
+<span class="lineNum">     293 </span>                :            :     }
+<span class="lineNum">     294 </span>                :<span class="lineNoCov">          0 :     return json;</span>
+<span class="lineNum">     295 </span>                :            : }
+<span class="lineNum">     296 </span>                :            : 
+<span class="lineNum">     297 </span>                :            : /* Private Helpers. */
+<a name="298"><span class="lineNum">     298 </span>                :            : </a>
+<span class="lineNum">     299 </span>                :            : static struct smap_node *
+<span class="lineNum">     300 </span>                :<span class="lineCov">      73884 : smap_add__(struct smap *smap, char *key, void *value, size_t hash)</span>
+<span class="lineNum">     301 </span>                :            : {
+<span class="lineNum">     302 </span>                :<span class="lineCov">      73884 :     struct smap_node *node = xmalloc(sizeof *node);</span>
+<span class="lineNum">     303 </span>                :<span class="lineCov">      73884 :     node-&gt;key = key;</span>
+<span class="lineNum">     304 </span>                :<span class="lineCov">      73884 :     node-&gt;value = value;</span>
+<span class="lineNum">     305 </span>                :<span class="lineCov">      73884 :     hmap_insert(&amp;smap-&gt;map, &amp;node-&gt;node, hash);</span>
+<span class="lineNum">     306 </span>                :<span class="lineCov">      73884 :     return node;</span>
+<span class="lineNum">     307 </span>                :            : }
+<a name="308"><span class="lineNum">     308 </span>                :            : </a>
+<span class="lineNum">     309 </span>                :            : static struct smap_node *
+<span class="lineNum">     310 </span>                :<span class="lineCov">      55481 : smap_find__(const struct smap *smap, const char *key, size_t key_len,</span>
+<span class="lineNum">     311 </span>                :            :             size_t hash)
+<span class="lineNum">     312 </span>                :            : {
+<span class="lineNum">     313 </span>                :            :     struct smap_node *node;
+<span class="lineNum">     314 </span>                :            : 
+<span class="lineNum">     315 </span>        [<span class="branchCov" title="Branch 2 was taken 2404 times"> + </span><span class="branchCov" title="Branch 3 was taken 53077 times"> + </span>]:<span class="lineCov">      55481 :     HMAP_FOR_EACH_WITH_HASH (node, node, hash, &amp;smap-&gt;map) {</span>
+<span class="lineNum">     316 </span>[<span class="branchCov" title="Branch 0 was taken 2404 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 2404 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">       2404 :         if (!strncmp(node-&gt;key, key, key_len) &amp;&amp; !node-&gt;key[key_len]) {</span>
+<span class="lineNum">     317 </span>                :<span class="lineCov">       2404 :             return node;</span>
+<span class="lineNum">     318 </span>                :            :         }
+<span class="lineNum">     319 </span>                :            :     }
+<span class="lineNum">     320 </span>                :            : 
+<span class="lineNum">     321 </span>                :<span class="lineCov">      55481 :     return NULL;</span>
+<span class="lineNum">     322 </span>                :            : }
+<a name="323"><span class="lineNum">     323 </span>                :            : </a>
+<span class="lineNum">     324 </span>                :            : static int
+<span class="lineNum">     325 </span>                :<span class="lineCov">         27 : compare_nodes_by_key(const void *a_, const void *b_)</span>
+<span class="lineNum">     326 </span>                :            : {
+<span class="lineNum">     327 </span>                :<span class="lineCov">         27 :     const struct smap_node *const *a = a_;</span>
+<span class="lineNum">     328 </span>                :<span class="lineCov">         27 :     const struct smap_node *const *b = b_;</span>
+<span class="lineNum">     329 </span>                :<span class="lineCov">         27 :     return strcmp((*a)-&gt;key, (*b)-&gt;key);</span>
+<span class="lineNum">     330 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

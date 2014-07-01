@@ -1,0 +1,1489 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - tests/test-classifier.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">tests</a> - test-classifier.c<span style="font-size: 80%;"> (source / <a href="test-classifier.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">646</td>
+            <td class="headerCovTableEntry">653</td>
+            <td class="headerCovTableEntryHi">98.9 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">48</td>
+            <td class="headerCovTableEntry">48</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">297</td>
+            <td class="headerCovTableEntry">360</td>
+            <td class="headerCovTableEntryMed">82.5 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2009, 2010, 2011, 2012, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : /* &quot;White box&quot; tests for classifier.
+<span class="lineNum">      18 </span>                :            :  *
+<span class="lineNum">      19 </span>                :            :  * With very few exceptions, these tests obtain complete coverage of every
+<span class="lineNum">      20 </span>                :            :  * basic block and every branch in the classifier implementation, e.g. a clean
+<span class="lineNum">      21 </span>                :            :  * report from &quot;gcov -b&quot;.  (Covering the exceptions would require finding
+<span class="lineNum">      22 </span>                :            :  * collisions in the hash function used for flow data, etc.)
+<span class="lineNum">      23 </span>                :            :  *
+<span class="lineNum">      24 </span>                :            :  * This test should receive a clean report from &quot;valgrind --leak-check=full&quot;:
+<span class="lineNum">      25 </span>                :            :  * it frees every heap block that it allocates.
+<span class="lineNum">      26 </span>                :            :  */
+<span class="lineNum">      27 </span>                :            : 
+<span class="lineNum">      28 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      29 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      30 </span>                :            : #include &lt;limits.h&gt;
+<span class="lineNum">      31 </span>                :            : #include &quot;byte-order.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;command-line.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;flow.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;ofp-util.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;packets.h&quot;
+<span class="lineNum">      36 </span>                :            : #include &quot;random.h&quot;
+<span class="lineNum">      37 </span>                :            : #include &quot;unaligned.h&quot;
+<span class="lineNum">      38 </span>                :            : #include &quot;ovstest.h&quot;
+<span class="lineNum">      39 </span>                :            : #undef NDEBUG
+<span class="lineNum">      40 </span>                :            : #include &lt;assert.h&gt;
+<span class="lineNum">      41 </span>                :            : 
+<span class="lineNum">      42 </span>                :            : /* We need access to classifier internal definitions to be able to fully
+<span class="lineNum">      43 </span>                :            :  * test them.  The alternative would be to expose them all in the classifier
+<span class="lineNum">      44 </span>                :            :  * API. */
+<span class="lineNum">      45 </span>                :            : #include &quot;classifier.c&quot;
+<span class="lineNum">      46 </span>                :            : 
+<span class="lineNum">      47 </span>                :            : /* Fields in a rule. */
+<span class="lineNum">      48 </span>                :            : #define CLS_FIELDS                                                  \
+<span class="lineNum">      49 </span>                :            :     /*        struct flow    all-caps */  \
+<span class="lineNum">      50 </span>                :            :     /*        member name    name     */  \
+<span class="lineNum">      51 </span>                :            :     /*        -----------    -------- */  \
+<span class="lineNum">      52 </span>                :            :     CLS_FIELD(tunnel.tun_id, TUN_ID)      \
+<span class="lineNum">      53 </span>                :            :     CLS_FIELD(metadata,      METADATA)    \
+<span class="lineNum">      54 </span>                :            :     CLS_FIELD(nw_src,        NW_SRC)      \
+<span class="lineNum">      55 </span>                :            :     CLS_FIELD(nw_dst,        NW_DST)      \
+<span class="lineNum">      56 </span>                :            :     CLS_FIELD(in_port,       IN_PORT)     \
+<span class="lineNum">      57 </span>                :            :     CLS_FIELD(vlan_tci,      VLAN_TCI)    \
+<span class="lineNum">      58 </span>                :            :     CLS_FIELD(dl_type,       DL_TYPE)     \
+<span class="lineNum">      59 </span>                :            :     CLS_FIELD(tp_src,        TP_SRC)      \
+<span class="lineNum">      60 </span>                :            :     CLS_FIELD(tp_dst,        TP_DST)      \
+<span class="lineNum">      61 </span>                :            :     CLS_FIELD(dl_src,        DL_SRC)      \
+<span class="lineNum">      62 </span>                :            :     CLS_FIELD(dl_dst,        DL_DST)      \
+<span class="lineNum">      63 </span>                :            :     CLS_FIELD(nw_proto,      NW_PROTO)    \
+<span class="lineNum">      64 </span>                :            :     CLS_FIELD(nw_tos,        NW_DSCP)
+<span class="lineNum">      65 </span>                :            : 
+<span class="lineNum">      66 </span>                :            : /* Field indexes.
+<span class="lineNum">      67 </span>                :            :  *
+<span class="lineNum">      68 </span>                :            :  * (These are also indexed into struct classifier's 'tables' array.) */
+<span class="lineNum">      69 </span>                :            : enum {
+<span class="lineNum">      70 </span>                :            : #define CLS_FIELD(MEMBER, NAME) CLS_F_IDX_##NAME,
+<span class="lineNum">      71 </span>                :            :     CLS_FIELDS
+<span class="lineNum">      72 </span>                :            : #undef CLS_FIELD
+<span class="lineNum">      73 </span>                :            :     CLS_N_FIELDS
+<span class="lineNum">      74 </span>                :            : };
+<span class="lineNum">      75 </span>                :            : 
+<span class="lineNum">      76 </span>                :            : /* Field information. */
+<span class="lineNum">      77 </span>                :            : struct cls_field {
+<span class="lineNum">      78 </span>                :            :     int ofs;                    /* Offset in struct flow. */
+<span class="lineNum">      79 </span>                :            :     int len;                    /* Length in bytes. */
+<span class="lineNum">      80 </span>                :            :     const char *name;           /* Name (for debugging). */
+<span class="lineNum">      81 </span>                :            : };
+<span class="lineNum">      82 </span>                :            : 
+<span class="lineNum">      83 </span>                :            : static const struct cls_field cls_fields[CLS_N_FIELDS] = {
+<span class="lineNum">      84 </span>                :            : #define CLS_FIELD(MEMBER, NAME)                 \
+<span class="lineNum">      85 </span>                :            :     { offsetof(struct flow, MEMBER),            \
+<span class="lineNum">      86 </span>                :            :       sizeof ((struct flow *)0)-&gt;MEMBER,        \
+<span class="lineNum">      87 </span>                :            :       #NAME },
+<span class="lineNum">      88 </span>                :            :     CLS_FIELDS
+<span class="lineNum">      89 </span>                :            : #undef CLS_FIELD
+<span class="lineNum">      90 </span>                :            : };
+<span class="lineNum">      91 </span>                :            : 
+<span class="lineNum">      92 </span>                :            : struct test_rule {
+<span class="lineNum">      93 </span>                :            :     int aux;                    /* Auxiliary data. */
+<span class="lineNum">      94 </span>                :            :     struct cls_rule cls_rule;   /* Classifier rule data. */
+<span class="lineNum">      95 </span>                :            : };
+<a name="96"><span class="lineNum">      96 </span>                :            : </a>
+<span class="lineNum">      97 </span>                :            : static struct test_rule *
+<span class="lineNum">      98 </span>                :<span class="lineCov">      32850 : test_rule_from_cls_rule(const struct cls_rule *rule)</span>
+<span class="lineNum">      99 </span>                :            : {
+<span class="lineNum">     100 </span>        [<span class="branchCov" title="Branch 0 was taken 32178 times"> + </span><span class="branchCov" title="Branch 1 was taken 672 times"> + </span>]:<span class="lineCov">      32850 :     return rule ? CONTAINER_OF(rule, struct test_rule, cls_rule) : NULL;</span>
+<span class="lineNum">     101 </span>                :            : }
+<a name="102"><span class="lineNum">     102 </span>                :            : </a>
+<span class="lineNum">     103 </span>                :            : static void
+<span class="lineNum">     104 </span>                :<span class="lineCov">      29248 : test_rule_destroy(struct test_rule *rule)</span>
+<span class="lineNum">     105 </span>                :            : {
+<span class="lineNum">     106 </span>        [<span class="branchCov" title="Branch 0 was taken 29248 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      29248 :     if (rule) {</span>
+<span class="lineNum">     107 </span>                :<span class="lineCov">      29248 :         cls_rule_destroy(&amp;rule-&gt;cls_rule);</span>
+<span class="lineNum">     108 </span>                :<span class="lineCov">      29248 :         free(rule);</span>
+<span class="lineNum">     109 </span>                :            :     }
+<span class="lineNum">     110 </span>                :<span class="lineCov">      29248 : }</span>
+<span class="lineNum">     111 </span>                :            : 
+<span class="lineNum">     112 </span>                :            : static struct test_rule *make_rule(int wc_fields, unsigned int priority,
+<span class="lineNum">     113 </span>                :            :                                    int value_pat);
+<span class="lineNum">     114 </span>                :            : static void free_rule(struct test_rule *);
+<span class="lineNum">     115 </span>                :            : static struct test_rule *clone_rule(const struct test_rule *);
+<span class="lineNum">     116 </span>                :            : 
+<span class="lineNum">     117 </span>                :            : /* Trivial (linear) classifier. */
+<span class="lineNum">     118 </span>                :            : struct tcls {
+<span class="lineNum">     119 </span>                :            :     size_t n_rules;
+<span class="lineNum">     120 </span>                :            :     size_t allocated_rules;
+<span class="lineNum">     121 </span>                :            :     struct test_rule **rules;
+<span class="lineNum">     122 </span>                :            : };
+<a name="123"><span class="lineNum">     123 </span>                :            : </a>
+<span class="lineNum">     124 </span>                :            : static void
+<span class="lineNum">     125 </span>                :<span class="lineCov">      24957 : tcls_init(struct tcls *tcls)</span>
+<span class="lineNum">     126 </span>                :            : {
+<span class="lineNum">     127 </span>                :<span class="lineCov">      24957 :     tcls-&gt;n_rules = 0;</span>
+<span class="lineNum">     128 </span>                :<span class="lineCov">      24957 :     tcls-&gt;allocated_rules = 0;</span>
+<span class="lineNum">     129 </span>                :<span class="lineCov">      24957 :     tcls-&gt;rules = NULL;</span>
+<span class="lineNum">     130 </span>                :<span class="lineCov">      24957 : }</span>
+<a name="131"><span class="lineNum">     131 </span>                :            : </a>
+<span class="lineNum">     132 </span>                :            : static void
+<span class="lineNum">     133 </span>                :<span class="lineCov">      24957 : tcls_destroy(struct tcls *tcls)</span>
+<span class="lineNum">     134 </span>                :            : {
+<span class="lineNum">     135 </span>        [<span class="branchCov" title="Branch 0 was taken 24957 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      24957 :     if (tcls) {</span>
+<span class="lineNum">     136 </span>                :            :         size_t i;
+<span class="lineNum">     137 </span>                :            : 
+<span class="lineNum">     138 </span>        [<span class="branchCov" title="Branch 0 was taken 16516 times"> + </span><span class="branchCov" title="Branch 1 was taken 24957 times"> + </span>]:<span class="lineCov">      41473 :         for (i = 0; i &lt; tcls-&gt;n_rules; i++) {</span>
+<span class="lineNum">     139 </span>                :<span class="lineCov">      16516 :             test_rule_destroy(tcls-&gt;rules[i]);</span>
+<span class="lineNum">     140 </span>                :            :         }
+<span class="lineNum">     141 </span>                :<span class="lineCov">      24957 :         free(tcls-&gt;rules);</span>
+<span class="lineNum">     142 </span>                :            :     }
+<span class="lineNum">     143 </span>                :<span class="lineCov">      24957 : }</span>
+<a name="144"><span class="lineNum">     144 </span>                :            : </a>
+<span class="lineNum">     145 </span>                :            : static bool
+<span class="lineNum">     146 </span>                :<span class="lineCov">       8193 : tcls_is_empty(const struct tcls *tcls)</span>
+<span class="lineNum">     147 </span>                :            : {
+<span class="lineNum">     148 </span>                :<span class="lineCov">       8193 :     return tcls-&gt;n_rules == 0;</span>
+<span class="lineNum">     149 </span>                :            : }
+<a name="150"><span class="lineNum">     150 </span>                :            : </a>
+<span class="lineNum">     151 </span>                :            : static struct test_rule *
+<span class="lineNum">     152 </span>                :<span class="lineCov">      29656 : tcls_insert(struct tcls *tcls, const struct test_rule *rule)</span>
+<span class="lineNum">     153 </span>                :            : {
+<span class="lineNum">     154 </span>                :            :     size_t i;
+<span class="lineNum">     155 </span>                :            : 
+<span class="lineNum">     156 </span>        [<span class="branchCov" title="Branch 0 was taken 46214 times"> + </span><span class="branchCov" title="Branch 1 was taken 25595 times"> + </span>]:<span class="lineCov">      71809 :     for (i = 0; i &lt; tcls-&gt;n_rules; i++) {</span>
+<span class="lineNum">     157 </span>                :<span class="lineCov">      46214 :         const struct cls_rule *pos = &amp;tcls-&gt;rules[i]-&gt;cls_rule;</span>
+<span class="lineNum">     158 </span>        [<span class="branchCov" title="Branch 1 was taken 408 times"> + </span><span class="branchCov" title="Branch 2 was taken 45806 times"> + </span>]:<span class="lineCov">      46214 :         if (cls_rule_equal(pos, &amp;rule-&gt;cls_rule)) {</span>
+<span class="lineNum">     159 </span>                :            :             /* Exact match. */
+<span class="lineNum">     160 </span>                :<span class="lineCov">        408 :             free_rule(tcls-&gt;rules[i]);</span>
+<span class="lineNum">     161 </span>                :<span class="lineCov">        408 :             tcls-&gt;rules[i] = clone_rule(rule);</span>
+<span class="lineNum">     162 </span>                :<span class="lineCov">        408 :             return tcls-&gt;rules[i];</span>
+<span class="lineNum">     163 </span>        [<span class="branchCov" title="Branch 0 was taken 3653 times"> + </span><span class="branchCov" title="Branch 1 was taken 42153 times"> + </span>]:<span class="lineCov">      45806 :         } else if (pos-&gt;priority &lt; rule-&gt;cls_rule.priority) {</span>
+<span class="lineNum">     164 </span>                :<span class="lineCov">       3653 :             break;</span>
+<span class="lineNum">     165 </span>                :            :         }
+<span class="lineNum">     166 </span>                :            :     }
+<span class="lineNum">     167 </span>                :            : 
+<span class="lineNum">     168 </span>        [<span class="branchCov" title="Branch 0 was taken 25764 times"> + </span><span class="branchCov" title="Branch 1 was taken 3484 times"> + </span>]:<span class="lineCov">      29248 :     if (tcls-&gt;n_rules &gt;= tcls-&gt;allocated_rules) {</span>
+<span class="lineNum">     169 </span>                :<span class="lineCov">      25764 :         tcls-&gt;rules = x2nrealloc(tcls-&gt;rules, &amp;tcls-&gt;allocated_rules,</span>
+<span class="lineNum">     170 </span>                :            :                                  sizeof *tcls-&gt;rules);
+<span class="lineNum">     171 </span>                :            :     }
+<span class="lineNum">     172 </span>        [<span class="branchCov" title="Branch 0 was taken 3653 times"> + </span><span class="branchCov" title="Branch 1 was taken 25595 times"> + </span>]:<span class="lineCov">      29248 :     if (i != tcls-&gt;n_rules) {</span>
+<span class="lineNum">     173 </span>                :<span class="lineCov">       3653 :         memmove(&amp;tcls-&gt;rules[i + 1], &amp;tcls-&gt;rules[i],</span>
+<span class="lineNum">     174 </span>                :<span class="lineCov">       3653 :                 sizeof *tcls-&gt;rules * (tcls-&gt;n_rules - i));</span>
+<span class="lineNum">     175 </span>                :            :     }
+<span class="lineNum">     176 </span>                :<span class="lineCov">      29248 :     tcls-&gt;rules[i] = clone_rule(rule);</span>
+<span class="lineNum">     177 </span>                :<span class="lineCov">      29248 :     tcls-&gt;n_rules++;</span>
+<span class="lineNum">     178 </span>                :<span class="lineCov">      29656 :     return tcls-&gt;rules[i];</span>
+<span class="lineNum">     179 </span>                :            : }
+<a name="180"><span class="lineNum">     180 </span>                :            : </a>
+<span class="lineNum">     181 </span>                :            : static void
+<span class="lineNum">     182 </span>                :<span class="lineCov">      12732 : tcls_remove(struct tcls *cls, const struct test_rule *rule)</span>
+<span class="lineNum">     183 </span>                :            : {
+<span class="lineNum">     184 </span>                :            :     size_t i;
+<span class="lineNum">     185 </span>                :            : 
+<span class="lineNum">     186 </span>        [<span class="branchCov" title="Branch 0 was taken 54349 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      54349 :     for (i = 0; i &lt; cls-&gt;n_rules; i++) {</span>
+<span class="lineNum">     187 </span>                :<span class="lineCov">      54349 :         struct test_rule *pos = cls-&gt;rules[i];</span>
+<span class="lineNum">     188 </span>        [<span class="branchCov" title="Branch 0 was taken 12732 times"> + </span><span class="branchCov" title="Branch 1 was taken 41617 times"> + </span>]:<span class="lineCov">      54349 :         if (pos == rule) {</span>
+<span class="lineNum">     189 </span>                :<span class="lineCov">      12732 :             test_rule_destroy(pos);</span>
+<span class="lineNum">     190 </span>                :            : 
+<span class="lineNum">     191 </span>                :<span class="lineCov">      12732 :             memmove(&amp;cls-&gt;rules[i], &amp;cls-&gt;rules[i + 1],</span>
+<span class="lineNum">     192 </span>                :<span class="lineCov">      12732 :                     sizeof *cls-&gt;rules * (cls-&gt;n_rules - i - 1));</span>
+<span class="lineNum">     193 </span>                :            : 
+<span class="lineNum">     194 </span>                :<span class="lineCov">      12732 :             cls-&gt;n_rules--;</span>
+<span class="lineNum">     195 </span>                :<span class="lineCov">      12732 :             return;</span>
+<span class="lineNum">     196 </span>                :            :         }
+<span class="lineNum">     197 </span>                :            :     }
+<span class="lineNum">     198 </span>                :<span class="lineNoCov">          0 :     OVS_NOT_REACHED();</span>
+<span class="lineNum">     199 </span>                :            : }
+<a name="200"><span class="lineNum">     200 </span>                :            : </a>
+<span class="lineNum">     201 </span>                :            : static bool
+<span class="lineNum">     202 </span>                :<span class="lineCov">   97933342 : match(const struct cls_rule *wild_, const struct flow *fixed)</span>
+<span class="lineNum">     203 </span>                :            : {
+<span class="lineNum">     204 </span>                :            :     struct match wild;
+<span class="lineNum">     205 </span>                :            :     int f_idx;
+<span class="lineNum">     206 </span>                :            : 
+<span class="lineNum">     207 </span>                :<span class="lineCov">   97933342 :     minimatch_expand(&amp;wild_-&gt;match, &amp;wild);</span>
+<span class="lineNum">     208 </span>        [<span class="branchCov" title="Branch 0 was taken 195875393 times"> + </span><span class="branchCov" title="Branch 1 was taken 14789 times"> + </span>]:<span class="lineCov">  195890182 :     for (f_idx = 0; f_idx &lt; CLS_N_FIELDS; f_idx++) {</span>
+<span class="lineNum">     209 </span>                :            :         bool eq;
+<span class="lineNum">     210 </span>                :            : 
+<span class="lineNum">     211 </span>        [<span class="branchCov" title="Branch 0 was taken 24486293 times"> + </span><span class="branchCov" title="Branch 1 was taken 171389100 times"> + </span>]:<span class="lineCov">  195875393 :         if (f_idx == CLS_F_IDX_NW_SRC) {</span>
+<span class="lineNum">     212 </span>                :<span class="lineCov">   24486293 :             eq = !((fixed-&gt;nw_src ^ wild.flow.nw_src)</span>
+<span class="lineNum">     213 </span>                :<span class="lineCov">   24486293 :                    &amp; wild.wc.masks.nw_src);</span>
+<span class="lineNum">     214 </span>        [<span class="branchCov" title="Branch 0 was taken 12244565 times"> + </span><span class="branchCov" title="Branch 1 was taken 159144535 times"> + </span>]:<span class="lineCov">  171389100 :         } else if (f_idx == CLS_F_IDX_NW_DST) {</span>
+<span class="lineNum">     215 </span>                :<span class="lineCov">   12244565 :             eq = !((fixed-&gt;nw_dst ^ wild.flow.nw_dst)</span>
+<span class="lineNum">     216 </span>                :<span class="lineCov">   12244565 :                    &amp; wild.wc.masks.nw_dst);</span>
+<span class="lineNum">     217 </span>        [<span class="branchCov" title="Branch 0 was taken 769321 times"> + </span><span class="branchCov" title="Branch 1 was taken 158375214 times"> + </span>]:<span class="lineCov">  159144535 :         } else if (f_idx == CLS_F_IDX_TP_SRC) {</span>
+<span class="lineNum">     218 </span>                :<span class="lineCov">     769321 :             eq = !((fixed-&gt;tp_src ^ wild.flow.tp_src)</span>
+<span class="lineNum">     219 </span>                :<span class="lineCov">     769321 :                    &amp; wild.wc.masks.tp_src);</span>
+<span class="lineNum">     220 </span>        [<span class="branchCov" title="Branch 0 was taken 385619 times"> + </span><span class="branchCov" title="Branch 1 was taken 157989595 times"> + </span>]:<span class="lineCov">  158375214 :         } else if (f_idx == CLS_F_IDX_TP_DST) {</span>
+<span class="lineNum">     221 </span>                :<span class="lineCov">     385619 :             eq = !((fixed-&gt;tp_dst ^ wild.flow.tp_dst)</span>
+<span class="lineNum">     222 </span>                :<span class="lineCov">     385619 :                    &amp; wild.wc.masks.tp_dst);</span>
+<span class="lineNum">     223 </span>        [<span class="branchCov" title="Branch 0 was taken 194102 times"> + </span><span class="branchCov" title="Branch 1 was taken 157795493 times"> + </span>]:<span class="lineCov">  157989595 :         } else if (f_idx == CLS_F_IDX_DL_SRC) {</span>
+<span class="lineNum">     224 </span>                :<span class="lineCov">     194102 :             eq = eth_addr_equal_except(fixed-&gt;dl_src, wild.flow.dl_src,</span>
+<span class="lineNum">     225 </span>                :            :                                        wild.wc.masks.dl_src);
+<span class="lineNum">     226 </span>        [<span class="branchCov" title="Branch 0 was taken 98864 times"> + </span><span class="branchCov" title="Branch 1 was taken 157696629 times"> + </span>]:<span class="lineCov">  157795493 :         } else if (f_idx == CLS_F_IDX_DL_DST) {</span>
+<span class="lineNum">     227 </span>                :<span class="lineCov">      98864 :             eq = eth_addr_equal_except(fixed-&gt;dl_dst, wild.flow.dl_dst,</span>
+<span class="lineNum">     228 </span>                :            :                                        wild.wc.masks.dl_dst);
+<span class="lineNum">     229 </span>        [<span class="branchCov" title="Branch 0 was taken 3064184 times"> + </span><span class="branchCov" title="Branch 1 was taken 154632445 times"> + </span>]:<span class="lineCov">  157696629 :         } else if (f_idx == CLS_F_IDX_VLAN_TCI) {</span>
+<span class="lineNum">     230 </span>                :<span class="lineCov">    3064184 :             eq = !((fixed-&gt;vlan_tci ^ wild.flow.vlan_tci)</span>
+<span class="lineNum">     231 </span>                :<span class="lineCov">    3064184 :                    &amp; wild.wc.masks.vlan_tci);</span>
+<span class="lineNum">     232 </span>        [<span class="branchCov" title="Branch 0 was taken 97933342 times"> + </span><span class="branchCov" title="Branch 1 was taken 56699103 times"> + </span>]:<span class="lineCov">  154632445 :         } else if (f_idx == CLS_F_IDX_TUN_ID) {</span>
+<span class="lineNum">     233 </span>                :<span class="lineCov">   97933342 :             eq = !((fixed-&gt;tunnel.tun_id ^ wild.flow.tunnel.tun_id)</span>
+<span class="lineNum">     234 </span>                :<span class="lineCov">   97933342 :                    &amp; wild.wc.masks.tunnel.tun_id);</span>
+<span class="lineNum">     235 </span>        [<span class="branchCov" title="Branch 0 was taken 48962236 times"> + </span><span class="branchCov" title="Branch 1 was taken 7736867 times"> + </span>]:<span class="lineCov">   56699103 :         } else if (f_idx == CLS_F_IDX_METADATA) {</span>
+<span class="lineNum">     236 </span>                :<span class="lineCov">   48962236 :             eq = !((fixed-&gt;metadata ^ wild.flow.metadata)</span>
+<span class="lineNum">     237 </span>                :<span class="lineCov">   48962236 :                    &amp; wild.wc.masks.metadata);</span>
+<span class="lineNum">     238 </span>        [<span class="branchCov" title="Branch 0 was taken 26998 times"> + </span><span class="branchCov" title="Branch 1 was taken 7709869 times"> + </span>]:<span class="lineCov">    7736867 :         } else if (f_idx == CLS_F_IDX_NW_DSCP) {</span>
+<span class="lineNum">     239 </span>                :<span class="lineCov">      26998 :             eq = !((fixed-&gt;nw_tos ^ wild.flow.nw_tos) &amp;</span>
+<span class="lineNum">     240 </span>                :<span class="lineCov">      26998 :                    (wild.wc.masks.nw_tos &amp; IP_DSCP_MASK));</span>
+<span class="lineNum">     241 </span>        [<span class="branchCov" title="Branch 0 was taken 50835 times"> + </span><span class="branchCov" title="Branch 1 was taken 7659034 times"> + </span>]:<span class="lineCov">    7709869 :         } else if (f_idx == CLS_F_IDX_NW_PROTO) {</span>
+<span class="lineNum">     242 </span>                :<span class="lineCov">      50835 :             eq = !((fixed-&gt;nw_proto ^ wild.flow.nw_proto)</span>
+<span class="lineNum">     243 </span>                :<span class="lineCov">      50835 :                    &amp; wild.wc.masks.nw_proto);</span>
+<span class="lineNum">     244 </span>        [<span class="branchCov" title="Branch 0 was taken 1533422 times"> + </span><span class="branchCov" title="Branch 1 was taken 6125612 times"> + </span>]:<span class="lineCov">    7659034 :         } else if (f_idx == CLS_F_IDX_DL_TYPE) {</span>
+<span class="lineNum">     245 </span>                :<span class="lineCov">    1533422 :             eq = !((fixed-&gt;dl_type ^ wild.flow.dl_type)</span>
+<span class="lineNum">     246 </span>                :<span class="lineCov">    1533422 :                    &amp; wild.wc.masks.dl_type);</span>
+<span class="lineNum">     247 </span>        [<span class="branchCov" title="Branch 0 was taken 6125612 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">    6125612 :         } else if (f_idx == CLS_F_IDX_IN_PORT) {</span>
+<span class="lineNum">     248 </span>                :<span class="lineCov">    6125612 :             eq = !((fixed-&gt;in_port.ofp_port</span>
+<span class="lineNum">     249 </span>                :<span class="lineCov">    6125612 :                     ^ wild.flow.in_port.ofp_port)</span>
+<span class="lineNum">     250 </span>                :<span class="lineCov">    6125612 :                    &amp; wild.wc.masks.in_port.ofp_port);</span>
+<span class="lineNum">     251 </span>                :            :         } else {
+<span class="lineNum">     252 </span>                :<span class="lineNoCov">          0 :             OVS_NOT_REACHED();</span>
+<span class="lineNum">     253 </span>                :            :         }
+<span class="lineNum">     254 </span>                :            : 
+<span class="lineNum">     255 </span>        [<span class="branchCov" title="Branch 0 was taken 97918553 times"> + </span><span class="branchCov" title="Branch 1 was taken 97956840 times"> + </span>]:<span class="lineCov">  195875393 :         if (!eq) {</span>
+<span class="lineNum">     256 </span>                :<span class="lineCov">   97918553 :             return false;</span>
+<span class="lineNum">     257 </span>                :            :         }
+<span class="lineNum">     258 </span>                :            :     }
+<span class="lineNum">     259 </span>                :<span class="lineCov">   97933342 :     return true;</span>
+<span class="lineNum">     260 </span>                :            : }
+<a name="261"><span class="lineNum">     261 </span>                :            : </a>
+<span class="lineNum">     262 </span>                :            : static struct cls_rule *
+<span class="lineNum">     263 </span>                :<span class="lineCov">   21191500 : tcls_lookup(const struct tcls *cls, const struct flow *flow)</span>
+<span class="lineNum">     264 </span>                :            : {
+<span class="lineNum">     265 </span>                :            :     size_t i;
+<span class="lineNum">     266 </span>                :            : 
+<span class="lineNum">     267 </span>        [<span class="branchCov" title="Branch 0 was taken 97857062 times"> + </span><span class="branchCov" title="Branch 1 was taken 21179711 times"> + </span>]:<span class="lineCov">  119036773 :     for (i = 0; i &lt; cls-&gt;n_rules; i++) {</span>
+<span class="lineNum">     268 </span>                :<span class="lineCov">   97857062 :         struct test_rule *pos = cls-&gt;rules[i];</span>
+<span class="lineNum">     269 </span>        [<span class="branchCov" title="Branch 1 was taken 11789 times"> + </span><span class="branchCov" title="Branch 2 was taken 97845273 times"> + </span>]:<span class="lineCov">   97857062 :         if (match(&amp;pos-&gt;cls_rule, flow)) {</span>
+<span class="lineNum">     270 </span>                :<span class="lineCov">      11789 :             return &amp;pos-&gt;cls_rule;</span>
+<span class="lineNum">     271 </span>                :            :         }
+<span class="lineNum">     272 </span>                :            :     }
+<span class="lineNum">     273 </span>                :<span class="lineCov">   21191500 :     return NULL;</span>
+<span class="lineNum">     274 </span>                :            : }
+<a name="275"><span class="lineNum">     275 </span>                :            : </a>
+<span class="lineNum">     276 </span>                :            : static void
+<span class="lineNum">     277 </span>                :<span class="lineCov">       2994 : tcls_delete_matches(struct tcls *cls, const struct cls_rule *target)</span>
+<span class="lineNum">     278 </span>                :            : {
+<span class="lineNum">     279 </span>                :            :     size_t i;
+<span class="lineNum">     280 </span>                :            : 
+<span class="lineNum">     281 </span>        [<span class="branchCov" title="Branch 0 was taken 76280 times"> + </span><span class="branchCov" title="Branch 1 was taken 2994 times"> + </span>]:<span class="lineCov">      79274 :     for (i = 0; i &lt; cls-&gt;n_rules; ) {</span>
+<span class="lineNum">     282 </span>                :<span class="lineCov">      76280 :         struct test_rule *pos = cls-&gt;rules[i];</span>
+<span class="lineNum">     283 </span>        [<span class="branchCov" title="Branch 1 was taken 76280 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">      76280 :         if (!minimask_has_extra(&amp;pos-&gt;cls_rule.match.mask,</span>
+<span class="lineNum">     284 </span>                :            :                                 &amp;target-&gt;match.mask)) {
+<span class="lineNum">     285 </span>                :            :             struct flow flow;
+<span class="lineNum">     286 </span>                :            : 
+<span class="lineNum">     287 </span>                :<span class="lineCov">      76280 :             miniflow_expand(&amp;pos-&gt;cls_rule.match.flow, &amp;flow);</span>
+<span class="lineNum">     288 </span>        [<span class="branchCov" title="Branch 1 was taken 3000 times"> + </span><span class="branchCov" title="Branch 2 was taken 73280 times"> + </span>]:<span class="lineCov">      76280 :             if (match(target, &amp;flow)) {</span>
+<span class="lineNum">     289 </span>                :<span class="lineCov">       3000 :                 tcls_remove(cls, pos);</span>
+<span class="lineNum">     290 </span>                :<span class="lineCov">      76280 :                 continue;</span>
+<span class="lineNum">     291 </span>                :            :             }
+<span class="lineNum">     292 </span>                :            :         }
+<span class="lineNum">     293 </span>                :<span class="lineCov">      73280 :         i++;</span>
+<span class="lineNum">     294 </span>                :            :     }
+<span class="lineNum">     295 </span>                :<span class="lineCov">       2994 : }</span>
+<span class="lineNum">     296 </span>                :            : 
+<span class="lineNum">     297 </span>                :            : static ovs_be32 nw_src_values[] = { CONSTANT_HTONL(0xc0a80001),
+<span class="lineNum">     298 </span>                :            :                                     CONSTANT_HTONL(0xc0a04455) };
+<span class="lineNum">     299 </span>                :            : static ovs_be32 nw_dst_values[] = { CONSTANT_HTONL(0xc0a80002),
+<span class="lineNum">     300 </span>                :            :                                     CONSTANT_HTONL(0xc0a04455) };
+<span class="lineNum">     301 </span>                :            : static ovs_be64 tun_id_values[] = {
+<span class="lineNum">     302 </span>                :            :     0,
+<span class="lineNum">     303 </span>                :            :     CONSTANT_HTONLL(UINT64_C(0xfedcba9876543210)) };
+<span class="lineNum">     304 </span>                :            : static ovs_be64 metadata_values[] = {
+<span class="lineNum">     305 </span>                :            :     0,
+<span class="lineNum">     306 </span>                :            :     CONSTANT_HTONLL(UINT64_C(0xfedcba9876543210)) };
+<span class="lineNum">     307 </span>                :            : static ofp_port_t in_port_values[] = { OFP_PORT_C(1), OFPP_LOCAL };
+<span class="lineNum">     308 </span>                :            : static ovs_be16 vlan_tci_values[] = { CONSTANT_HTONS(101), CONSTANT_HTONS(0) };
+<span class="lineNum">     309 </span>                :            : static ovs_be16 dl_type_values[]
+<span class="lineNum">     310 </span>                :            :             = { CONSTANT_HTONS(ETH_TYPE_IP), CONSTANT_HTONS(ETH_TYPE_ARP) };
+<span class="lineNum">     311 </span>                :            : static ovs_be16 tp_src_values[] = { CONSTANT_HTONS(49362),
+<span class="lineNum">     312 </span>                :            :                                     CONSTANT_HTONS(80) };
+<span class="lineNum">     313 </span>                :            : static ovs_be16 tp_dst_values[] = { CONSTANT_HTONS(6667), CONSTANT_HTONS(22) };
+<span class="lineNum">     314 </span>                :            : static uint8_t dl_src_values[][6] = { { 0x00, 0x02, 0xe3, 0x0f, 0x80, 0xa4 },
+<span class="lineNum">     315 </span>                :            :                                       { 0x5e, 0x33, 0x7f, 0x5f, 0x1e, 0x99 } };
+<span class="lineNum">     316 </span>                :            : static uint8_t dl_dst_values[][6] = { { 0x4a, 0x27, 0x71, 0xae, 0x64, 0xc1 },
+<span class="lineNum">     317 </span>                :            :                                       { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } };
+<span class="lineNum">     318 </span>                :            : static uint8_t nw_proto_values[] = { IPPROTO_TCP, IPPROTO_ICMP };
+<span class="lineNum">     319 </span>                :            : static uint8_t nw_dscp_values[] = { 48, 0 };
+<span class="lineNum">     320 </span>                :            : 
+<span class="lineNum">     321 </span>                :            : static void *values[CLS_N_FIELDS][2];
+<a name="322"><span class="lineNum">     322 </span>                :            : </a>
+<span class="lineNum">     323 </span>                :            : static void
+<span class="lineNum">     324 </span>                :<span class="lineCov">         11 : init_values(void)</span>
+<span class="lineNum">     325 </span>                :            : {
+<span class="lineNum">     326 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_TUN_ID][0] = &amp;tun_id_values[0];</span>
+<span class="lineNum">     327 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_TUN_ID][1] = &amp;tun_id_values[1];</span>
+<span class="lineNum">     328 </span>                :            : 
+<span class="lineNum">     329 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_METADATA][0] = &amp;metadata_values[0];</span>
+<span class="lineNum">     330 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_METADATA][1] = &amp;metadata_values[1];</span>
+<span class="lineNum">     331 </span>                :            : 
+<span class="lineNum">     332 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_IN_PORT][0] = &amp;in_port_values[0];</span>
+<span class="lineNum">     333 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_IN_PORT][1] = &amp;in_port_values[1];</span>
+<span class="lineNum">     334 </span>                :            : 
+<span class="lineNum">     335 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_VLAN_TCI][0] = &amp;vlan_tci_values[0];</span>
+<span class="lineNum">     336 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_VLAN_TCI][1] = &amp;vlan_tci_values[1];</span>
+<span class="lineNum">     337 </span>                :            : 
+<span class="lineNum">     338 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_DL_SRC][0] = dl_src_values[0];</span>
+<span class="lineNum">     339 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_DL_SRC][1] = dl_src_values[1];</span>
+<span class="lineNum">     340 </span>                :            : 
+<span class="lineNum">     341 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_DL_DST][0] = dl_dst_values[0];</span>
+<span class="lineNum">     342 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_DL_DST][1] = dl_dst_values[1];</span>
+<span class="lineNum">     343 </span>                :            : 
+<span class="lineNum">     344 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_DL_TYPE][0] = &amp;dl_type_values[0];</span>
+<span class="lineNum">     345 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_DL_TYPE][1] = &amp;dl_type_values[1];</span>
+<span class="lineNum">     346 </span>                :            : 
+<span class="lineNum">     347 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_NW_SRC][0] = &amp;nw_src_values[0];</span>
+<span class="lineNum">     348 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_NW_SRC][1] = &amp;nw_src_values[1];</span>
+<span class="lineNum">     349 </span>                :            : 
+<span class="lineNum">     350 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_NW_DST][0] = &amp;nw_dst_values[0];</span>
+<span class="lineNum">     351 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_NW_DST][1] = &amp;nw_dst_values[1];</span>
+<span class="lineNum">     352 </span>                :            : 
+<span class="lineNum">     353 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_NW_PROTO][0] = &amp;nw_proto_values[0];</span>
+<span class="lineNum">     354 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_NW_PROTO][1] = &amp;nw_proto_values[1];</span>
+<span class="lineNum">     355 </span>                :            : 
+<span class="lineNum">     356 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_NW_DSCP][0] = &amp;nw_dscp_values[0];</span>
+<span class="lineNum">     357 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_NW_DSCP][1] = &amp;nw_dscp_values[1];</span>
+<span class="lineNum">     358 </span>                :            : 
+<span class="lineNum">     359 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_TP_SRC][0] = &amp;tp_src_values[0];</span>
+<span class="lineNum">     360 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_TP_SRC][1] = &amp;tp_src_values[1];</span>
+<span class="lineNum">     361 </span>                :            : 
+<span class="lineNum">     362 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_TP_DST][0] = &amp;tp_dst_values[0];</span>
+<span class="lineNum">     363 </span>                :<span class="lineCov">         11 :     values[CLS_F_IDX_TP_DST][1] = &amp;tp_dst_values[1];</span>
+<span class="lineNum">     364 </span>                :<span class="lineCov">         11 : }</span>
+<span class="lineNum">     365 </span>                :            : 
+<span class="lineNum">     366 </span>                :            : #define N_NW_SRC_VALUES ARRAY_SIZE(nw_src_values)
+<span class="lineNum">     367 </span>                :            : #define N_NW_DST_VALUES ARRAY_SIZE(nw_dst_values)
+<span class="lineNum">     368 </span>                :            : #define N_TUN_ID_VALUES ARRAY_SIZE(tun_id_values)
+<span class="lineNum">     369 </span>                :            : #define N_METADATA_VALUES ARRAY_SIZE(metadata_values)
+<span class="lineNum">     370 </span>                :            : #define N_IN_PORT_VALUES ARRAY_SIZE(in_port_values)
+<span class="lineNum">     371 </span>                :            : #define N_VLAN_TCI_VALUES ARRAY_SIZE(vlan_tci_values)
+<span class="lineNum">     372 </span>                :            : #define N_DL_TYPE_VALUES ARRAY_SIZE(dl_type_values)
+<span class="lineNum">     373 </span>                :            : #define N_TP_SRC_VALUES ARRAY_SIZE(tp_src_values)
+<span class="lineNum">     374 </span>                :            : #define N_TP_DST_VALUES ARRAY_SIZE(tp_dst_values)
+<span class="lineNum">     375 </span>                :            : #define N_DL_SRC_VALUES ARRAY_SIZE(dl_src_values)
+<span class="lineNum">     376 </span>                :            : #define N_DL_DST_VALUES ARRAY_SIZE(dl_dst_values)
+<span class="lineNum">     377 </span>                :            : #define N_NW_PROTO_VALUES ARRAY_SIZE(nw_proto_values)
+<span class="lineNum">     378 </span>                :            : #define N_NW_DSCP_VALUES ARRAY_SIZE(nw_dscp_values)
+<span class="lineNum">     379 </span>                :            : 
+<span class="lineNum">     380 </span>                :            : #define N_FLOW_VALUES (N_NW_SRC_VALUES *        \
+<span class="lineNum">     381 </span>                :            :                        N_NW_DST_VALUES *        \
+<span class="lineNum">     382 </span>                :            :                        N_TUN_ID_VALUES *        \
+<span class="lineNum">     383 </span>                :            :                        N_IN_PORT_VALUES *       \
+<span class="lineNum">     384 </span>                :            :                        N_VLAN_TCI_VALUES *       \
+<span class="lineNum">     385 </span>                :            :                        N_DL_TYPE_VALUES *       \
+<span class="lineNum">     386 </span>                :            :                        N_TP_SRC_VALUES *        \
+<span class="lineNum">     387 </span>                :            :                        N_TP_DST_VALUES *        \
+<span class="lineNum">     388 </span>                :            :                        N_DL_SRC_VALUES *        \
+<span class="lineNum">     389 </span>                :            :                        N_DL_DST_VALUES *        \
+<span class="lineNum">     390 </span>                :            :                        N_NW_PROTO_VALUES *      \
+<span class="lineNum">     391 </span>                :            :                        N_NW_DSCP_VALUES)
+<a name="392"><span class="lineNum">     392 </span>                :            : </a>
+<span class="lineNum">     393 </span>                :            : static unsigned int
+<span class="lineNum">     394 </span>                :<span class="lineCov">  275489500 : get_value(unsigned int *x, unsigned n_values)</span>
+<span class="lineNum">     395 </span>                :            : {
+<span class="lineNum">     396 </span>                :<span class="lineCov">  275489500 :     unsigned int rem = *x % n_values;</span>
+<span class="lineNum">     397 </span>                :<span class="lineCov">  275489500 :     *x /= n_values;</span>
+<span class="lineNum">     398 </span>                :<span class="lineCov">  275489500 :     return rem;</span>
+<span class="lineNum">     399 </span>                :            : }
+<a name="400"><span class="lineNum">     400 </span>                :            : </a>
+<span class="lineNum">     401 </span>                :            : static void
+<span class="lineNum">     402 </span>                :<span class="lineCov">      42383 : compare_classifiers(struct classifier *cls, struct tcls *tcls)</span>
+<span class="lineNum">     403 </span>                :            :     OVS_REQ_RDLOCK(cls-&gt;rwlock)
+<span class="lineNum">     404 </span>                :            : {
+<span class="lineNum">     405 </span>                :            :     static const int confidence = 500;
+<span class="lineNum">     406 </span>                :            :     unsigned int i;
+<span class="lineNum">     407 </span>                :            : 
+<span class="lineNum">     408 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 42383 times"> + </span>]:<span class="lineCov">      42383 :     assert(classifier_count(cls) == tcls-&gt;n_rules);</span>
+<span class="lineNum">     409 </span>        [<span class="branchCov" title="Branch 0 was taken 21191500 times"> + </span><span class="branchCov" title="Branch 1 was taken 42383 times"> + </span>]:<span class="lineCov">   21233883 :     for (i = 0; i &lt; confidence; i++) {</span>
+<span class="lineNum">     410 </span>                :            :         struct cls_rule *cr0, *cr1, *cr2;
+<span class="lineNum">     411 </span>                :            :         struct flow flow;
+<span class="lineNum">     412 </span>                :            :         struct flow_wildcards wc;
+<span class="lineNum">     413 </span>                :            :         unsigned int x;
+<span class="lineNum">     414 </span>                :            : 
+<span class="lineNum">     415 </span>                :<span class="lineCov">   21191500 :         flow_wildcards_init_catchall(&amp;wc);</span>
+<span class="lineNum">     416 </span>                :<span class="lineCov">   21191500 :         x = random_range(N_FLOW_VALUES);</span>
+<span class="lineNum">     417 </span>                :<span class="lineCov">   21191500 :         memset(&amp;flow, 0, sizeof flow);</span>
+<span class="lineNum">     418 </span>                :<span class="lineCov">   21191500 :         flow.nw_src = nw_src_values[get_value(&amp;x, N_NW_SRC_VALUES)];</span>
+<span class="lineNum">     419 </span>                :<span class="lineCov">   21191500 :         flow.nw_dst = nw_dst_values[get_value(&amp;x, N_NW_DST_VALUES)];</span>
+<span class="lineNum">     420 </span>                :<span class="lineCov">   21191500 :         flow.tunnel.tun_id = tun_id_values[get_value(&amp;x, N_TUN_ID_VALUES)];</span>
+<span class="lineNum">     421 </span>                :<span class="lineCov">   21191500 :         flow.metadata = metadata_values[get_value(&amp;x, N_METADATA_VALUES)];</span>
+<span class="lineNum">     422 </span>                :<span class="lineCov">   21191500 :         flow.in_port.ofp_port = in_port_values[get_value(&amp;x,</span>
+<span class="lineNum">     423 </span>                :            :                                                    N_IN_PORT_VALUES)];
+<span class="lineNum">     424 </span>                :<span class="lineCov">   21191500 :         flow.vlan_tci = vlan_tci_values[get_value(&amp;x, N_VLAN_TCI_VALUES)];</span>
+<span class="lineNum">     425 </span>                :<span class="lineCov">   21191500 :         flow.dl_type = dl_type_values[get_value(&amp;x, N_DL_TYPE_VALUES)];</span>
+<span class="lineNum">     426 </span>                :<span class="lineCov">   21191500 :         flow.tp_src = tp_src_values[get_value(&amp;x, N_TP_SRC_VALUES)];</span>
+<span class="lineNum">     427 </span>                :<span class="lineCov">   21191500 :         flow.tp_dst = tp_dst_values[get_value(&amp;x, N_TP_DST_VALUES)];</span>
+<span class="lineNum">     428 </span>                :<span class="lineCov">   21191500 :         memcpy(flow.dl_src, dl_src_values[get_value(&amp;x, N_DL_SRC_VALUES)],</span>
+<span class="lineNum">     429 </span>                :            :                ETH_ADDR_LEN);
+<span class="lineNum">     430 </span>                :<span class="lineCov">   21191500 :         memcpy(flow.dl_dst, dl_dst_values[get_value(&amp;x, N_DL_DST_VALUES)],</span>
+<span class="lineNum">     431 </span>                :            :                ETH_ADDR_LEN);
+<span class="lineNum">     432 </span>                :<span class="lineCov">   21191500 :         flow.nw_proto = nw_proto_values[get_value(&amp;x, N_NW_PROTO_VALUES)];</span>
+<span class="lineNum">     433 </span>                :<span class="lineCov">   21191500 :         flow.nw_tos = nw_dscp_values[get_value(&amp;x, N_NW_DSCP_VALUES)];</span>
+<span class="lineNum">     434 </span>                :            : 
+<span class="lineNum">     435 </span>                :            :         /* This assertion is here to suppress a GCC 4.9 array-bounds warning */
+<span class="lineNum">     436 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 21191500 times"> + </span>]:<span class="lineCov">   21191500 :         ovs_assert(cls-&gt;cls-&gt;n_tries &lt;= CLS_MAX_TRIES);</span>
+<span class="lineNum">     437 </span>                :            : 
+<span class="lineNum">     438 </span>                :<span class="lineCov">   21191500 :         cr0 = classifier_lookup(cls, &amp;flow, &amp;wc);</span>
+<span class="lineNum">     439 </span>                :<span class="lineCov">   21191500 :         cr1 = tcls_lookup(tcls, &amp;flow);</span>
+<span class="lineNum">     440 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 21191500 times"> + </span>]:<span class="lineCov">   21191500 :         assert((cr0 == NULL) == (cr1 == NULL));</span>
+<span class="lineNum">     441 </span>        [<span class="branchCov" title="Branch 0 was taken 11789 times"> + </span><span class="branchCov" title="Branch 1 was taken 21179711 times"> + </span>]:<span class="lineCov">   21191500 :         if (cr0 != NULL) {</span>
+<span class="lineNum">     442 </span>                :<span class="lineCov">      11789 :             const struct test_rule *tr0 = test_rule_from_cls_rule(cr0);</span>
+<span class="lineNum">     443 </span>                :<span class="lineCov">      11789 :             const struct test_rule *tr1 = test_rule_from_cls_rule(cr1);</span>
+<span class="lineNum">     444 </span>                :            : 
+<span class="lineNum">     445 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 11789 times"> + </span>]:<span class="lineCov">      11789 :             assert(cls_rule_equal(cr0, cr1));</span>
+<span class="lineNum">     446 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 11789 times"> + </span>]:<span class="lineCov">      11789 :             assert(tr0-&gt;aux == tr1-&gt;aux);</span>
+<span class="lineNum">     447 </span>                :            :         }
+<span class="lineNum">     448 </span>                :<span class="lineCov">   21191500 :         cr2 = classifier_lookup(cls, &amp;flow, NULL);</span>
+<span class="lineNum">     449 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 21191500 times"> + </span>]:<span class="lineCov">   21191500 :         assert(cr2 == cr0);</span>
+<span class="lineNum">     450 </span>                :            :     }
+<span class="lineNum">     451 </span>                :<span class="lineCov">      42383 : }</span>
+<a name="452"><span class="lineNum">     452 </span>                :            : </a>
+<span class="lineNum">     453 </span>                :            : static void
+<span class="lineNum">     454 </span>                :<span class="lineCov">       8252 : destroy_classifier(struct classifier *cls)</span>
+<span class="lineNum">     455 </span>                :            : {
+<span class="lineNum">     456 </span>                :            :     struct test_rule *rule, *next_rule;
+<span class="lineNum">     457 </span>                :            :     struct cls_cursor cursor;
+<span class="lineNum">     458 </span>                :            : 
+<span class="lineNum">     459 </span>                :<span class="lineCov">       8252 :     fat_rwlock_wrlock(&amp;cls-&gt;rwlock);</span>
+<span class="lineNum">     460 </span>                :<span class="lineCov">       8252 :     cls_cursor_init(&amp;cursor, cls, NULL);</span>
+<span class="lineNum">     461 </span>[<span class="branchCov" title="Branch 1 was taken 8192 times"> + </span><span class="branchCov" title="Branch 2 was taken 8252 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 8192 times"> + </span><span class="branchCov" title="Branch 5 was taken 8252 times"> + </span>]:<span class="lineCov">      16444 :     CLS_CURSOR_FOR_EACH_SAFE (rule, next_rule, cls_rule, &amp;cursor) {</span>
+<span class="lineNum">     462 </span>                :<span class="lineCov">       8192 :         classifier_remove(cls, &amp;rule-&gt;cls_rule);</span>
+<span class="lineNum">     463 </span>                :<span class="lineCov">       8192 :         free_rule(rule);</span>
+<span class="lineNum">     464 </span>                :            :     }
+<span class="lineNum">     465 </span>                :<span class="lineCov">       8252 :     fat_rwlock_unlock(&amp;cls-&gt;rwlock);</span>
+<span class="lineNum">     466 </span>                :<span class="lineCov">       8252 :     classifier_destroy(cls);</span>
+<span class="lineNum">     467 </span>                :<span class="lineCov">       8252 : }</span>
+<a name="468"><span class="lineNum">     468 </span>                :            : </a>
+<span class="lineNum">     469 </span>                :            : static void
+<span class="lineNum">     470 </span>                :<span class="lineCov">      34190 : pvector_verify(struct pvector *pvec)</span>
+<span class="lineNum">     471 </span>                :            : {
+<span class="lineNum">     472 </span>                :            :     void *ptr OVS_UNUSED;
+<span class="lineNum">     473 </span>                :<span class="lineCov">      34190 :     unsigned int priority, prev_priority = UINT_MAX;</span>
+<span class="lineNum">     474 </span>                :            : 
+<span class="lineNum">     475 </span>        [<span class="branchCov" title="Branch 2 was taken 33776 times"> + </span><span class="branchCov" title="Branch 3 was taken 34190 times"> + </span>]:<span class="lineCov">      67966 :     PVECTOR_FOR_EACH (ptr, pvec) {</span>
+<span class="lineNum">     476 </span>                :<span class="lineCov">      33776 :         priority = cursor__.vector[cursor__.entry_idx].priority;</span>
+<span class="lineNum">     477 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 33776 times"> + </span>]:<span class="lineCov">      33776 :         if (priority &gt; prev_priority) {</span>
+<span class="lineNum">     478 </span>                :<span class="lineNoCov">          0 :             VLOG_ABORT(&quot;Priority vector is out of order (%u &gt; %u)&quot;,</span>
+<span class="lineNum">     479 </span>                :            :                        priority, prev_priority);
+<span class="lineNum">     480 </span>                :            :         }
+<span class="lineNum">     481 </span>                :<span class="lineCov">      33776 :         prev_priority = priority;</span>
+<span class="lineNum">     482 </span>                :            :     }
+<span class="lineNum">     483 </span>                :<span class="lineCov">      34190 : }</span>
+<a name="484"><span class="lineNum">     484 </span>                :            : </a>
+<span class="lineNum">     485 </span>                :            : static void
+<span class="lineNum">     486 </span>                :<span class="lineCov">      34190 : check_tables(const struct classifier *cls, int n_tables, int n_rules,</span>
+<span class="lineNum">     487 </span>                :            :              int n_dups) OVS_REQ_RDLOCK(cls-&gt;rwlock)
+<span class="lineNum">     488 </span>                :            : {
+<span class="lineNum">     489 </span>                :            :     const struct cls_subtable *table;
+<span class="lineNum">     490 </span>                :            :     struct test_rule *test_rule;
+<span class="lineNum">     491 </span>                :            :     struct cls_cursor cursor;
+<span class="lineNum">     492 </span>                :<span class="lineCov">      34190 :     int found_tables = 0;</span>
+<span class="lineNum">     493 </span>                :<span class="lineCov">      34190 :     int found_rules = 0;</span>
+<span class="lineNum">     494 </span>                :<span class="lineCov">      34190 :     int found_dups = 0;</span>
+<span class="lineNum">     495 </span>                :<span class="lineCov">      34190 :     int found_rules2 = 0;</span>
+<span class="lineNum">     496 </span>                :            : 
+<span class="lineNum">     497 </span>                :<span class="lineCov">      34190 :     pvector_verify(&amp;cls-&gt;cls-&gt;subtables);</span>
+<span class="lineNum">     498 </span>                :            : 
+<span class="lineNum">     499 </span>        [<span class="branchCov" title="Branch 2 was taken 33776 times"> + </span><span class="branchCov" title="Branch 3 was taken 34190 times"> + </span>]:<span class="lineCov">      67966 :     HMAP_FOR_EACH (table, hmap_node, &amp;cls-&gt;cls-&gt;subtables_map) {</span>
+<span class="lineNum">     500 </span>                :            :         const struct cls_match *head;
+<span class="lineNum">     501 </span>                :<span class="lineCov">      33776 :         unsigned int max_priority = 0;</span>
+<span class="lineNum">     502 </span>                :<span class="lineCov">      33776 :         unsigned int max_count = 0;</span>
+<span class="lineNum">     503 </span>                :<span class="lineCov">      33776 :         bool found = false;</span>
+<span class="lineNum">     504 </span>                :            :         const struct cls_subtable *iter;
+<span class="lineNum">     505 </span>                :            : 
+<span class="lineNum">     506 </span>                :            :         /* Locate the subtable from 'subtables'. */
+<span class="lineNum">     507 </span>        [<span class="branchCov" title="Branch 2 was taken 33776 times"> + </span><span class="branchCov" title="Branch 3 was taken 33776 times"> + </span>]:<span class="lineCov">      67552 :         PVECTOR_FOR_EACH (iter, &amp;cls-&gt;cls-&gt;subtables) {</span>
+<span class="lineNum">     508 </span>        [<span class="branchCov" title="Branch 0 was taken 33776 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      33776 :             if (iter == table) {</span>
+<span class="lineNum">     509 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 33776 times"> + </span>]:<span class="lineCov">      33776 :                 if (found) {</span>
+<span class="lineNum">     510 </span>                :<span class="lineNoCov">          0 :                     VLOG_ABORT(&quot;Subtable %p duplicated in 'subtables'.&quot;,</span>
+<span class="lineNum">     511 </span>                :            :                                table);
+<span class="lineNum">     512 </span>                :            :                 }
+<span class="lineNum">     513 </span>                :<span class="lineCov">      33776 :                 found = true;</span>
+<span class="lineNum">     514 </span>                :            :             }
+<span class="lineNum">     515 </span>                :            :         }
+<span class="lineNum">     516 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 33776 times"> + </span>]:<span class="lineCov">      33776 :         if (!found) {</span>
+<span class="lineNum">     517 </span>                :<span class="lineNoCov">          0 :             VLOG_ABORT(&quot;Subtable %p not found from 'subtables'.&quot;, table);</span>
+<span class="lineNum">     518 </span>                :            :         }
+<span class="lineNum">     519 </span>                :            : 
+<span class="lineNum">     520 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 33776 times"> + </span>]:<span class="lineCov">      33776 :         assert(!hmap_is_empty(&amp;table-&gt;rules));</span>
+<span class="lineNum">     521 </span>                :            : 
+<span class="lineNum">     522 </span>                :<span class="lineCov">      33776 :         found_tables++;</span>
+<span class="lineNum">     523 </span>        [<span class="branchCov" title="Branch 2 was taken 195424 times"> + </span><span class="branchCov" title="Branch 3 was taken 33776 times"> + </span>]:<span class="lineCov">     229200 :         HMAP_FOR_EACH (head, hmap_node, &amp;table-&gt;rules) {</span>
+<span class="lineNum">     524 </span>                :<span class="lineCov">     195424 :             unsigned int prev_priority = UINT_MAX;</span>
+<span class="lineNum">     525 </span>                :            :             const struct cls_match *rule;
+<span class="lineNum">     526 </span>                :            : 
+<span class="lineNum">     527 </span>        [<span class="branchCov" title="Branch 0 was taken 52118 times"> + </span><span class="branchCov" title="Branch 1 was taken 143306 times"> + </span>]:<span class="lineCov">     195424 :             if (head-&gt;priority &gt; max_priority) {</span>
+<span class="lineNum">     528 </span>                :<span class="lineCov">      52118 :                 max_priority = head-&gt;priority;</span>
+<span class="lineNum">     529 </span>                :<span class="lineCov">      52118 :                 max_count = 1;</span>
+<span class="lineNum">     530 </span>        [<span class="branchCov" title="Branch 0 was taken 708 times"> + </span><span class="branchCov" title="Branch 1 was taken 142598 times"> + </span>]:<span class="lineCov">     143306 :             } else if (head-&gt;priority == max_priority) {</span>
+<span class="lineNum">     531 </span>                :<span class="lineCov">        708 :                 ++max_count;</span>
+<span class="lineNum">     532 </span>                :            :             }
+<span class="lineNum">     533 </span>                :            : 
+<span class="lineNum">     534 </span>                :<span class="lineCov">     195424 :             found_rules++;</span>
+<span class="lineNum">     535 </span>        [<span class="branchCov" title="Branch 0 was taken 600 times"> + </span><span class="branchCov" title="Branch 1 was taken 195424 times"> + </span>]:<span class="lineCov">     196024 :             LIST_FOR_EACH (rule, list, &amp;head-&gt;list) {</span>
+<span class="lineNum">     536 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 600 times"> + </span>]:<span class="lineCov">        600 :                 assert(rule-&gt;priority &lt; prev_priority);</span>
+<span class="lineNum">     537 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 600 times"> + </span>]:<span class="lineCov">        600 :                 assert(rule-&gt;priority &lt;= table-&gt;max_priority);</span>
+<span class="lineNum">     538 </span>                :            : 
+<span class="lineNum">     539 </span>                :<span class="lineCov">        600 :                 prev_priority = rule-&gt;priority;</span>
+<span class="lineNum">     540 </span>                :<span class="lineCov">        600 :                 found_rules++;</span>
+<span class="lineNum">     541 </span>                :<span class="lineCov">        600 :                 found_dups++;</span>
+<span class="lineNum">     542 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 600 times"> + </span>]:<span class="lineCov">        600 :                 assert(classifier_find_rule_exactly(cls, rule-&gt;cls_rule)</span>
+<span class="lineNum">     543 </span>                :            :                        == rule-&gt;cls_rule);
+<span class="lineNum">     544 </span>                :            :             }
+<span class="lineNum">     545 </span>                :            :         }
+<span class="lineNum">     546 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 33776 times"> + </span>]:<span class="lineCov">      33776 :         assert(table-&gt;max_priority == max_priority);</span>
+<span class="lineNum">     547 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 33776 times"> + </span>]:<span class="lineCov">      33776 :         assert(table-&gt;max_count == max_count);</span>
+<span class="lineNum">     548 </span>                :            :     }
+<span class="lineNum">     549 </span>                :            : 
+<span class="lineNum">     550 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 34190 times"> + </span>]:<span class="lineCov">      34190 :     assert(found_tables == hmap_count(&amp;cls-&gt;cls-&gt;subtables_map));</span>
+<span class="lineNum">     551 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 34190 times"> + </span>]:<span class="lineCov">      34190 :     assert(found_tables == pvector_count(&amp;cls-&gt;cls-&gt;subtables));</span>
+<span class="lineNum">     552 </span>[<span class="branchCov" title="Branch 0 was taken 28196 times"> + </span><span class="branchCov" title="Branch 1 was taken 5994 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 28196 times"> + </span>]:<span class="lineCov">      34190 :     assert(n_tables == -1 || n_tables == hmap_count(&amp;cls-&gt;cls-&gt;subtables_map));</span>
+<span class="lineNum">     553 </span>[<span class="branchCov" title="Branch 0 was taken 31196 times"> + </span><span class="branchCov" title="Branch 1 was taken 2994 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 31196 times"> + </span>]:<span class="lineCov">      34190 :     assert(n_rules == -1 || found_rules == n_rules);</span>
+<span class="lineNum">     554 </span>[<span class="branchCov" title="Branch 0 was taken 27892 times"> + </span><span class="branchCov" title="Branch 1 was taken 6298 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 27892 times"> + </span>]:<span class="lineCov">      34190 :     assert(n_dups == -1 || found_dups == n_dups);</span>
+<span class="lineNum">     555 </span>                :            : 
+<span class="lineNum">     556 </span>                :<span class="lineCov">      34190 :     cls_cursor_init(&amp;cursor, cls, NULL);</span>
+<span class="lineNum">     557 </span>        [<span class="branchCov" title="Branch 2 was taken 196024 times"> + </span><span class="branchCov" title="Branch 3 was taken 34190 times"> + </span>]:<span class="lineCov">     230214 :     CLS_CURSOR_FOR_EACH (test_rule, cls_rule, &amp;cursor) {</span>
+<span class="lineNum">     558 </span>                :<span class="lineCov">     196024 :         found_rules2++;</span>
+<span class="lineNum">     559 </span>                :            :     }
+<span class="lineNum">     560 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 34190 times"> + </span>]:<span class="lineCov">      34190 :     assert(found_rules == found_rules2);</span>
+<span class="lineNum">     561 </span>                :<span class="lineCov">      34190 : }</span>
+<a name="562"><span class="lineNum">     562 </span>                :            : </a>
+<span class="lineNum">     563 </span>                :            : static struct test_rule *
+<span class="lineNum">     564 </span>                :<span class="lineCov">      29386 : make_rule(int wc_fields, unsigned int priority, int value_pat)</span>
+<span class="lineNum">     565 </span>                :            : {
+<span class="lineNum">     566 </span>                :            :     const struct cls_field *f;
+<span class="lineNum">     567 </span>                :            :     struct test_rule *rule;
+<span class="lineNum">     568 </span>                :            :     struct match match;
+<span class="lineNum">     569 </span>                :            : 
+<span class="lineNum">     570 </span>                :<span class="lineCov">      29386 :     match_init_catchall(&amp;match);</span>
+<span class="lineNum">     571 </span>        [<span class="branchCov" title="Branch 0 was taken 382018 times"> + </span><span class="branchCov" title="Branch 1 was taken 29386 times"> + </span>]:<span class="lineCov">     411404 :     for (f = &amp;cls_fields[0]; f &lt; &amp;cls_fields[CLS_N_FIELDS]; f++) {</span>
+<span class="lineNum">     572 </span>                :<span class="lineCov">     382018 :         int f_idx = f - cls_fields;</span>
+<span class="lineNum">     573 </span>                :<span class="lineCov">     382018 :         int value_idx = (value_pat &amp; (1u &lt;&lt; f_idx)) != 0;</span>
+<span class="lineNum">     574 </span>                :<span class="lineCov">     764036 :         memcpy((char *) &amp;match.flow + f-&gt;ofs,</span>
+<span class="lineNum">     575 </span>                :<span class="lineCov">     764036 :                values[f_idx][value_idx], f-&gt;len);</span>
+<span class="lineNum">     576 </span>                :            : 
+<span class="lineNum">     577 </span>        [<span class="branchCov" title="Branch 0 was taken 29386 times"> + </span><span class="branchCov" title="Branch 1 was taken 352632 times"> + </span>]:<span class="lineCov">     382018 :         if (f_idx == CLS_F_IDX_NW_SRC) {</span>
+<span class="lineNum">     578 </span>                :<span class="lineCov">      29386 :             match.wc.masks.nw_src = OVS_BE32_MAX;</span>
+<span class="lineNum">     579 </span>        [<span class="branchCov" title="Branch 0 was taken 29386 times"> + </span><span class="branchCov" title="Branch 1 was taken 323246 times"> + </span>]:<span class="lineCov">     352632 :         } else if (f_idx == CLS_F_IDX_NW_DST) {</span>
+<span class="lineNum">     580 </span>                :<span class="lineCov">      29386 :             match.wc.masks.nw_dst = OVS_BE32_MAX;</span>
+<span class="lineNum">     581 </span>        [<span class="branchCov" title="Branch 0 was taken 29386 times"> + </span><span class="branchCov" title="Branch 1 was taken 293860 times"> + </span>]:<span class="lineCov">     323246 :         } else if (f_idx == CLS_F_IDX_TP_SRC) {</span>
+<span class="lineNum">     582 </span>                :<span class="lineCov">      29386 :             match.wc.masks.tp_src = OVS_BE16_MAX;</span>
+<span class="lineNum">     583 </span>        [<span class="branchCov" title="Branch 0 was taken 29386 times"> + </span><span class="branchCov" title="Branch 1 was taken 264474 times"> + </span>]:<span class="lineCov">     293860 :         } else if (f_idx == CLS_F_IDX_TP_DST) {</span>
+<span class="lineNum">     584 </span>                :<span class="lineCov">      29386 :             match.wc.masks.tp_dst = OVS_BE16_MAX;</span>
+<span class="lineNum">     585 </span>        [<span class="branchCov" title="Branch 0 was taken 29386 times"> + </span><span class="branchCov" title="Branch 1 was taken 235088 times"> + </span>]:<span class="lineCov">     264474 :         } else if (f_idx == CLS_F_IDX_DL_SRC) {</span>
+<span class="lineNum">     586 </span>                :<span class="lineCov">      29386 :             memset(match.wc.masks.dl_src, 0xff, ETH_ADDR_LEN);</span>
+<span class="lineNum">     587 </span>        [<span class="branchCov" title="Branch 0 was taken 29386 times"> + </span><span class="branchCov" title="Branch 1 was taken 205702 times"> + </span>]:<span class="lineCov">     235088 :         } else if (f_idx == CLS_F_IDX_DL_DST) {</span>
+<span class="lineNum">     588 </span>                :<span class="lineCov">      29386 :             memset(match.wc.masks.dl_dst, 0xff, ETH_ADDR_LEN);</span>
+<span class="lineNum">     589 </span>        [<span class="branchCov" title="Branch 0 was taken 29386 times"> + </span><span class="branchCov" title="Branch 1 was taken 176316 times"> + </span>]:<span class="lineCov">     205702 :         } else if (f_idx == CLS_F_IDX_VLAN_TCI) {</span>
+<span class="lineNum">     590 </span>                :<span class="lineCov">      29386 :             match.wc.masks.vlan_tci = OVS_BE16_MAX;</span>
+<span class="lineNum">     591 </span>        [<span class="branchCov" title="Branch 0 was taken 29386 times"> + </span><span class="branchCov" title="Branch 1 was taken 146930 times"> + </span>]:<span class="lineCov">     176316 :         } else if (f_idx == CLS_F_IDX_TUN_ID) {</span>
+<span class="lineNum">     592 </span>                :<span class="lineCov">      29386 :             match.wc.masks.tunnel.tun_id = OVS_BE64_MAX;</span>
+<span class="lineNum">     593 </span>        [<span class="branchCov" title="Branch 0 was taken 29386 times"> + </span><span class="branchCov" title="Branch 1 was taken 117544 times"> + </span>]:<span class="lineCov">     146930 :         } else if (f_idx == CLS_F_IDX_METADATA) {</span>
+<span class="lineNum">     594 </span>                :<span class="lineCov">      29386 :             match.wc.masks.metadata = OVS_BE64_MAX;</span>
+<span class="lineNum">     595 </span>        [<span class="branchCov" title="Branch 0 was taken 29386 times"> + </span><span class="branchCov" title="Branch 1 was taken 88158 times"> + </span>]:<span class="lineCov">     117544 :         } else if (f_idx == CLS_F_IDX_NW_DSCP) {</span>
+<span class="lineNum">     596 </span>                :<span class="lineCov">      29386 :             match.wc.masks.nw_tos |= IP_DSCP_MASK;</span>
+<span class="lineNum">     597 </span>        [<span class="branchCov" title="Branch 0 was taken 29386 times"> + </span><span class="branchCov" title="Branch 1 was taken 58772 times"> + </span>]:<span class="lineCov">      88158 :         } else if (f_idx == CLS_F_IDX_NW_PROTO) {</span>
+<span class="lineNum">     598 </span>                :<span class="lineCov">      29386 :             match.wc.masks.nw_proto = UINT8_MAX;</span>
+<span class="lineNum">     599 </span>        [<span class="branchCov" title="Branch 0 was taken 29386 times"> + </span><span class="branchCov" title="Branch 1 was taken 29386 times"> + </span>]:<span class="lineCov">      58772 :         } else if (f_idx == CLS_F_IDX_DL_TYPE) {</span>
+<span class="lineNum">     600 </span>                :<span class="lineCov">      29386 :             match.wc.masks.dl_type = OVS_BE16_MAX;</span>
+<span class="lineNum">     601 </span>        [<span class="branchCov" title="Branch 0 was taken 29386 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      29386 :         } else if (f_idx == CLS_F_IDX_IN_PORT) {</span>
+<span class="lineNum">     602 </span>                :<span class="lineCov">      29386 :             match.wc.masks.in_port.ofp_port = u16_to_ofp(UINT16_MAX);</span>
+<span class="lineNum">     603 </span>                :            :         } else {
+<span class="lineNum">     604 </span>                :<span class="lineNoCov">          0 :             OVS_NOT_REACHED();</span>
+<span class="lineNum">     605 </span>                :            :         }
+<span class="lineNum">     606 </span>                :            :     }
+<span class="lineNum">     607 </span>                :            : 
+<span class="lineNum">     608 </span>                :<span class="lineCov">      29386 :     rule = xzalloc(sizeof *rule);</span>
+<span class="lineNum">     609 </span>        [<span class="branchCov" title="Branch 0 was taken 29383 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">      29386 :     cls_rule_init(&amp;rule-&gt;cls_rule, &amp;match, wc_fields ? priority : UINT_MAX);</span>
+<span class="lineNum">     610 </span>                :<span class="lineCov">      29386 :     return rule;</span>
+<span class="lineNum">     611 </span>                :            : }
+<a name="612"><span class="lineNum">     612 </span>                :            : </a>
+<span class="lineNum">     613 </span>                :            : static struct test_rule *
+<span class="lineNum">     614 </span>                :<span class="lineCov">      32650 : clone_rule(const struct test_rule *src)</span>
+<span class="lineNum">     615 </span>                :            : {
+<span class="lineNum">     616 </span>                :            :     struct test_rule *dst;
+<span class="lineNum">     617 </span>                :            : 
+<span class="lineNum">     618 </span>                :<span class="lineCov">      32650 :     dst = xmalloc(sizeof *dst);</span>
+<span class="lineNum">     619 </span>                :<span class="lineCov">      32650 :     dst-&gt;aux = src-&gt;aux;</span>
+<span class="lineNum">     620 </span>                :<span class="lineCov">      32650 :     cls_rule_clone(&amp;dst-&gt;cls_rule, &amp;src-&gt;cls_rule);</span>
+<span class="lineNum">     621 </span>                :<span class="lineCov">      32650 :     return dst;</span>
+<span class="lineNum">     622 </span>                :            : }
+<a name="623"><span class="lineNum">     623 </span>                :            : </a>
+<span class="lineNum">     624 </span>                :            : static void
+<span class="lineNum">     625 </span>                :<span class="lineCov">      32788 : free_rule(struct test_rule *rule)</span>
+<span class="lineNum">     626 </span>                :            : {
+<span class="lineNum">     627 </span>                :<span class="lineCov">      32788 :     cls_rule_destroy(&amp;rule-&gt;cls_rule);</span>
+<span class="lineNum">     628 </span>                :<span class="lineCov">      32788 :     free(rule);</span>
+<span class="lineNum">     629 </span>                :<span class="lineCov">      32788 : }</span>
+<a name="630"><span class="lineNum">     630 </span>                :            : </a>
+<span class="lineNum">     631 </span>                :            : static void
+<span class="lineNum">     632 </span>                :<span class="lineCov">         60 : shuffle(unsigned int *p, size_t n)</span>
+<span class="lineNum">     633 </span>                :            : {
+<span class="lineNum">     634 </span>        [<span class="branchCov" title="Branch 0 was taken 2940 times"> + </span><span class="branchCov" title="Branch 1 was taken 60 times"> + </span>]:<span class="lineCov">       3000 :     for (; n &gt; 1; n--, p++) {</span>
+<span class="lineNum">     635 </span>                :<span class="lineCov">       2940 :         unsigned int *q = &amp;p[random_range(n)];</span>
+<span class="lineNum">     636 </span>                :<span class="lineCov">       2940 :         unsigned int tmp = *p;</span>
+<span class="lineNum">     637 </span>                :<span class="lineCov">       2940 :         *p = *q;</span>
+<span class="lineNum">     638 </span>                :<span class="lineCov">       2940 :         *q = tmp;</span>
+<span class="lineNum">     639 </span>                :            :     }
+<span class="lineNum">     640 </span>                :<span class="lineCov">         60 : }</span>
+<a name="641"><span class="lineNum">     641 </span>                :            : </a>
+<span class="lineNum">     642 </span>                :            : static void
+<span class="lineNum">     643 </span>                :<span class="lineCov">       3683 : shuffle_u32s(uint32_t *p, size_t n)</span>
+<span class="lineNum">     644 </span>                :            : {
+<span class="lineNum">     645 </span>        [<span class="branchCov" title="Branch 0 was taken 180467 times"> + </span><span class="branchCov" title="Branch 1 was taken 3683 times"> + </span>]:<span class="lineCov">     184150 :     for (; n &gt; 1; n--, p++) {</span>
+<span class="lineNum">     646 </span>                :<span class="lineCov">     180467 :         uint32_t *q = &amp;p[random_range(n)];</span>
+<span class="lineNum">     647 </span>                :<span class="lineCov">     180467 :         uint32_t tmp = *p;</span>
+<span class="lineNum">     648 </span>                :<span class="lineCov">     180467 :         *p = *q;</span>
+<span class="lineNum">     649 </span>                :<span class="lineCov">     180467 :         *q = tmp;</span>
+<span class="lineNum">     650 </span>                :            :     }
+<span class="lineNum">     651 </span>                :<span class="lineCov">       3683 : }</span>
+<span class="lineNum">     652 </span>                :            : 
+<span class="lineNum">     653 </span>                :            : /* Classifier tests. */
+<span class="lineNum">     654 </span>                :            : 
+<span class="lineNum">     655 </span>                :            : static enum mf_field_id trie_fields[2] = {
+<span class="lineNum">     656 </span>                :            :     MFF_IPV4_DST, MFF_IPV4_SRC
+<span class="lineNum">     657 </span>                :            : };
+<span class="lineNum">     658 </span>                :            : 
+<a name="659"><span class="lineNum">     659 </span>                :            : /* Tests an empty classifier. */</a>
+<span class="lineNum">     660 </span>                :            : static void
+<span class="lineNum">     661 </span>                :<span class="lineCov">          1 : test_empty(int argc OVS_UNUSED, char *argv[] OVS_UNUSED)</span>
+<span class="lineNum">     662 </span>                :            : {
+<span class="lineNum">     663 </span>                :            :     struct classifier cls;
+<span class="lineNum">     664 </span>                :            :     struct tcls tcls;
+<span class="lineNum">     665 </span>                :            : 
+<span class="lineNum">     666 </span>                :<span class="lineCov">          1 :     classifier_init(&amp;cls, flow_segment_u32s);</span>
+<span class="lineNum">     667 </span>                :<span class="lineCov">          1 :     fat_rwlock_wrlock(&amp;cls.rwlock);</span>
+<span class="lineNum">     668 </span>                :<span class="lineCov">          1 :     classifier_set_prefix_fields(&amp;cls, trie_fields, ARRAY_SIZE(trie_fields));</span>
+<span class="lineNum">     669 </span>                :<span class="lineCov">          1 :     tcls_init(&amp;tcls);</span>
+<span class="lineNum">     670 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     assert(classifier_is_empty(&amp;cls));</span>
+<span class="lineNum">     671 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     assert(tcls_is_empty(&amp;tcls));</span>
+<span class="lineNum">     672 </span>                :<span class="lineCov">          1 :     compare_classifiers(&amp;cls, &amp;tcls);</span>
+<span class="lineNum">     673 </span>                :<span class="lineCov">          1 :     fat_rwlock_unlock(&amp;cls.rwlock);</span>
+<span class="lineNum">     674 </span>                :<span class="lineCov">          1 :     classifier_destroy(&amp;cls);</span>
+<span class="lineNum">     675 </span>                :<span class="lineCov">          1 :     tcls_destroy(&amp;tcls);</span>
+<span class="lineNum">     676 </span>                :<span class="lineCov">          1 : }</span>
+<span class="lineNum">     677 </span>                :            : 
+<a name="678"><span class="lineNum">     678 </span>                :            : /* Destroys a null classifier. */</a>
+<span class="lineNum">     679 </span>                :            : static void
+<span class="lineNum">     680 </span>                :<span class="lineCov">          1 : test_destroy_null(int argc OVS_UNUSED, char *argv[] OVS_UNUSED)</span>
+<span class="lineNum">     681 </span>                :            : {
+<span class="lineNum">     682 </span>                :<span class="lineCov">          1 :     classifier_destroy(NULL);</span>
+<span class="lineNum">     683 </span>                :<span class="lineCov">          1 : }</span>
+<span class="lineNum">     684 </span>                :            : 
+<a name="685"><span class="lineNum">     685 </span>                :            : /* Tests classification with one rule at a time. */</a>
+<span class="lineNum">     686 </span>                :            : static void
+<span class="lineNum">     687 </span>                :<span class="lineCov">          1 : test_single_rule(int argc OVS_UNUSED, char *argv[] OVS_UNUSED)</span>
+<span class="lineNum">     688 </span>                :            : {
+<span class="lineNum">     689 </span>                :            :     unsigned int wc_fields;     /* Hilarious. */
+<span class="lineNum">     690 </span>                :            : 
+<span class="lineNum">     691 </span>        [<span class="branchCov" title="Branch 0 was taken 8192 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">       8193 :     for (wc_fields = 0; wc_fields &lt; (1u &lt;&lt; CLS_N_FIELDS); wc_fields++) {</span>
+<span class="lineNum">     692 </span>                :            :         struct classifier cls;
+<span class="lineNum">     693 </span>                :            :         struct test_rule *rule, *tcls_rule;
+<span class="lineNum">     694 </span>                :            :         struct tcls tcls;
+<span class="lineNum">     695 </span>                :            : 
+<span class="lineNum">     696 </span>                :<span class="lineCov">       8192 :         rule = make_rule(wc_fields,</span>
+<span class="lineNum">     697 </span>                :            :                          hash_bytes(&amp;wc_fields, sizeof wc_fields, 0), 0);
+<span class="lineNum">     698 </span>                :            : 
+<span class="lineNum">     699 </span>                :<span class="lineCov">       8192 :         classifier_init(&amp;cls, flow_segment_u32s);</span>
+<span class="lineNum">     700 </span>                :<span class="lineCov">       8192 :         fat_rwlock_wrlock(&amp;cls.rwlock);</span>
+<span class="lineNum">     701 </span>                :<span class="lineCov">       8192 :         classifier_set_prefix_fields(&amp;cls, trie_fields,</span>
+<span class="lineNum">     702 </span>                :            :                                      ARRAY_SIZE(trie_fields));
+<span class="lineNum">     703 </span>                :<span class="lineCov">       8192 :         tcls_init(&amp;tcls);</span>
+<span class="lineNum">     704 </span>                :            : 
+<span class="lineNum">     705 </span>                :<span class="lineCov">       8192 :         tcls_rule = tcls_insert(&amp;tcls, rule);</span>
+<span class="lineNum">     706 </span>                :<span class="lineCov">       8192 :         classifier_insert(&amp;cls, &amp;rule-&gt;cls_rule);</span>
+<span class="lineNum">     707 </span>                :<span class="lineCov">       8192 :         check_tables(&amp;cls, 1, 1, 0);</span>
+<span class="lineNum">     708 </span>                :<span class="lineCov">       8192 :         compare_classifiers(&amp;cls, &amp;tcls);</span>
+<span class="lineNum">     709 </span>                :            : 
+<span class="lineNum">     710 </span>                :<span class="lineCov">       8192 :         classifier_remove(&amp;cls, &amp;rule-&gt;cls_rule);</span>
+<span class="lineNum">     711 </span>                :<span class="lineCov">       8192 :         tcls_remove(&amp;tcls, tcls_rule);</span>
+<span class="lineNum">     712 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 8192 times"> + </span>]:<span class="lineCov">       8192 :         assert(classifier_is_empty(&amp;cls));</span>
+<span class="lineNum">     713 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 8192 times"> + </span>]:<span class="lineCov">       8192 :         assert(tcls_is_empty(&amp;tcls));</span>
+<span class="lineNum">     714 </span>                :<span class="lineCov">       8192 :         compare_classifiers(&amp;cls, &amp;tcls);</span>
+<span class="lineNum">     715 </span>                :            : 
+<span class="lineNum">     716 </span>                :<span class="lineCov">       8192 :         free_rule(rule);</span>
+<span class="lineNum">     717 </span>                :<span class="lineCov">       8192 :         fat_rwlock_unlock(&amp;cls.rwlock);</span>
+<span class="lineNum">     718 </span>                :<span class="lineCov">       8192 :         classifier_destroy(&amp;cls);</span>
+<span class="lineNum">     719 </span>                :<span class="lineCov">       8192 :         tcls_destroy(&amp;tcls);</span>
+<span class="lineNum">     720 </span>                :            :     }
+<span class="lineNum">     721 </span>                :<span class="lineCov">          1 : }</span>
+<span class="lineNum">     722 </span>                :            : 
+<a name="723"><span class="lineNum">     723 </span>                :            : /* Tests replacing one rule by another. */</a>
+<span class="lineNum">     724 </span>                :            : static void
+<span class="lineNum">     725 </span>                :<span class="lineCov">          1 : test_rule_replacement(int argc OVS_UNUSED, char *argv[] OVS_UNUSED)</span>
+<span class="lineNum">     726 </span>                :            : {
+<span class="lineNum">     727 </span>                :            :     unsigned int wc_fields;
+<span class="lineNum">     728 </span>                :            : 
+<span class="lineNum">     729 </span>        [<span class="branchCov" title="Branch 0 was taken 8192 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">       8193 :     for (wc_fields = 0; wc_fields &lt; (1u &lt;&lt; CLS_N_FIELDS); wc_fields++) {</span>
+<span class="lineNum">     730 </span>                :            :         struct classifier cls;
+<span class="lineNum">     731 </span>                :            :         struct test_rule *rule1;
+<span class="lineNum">     732 </span>                :            :         struct test_rule *rule2;
+<span class="lineNum">     733 </span>                :            :         struct tcls tcls;
+<span class="lineNum">     734 </span>                :            : 
+<span class="lineNum">     735 </span>                :<span class="lineCov">       8192 :         rule1 = make_rule(wc_fields, OFP_DEFAULT_PRIORITY, UINT_MAX);</span>
+<span class="lineNum">     736 </span>                :<span class="lineCov">       8192 :         rule2 = make_rule(wc_fields, OFP_DEFAULT_PRIORITY, UINT_MAX);</span>
+<span class="lineNum">     737 </span>                :<span class="lineCov">       8192 :         rule2-&gt;aux += 5;</span>
+<span class="lineNum">     738 </span>                :<span class="lineCov">       8192 :         rule2-&gt;aux += 5;</span>
+<span class="lineNum">     739 </span>                :            : 
+<span class="lineNum">     740 </span>                :<span class="lineCov">       8192 :         classifier_init(&amp;cls, flow_segment_u32s);</span>
+<span class="lineNum">     741 </span>                :<span class="lineCov">       8192 :         fat_rwlock_wrlock(&amp;cls.rwlock);</span>
+<span class="lineNum">     742 </span>                :<span class="lineCov">       8192 :         classifier_set_prefix_fields(&amp;cls, trie_fields,</span>
+<span class="lineNum">     743 </span>                :            :                                      ARRAY_SIZE(trie_fields));
+<span class="lineNum">     744 </span>                :<span class="lineCov">       8192 :         tcls_init(&amp;tcls);</span>
+<span class="lineNum">     745 </span>                :<span class="lineCov">       8192 :         tcls_insert(&amp;tcls, rule1);</span>
+<span class="lineNum">     746 </span>                :<span class="lineCov">       8192 :         classifier_insert(&amp;cls, &amp;rule1-&gt;cls_rule);</span>
+<span class="lineNum">     747 </span>                :<span class="lineCov">       8192 :         check_tables(&amp;cls, 1, 1, 0);</span>
+<span class="lineNum">     748 </span>                :<span class="lineCov">       8192 :         compare_classifiers(&amp;cls, &amp;tcls);</span>
+<span class="lineNum">     749 </span>                :<span class="lineCov">       8192 :         tcls_destroy(&amp;tcls);</span>
+<span class="lineNum">     750 </span>                :            : 
+<span class="lineNum">     751 </span>                :<span class="lineCov">       8192 :         tcls_init(&amp;tcls);</span>
+<span class="lineNum">     752 </span>                :<span class="lineCov">       8192 :         tcls_insert(&amp;tcls, rule2);</span>
+<span class="lineNum">     753 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 8192 times"> + </span>]:<span class="lineCov">       8192 :         assert(test_rule_from_cls_rule(</span>
+<span class="lineNum">     754 </span>                :            :                    classifier_replace(&amp;cls, &amp;rule2-&gt;cls_rule)) == rule1);
+<span class="lineNum">     755 </span>                :<span class="lineCov">       8192 :         free_rule(rule1);</span>
+<span class="lineNum">     756 </span>                :<span class="lineCov">       8192 :         check_tables(&amp;cls, 1, 1, 0);</span>
+<span class="lineNum">     757 </span>                :<span class="lineCov">       8192 :         compare_classifiers(&amp;cls, &amp;tcls);</span>
+<span class="lineNum">     758 </span>                :<span class="lineCov">       8192 :         tcls_destroy(&amp;tcls);</span>
+<span class="lineNum">     759 </span>                :<span class="lineCov">       8192 :         fat_rwlock_unlock(&amp;cls.rwlock);</span>
+<span class="lineNum">     760 </span>                :<span class="lineCov">       8192 :         destroy_classifier(&amp;cls);</span>
+<span class="lineNum">     761 </span>                :            :     }
+<span class="lineNum">     762 </span>                :<span class="lineCov">          1 : }</span>
+<a name="763"><span class="lineNum">     763 </span>                :            : </a>
+<span class="lineNum">     764 </span>                :            : static int
+<span class="lineNum">     765 </span>                :<span class="lineCov">          3 : factorial(int n_items)</span>
+<span class="lineNum">     766 </span>                :            : {
+<span class="lineNum">     767 </span>                :            :     int n, i;
+<span class="lineNum">     768 </span>                :            : 
+<span class="lineNum">     769 </span>                :<span class="lineCov">          3 :     n = 1;</span>
+<span class="lineNum">     770 </span>        [<span class="branchCov" title="Branch 0 was taken 15 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">         18 :     for (i = 2; i &lt;= n_items; i++) {</span>
+<span class="lineNum">     771 </span>                :<span class="lineCov">         15 :         n *= i;</span>
+<span class="lineNum">     772 </span>                :            :     }
+<span class="lineNum">     773 </span>                :<span class="lineCov">          3 :     return n;</span>
+<span class="lineNum">     774 </span>                :            : }
+<a name="775"><span class="lineNum">     775 </span>                :            : </a>
+<span class="lineNum">     776 </span>                :            : static void
+<span class="lineNum">     777 </span>                :<span class="lineCov">        450 : swap(int *a, int *b)</span>
+<span class="lineNum">     778 </span>                :            : {
+<span class="lineNum">     779 </span>                :<span class="lineCov">        450 :     int tmp = *a;</span>
+<span class="lineNum">     780 </span>                :<span class="lineCov">        450 :     *a = *b;</span>
+<span class="lineNum">     781 </span>                :<span class="lineCov">        450 :     *b = tmp;</span>
+<span class="lineNum">     782 </span>                :<span class="lineCov">        450 : }</span>
+<a name="783"><span class="lineNum">     783 </span>                :            : </a>
+<span class="lineNum">     784 </span>                :            : static void
+<span class="lineNum">     785 </span>                :<span class="lineCov">        267 : reverse(int *a, int n)</span>
+<span class="lineNum">     786 </span>                :            : {
+<span class="lineNum">     787 </span>                :            :     int i;
+<span class="lineNum">     788 </span>                :            : 
+<span class="lineNum">     789 </span>        [<span class="branchCov" title="Branch 0 was taken 183 times"> + </span><span class="branchCov" title="Branch 1 was taken 267 times"> + </span>]:<span class="lineCov">        450 :     for (i = 0; i &lt; n / 2; i++) {</span>
+<span class="lineNum">     790 </span>                :<span class="lineCov">        183 :         int j = n - (i + 1);</span>
+<span class="lineNum">     791 </span>                :<span class="lineCov">        183 :         swap(&amp;a[i], &amp;a[j]);</span>
+<span class="lineNum">     792 </span>                :            :     }
+<span class="lineNum">     793 </span>                :<span class="lineCov">        267 : }</span>
+<a name="794"><span class="lineNum">     794 </span>                :            : </a>
+<span class="lineNum">     795 </span>                :            : static bool
+<span class="lineNum">     796 </span>                :<span class="lineCov">        270 : next_permutation(int *a, int n)</span>
+<span class="lineNum">     797 </span>                :            : {
+<span class="lineNum">     798 </span>                :            :     int k;
+<span class="lineNum">     799 </span>                :            : 
+<span class="lineNum">     800 </span>        [<span class="branchCov" title="Branch 0 was taken 540 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">        543 :     for (k = n - 2; k &gt;= 0; k--) {</span>
+<span class="lineNum">     801 </span>        [<span class="branchCov" title="Branch 0 was taken 267 times"> + </span><span class="branchCov" title="Branch 1 was taken 273 times"> + </span>]:<span class="lineCov">        540 :         if (a[k] &lt; a[k + 1]) {</span>
+<span class="lineNum">     802 </span>                :            :             int l;
+<span class="lineNum">     803 </span>                :            : 
+<span class="lineNum">     804 </span>                :<span class="lineCov">        267 :             for (l = n - 1; ; l--) {</span>
+<span class="lineNum">     805 </span>        [<span class="branchCov" title="Branch 0 was taken 267 times"> + </span><span class="branchCov" title="Branch 1 was taken 129 times"> + </span>]:<span class="lineCov">        396 :                 if (a[l] &gt; a[k]) {</span>
+<span class="lineNum">     806 </span>                :<span class="lineCov">        267 :                     swap(&amp;a[k], &amp;a[l]);</span>
+<span class="lineNum">     807 </span>                :<span class="lineCov">        267 :                     reverse(a + (k + 1), n - (k + 1));</span>
+<span class="lineNum">     808 </span>                :<span class="lineCov">        267 :                     return true;</span>
+<span class="lineNum">     809 </span>                :            :                 }
+<span class="lineNum">     810 </span>                :<span class="lineCov">        129 :             }</span>
+<span class="lineNum">     811 </span>                :            :         }
+<span class="lineNum">     812 </span>                :            :     }
+<span class="lineNum">     813 </span>                :<span class="lineCov">        270 :     return false;</span>
+<span class="lineNum">     814 </span>                :            : }
+<span class="lineNum">     815 </span>                :            : 
+<a name="816"><span class="lineNum">     816 </span>                :            : /* Tests classification with rules that have the same matching criteria. */</a>
+<span class="lineNum">     817 </span>                :            : static void
+<span class="lineNum">     818 </span>                :<span class="lineCov">          1 : test_many_rules_in_one_list (int argc OVS_UNUSED, char *argv[] OVS_UNUSED)</span>
+<span class="lineNum">     819 </span>                :            : {
+<span class="lineNum">     820 </span>                :            :     enum { N_RULES = 3 };
+<span class="lineNum">     821 </span>                :            :     int n_pris;
+<span class="lineNum">     822 </span>                :            : 
+<span class="lineNum">     823 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          4 :     for (n_pris = N_RULES; n_pris &gt;= 1; n_pris--) {</span>
+<span class="lineNum">     824 </span>                :            :         int ops[N_RULES * 2];
+<span class="lineNum">     825 </span>                :            :         int pris[N_RULES];
+<span class="lineNum">     826 </span>                :            :         int n_permutations;
+<span class="lineNum">     827 </span>                :            :         int i;
+<span class="lineNum">     828 </span>                :            : 
+<span class="lineNum">     829 </span>                :<span class="lineCov">          3 :         pris[0] = 0;</span>
+<span class="lineNum">     830 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">          9 :         for (i = 1; i &lt; N_RULES; i++) {</span>
+<span class="lineNum">     831 </span>                :<span class="lineCov">          6 :             pris[i] = pris[i - 1] + (n_pris &gt; i);</span>
+<span class="lineNum">     832 </span>                :            :         }
+<span class="lineNum">     833 </span>                :            : 
+<span class="lineNum">     834 </span>        [<span class="branchCov" title="Branch 0 was taken 18 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">         21 :         for (i = 0; i &lt; N_RULES * 2; i++) {</span>
+<span class="lineNum">     835 </span>                :<span class="lineCov">         18 :             ops[i] = i / 2;</span>
+<span class="lineNum">     836 </span>                :            :         }
+<span class="lineNum">     837 </span>                :            : 
+<span class="lineNum">     838 </span>                :<span class="lineCov">          3 :         n_permutations = 0;</span>
+<span class="lineNum">     839 </span>                :            :         do {
+<span class="lineNum">     840 </span>                :            :             struct test_rule *rules[N_RULES];
+<span class="lineNum">     841 </span>                :            :             struct test_rule *tcls_rules[N_RULES];
+<span class="lineNum">     842 </span>                :            :             int pri_rules[N_RULES];
+<span class="lineNum">     843 </span>                :            :             struct classifier cls;
+<span class="lineNum">     844 </span>                :            :             struct tcls tcls;
+<span class="lineNum">     845 </span>                :            : 
+<span class="lineNum">     846 </span>                :<span class="lineCov">        270 :             n_permutations++;</span>
+<span class="lineNum">     847 </span>                :            : 
+<span class="lineNum">     848 </span>        [<span class="branchCov" title="Branch 0 was taken 810 times"> + </span><span class="branchCov" title="Branch 1 was taken 270 times"> + </span>]:<span class="lineCov">       1080 :             for (i = 0; i &lt; N_RULES; i++) {</span>
+<span class="lineNum">     849 </span>                :<span class="lineCov">        810 :                 rules[i] = make_rule(456, pris[i], 0);</span>
+<span class="lineNum">     850 </span>                :<span class="lineCov">        810 :                 tcls_rules[i] = NULL;</span>
+<span class="lineNum">     851 </span>                :<span class="lineCov">        810 :                 pri_rules[i] = -1;</span>
+<span class="lineNum">     852 </span>                :            :             }
+<span class="lineNum">     853 </span>                :            : 
+<span class="lineNum">     854 </span>                :<span class="lineCov">        270 :             classifier_init(&amp;cls, flow_segment_u32s);</span>
+<span class="lineNum">     855 </span>                :<span class="lineCov">        270 :             fat_rwlock_wrlock(&amp;cls.rwlock);</span>
+<span class="lineNum">     856 </span>                :<span class="lineCov">        270 :             classifier_set_prefix_fields(&amp;cls, trie_fields,</span>
+<span class="lineNum">     857 </span>                :            :                                          ARRAY_SIZE(trie_fields));
+<span class="lineNum">     858 </span>                :<span class="lineCov">        270 :             tcls_init(&amp;tcls);</span>
+<span class="lineNum">     859 </span>                :            : 
+<span class="lineNum">     860 </span>        [<span class="branchCov" title="Branch 0 was taken 1620 times"> + </span><span class="branchCov" title="Branch 1 was taken 270 times"> + </span>]:<span class="lineCov">       1890 :             for (i = 0; i &lt; ARRAY_SIZE(ops); i++) {</span>
+<span class="lineNum">     861 </span>                :<span class="lineCov">       1620 :                 int j = ops[i];</span>
+<span class="lineNum">     862 </span>                :            :                 int m, n;
+<span class="lineNum">     863 </span>                :            : 
+<span class="lineNum">     864 </span>        [<span class="branchCov" title="Branch 0 was taken 1080 times"> + </span><span class="branchCov" title="Branch 1 was taken 540 times"> + </span>]:<span class="lineCov">       1620 :                 if (!tcls_rules[j]) {</span>
+<span class="lineNum">     865 </span>                :            :                     struct test_rule *displaced_rule;
+<span class="lineNum">     866 </span>                :            : 
+<span class="lineNum">     867 </span>                :<span class="lineCov">       1080 :                     tcls_rules[j] = tcls_insert(&amp;tcls, rules[j]);</span>
+<span class="lineNum">     868 </span>                :<span class="lineCov">       1080 :                     displaced_rule = test_rule_from_cls_rule(</span>
+<span class="lineNum">     869 </span>                :<span class="lineCov">       1080 :                         classifier_replace(&amp;cls, &amp;rules[j]-&gt;cls_rule));</span>
+<span class="lineNum">     870 </span>        [<span class="branchCov" title="Branch 0 was taken 408 times"> + </span><span class="branchCov" title="Branch 1 was taken 672 times"> + </span>]:<span class="lineCov">       1080 :                     if (pri_rules[pris[j]] &gt;= 0) {</span>
+<span class="lineNum">     871 </span>                :<span class="lineCov">        408 :                         int k = pri_rules[pris[j]];</span>
+<span class="lineNum">     872 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 408 times"> + </span>]:<span class="lineCov">        408 :                         assert(displaced_rule != NULL);</span>
+<span class="lineNum">     873 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 408 times"> + </span>]:<span class="lineCov">        408 :                         assert(displaced_rule != rules[j]);</span>
+<span class="lineNum">     874 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 408 times"> + </span>]:<span class="lineCov">        408 :                         assert(pris[j] == displaced_rule-&gt;cls_rule.priority);</span>
+<span class="lineNum">     875 </span>                :<span class="lineCov">        408 :                         tcls_rules[k] = NULL;</span>
+<span class="lineNum">     876 </span>                :            :                     } else {
+<span class="lineNum">     877 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 672 times"> + </span>]:<span class="lineCov">        672 :                         assert(displaced_rule == NULL);</span>
+<span class="lineNum">     878 </span>                :            :                     }
+<span class="lineNum">     879 </span>                :<span class="lineCov">       1080 :                     pri_rules[pris[j]] = j;</span>
+<span class="lineNum">     880 </span>                :            :                 } else {
+<span class="lineNum">     881 </span>                :<span class="lineCov">        540 :                     classifier_remove(&amp;cls, &amp;rules[j]-&gt;cls_rule);</span>
+<span class="lineNum">     882 </span>                :<span class="lineCov">        540 :                     tcls_remove(&amp;tcls, tcls_rules[j]);</span>
+<span class="lineNum">     883 </span>                :<span class="lineCov">        540 :                     tcls_rules[j] = NULL;</span>
+<span class="lineNum">     884 </span>                :<span class="lineCov">        540 :                     pri_rules[pris[j]] = -1;</span>
+<span class="lineNum">     885 </span>                :            :                 }
+<span class="lineNum">     886 </span>                :            : 
+<span class="lineNum">     887 </span>                :<span class="lineCov">       1620 :                 n = 0;</span>
+<span class="lineNum">     888 </span>        [<span class="branchCov" title="Branch 0 was taken 4860 times"> + </span><span class="branchCov" title="Branch 1 was taken 1620 times"> + </span>]:<span class="lineCov">       6480 :                 for (m = 0; m &lt; N_RULES; m++) {</span>
+<span class="lineNum">     889 </span>                :<span class="lineCov">       4860 :                     n += tcls_rules[m] != NULL;</span>
+<span class="lineNum">     890 </span>                :            :                 }
+<span class="lineNum">     891 </span>                :<span class="lineCov">       1620 :                 check_tables(&amp;cls, n &gt; 0, n, n - 1);</span>
+<span class="lineNum">     892 </span>                :            : 
+<span class="lineNum">     893 </span>                :<span class="lineCov">       1620 :                 compare_classifiers(&amp;cls, &amp;tcls);</span>
+<span class="lineNum">     894 </span>                :            :             }
+<span class="lineNum">     895 </span>                :            : 
+<span class="lineNum">     896 </span>        [<span class="branchCov" title="Branch 0 was taken 810 times"> + </span><span class="branchCov" title="Branch 1 was taken 270 times"> + </span>]:<span class="lineCov">       1080 :             for (i = 0; i &lt; N_RULES; i++) {</span>
+<span class="lineNum">     897 </span>        [<span class="branchCov" title="Branch 0 was taken 132 times"> + </span><span class="branchCov" title="Branch 1 was taken 678 times"> + </span>]:<span class="lineCov">        810 :                 if (rules[i]-&gt;cls_rule.cls_match) {</span>
+<span class="lineNum">     898 </span>                :<span class="lineCov">        132 :                     classifier_remove(&amp;cls, &amp;rules[i]-&gt;cls_rule);</span>
+<span class="lineNum">     899 </span>                :            :                 }
+<span class="lineNum">     900 </span>                :<span class="lineCov">        810 :                 free_rule(rules[i]);</span>
+<span class="lineNum">     901 </span>                :            :             }
+<span class="lineNum">     902 </span>                :            : 
+<span class="lineNum">     903 </span>                :<span class="lineCov">        270 :             fat_rwlock_unlock(&amp;cls.rwlock);</span>
+<span class="lineNum">     904 </span>                :<span class="lineCov">        270 :             classifier_destroy(&amp;cls);</span>
+<span class="lineNum">     905 </span>                :<span class="lineCov">        270 :             tcls_destroy(&amp;tcls);</span>
+<span class="lineNum">     906 </span>        [<span class="branchCov" title="Branch 1 was taken 267 times"> + </span><span class="branchCov" title="Branch 2 was taken 3 times"> + </span>]:<span class="lineCov">        270 :         } while (next_permutation(ops, ARRAY_SIZE(ops)));</span>
+<span class="lineNum">     907 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 3 times"> + </span>]:<span class="lineCov">          3 :         assert(n_permutations == (factorial(N_RULES * 2) &gt;&gt; N_RULES));</span>
+<span class="lineNum">     908 </span>                :            :     }
+<span class="lineNum">     909 </span>                :<span class="lineCov">          1 : }</span>
+<a name="910"><span class="lineNum">     910 </span>                :            : </a>
+<span class="lineNum">     911 </span>                :            : static int
+<span class="lineNum">     912 </span>                :<span class="lineCov">         56 : count_ones(unsigned long int x)</span>
+<span class="lineNum">     913 </span>                :            : {
+<span class="lineNum">     914 </span>                :<span class="lineCov">         56 :     int n = 0;</span>
+<span class="lineNum">     915 </span>                :            : 
+<span class="lineNum">     916 </span>        [<span class="branchCov" title="Branch 0 was taken 354 times"> + </span><span class="branchCov" title="Branch 1 was taken 56 times"> + </span>]:<span class="lineCov">        410 :     while (x) {</span>
+<span class="lineNum">     917 </span>                :<span class="lineCov">        354 :         x = zero_rightmost_1bit(x);</span>
+<span class="lineNum">     918 </span>                :<span class="lineCov">        354 :         n++;</span>
+<span class="lineNum">     919 </span>                :            :     }
+<span class="lineNum">     920 </span>                :            : 
+<span class="lineNum">     921 </span>                :<span class="lineCov">         56 :     return n;</span>
+<span class="lineNum">     922 </span>                :            : }
+<a name="923"><span class="lineNum">     923 </span>                :            : </a>
+<span class="lineNum">     924 </span>                :            : static bool
+<span class="lineNum">     925 </span>                :<span class="lineCov">       1201 : array_contains(int *array, int n, int value)</span>
+<span class="lineNum">     926 </span>                :            : {
+<span class="lineNum">     927 </span>                :            :     int i;
+<span class="lineNum">     928 </span>                :            : 
+<span class="lineNum">     929 </span>        [<span class="branchCov" title="Branch 0 was taken 10941 times"> + </span><span class="branchCov" title="Branch 1 was taken 1007 times"> + </span>]:<span class="lineCov">      11948 :     for (i = 0; i &lt; n; i++) {</span>
+<span class="lineNum">     930 </span>        [<span class="branchCov" title="Branch 0 was taken 194 times"> + </span><span class="branchCov" title="Branch 1 was taken 10747 times"> + </span>]:<span class="lineCov">      10941 :         if (array[i] == value) {</span>
+<span class="lineNum">     931 </span>                :<span class="lineCov">        194 :             return true;</span>
+<span class="lineNum">     932 </span>                :            :         }
+<span class="lineNum">     933 </span>                :            :     }
+<span class="lineNum">     934 </span>                :            : 
+<span class="lineNum">     935 </span>                :<span class="lineCov">       1201 :     return false;</span>
+<span class="lineNum">     936 </span>                :            : }
+<span class="lineNum">     937 </span>                :            : 
+<span class="lineNum">     938 </span>                :            : /* Tests classification with two rules at a time that fall into the same
+<a name="939"><span class="lineNum">     939 </span>                :            :  * table but different lists. */</a>
+<span class="lineNum">     940 </span>                :            : static void
+<span class="lineNum">     941 </span>                :<span class="lineCov">          1 : test_many_rules_in_one_table(int argc OVS_UNUSED, char *argv[] OVS_UNUSED)</span>
+<span class="lineNum">     942 </span>                :            : {
+<span class="lineNum">     943 </span>                :            :     int iteration;
+<span class="lineNum">     944 </span>                :            : 
+<span class="lineNum">     945 </span>        [<span class="branchCov" title="Branch 0 was taken 50 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">         51 :     for (iteration = 0; iteration &lt; 50; iteration++) {</span>
+<span class="lineNum">     946 </span>                :            :         enum { N_RULES = 20 };
+<span class="lineNum">     947 </span>                :            :         struct test_rule *rules[N_RULES];
+<span class="lineNum">     948 </span>                :            :         struct test_rule *tcls_rules[N_RULES];
+<span class="lineNum">     949 </span>                :            :         struct classifier cls;
+<span class="lineNum">     950 </span>                :            :         struct tcls tcls;
+<span class="lineNum">     951 </span>                :            :         int value_pats[N_RULES];
+<span class="lineNum">     952 </span>                :            :         int value_mask;
+<span class="lineNum">     953 </span>                :            :         int wcf;
+<span class="lineNum">     954 </span>                :            :         int i;
+<span class="lineNum">     955 </span>                :            : 
+<span class="lineNum">     956 </span>                :            :         do {
+<span class="lineNum">     957 </span>                :<span class="lineCov">         56 :             wcf = random_uint32() &amp; ((1u &lt;&lt; CLS_N_FIELDS) - 1);</span>
+<span class="lineNum">     958 </span>                :<span class="lineCov">         56 :             value_mask = ~wcf &amp; ((1u &lt;&lt; CLS_N_FIELDS) - 1);</span>
+<span class="lineNum">     959 </span>        [<span class="branchCov" title="Branch 1 was taken 6 times"> + </span><span class="branchCov" title="Branch 2 was taken 50 times"> + </span>]:<span class="lineCov">         56 :         } while ((1 &lt;&lt; count_ones(value_mask)) &lt; N_RULES);</span>
+<span class="lineNum">     960 </span>                :            : 
+<span class="lineNum">     961 </span>                :<span class="lineCov">         50 :         classifier_init(&amp;cls, flow_segment_u32s);</span>
+<span class="lineNum">     962 </span>                :<span class="lineCov">         50 :         fat_rwlock_wrlock(&amp;cls.rwlock);</span>
+<span class="lineNum">     963 </span>                :<span class="lineCov">         50 :         classifier_set_prefix_fields(&amp;cls, trie_fields,</span>
+<span class="lineNum">     964 </span>                :            :                                      ARRAY_SIZE(trie_fields));
+<span class="lineNum">     965 </span>                :<span class="lineCov">         50 :         tcls_init(&amp;tcls);</span>
+<span class="lineNum">     966 </span>                :            : 
+<span class="lineNum">     967 </span>        [<span class="branchCov" title="Branch 0 was taken 1000 times"> + </span><span class="branchCov" title="Branch 1 was taken 50 times"> + </span>]:<span class="lineCov">       1050 :         for (i = 0; i &lt; N_RULES; i++) {</span>
+<span class="lineNum">     968 </span>                :<span class="lineCov">       1000 :             unsigned int priority = random_uint32();</span>
+<span class="lineNum">     969 </span>                :            : 
+<span class="lineNum">     970 </span>                :            :             do {
+<span class="lineNum">     971 </span>                :<span class="lineCov">       1194 :                 value_pats[i] = random_uint32() &amp; value_mask;</span>
+<span class="lineNum">     972 </span>        [<span class="branchCov" title="Branch 1 was taken 194 times"> + </span><span class="branchCov" title="Branch 2 was taken 1000 times"> + </span>]:<span class="lineCov">       1194 :             } while (array_contains(value_pats, i, value_pats[i]));</span>
+<span class="lineNum">     973 </span>                :            : 
+<span class="lineNum">     974 </span>                :<span class="lineCov">       1000 :             rules[i] = make_rule(wcf, priority, value_pats[i]);</span>
+<span class="lineNum">     975 </span>                :<span class="lineCov">       1000 :             tcls_rules[i] = tcls_insert(&amp;tcls, rules[i]);</span>
+<span class="lineNum">     976 </span>                :<span class="lineCov">       1000 :             classifier_insert(&amp;cls, &amp;rules[i]-&gt;cls_rule);</span>
+<span class="lineNum">     977 </span>                :            : 
+<span class="lineNum">     978 </span>                :<span class="lineCov">       1000 :             check_tables(&amp;cls, 1, i + 1, 0);</span>
+<span class="lineNum">     979 </span>                :<span class="lineCov">       1000 :             compare_classifiers(&amp;cls, &amp;tcls);</span>
+<span class="lineNum">     980 </span>                :            :         }
+<span class="lineNum">     981 </span>                :            : 
+<span class="lineNum">     982 </span>        [<span class="branchCov" title="Branch 0 was taken 1000 times"> + </span><span class="branchCov" title="Branch 1 was taken 50 times"> + </span>]:<span class="lineCov">       1050 :         for (i = 0; i &lt; N_RULES; i++) {</span>
+<span class="lineNum">     983 </span>                :<span class="lineCov">       1000 :             tcls_remove(&amp;tcls, tcls_rules[i]);</span>
+<span class="lineNum">     984 </span>                :<span class="lineCov">       1000 :             classifier_remove(&amp;cls, &amp;rules[i]-&gt;cls_rule);</span>
+<span class="lineNum">     985 </span>                :<span class="lineCov">       1000 :             free_rule(rules[i]);</span>
+<span class="lineNum">     986 </span>                :            : 
+<span class="lineNum">     987 </span>                :<span class="lineCov">       1000 :             check_tables(&amp;cls, i &lt; N_RULES - 1, N_RULES - (i + 1), 0);</span>
+<span class="lineNum">     988 </span>                :<span class="lineCov">       1000 :             compare_classifiers(&amp;cls, &amp;tcls);</span>
+<span class="lineNum">     989 </span>                :            :         }
+<span class="lineNum">     990 </span>                :            : 
+<span class="lineNum">     991 </span>                :<span class="lineCov">         50 :         fat_rwlock_unlock(&amp;cls.rwlock);</span>
+<span class="lineNum">     992 </span>                :<span class="lineCov">         50 :         classifier_destroy(&amp;cls);</span>
+<span class="lineNum">     993 </span>                :<span class="lineCov">         50 :         tcls_destroy(&amp;tcls);</span>
+<span class="lineNum">     994 </span>                :            :     }
+<span class="lineNum">     995 </span>                :<span class="lineCov">          1 : }</span>
+<span class="lineNum">     996 </span>                :            : 
+<span class="lineNum">     997 </span>                :            : /* Tests classification with many rules at a time that fall into random lists
+<a name="998"><span class="lineNum">     998 </span>                :            :  * in 'n' tables. */</a>
+<span class="lineNum">     999 </span>                :            : static void
+<span class="lineNum">    1000 </span>                :<span class="lineCov">          2 : test_many_rules_in_n_tables(int n_tables)</span>
+<span class="lineNum">    1001 </span>                :            : {
+<span class="lineNum">    1002 </span>                :            :     enum { MAX_RULES = 50 };
+<span class="lineNum">    1003 </span>                :            :     int wcfs[10];
+<span class="lineNum">    1004 </span>                :            :     int iteration;
+<span class="lineNum">    1005 </span>                :            :     int i;
+<span class="lineNum">    1006 </span>                :            : 
+<span class="lineNum">    1007 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :     assert(n_tables &lt; 10);</span>
+<span class="lineNum">    1008 </span>        [<span class="branchCov" title="Branch 0 was taken 7 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          9 :     for (i = 0; i &lt; n_tables; i++) {</span>
+<span class="lineNum">    1009 </span>                :            :         do {
+<span class="lineNum">    1010 </span>                :<span class="lineCov">          7 :             wcfs[i] = random_uint32() &amp; ((1u &lt;&lt; CLS_N_FIELDS) - 1);</span>
+<span class="lineNum">    1011 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 7 times"> + </span>]:<span class="lineCov">          7 :         } while (array_contains(wcfs, i, wcfs[i]));</span>
+<span class="lineNum">    1012 </span>                :            :     }
+<span class="lineNum">    1013 </span>                :            : 
+<span class="lineNum">    1014 </span>        [<span class="branchCov" title="Branch 0 was taken 60 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">         62 :     for (iteration = 0; iteration &lt; 30; iteration++) {</span>
+<span class="lineNum">    1015 </span>                :            :         unsigned int priorities[MAX_RULES];
+<span class="lineNum">    1016 </span>                :            :         struct classifier cls;
+<span class="lineNum">    1017 </span>                :            :         struct tcls tcls;
+<span class="lineNum">    1018 </span>                :            : 
+<span class="lineNum">    1019 </span>                :<span class="lineCov">         60 :         random_set_seed(iteration + 1);</span>
+<span class="lineNum">    1020 </span>        [<span class="branchCov" title="Branch 0 was taken 3000 times"> + </span><span class="branchCov" title="Branch 1 was taken 60 times"> + </span>]:<span class="lineCov">       3060 :         for (i = 0; i &lt; MAX_RULES; i++) {</span>
+<span class="lineNum">    1021 </span>                :<span class="lineCov">       3000 :             priorities[i] = i * 129;</span>
+<span class="lineNum">    1022 </span>                :            :         }
+<span class="lineNum">    1023 </span>                :<span class="lineCov">         60 :         shuffle(priorities, ARRAY_SIZE(priorities));</span>
+<span class="lineNum">    1024 </span>                :            : 
+<span class="lineNum">    1025 </span>                :<span class="lineCov">         60 :         classifier_init(&amp;cls, flow_segment_u32s);</span>
+<span class="lineNum">    1026 </span>                :<span class="lineCov">         60 :         fat_rwlock_wrlock(&amp;cls.rwlock);</span>
+<span class="lineNum">    1027 </span>                :<span class="lineCov">         60 :         classifier_set_prefix_fields(&amp;cls, trie_fields,</span>
+<span class="lineNum">    1028 </span>                :            :                                      ARRAY_SIZE(trie_fields));
+<span class="lineNum">    1029 </span>                :<span class="lineCov">         60 :         tcls_init(&amp;tcls);</span>
+<span class="lineNum">    1030 </span>                :            : 
+<span class="lineNum">    1031 </span>        [<span class="branchCov" title="Branch 0 was taken 3000 times"> + </span><span class="branchCov" title="Branch 1 was taken 60 times"> + </span>]:<span class="lineCov">       3060 :         for (i = 0; i &lt; MAX_RULES; i++) {</span>
+<span class="lineNum">    1032 </span>                :            :             struct test_rule *rule;
+<span class="lineNum">    1033 </span>                :<span class="lineCov">       3000 :             unsigned int priority = priorities[i];</span>
+<span class="lineNum">    1034 </span>                :<span class="lineCov">       3000 :             int wcf = wcfs[random_range(n_tables)];</span>
+<span class="lineNum">    1035 </span>                :<span class="lineCov">       3000 :             int value_pat = random_uint32() &amp; ((1u &lt;&lt; CLS_N_FIELDS) - 1);</span>
+<span class="lineNum">    1036 </span>                :<span class="lineCov">       3000 :             rule = make_rule(wcf, priority, value_pat);</span>
+<span class="lineNum">    1037 </span>                :<span class="lineCov">       3000 :             tcls_insert(&amp;tcls, rule);</span>
+<span class="lineNum">    1038 </span>                :<span class="lineCov">       3000 :             classifier_insert(&amp;cls, &amp;rule-&gt;cls_rule);</span>
+<span class="lineNum">    1039 </span>                :<span class="lineCov">       3000 :             check_tables(&amp;cls, -1, i + 1, -1);</span>
+<span class="lineNum">    1040 </span>                :<span class="lineCov">       3000 :             compare_classifiers(&amp;cls, &amp;tcls);</span>
+<span class="lineNum">    1041 </span>                :            :         }
+<span class="lineNum">    1042 </span>                :            : 
+<span class="lineNum">    1043 </span>        [<span class="branchCov" title="Branch 1 was taken 2994 times"> + </span><span class="branchCov" title="Branch 2 was taken 60 times"> + </span>]:<span class="lineCov">       3054 :         while (!classifier_is_empty(&amp;cls)) {</span>
+<span class="lineNum">    1044 </span>                :            :             struct test_rule *rule, *next_rule;
+<span class="lineNum">    1045 </span>                :            :             struct test_rule *target;
+<span class="lineNum">    1046 </span>                :            :             struct cls_cursor cursor;
+<span class="lineNum">    1047 </span>                :            : 
+<span class="lineNum">    1048 </span>                :<span class="lineCov">       2994 :             target = clone_rule(tcls.rules[random_range(tcls.n_rules)]);</span>
+<span class="lineNum">    1049 </span>                :            : 
+<span class="lineNum">    1050 </span>                :<span class="lineCov">       2994 :             cls_cursor_init(&amp;cursor, &amp;cls, &amp;target-&gt;cls_rule);</span>
+<span class="lineNum">    1051 </span>[<span class="branchCov" title="Branch 1 was taken 3000 times"> + </span><span class="branchCov" title="Branch 2 was taken 2994 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 3000 times"> + </span><span class="branchCov" title="Branch 5 was taken 2994 times"> + </span>]:<span class="lineCov">       5994 :             CLS_CURSOR_FOR_EACH_SAFE (rule, next_rule, cls_rule, &amp;cursor) {</span>
+<span class="lineNum">    1052 </span>                :<span class="lineCov">       3000 :                 classifier_remove(&amp;cls, &amp;rule-&gt;cls_rule);</span>
+<span class="lineNum">    1053 </span>                :<span class="lineCov">       3000 :                 free_rule(rule);</span>
+<span class="lineNum">    1054 </span>                :            :             }
+<span class="lineNum">    1055 </span>                :<span class="lineCov">       2994 :             tcls_delete_matches(&amp;tcls, &amp;target-&gt;cls_rule);</span>
+<span class="lineNum">    1056 </span>                :<span class="lineCov">       2994 :             compare_classifiers(&amp;cls, &amp;tcls);</span>
+<span class="lineNum">    1057 </span>                :<span class="lineCov">       2994 :             check_tables(&amp;cls, -1, -1, -1);</span>
+<span class="lineNum">    1058 </span>                :<span class="lineCov">       2994 :             free_rule(target);</span>
+<span class="lineNum">    1059 </span>                :            :         }
+<span class="lineNum">    1060 </span>                :            : 
+<span class="lineNum">    1061 </span>                :<span class="lineCov">         60 :         fat_rwlock_unlock(&amp;cls.rwlock);</span>
+<span class="lineNum">    1062 </span>                :<span class="lineCov">         60 :         destroy_classifier(&amp;cls);</span>
+<span class="lineNum">    1063 </span>                :<span class="lineCov">         60 :         tcls_destroy(&amp;tcls);</span>
+<span class="lineNum">    1064 </span>                :            :     }
+<span class="lineNum">    1065 </span>                :<span class="lineCov">          2 : }</span>
+<a name="1066"><span class="lineNum">    1066 </span>                :            : </a>
+<span class="lineNum">    1067 </span>                :            : static void
+<span class="lineNum">    1068 </span>                :<span class="lineCov">          1 : test_many_rules_in_two_tables(int argc OVS_UNUSED, char *argv[] OVS_UNUSED)</span>
+<span class="lineNum">    1069 </span>                :            : {
+<span class="lineNum">    1070 </span>                :<span class="lineCov">          1 :     test_many_rules_in_n_tables(2);</span>
+<span class="lineNum">    1071 </span>                :<span class="lineCov">          1 : }</span>
+<a name="1072"><span class="lineNum">    1072 </span>                :            : </a>
+<span class="lineNum">    1073 </span>                :            : static void
+<span class="lineNum">    1074 </span>                :<span class="lineCov">          1 : test_many_rules_in_five_tables(int argc OVS_UNUSED, char *argv[] OVS_UNUSED)</span>
+<span class="lineNum">    1075 </span>                :            : {
+<span class="lineNum">    1076 </span>                :<span class="lineCov">          1 :     test_many_rules_in_n_tables(5);</span>
+<span class="lineNum">    1077 </span>                :<span class="lineCov">          1 : }</span>
+<span class="lineNum">    1078 </span>                :            : 
+<span class="lineNum">    1079 </span>                :            : /* Miniflow tests. */
+<a name="1080"><span class="lineNum">    1080 </span>                :            : </a>
+<span class="lineNum">    1081 </span>                :            : static uint32_t
+<span class="lineNum">    1082 </span>                :<span class="lineCov">     114103 : random_value(void)</span>
+<span class="lineNum">    1083 </span>                :            : {
+<span class="lineNum">    1084 </span>                :            :     static const uint32_t values[] =
+<span class="lineNum">    1085 </span>                :            :         { 0xffffffff, 0xaaaaaaaa, 0x55555555, 0x80000000,
+<span class="lineNum">    1086 </span>                :            :           0x00000001, 0xface0000, 0x00d00d1e, 0xdeadbeef };
+<span class="lineNum">    1087 </span>                :            : 
+<span class="lineNum">    1088 </span>                :<span class="lineCov">     114103 :     return values[random_range(ARRAY_SIZE(values))];</span>
+<span class="lineNum">    1089 </span>                :            : }
+<a name="1090"><span class="lineNum">    1090 </span>                :            : </a>
+<span class="lineNum">    1091 </span>                :            : static bool
+<span class="lineNum">    1092 </span>                :<span class="lineCov">    3570397 : choose(unsigned int n, unsigned int *idxp)</span>
+<span class="lineNum">    1093 </span>                :            : {
+<span class="lineNum">    1094 </span>        [<span class="branchCov" title="Branch 0 was taken 18605 times"> + </span><span class="branchCov" title="Branch 1 was taken 3551792 times"> + </span>]:<span class="lineCov">    3570397 :     if (*idxp &lt; n) {</span>
+<span class="lineNum">    1095 </span>                :<span class="lineCov">      18605 :         return true;</span>
+<span class="lineNum">    1096 </span>                :            :     } else {
+<span class="lineNum">    1097 </span>                :<span class="lineCov">    3551792 :         *idxp -= n;</span>
+<span class="lineNum">    1098 </span>                :<span class="lineCov">    3570397 :         return false;</span>
+<span class="lineNum">    1099 </span>                :            :     }
+<span class="lineNum">    1100 </span>                :            : }
+<a name="1101"><span class="lineNum">    1101 </span>                :            : </a>
+<span class="lineNum">    1102 </span>                :            : static bool
+<span class="lineNum">    1103 </span>                :<span class="lineCov">      91048 : init_consecutive_values(int n_consecutive, struct flow *flow,</span>
+<span class="lineNum">    1104 </span>                :            :                         unsigned int *idxp)
+<span class="lineNum">    1105 </span>                :            : {
+<span class="lineNum">    1106 </span>                :<span class="lineCov">      91048 :     uint32_t *flow_u32 = (uint32_t *) flow;</span>
+<span class="lineNum">    1107 </span>                :            : 
+<span class="lineNum">    1108 </span>        [<span class="branchCov" title="Branch 1 was taken 3170 times"> + </span><span class="branchCov" title="Branch 2 was taken 87878 times"> + </span>]:<span class="lineCov">      91048 :     if (choose(FLOW_U32S - n_consecutive + 1, idxp)) {</span>
+<span class="lineNum">    1109 </span>                :            :         int i;
+<span class="lineNum">    1110 </span>                :            : 
+<span class="lineNum">    1111 </span>        [<span class="branchCov" title="Branch 0 was taken 8124 times"> + </span><span class="branchCov" title="Branch 1 was taken 3170 times"> + </span>]:<span class="lineCov">      11294 :         for (i = 0; i &lt; n_consecutive; i++) {</span>
+<span class="lineNum">    1112 </span>                :<span class="lineCov">       8124 :             flow_u32[*idxp + i] = random_value();</span>
+<span class="lineNum">    1113 </span>                :            :         }
+<span class="lineNum">    1114 </span>                :<span class="lineCov">       3170 :         return true;</span>
+<span class="lineNum">    1115 </span>                :            :     } else {
+<span class="lineNum">    1116 </span>                :<span class="lineCov">      91048 :         return false;</span>
+<span class="lineNum">    1117 </span>                :            :     }
+<span class="lineNum">    1118 </span>                :            : }
+<a name="1119"><span class="lineNum">    1119 </span>                :            : </a>
+<span class="lineNum">    1120 </span>                :            : static bool
+<span class="lineNum">    1121 </span>                :<span class="lineCov">      12736 : next_random_flow(struct flow *flow, unsigned int idx)</span>
+<span class="lineNum">    1122 </span>                :            : {
+<span class="lineNum">    1123 </span>                :<span class="lineCov">      12736 :     uint32_t *flow_u32 = (uint32_t *) flow;</span>
+<span class="lineNum">    1124 </span>                :            :     int i;
+<span class="lineNum">    1125 </span>                :            : 
+<span class="lineNum">    1126 </span>                :<span class="lineCov">      12736 :     memset(flow, 0, sizeof *flow);</span>
+<span class="lineNum">    1127 </span>                :            : 
+<span class="lineNum">    1128 </span>                :            :     /* Empty flow. */
+<span class="lineNum">    1129 </span>        [<span class="branchCov" title="Branch 1 was taken 6 times"> + </span><span class="branchCov" title="Branch 2 was taken 12730 times"> + </span>]:<span class="lineCov">      12736 :     if (choose(1, &amp;idx)) {</span>
+<span class="lineNum">    1130 </span>                :<span class="lineCov">          6 :         return true;</span>
+<span class="lineNum">    1131 </span>                :            :     }
+<span class="lineNum">    1132 </span>                :            : 
+<span class="lineNum">    1133 </span>                :            :     /* All flows with a small number of consecutive nonzero values. */
+<span class="lineNum">    1134 </span>        [<span class="branchCov" title="Branch 0 was taken 43074 times"> + </span><span class="branchCov" title="Branch 1 was taken 9636 times"> + </span>]:<span class="lineCov">      52710 :     for (i = 1; i &lt;= 4; i++) {</span>
+<span class="lineNum">    1135 </span>        [<span class="branchCov" title="Branch 1 was taken 3094 times"> + </span><span class="branchCov" title="Branch 2 was taken 39980 times"> + </span>]:<span class="lineCov">      43074 :         if (init_consecutive_values(i, flow, &amp;idx)) {</span>
+<span class="lineNum">    1136 </span>                :<span class="lineCov">       3094 :             return true;</span>
+<span class="lineNum">    1137 </span>                :            :         }
+<span class="lineNum">    1138 </span>                :            :     }
+<span class="lineNum">    1139 </span>                :            : 
+<span class="lineNum">    1140 </span>                :            :     /* All flows with a large number of consecutive nonzero values. */
+<span class="lineNum">    1141 </span>        [<span class="branchCov" title="Branch 0 was taken 47974 times"> + </span><span class="branchCov" title="Branch 1 was taken 9560 times"> + </span>]:<span class="lineCov">      57534 :     for (i = FLOW_U32S - 4; i &lt;= FLOW_U32S; i++) {</span>
+<span class="lineNum">    1142 </span>        [<span class="branchCov" title="Branch 1 was taken 76 times"> + </span><span class="branchCov" title="Branch 2 was taken 47898 times"> + </span>]:<span class="lineCov">      47974 :         if (init_consecutive_values(i, flow, &amp;idx)) {</span>
+<span class="lineNum">    1143 </span>                :<span class="lineCov">         76 :             return true;</span>
+<span class="lineNum">    1144 </span>                :            :         }
+<span class="lineNum">    1145 </span>                :            :     }
+<span class="lineNum">    1146 </span>                :            : 
+<span class="lineNum">    1147 </span>                :            :     /* All flows with exactly two nonconsecutive nonzero values. */
+<span class="lineNum">    1148 </span>        [<span class="branchCov" title="Branch 1 was taken 5873 times"> + </span><span class="branchCov" title="Branch 2 was taken 3687 times"> + </span>]:<span class="lineCov">       9560 :     if (choose((FLOW_U32S - 1) * (FLOW_U32S - 2) / 2, &amp;idx)) {</span>
+<span class="lineNum">    1149 </span>                :            :         int ofs1;
+<span class="lineNum">    1150 </span>                :            : 
+<span class="lineNum">    1151 </span>        [<span class="branchCov" title="Branch 0 was taken 97814 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      97814 :         for (ofs1 = 0; ofs1 &lt; FLOW_U32S - 2; ofs1++) {</span>
+<span class="lineNum">    1152 </span>                :            :             int ofs2;
+<span class="lineNum">    1153 </span>                :            : 
+<span class="lineNum">    1154 </span>        [<span class="branchCov" title="Branch 0 was taken 3453366 times"> + </span><span class="branchCov" title="Branch 1 was taken 91941 times"> + </span>]:<span class="lineCov">    3545307 :             for (ofs2 = ofs1 + 2; ofs2 &lt; FLOW_U32S; ofs2++) {</span>
+<span class="lineNum">    1155 </span>        [<span class="branchCov" title="Branch 1 was taken 5873 times"> + </span><span class="branchCov" title="Branch 2 was taken 3447493 times"> + </span>]:<span class="lineCov">    3453366 :                 if (choose(1, &amp;idx)) {</span>
+<span class="lineNum">    1156 </span>                :<span class="lineCov">       5873 :                     flow_u32[ofs1] = random_value();</span>
+<span class="lineNum">    1157 </span>                :<span class="lineCov">       5873 :                     flow_u32[ofs2] = random_value();</span>
+<span class="lineNum">    1158 </span>                :<span class="lineCov">       5873 :                     return true;</span>
+<span class="lineNum">    1159 </span>                :            :                 }
+<span class="lineNum">    1160 </span>                :            :             }
+<span class="lineNum">    1161 </span>                :            :         }
+<span class="lineNum">    1162 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">    1163 </span>                :            :     }
+<span class="lineNum">    1164 </span>                :            : 
+<span class="lineNum">    1165 </span>                :            :     /* 16 randomly chosen flows with N &gt;= 3 nonzero values. */
+<span class="lineNum">    1166 </span>        [<span class="branchCov" title="Branch 1 was taken 3683 times"> + </span><span class="branchCov" title="Branch 2 was taken 4 times"> + </span>]:<span class="lineCov">       3687 :     if (choose(16 * (FLOW_U32S - 4), &amp;idx)) {</span>
+<span class="lineNum">    1167 </span>                :<span class="lineCov">       3683 :         int n = idx / 16 + 3;</span>
+<span class="lineNum">    1168 </span>                :            :         int i;
+<span class="lineNum">    1169 </span>                :            : 
+<span class="lineNum">    1170 </span>        [<span class="branchCov" title="Branch 0 was taken 94233 times"> + </span><span class="branchCov" title="Branch 1 was taken 3683 times"> + </span>]:<span class="lineCov">      97916 :         for (i = 0; i &lt; n; i++) {</span>
+<span class="lineNum">    1171 </span>                :<span class="lineCov">      94233 :             flow_u32[i] = random_value();</span>
+<span class="lineNum">    1172 </span>                :            :         }
+<span class="lineNum">    1173 </span>                :<span class="lineCov">       3683 :         shuffle_u32s(flow_u32, FLOW_U32S);</span>
+<span class="lineNum">    1174 </span>                :            : 
+<span class="lineNum">    1175 </span>                :<span class="lineCov">       3683 :         return true;</span>
+<span class="lineNum">    1176 </span>                :            :     }
+<span class="lineNum">    1177 </span>                :            : 
+<span class="lineNum">    1178 </span>                :<span class="lineCov">      12736 :     return false;</span>
+<span class="lineNum">    1179 </span>                :            : }
+<a name="1180"><span class="lineNum">    1180 </span>                :            : </a>
+<span class="lineNum">    1181 </span>                :            : static void
+<span class="lineNum">    1182 </span>                :<span class="lineCov">       2122 : any_random_flow(struct flow *flow)</span>
+<span class="lineNum">    1183 </span>                :            : {
+<span class="lineNum">    1184 </span>                :            :     static unsigned int max;
+<span class="lineNum">    1185 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 2121 times"> + </span>]:<span class="lineCov">       2122 :     if (!max) {</span>
+<span class="lineNum">    1186 </span>        [<span class="branchCov" title="Branch 1 was taken 2122 times"> + </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">       2123 :         while (next_random_flow(flow, max)) {</span>
+<span class="lineNum">    1187 </span>                :<span class="lineCov">       2122 :             max++;</span>
+<span class="lineNum">    1188 </span>                :            :         }
+<span class="lineNum">    1189 </span>                :            :     }
+<span class="lineNum">    1190 </span>                :            : 
+<span class="lineNum">    1191 </span>                :<span class="lineCov">       2122 :     next_random_flow(flow, random_range(max));</span>
+<span class="lineNum">    1192 </span>                :<span class="lineCov">       2122 : }</span>
+<a name="1193"><span class="lineNum">    1193 </span>                :            : </a>
+<span class="lineNum">    1194 </span>                :            : static void
+<span class="lineNum">    1195 </span>                :<span class="lineCov">       2122 : toggle_masked_flow_bits(struct flow *flow, const struct flow_wildcards *mask)</span>
+<span class="lineNum">    1196 </span>                :            : {
+<span class="lineNum">    1197 </span>                :<span class="lineCov">       2122 :     const uint32_t *mask_u32 = (const uint32_t *) &amp;mask-&gt;masks;</span>
+<span class="lineNum">    1198 </span>                :<span class="lineCov">       2122 :     uint32_t *flow_u32 = (uint32_t *) flow;</span>
+<span class="lineNum">    1199 </span>                :            :     int i;
+<span class="lineNum">    1200 </span>                :            : 
+<span class="lineNum">    1201 </span>        [<span class="branchCov" title="Branch 0 was taken 106100 times"> + </span><span class="branchCov" title="Branch 1 was taken 2122 times"> + </span>]:<span class="lineCov">     108222 :     for (i = 0; i &lt; FLOW_U32S; i++) {</span>
+<span class="lineNum">    1202 </span>        [<span class="branchCov" title="Branch 0 was taken 2122 times"> + </span><span class="branchCov" title="Branch 1 was taken 103978 times"> + </span>]:<span class="lineCov">     106100 :         if (mask_u32[i] != 0) {</span>
+<span class="lineNum">    1203 </span>                :            :             uint32_t bit;
+<span class="lineNum">    1204 </span>                :            : 
+<span class="lineNum">    1205 </span>                :            :             do {
+<span class="lineNum">    1206 </span>                :<span class="lineCov">      20029 :                 bit = 1u &lt;&lt; random_range(32);</span>
+<span class="lineNum">    1207 </span>        [<span class="branchCov" title="Branch 0 was taken 17907 times"> + </span><span class="branchCov" title="Branch 1 was taken 2122 times"> + </span>]:<span class="lineCov">      20029 :             } while (!(bit &amp; mask_u32[i]));</span>
+<span class="lineNum">    1208 </span>                :<span class="lineCov">       2122 :             flow_u32[i] ^= bit;</span>
+<span class="lineNum">    1209 </span>                :            :         }
+<span class="lineNum">    1210 </span>                :            :     }
+<span class="lineNum">    1211 </span>                :<span class="lineCov">       2122 : }</span>
+<a name="1212"><span class="lineNum">    1212 </span>                :            : </a>
+<span class="lineNum">    1213 </span>                :            : static void
+<span class="lineNum">    1214 </span>                :<span class="lineCov">       2121 : wildcard_extra_bits(struct flow_wildcards *mask)</span>
+<span class="lineNum">    1215 </span>                :            : {
+<span class="lineNum">    1216 </span>                :<span class="lineCov">       2121 :     uint32_t *mask_u32 = (uint32_t *) &amp;mask-&gt;masks;</span>
+<span class="lineNum">    1217 </span>                :            :     int i;
+<span class="lineNum">    1218 </span>                :            : 
+<span class="lineNum">    1219 </span>        [<span class="branchCov" title="Branch 0 was taken 106050 times"> + </span><span class="branchCov" title="Branch 1 was taken 2121 times"> + </span>]:<span class="lineCov">     108171 :     for (i = 0; i &lt; FLOW_U32S; i++) {</span>
+<span class="lineNum">    1220 </span>        [<span class="branchCov" title="Branch 0 was taken 22310 times"> + </span><span class="branchCov" title="Branch 1 was taken 83740 times"> + </span>]:<span class="lineCov">     106050 :         if (mask_u32[i] != 0) {</span>
+<span class="lineNum">    1221 </span>                :            :             uint32_t bit;
+<span class="lineNum">    1222 </span>                :            : 
+<span class="lineNum">    1223 </span>                :            :             do {
+<span class="lineNum">    1224 </span>                :<span class="lineCov">     211491 :                 bit = 1u &lt;&lt; random_range(32);</span>
+<span class="lineNum">    1225 </span>        [<span class="branchCov" title="Branch 0 was taken 189181 times"> + </span><span class="branchCov" title="Branch 1 was taken 22310 times"> + </span>]:<span class="lineCov">     211491 :             } while (!(bit &amp; mask_u32[i]));</span>
+<span class="lineNum">    1226 </span>                :<span class="lineCov">      22310 :             mask_u32[i] &amp;= ~bit;</span>
+<span class="lineNum">    1227 </span>                :            :         }
+<span class="lineNum">    1228 </span>                :            :     }
+<span class="lineNum">    1229 </span>                :<span class="lineCov">       2121 : }</span>
+<a name="1230"><span class="lineNum">    1230 </span>                :            : </a>
+<span class="lineNum">    1231 </span>                :            : static void
+<span class="lineNum">    1232 </span>                :<span class="lineCov">          1 : test_miniflow(int argc OVS_UNUSED, char *argv[] OVS_UNUSED)</span>
+<span class="lineNum">    1233 </span>                :            : {
+<span class="lineNum">    1234 </span>                :            :     struct flow flow;
+<span class="lineNum">    1235 </span>                :            :     unsigned int idx;
+<span class="lineNum">    1236 </span>                :            : 
+<span class="lineNum">    1237 </span>                :<span class="lineCov">          1 :     random_set_seed(0xb3faca38);</span>
+<span class="lineNum">    1238 </span>        [<span class="branchCov" title="Branch 1 was taken 2122 times"> + </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">       2123 :     for (idx = 0; next_random_flow(&amp;flow, idx); idx++) {</span>
+<span class="lineNum">    1239 </span>                :<span class="lineCov">       2122 :         const uint32_t *flow_u32 = (const uint32_t *) &amp;flow;</span>
+<span class="lineNum">    1240 </span>                :            :         struct miniflow miniflow, miniflow2, miniflow3;
+<span class="lineNum">    1241 </span>                :            :         struct flow flow2, flow3;
+<span class="lineNum">    1242 </span>                :            :         struct flow_wildcards mask;
+<span class="lineNum">    1243 </span>                :            :         struct minimask minimask;
+<span class="lineNum">    1244 </span>                :            :         int i;
+<span class="lineNum">    1245 </span>                :            : 
+<span class="lineNum">    1246 </span>                :            :         /* Convert flow to miniflow. */
+<span class="lineNum">    1247 </span>                :<span class="lineCov">       2122 :         miniflow_init(&amp;miniflow, &amp;flow);</span>
+<span class="lineNum">    1248 </span>                :            : 
+<span class="lineNum">    1249 </span>                :            :         /* Check that the flow equals its miniflow. */
+<span class="lineNum">    1250 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         assert(miniflow_get_vid(&amp;miniflow) == vlan_tci_to_vid(flow.vlan_tci));</span>
+<span class="lineNum">    1251 </span>        [<span class="branchCov" title="Branch 0 was taken 106100 times"> + </span><span class="branchCov" title="Branch 1 was taken 2122 times"> + </span>]:<span class="lineCov">     108222 :         for (i = 0; i &lt; FLOW_U32S; i++) {</span>
+<span class="lineNum">    1252 </span>[<span class="branchCov" title="Branch 0 was taken 22310 times"> + </span><span class="branchCov" title="Branch 1 was taken 83790 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 106100 times"> + </span>]:<span class="lineCov">     106100 :             assert(MINIFLOW_GET_TYPE(&amp;miniflow, uint32_t, i * 4)</span>
+<span class="lineNum">    1253 </span>                :            :                    == flow_u32[i]);
+<span class="lineNum">    1254 </span>                :            :         }
+<span class="lineNum">    1255 </span>                :            : 
+<span class="lineNum">    1256 </span>                :            :         /* Check that the miniflow equals itself. */
+<span class="lineNum">    1257 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         assert(miniflow_equal(&amp;miniflow, &amp;miniflow));</span>
+<span class="lineNum">    1258 </span>                :            : 
+<span class="lineNum">    1259 </span>                :            :         /* Convert miniflow back to flow and verify that it's the same. */
+<span class="lineNum">    1260 </span>                :<span class="lineCov">       2122 :         miniflow_expand(&amp;miniflow, &amp;flow2);</span>
+<span class="lineNum">    1261 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         assert(flow_equal(&amp;flow, &amp;flow2));</span>
+<span class="lineNum">    1262 </span>                :            : 
+<span class="lineNum">    1263 </span>                :            :         /* Check that copying a miniflow works properly. */
+<span class="lineNum">    1264 </span>                :<span class="lineCov">       2122 :         miniflow_clone(&amp;miniflow2, &amp;miniflow);</span>
+<span class="lineNum">    1265 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         assert(miniflow_equal(&amp;miniflow, &amp;miniflow2));</span>
+<span class="lineNum">    1266 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         assert(miniflow_hash(&amp;miniflow, 0) == miniflow_hash(&amp;miniflow2, 0));</span>
+<span class="lineNum">    1267 </span>                :<span class="lineCov">       2122 :         miniflow_expand(&amp;miniflow2, &amp;flow3);</span>
+<span class="lineNum">    1268 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         assert(flow_equal(&amp;flow, &amp;flow3));</span>
+<span class="lineNum">    1269 </span>                :            : 
+<span class="lineNum">    1270 </span>                :            :         /* Check that masked matches work as expected for identical flows and
+<span class="lineNum">    1271 </span>                :            :          * miniflows. */
+<span class="lineNum">    1272 </span>                :            :         do {
+<span class="lineNum">    1273 </span>                :<span class="lineCov">       2122 :             next_random_flow(&amp;mask.masks, 1);</span>
+<span class="lineNum">    1274 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         } while (flow_wildcards_is_catchall(&amp;mask));</span>
+<span class="lineNum">    1275 </span>                :<span class="lineCov">       2122 :         minimask_init(&amp;minimask, &amp;mask);</span>
+<span class="lineNum">    1276 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         assert(minimask_is_catchall(&amp;minimask)</span>
+<span class="lineNum">    1277 </span>                :            :                == flow_wildcards_is_catchall(&amp;mask));
+<span class="lineNum">    1278 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         assert(miniflow_equal_in_minimask(&amp;miniflow, &amp;miniflow2, &amp;minimask));</span>
+<span class="lineNum">    1279 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         assert(miniflow_equal_flow_in_minimask(&amp;miniflow, &amp;flow2, &amp;minimask));</span>
+<span class="lineNum">    1280 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         assert(miniflow_hash_in_minimask(&amp;miniflow, &amp;minimask, 0x12345678) ==</span>
+<span class="lineNum">    1281 </span>                :            :                flow_hash_in_minimask(&amp;flow, &amp;minimask, 0x12345678));
+<span class="lineNum">    1282 </span>                :            : 
+<span class="lineNum">    1283 </span>                :            :         /* Check that masked matches work as expected for differing flows and
+<span class="lineNum">    1284 </span>                :            :          * miniflows. */
+<span class="lineNum">    1285 </span>                :<span class="lineCov">       2122 :         toggle_masked_flow_bits(&amp;flow2, &amp;mask);</span>
+<span class="lineNum">    1286 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         assert(!miniflow_equal_flow_in_minimask(&amp;miniflow, &amp;flow2, &amp;minimask));</span>
+<span class="lineNum">    1287 </span>                :<span class="lineCov">       2122 :         miniflow_init(&amp;miniflow3, &amp;flow2);</span>
+<span class="lineNum">    1288 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         assert(!miniflow_equal_in_minimask(&amp;miniflow, &amp;miniflow3, &amp;minimask));</span>
+<span class="lineNum">    1289 </span>                :            : 
+<span class="lineNum">    1290 </span>                :            :         /* Clean up. */
+<span class="lineNum">    1291 </span>                :<span class="lineCov">       2122 :         miniflow_destroy(&amp;miniflow);</span>
+<span class="lineNum">    1292 </span>                :<span class="lineCov">       2122 :         miniflow_destroy(&amp;miniflow2);</span>
+<span class="lineNum">    1293 </span>                :<span class="lineCov">       2122 :         miniflow_destroy(&amp;miniflow3);</span>
+<span class="lineNum">    1294 </span>                :<span class="lineCov">       2122 :         minimask_destroy(&amp;minimask);</span>
+<span class="lineNum">    1295 </span>                :            :     }
+<span class="lineNum">    1296 </span>                :<span class="lineCov">          1 : }</span>
+<a name="1297"><span class="lineNum">    1297 </span>                :            : </a>
+<span class="lineNum">    1298 </span>                :            : static void
+<span class="lineNum">    1299 </span>                :<span class="lineCov">          1 : test_minimask_has_extra(int argc OVS_UNUSED, char *argv[] OVS_UNUSED)</span>
+<span class="lineNum">    1300 </span>                :            : {
+<span class="lineNum">    1301 </span>                :            :     struct flow_wildcards catchall;
+<span class="lineNum">    1302 </span>                :            :     struct minimask minicatchall;
+<span class="lineNum">    1303 </span>                :            :     struct flow flow;
+<span class="lineNum">    1304 </span>                :            :     unsigned int idx;
+<span class="lineNum">    1305 </span>                :            : 
+<span class="lineNum">    1306 </span>                :<span class="lineCov">          1 :     flow_wildcards_init_catchall(&amp;catchall);</span>
+<span class="lineNum">    1307 </span>                :<span class="lineCov">          1 :     minimask_init(&amp;minicatchall, &amp;catchall);</span>
+<span class="lineNum">    1308 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     assert(minimask_is_catchall(&amp;minicatchall));</span>
+<span class="lineNum">    1309 </span>                :            : 
+<span class="lineNum">    1310 </span>                :<span class="lineCov">          1 :     random_set_seed(0x2ec7905b);</span>
+<span class="lineNum">    1311 </span>        [<span class="branchCov" title="Branch 1 was taken 2122 times"> + </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">       2123 :     for (idx = 0; next_random_flow(&amp;flow, idx); idx++) {</span>
+<span class="lineNum">    1312 </span>                :            :         struct flow_wildcards mask;
+<span class="lineNum">    1313 </span>                :            :         struct minimask minimask;
+<span class="lineNum">    1314 </span>                :            : 
+<span class="lineNum">    1315 </span>                :<span class="lineCov">       2122 :         mask.masks = flow;</span>
+<span class="lineNum">    1316 </span>                :<span class="lineCov">       2122 :         minimask_init(&amp;minimask, &amp;mask);</span>
+<span class="lineNum">    1317 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         assert(!minimask_has_extra(&amp;minimask, &amp;minimask));</span>
+<span class="lineNum">    1318 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         assert(minimask_has_extra(&amp;minicatchall, &amp;minimask)</span>
+<span class="lineNum">    1319 </span>                :            :                == !minimask_is_catchall(&amp;minimask));
+<span class="lineNum">    1320 </span>        [<span class="branchCov" title="Branch 1 was taken 2121 times"> + </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">       2122 :         if (!minimask_is_catchall(&amp;minimask)) {</span>
+<span class="lineNum">    1321 </span>                :            :             struct minimask minimask2;
+<span class="lineNum">    1322 </span>                :            : 
+<span class="lineNum">    1323 </span>                :<span class="lineCov">       2121 :             wildcard_extra_bits(&amp;mask);</span>
+<span class="lineNum">    1324 </span>                :<span class="lineCov">       2121 :             minimask_init(&amp;minimask2, &amp;mask);</span>
+<span class="lineNum">    1325 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 2121 times"> + </span>]:<span class="lineCov">       2121 :             assert(minimask_has_extra(&amp;minimask2, &amp;minimask));</span>
+<span class="lineNum">    1326 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 2121 times"> + </span>]:<span class="lineCov">       2121 :             assert(!minimask_has_extra(&amp;minimask, &amp;minimask2));</span>
+<span class="lineNum">    1327 </span>                :<span class="lineCov">       2121 :             minimask_destroy(&amp;minimask2);</span>
+<span class="lineNum">    1328 </span>                :            :         }
+<span class="lineNum">    1329 </span>                :            : 
+<span class="lineNum">    1330 </span>                :<span class="lineCov">       2122 :         minimask_destroy(&amp;minimask);</span>
+<span class="lineNum">    1331 </span>                :            :     }
+<span class="lineNum">    1332 </span>                :            : 
+<span class="lineNum">    1333 </span>                :<span class="lineCov">          1 :     minimask_destroy(&amp;minicatchall);</span>
+<span class="lineNum">    1334 </span>                :<span class="lineCov">          1 : }</span>
+<a name="1335"><span class="lineNum">    1335 </span>                :            : </a>
+<span class="lineNum">    1336 </span>                :            : static void
+<span class="lineNum">    1337 </span>                :<span class="lineCov">          1 : test_minimask_combine(int argc OVS_UNUSED, char *argv[] OVS_UNUSED)</span>
+<span class="lineNum">    1338 </span>                :            : {
+<span class="lineNum">    1339 </span>                :            :     struct flow_wildcards catchall;
+<span class="lineNum">    1340 </span>                :            :     struct minimask minicatchall;
+<span class="lineNum">    1341 </span>                :            :     struct flow flow;
+<span class="lineNum">    1342 </span>                :            :     unsigned int idx;
+<span class="lineNum">    1343 </span>                :            : 
+<span class="lineNum">    1344 </span>                :<span class="lineCov">          1 :     flow_wildcards_init_catchall(&amp;catchall);</span>
+<span class="lineNum">    1345 </span>                :<span class="lineCov">          1 :     minimask_init(&amp;minicatchall, &amp;catchall);</span>
+<span class="lineNum">    1346 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     assert(minimask_is_catchall(&amp;minicatchall));</span>
+<span class="lineNum">    1347 </span>                :            : 
+<span class="lineNum">    1348 </span>                :<span class="lineCov">          1 :     random_set_seed(0x181bf0cd);</span>
+<span class="lineNum">    1349 </span>        [<span class="branchCov" title="Branch 1 was taken 2122 times"> + </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">       2123 :     for (idx = 0; next_random_flow(&amp;flow, idx); idx++) {</span>
+<span class="lineNum">    1350 </span>                :            :         struct minimask minimask, minimask2, minicombined;
+<span class="lineNum">    1351 </span>                :            :         struct flow_wildcards mask, mask2, combined, combined2;
+<span class="lineNum">    1352 </span>                :            :         uint32_t storage[FLOW_U32S];
+<span class="lineNum">    1353 </span>                :            :         struct flow flow2;
+<span class="lineNum">    1354 </span>                :            : 
+<span class="lineNum">    1355 </span>                :<span class="lineCov">       2122 :         mask.masks = flow;</span>
+<span class="lineNum">    1356 </span>                :<span class="lineCov">       2122 :         minimask_init(&amp;minimask, &amp;mask);</span>
+<span class="lineNum">    1357 </span>                :            : 
+<span class="lineNum">    1358 </span>                :<span class="lineCov">       2122 :         minimask_combine(&amp;minicombined, &amp;minimask, &amp;minicatchall, storage);</span>
+<span class="lineNum">    1359 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         assert(minimask_is_catchall(&amp;minicombined));</span>
+<span class="lineNum">    1360 </span>                :            : 
+<span class="lineNum">    1361 </span>                :<span class="lineCov">       2122 :         any_random_flow(&amp;flow2);</span>
+<span class="lineNum">    1362 </span>                :<span class="lineCov">       2122 :         mask2.masks = flow2;</span>
+<span class="lineNum">    1363 </span>                :<span class="lineCov">       2122 :         minimask_init(&amp;minimask2, &amp;mask2);</span>
+<span class="lineNum">    1364 </span>                :            : 
+<span class="lineNum">    1365 </span>                :<span class="lineCov">       2122 :         minimask_combine(&amp;minicombined, &amp;minimask, &amp;minimask2, storage);</span>
+<span class="lineNum">    1366 </span>                :<span class="lineCov">       2122 :         flow_wildcards_and(&amp;combined, &amp;mask, &amp;mask2);</span>
+<span class="lineNum">    1367 </span>                :<span class="lineCov">       2122 :         minimask_expand(&amp;minicombined, &amp;combined2);</span>
+<span class="lineNum">    1368 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 2122 times"> + </span>]:<span class="lineCov">       2122 :         assert(flow_wildcards_equal(&amp;combined, &amp;combined2));</span>
+<span class="lineNum">    1369 </span>                :            : 
+<span class="lineNum">    1370 </span>                :<span class="lineCov">       2122 :         minimask_destroy(&amp;minimask);</span>
+<span class="lineNum">    1371 </span>                :<span class="lineCov">       2122 :         minimask_destroy(&amp;minimask2);</span>
+<span class="lineNum">    1372 </span>                :            :     }
+<span class="lineNum">    1373 </span>                :            : 
+<span class="lineNum">    1374 </span>                :<span class="lineCov">          1 :     minimask_destroy(&amp;minicatchall);</span>
+<span class="lineNum">    1375 </span>                :<span class="lineCov">          1 : }</span>
+<span class="lineNum">    1376 </span>                :            : 
+<span class="lineNum">    1377 </span>                :            : static const struct command commands[] = {
+<span class="lineNum">    1378 </span>                :            :     /* Classifier tests. */
+<span class="lineNum">    1379 </span>                :            :     {&quot;empty&quot;, 0, 0, test_empty},
+<span class="lineNum">    1380 </span>                :            :     {&quot;destroy-null&quot;, 0, 0, test_destroy_null},
+<span class="lineNum">    1381 </span>                :            :     {&quot;single-rule&quot;, 0, 0, test_single_rule},
+<span class="lineNum">    1382 </span>                :            :     {&quot;rule-replacement&quot;, 0, 0, test_rule_replacement},
+<span class="lineNum">    1383 </span>                :            :     {&quot;many-rules-in-one-list&quot;, 0, 0, test_many_rules_in_one_list},
+<span class="lineNum">    1384 </span>                :            :     {&quot;many-rules-in-one-table&quot;, 0, 0, test_many_rules_in_one_table},
+<span class="lineNum">    1385 </span>                :            :     {&quot;many-rules-in-two-tables&quot;, 0, 0, test_many_rules_in_two_tables},
+<span class="lineNum">    1386 </span>                :            :     {&quot;many-rules-in-five-tables&quot;, 0, 0, test_many_rules_in_five_tables},
+<span class="lineNum">    1387 </span>                :            : 
+<span class="lineNum">    1388 </span>                :            :     /* Miniflow and minimask tests. */
+<span class="lineNum">    1389 </span>                :            :     {&quot;miniflow&quot;, 0, 0, test_miniflow},
+<span class="lineNum">    1390 </span>                :            :     {&quot;minimask_has_extra&quot;, 0, 0, test_minimask_has_extra},
+<span class="lineNum">    1391 </span>                :            :     {&quot;minimask_combine&quot;, 0, 0, test_minimask_combine},
+<span class="lineNum">    1392 </span>                :            : 
+<span class="lineNum">    1393 </span>                :            :     {NULL, 0, 0, NULL},
+<span class="lineNum">    1394 </span>                :            : };
+<a name="1395"><span class="lineNum">    1395 </span>                :            : </a>
+<span class="lineNum">    1396 </span>                :            : static void
+<span class="lineNum">    1397 </span>                :<span class="lineCov">         11 : test_classifier_main(int argc, char *argv[])</span>
+<span class="lineNum">    1398 </span>                :            : {
+<span class="lineNum">    1399 </span>                :<span class="lineCov">         11 :     set_program_name(argv[0]);</span>
+<span class="lineNum">    1400 </span>                :<span class="lineCov">         11 :     init_values();</span>
+<span class="lineNum">    1401 </span>                :<span class="lineCov">         11 :     run_command(argc - 1, argv + 1, commands);</span>
+<a name="1402"><span class="lineNum">    1402 </span>                :<span class="lineCov">         11 : }</span></a>
+<span class="lineNum">    1403 </span>                :            : 
+<span class="lineNum">    1404 </span>                :<span class="lineCov">        478 : OVSTEST_REGISTER(&quot;test-classifier&quot;, test_classifier_main);</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

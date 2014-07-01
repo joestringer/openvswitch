@@ -1,0 +1,582 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/sflow_agent.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - sflow_agent.c<span style="font-size: 80%;"> (source / <a href="sflow_agent.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">83</td>
+            <td class="headerCovTableEntry">187</td>
+            <td class="headerCovTableEntryLo">44.4 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">11</td>
+            <td class="headerCovTableEntry">25</td>
+            <td class="headerCovTableEntryLo">44.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">33</td>
+            <td class="headerCovTableEntry">110</td>
+            <td class="headerCovTableEntryLo">30.0 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (c) 2002-2009 InMon Corp. Licensed under the terms of either the</a>
+<span class="lineNum">       2 </span>                :            :  *   Sun Industry Standards Source License 1.1, that is available at:
+<span class="lineNum">       3 </span>                :            :  *    http://host-sflow.sourceforge.net/sissl.html
+<span class="lineNum">       4 </span>                :            :  * or the InMon sFlow License, that is available at:
+<span class="lineNum">       5 </span>                :            :  *    http://www.inmon.com/technology/sflowlicense.txt
+<span class="lineNum">       6 </span>                :            :  */
+<span class="lineNum">       7 </span>                :            : 
+<span class="lineNum">       8 </span>                :            : #include &quot;sflow_api.h&quot;
+<span class="lineNum">       9 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      10 </span>                :            : 
+<span class="lineNum">      11 </span>                :            : static void * sflAlloc(SFLAgent *agent, size_t bytes);
+<span class="lineNum">      12 </span>                :            : static void sflFree(SFLAgent *agent, void *obj);
+<span class="lineNum">      13 </span>                :            : static void sfl_agent_jumpTableAdd(SFLAgent *agent, SFLSampler *sampler);
+<span class="lineNum">      14 </span>                :            : static void sfl_agent_jumpTableRemove(SFLAgent *agent, SFLSampler *sampler);
+<span class="lineNum">      15 </span>                :            : 
+<span class="lineNum">      16 </span>                :            : /*________________--------------------------__________________
+<span class="lineNum">      17 </span>                :            :   ________________    sfl_agent_init        __________________
+<span class="lineNum">      18 </span>                :            :   ----------------__________________________------------------
+<a name="19"><span class="lineNum">      19 </span>                :            : */</a>
+<span class="lineNum">      20 </span>                :            : 
+<span class="lineNum">      21 </span>                :<span class="lineCov">          2 : void sfl_agent_init(SFLAgent *agent,</span>
+<span class="lineNum">      22 </span>                :            :                     SFLAddress *myIP, /* IP address of this agent in net byte order */
+<span class="lineNum">      23 </span>                :            :                     u_int32_t subId,  /* agent_sub_id */
+<span class="lineNum">      24 </span>                :            :                     time_t bootTime,  /* agent boot time */
+<span class="lineNum">      25 </span>                :            :                     time_t now,       /* time now */
+<span class="lineNum">      26 </span>                :            :                     void *magic,      /* ptr to pass back in logging and alloc fns */
+<span class="lineNum">      27 </span>                :            :                     allocFn_t allocFn,
+<span class="lineNum">      28 </span>                :            :                     freeFn_t freeFn,
+<span class="lineNum">      29 </span>                :            :                     errorFn_t errorFn,
+<span class="lineNum">      30 </span>                :            :                     sendFn_t sendFn)
+<span class="lineNum">      31 </span>                :            : {
+<span class="lineNum">      32 </span>                :            :     /* first clear everything */
+<span class="lineNum">      33 </span>                :<span class="lineCov">          2 :     memset(agent, 0, sizeof(*agent));</span>
+<span class="lineNum">      34 </span>                :            :     /* now copy in the parameters */
+<span class="lineNum">      35 </span>                :<span class="lineCov">          2 :     agent-&gt;myIP = *myIP; /* structure copy */</span>
+<span class="lineNum">      36 </span>                :<span class="lineCov">          2 :     agent-&gt;subId = subId;</span>
+<span class="lineNum">      37 </span>                :<span class="lineCov">          2 :     agent-&gt;bootTime = bootTime;</span>
+<span class="lineNum">      38 </span>                :<span class="lineCov">          2 :     agent-&gt;now = now;</span>
+<span class="lineNum">      39 </span>                :<span class="lineCov">          2 :     agent-&gt;magic = magic;</span>
+<span class="lineNum">      40 </span>                :<span class="lineCov">          2 :     agent-&gt;allocFn = allocFn;</span>
+<span class="lineNum">      41 </span>                :<span class="lineCov">          2 :     agent-&gt;freeFn = freeFn;</span>
+<span class="lineNum">      42 </span>                :<span class="lineCov">          2 :     agent-&gt;errorFn = errorFn;</span>
+<span class="lineNum">      43 </span>                :<span class="lineCov">          2 :     agent-&gt;sendFn = sendFn;</span>
+<span class="lineNum">      44 </span>                :            : 
+<span class="lineNum">      45 </span>                :            : #ifdef SFLOW_DO_SOCKET
+<span class="lineNum">      46 </span>                :            :     if(sendFn == NULL) {
+<span class="lineNum">      47 </span>                :            :         /* open the socket - really need one for v4 and another for v6? */
+<span class="lineNum">      48 </span>                :            :         if((agent-&gt;receiverSocket4 = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+<span class="lineNum">      49 </span>                :            :             sfl_agent_sysError(agent, &quot;agent&quot;, &quot;IPv4 socket open failed&quot;);
+<span class="lineNum">      50 </span>                :            :         if((agent-&gt;receiverSocket6 = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+<span class="lineNum">      51 </span>                :            :             sfl_agent_sysError(agent, &quot;agent&quot;, &quot;IPv6 socket open failed&quot;);
+<span class="lineNum">      52 </span>                :            :     }
+<span class="lineNum">      53 </span>                :            : #endif
+<span class="lineNum">      54 </span>                :<span class="lineCov">          2 : }</span>
+<span class="lineNum">      55 </span>                :            : 
+<span class="lineNum">      56 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">      57 </span>                :            :   _________________   sfl_agent_release       __________________
+<span class="lineNum">      58 </span>                :            :   -----------------___________________________------------------
+<a name="59"><span class="lineNum">      59 </span>                :            : */</a>
+<span class="lineNum">      60 </span>                :            : 
+<span class="lineNum">      61 </span>                :<span class="lineNoCov">          0 : void sfl_agent_release(SFLAgent *agent)</span>
+<span class="lineNum">      62 </span>                :            : {
+<span class="lineNum">      63 </span>                :            :     /* release and free the samplers, pollers and receivers */
+<span class="lineNum">      64 </span>                :<span class="lineNoCov">          0 :     SFLSampler *sm = agent-&gt;samplers;</span>
+<span class="lineNum">      65 </span>                :<span class="lineNoCov">          0 :     SFLPoller *pl = agent-&gt;pollers;</span>
+<span class="lineNum">      66 </span>                :<span class="lineNoCov">          0 :     SFLReceiver *rcv = agent-&gt;receivers;</span>
+<span class="lineNum">      67 </span>                :            : 
+<span class="lineNum">      68 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for(; sm != NULL; ) {</span>
+<span class="lineNum">      69 </span>                :<span class="lineNoCov">          0 :         SFLSampler *nextSm = sm-&gt;nxt;</span>
+<span class="lineNum">      70 </span>                :<span class="lineNoCov">          0 :         sflFree(agent, sm);</span>
+<span class="lineNum">      71 </span>                :<span class="lineNoCov">          0 :         sm = nextSm;</span>
+<span class="lineNum">      72 </span>                :            :     }
+<span class="lineNum">      73 </span>                :<span class="lineNoCov">          0 :     agent-&gt;samplers = NULL;</span>
+<span class="lineNum">      74 </span>                :            : 
+<span class="lineNum">      75 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for(; pl != NULL; ) {</span>
+<span class="lineNum">      76 </span>                :<span class="lineNoCov">          0 :         SFLPoller *nextPl = pl-&gt;nxt;</span>
+<span class="lineNum">      77 </span>                :<span class="lineNoCov">          0 :         sflFree(agent, pl);</span>
+<span class="lineNum">      78 </span>                :<span class="lineNoCov">          0 :         pl = nextPl;</span>
+<span class="lineNum">      79 </span>                :            :     }
+<span class="lineNum">      80 </span>                :<span class="lineNoCov">          0 :     agent-&gt;pollers = NULL;</span>
+<span class="lineNum">      81 </span>                :            : 
+<span class="lineNum">      82 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for(; rcv != NULL; ) {</span>
+<span class="lineNum">      83 </span>                :<span class="lineNoCov">          0 :         SFLReceiver *nextRcv = rcv-&gt;nxt;</span>
+<span class="lineNum">      84 </span>                :<span class="lineNoCov">          0 :         sflFree(agent, rcv);</span>
+<span class="lineNum">      85 </span>                :<span class="lineNoCov">          0 :         rcv = nextRcv;</span>
+<span class="lineNum">      86 </span>                :            :     }
+<span class="lineNum">      87 </span>                :<span class="lineNoCov">          0 :     agent-&gt;receivers = NULL;</span>
+<span class="lineNum">      88 </span>                :            : 
+<span class="lineNum">      89 </span>                :            : #ifdef SFLOW_DO_SOCKET
+<span class="lineNum">      90 </span>                :            :     /* close the sockets */
+<span class="lineNum">      91 </span>                :            :     if(agent-&gt;receiverSocket4 &gt; 0) close(agent-&gt;receiverSocket4);
+<span class="lineNum">      92 </span>                :            :     if(agent-&gt;receiverSocket6 &gt; 0) close(agent-&gt;receiverSocket6);
+<span class="lineNum">      93 </span>                :            : #endif
+<span class="lineNum">      94 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      95 </span>                :            : 
+<span class="lineNum">      96 </span>                :            : 
+<span class="lineNum">      97 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">      98 </span>                :            :   _________________   sfl_agent_set_*         __________________
+<span class="lineNum">      99 </span>                :            :   -----------------___________________________------------------
+<a name="100"><span class="lineNum">     100 </span>                :            : */</a>
+<span class="lineNum">     101 </span>                :            : 
+<span class="lineNum">     102 </span>                :<span class="lineNoCov">          0 : void sfl_agent_set_agentAddress(SFLAgent *agent, SFLAddress *addr)</span>
+<span class="lineNum">     103 </span>                :            : {
+<span class="lineNum">     104 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if(addr &amp;&amp; memcmp(addr, &amp;agent-&gt;myIP, sizeof(agent-&gt;myIP)) != 0) {</span>
+<span class="lineNum">     105 </span>                :            :         /* change of address */
+<span class="lineNum">     106 </span>                :<span class="lineNoCov">          0 :         agent-&gt;myIP = *addr; /* structure copy */</span>
+<span class="lineNum">     107 </span>                :            :         /* reset sequence numbers here? */
+<span class="lineNum">     108 </span>                :            :     }
+<a name="109"><span class="lineNum">     109 </span>                :<span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     110 </span>                :            : 
+<span class="lineNum">     111 </span>                :<span class="lineNoCov">          0 : void sfl_agent_set_agentSubId(SFLAgent *agent, u_int32_t subId)</span>
+<span class="lineNum">     112 </span>                :            : {
+<span class="lineNum">     113 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if(subId != agent-&gt;subId) {</span>
+<span class="lineNum">     114 </span>                :            :         /* change of subId */
+<span class="lineNum">     115 </span>                :<span class="lineNoCov">          0 :         agent-&gt;subId = subId;</span>
+<span class="lineNum">     116 </span>                :            :         /* reset sequence numbers here? */
+<span class="lineNum">     117 </span>                :            :     }
+<span class="lineNum">     118 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     119 </span>                :            : 
+<span class="lineNum">     120 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     121 </span>                :            :   _________________   sfl_agent_tick          __________________
+<span class="lineNum">     122 </span>                :            :   -----------------___________________________------------------
+<a name="123"><span class="lineNum">     123 </span>                :            : */</a>
+<span class="lineNum">     124 </span>                :            : 
+<span class="lineNum">     125 </span>                :<span class="lineCov">          6 : void sfl_agent_tick(SFLAgent *agent, time_t now)</span>
+<span class="lineNum">     126 </span>                :            : {
+<span class="lineNum">     127 </span>                :<span class="lineCov">          6 :     SFLReceiver *rcv = agent-&gt;receivers;</span>
+<span class="lineNum">     128 </span>                :<span class="lineCov">          6 :     SFLSampler *sm = agent-&gt;samplers;</span>
+<span class="lineNum">     129 </span>                :<span class="lineCov">          6 :     SFLPoller *pl = agent-&gt;pollers;</span>
+<span class="lineNum">     130 </span>                :<span class="lineCov">          6 :     agent-&gt;now = now;</span>
+<span class="lineNum">     131 </span>                :            :     /* receivers use ticks to flush send data */
+<span class="lineNum">     132 </span>        [<span class="branchCov" title="Branch 1 was taken 6 times"> + </span><span class="branchCov" title="Branch 2 was taken 6 times"> + </span>]:<span class="lineCov">         12 :     for(; rcv != NULL; rcv = rcv-&gt;nxt) sfl_receiver_tick(rcv, now);</span>
+<span class="lineNum">     133 </span>                :            :     /* samplers use ticks to decide when they are sampling too fast */
+<span class="lineNum">     134 </span>        [<span class="branchCov" title="Branch 1 was taken 6 times"> + </span><span class="branchCov" title="Branch 2 was taken 6 times"> + </span>]:<span class="lineCov">         12 :     for(; sm != NULL; sm = sm-&gt;nxt) sfl_sampler_tick(sm, now);</span>
+<span class="lineNum">     135 </span>                :            :     /* pollers use ticks to decide when to ask for counters */
+<span class="lineNum">     136 </span>        [<span class="branchCov" title="Branch 1 was taken 18 times"> + </span><span class="branchCov" title="Branch 2 was taken 6 times"> + </span>]:<span class="lineCov">         24 :     for(; pl != NULL; pl = pl-&gt;nxt) sfl_poller_tick(pl, now);</span>
+<span class="lineNum">     137 </span>                :<span class="lineCov">          6 : }</span>
+<span class="lineNum">     138 </span>                :            : 
+<span class="lineNum">     139 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     140 </span>                :            :   _________________   sfl_agent_addReceiver   __________________
+<span class="lineNum">     141 </span>                :            :   -----------------___________________________------------------
+<a name="142"><span class="lineNum">     142 </span>                :            : */</a>
+<span class="lineNum">     143 </span>                :            : 
+<span class="lineNum">     144 </span>                :<span class="lineCov">          2 : SFLReceiver *sfl_agent_addReceiver(SFLAgent *agent)</span>
+<span class="lineNum">     145 </span>                :            : {
+<span class="lineNum">     146 </span>                :<span class="lineCov">          2 :     SFLReceiver *rcv = (SFLReceiver *)sflAlloc(agent, sizeof(SFLReceiver));</span>
+<span class="lineNum">     147 </span>                :<span class="lineCov">          2 :     sfl_receiver_init(rcv, agent);</span>
+<span class="lineNum">     148 </span>                :            :     /* add to end of list - to preserve the receiver index numbers for existing receivers */
+<span class="lineNum">     149 </span>                :            :     {
+<span class="lineNum">     150 </span>                :<span class="lineCov">          2 :         SFLReceiver *r, *prev = NULL;</span>
+<span class="lineNum">     151 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :         for(r = agent-&gt;receivers; r != NULL; prev = r, r = r-&gt;nxt);</span>
+<span class="lineNum">     152 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :         if(prev) prev-&gt;nxt = rcv;</span>
+<span class="lineNum">     153 </span>                :<span class="lineCov">          2 :         else agent-&gt;receivers = rcv;</span>
+<span class="lineNum">     154 </span>                :<span class="lineCov">          2 :         rcv-&gt;nxt = NULL;</span>
+<span class="lineNum">     155 </span>                :            :     }
+<span class="lineNum">     156 </span>                :<span class="lineCov">          2 :     return rcv;</span>
+<span class="lineNum">     157 </span>                :            : }
+<span class="lineNum">     158 </span>                :            : 
+<span class="lineNum">     159 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     160 </span>                :            :   _________________     sfl_dsi_compare       __________________
+<span class="lineNum">     161 </span>                :            :   -----------------___________________________------------------
+<span class="lineNum">     162 </span>                :            : 
+<span class="lineNum">     163 </span>                :            :   Note that if there is a mixture of ds_classes for this agent, then
+<span class="lineNum">     164 </span>                :            :   the simple numeric comparison may not be correct - the sort order (for
+<span class="lineNum">     165 </span>                :            :   the purposes of the SNMP MIB) should really be determined by the OID
+<span class="lineNum">     166 </span>                :            :   that these numeric ds_class numbers are a shorthand for.  For example,
+<span class="lineNum">     167 </span>                :            :   ds_class == 0 means ifIndex, which is the oid &quot;1.3.6.1.2.1.2.2.1&quot;
+<a name="168"><span class="lineNum">     168 </span>                :            : */</a>
+<span class="lineNum">     169 </span>                :            : 
+<span class="lineNum">     170 </span>                :<span class="lineCov">         22 : static inline int sfl_dsi_compare(SFLDataSource_instance *pdsi1, SFLDataSource_instance *pdsi2) {</span>
+<span class="lineNum">     171 </span>                :            :     /* could have used just memcmp(),  but not sure if that would
+<span class="lineNum">     172 </span>                :            :        give the right answer on little-endian platforms. Safer to be explicit... */
+<span class="lineNum">     173 </span>                :<span class="lineCov">         22 :     int cmp = pdsi2-&gt;ds_class - pdsi1-&gt;ds_class;</span>
+<span class="lineNum">     174 </span>        [<span class="branchCov" title="Branch 0 was taken 16 times"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">         22 :     if(cmp == 0) cmp = pdsi2-&gt;ds_index - pdsi1-&gt;ds_index;</span>
+<span class="lineNum">     175 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 16 times"> + </span>]:<span class="lineCov">         22 :     if(cmp == 0) cmp = pdsi2-&gt;ds_instance - pdsi1-&gt;ds_instance;</span>
+<span class="lineNum">     176 </span>                :<span class="lineCov">         22 :     return cmp;</span>
+<span class="lineNum">     177 </span>                :            : }
+<span class="lineNum">     178 </span>                :            : 
+<span class="lineNum">     179 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     180 </span>                :            :   _________________   sfl_agent_addSampler    __________________
+<span class="lineNum">     181 </span>                :            :   -----------------___________________________------------------
+<a name="182"><span class="lineNum">     182 </span>                :            : */</a>
+<span class="lineNum">     183 </span>                :            : 
+<span class="lineNum">     184 </span>                :<span class="lineCov">          2 : SFLSampler *sfl_agent_addSampler(SFLAgent *agent, SFLDataSource_instance *pdsi)</span>
+<span class="lineNum">     185 </span>                :            : {
+<span class="lineNum">     186 </span>                :            :     /* Keep the list sorted. */
+<span class="lineNum">     187 </span>                :<span class="lineCov">          2 :     SFLSampler *prev = NULL, *sm = agent-&gt;samplers;</span>
+<span class="lineNum">     188 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :     for(; sm != NULL; prev = sm, sm = sm-&gt;nxt) {</span>
+<span class="lineNum">     189 </span>                :<span class="lineNoCov">          0 :         int64_t cmp = sfl_dsi_compare(pdsi, &amp;sm-&gt;dsi);</span>
+<span class="lineNum">     190 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if(cmp == 0) return sm;  /* found - return existing one */</span>
+<span class="lineNum">     191 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if(cmp &lt; 0) break;       /* insert here */</span>
+<span class="lineNum">     192 </span>                :            :     }
+<span class="lineNum">     193 </span>                :            :     /* either we found the insert point, or reached the end of the list...*/
+<span class="lineNum">     194 </span>                :            : 
+<span class="lineNum">     195 </span>                :            :     {
+<span class="lineNum">     196 </span>                :<span class="lineCov">          2 :         SFLSampler *newsm = (SFLSampler *)sflAlloc(agent, sizeof(SFLSampler));</span>
+<span class="lineNum">     197 </span>                :<span class="lineCov">          2 :         sfl_sampler_init(newsm, agent, pdsi);</span>
+<span class="lineNum">     198 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :         if(prev) prev-&gt;nxt = newsm;</span>
+<span class="lineNum">     199 </span>                :<span class="lineCov">          2 :         else agent-&gt;samplers = newsm;</span>
+<span class="lineNum">     200 </span>                :<span class="lineCov">          2 :         newsm-&gt;nxt = sm;</span>
+<span class="lineNum">     201 </span>                :            : 
+<span class="lineNum">     202 </span>                :            :         /* see if we should go in the ifIndex jumpTable */
+<span class="lineNum">     203 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :         if(SFL_DS_CLASS(newsm-&gt;dsi) == 0) {</span>
+<span class="lineNum">     204 </span>                :<span class="lineNoCov">          0 :             SFLSampler *test = sfl_agent_getSamplerByIfIndex(agent, SFL_DS_INDEX(newsm-&gt;dsi));</span>
+<span class="lineNum">     205 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if(test &amp;&amp; (SFL_DS_INSTANCE(newsm-&gt;dsi) &lt; SFL_DS_INSTANCE(test-&gt;dsi))) {</span>
+<span class="lineNum">     206 </span>                :            :                 /* replace with this new one because it has a lower ds_instance number */
+<span class="lineNum">     207 </span>                :<span class="lineNoCov">          0 :                 sfl_agent_jumpTableRemove(agent, test);</span>
+<span class="lineNum">     208 </span>                :<span class="lineNoCov">          0 :                 test = NULL;</span>
+<span class="lineNum">     209 </span>                :            :             }
+<span class="lineNum">     210 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if(test == NULL) sfl_agent_jumpTableAdd(agent, newsm);</span>
+<span class="lineNum">     211 </span>                :            :         }
+<span class="lineNum">     212 </span>                :<span class="lineCov">          2 :         return newsm;</span>
+<span class="lineNum">     213 </span>                :            :     }
+<span class="lineNum">     214 </span>                :            : }
+<span class="lineNum">     215 </span>                :            : 
+<span class="lineNum">     216 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     217 </span>                :            :   _________________   sfl_agent_addPoller     __________________
+<span class="lineNum">     218 </span>                :            :   -----------------___________________________------------------
+<a name="219"><span class="lineNum">     219 </span>                :            : */</a>
+<span class="lineNum">     220 </span>                :            : 
+<span class="lineNum">     221 </span>                :<span class="lineCov">          6 : SFLPoller *sfl_agent_addPoller(SFLAgent *agent,</span>
+<span class="lineNum">     222 </span>                :            :                                SFLDataSource_instance *pdsi,
+<span class="lineNum">     223 </span>                :            :                                void *magic,         /* ptr to pass back in getCountersFn() */
+<span class="lineNum">     224 </span>                :            :                                getCountersFn_t getCountersFn)
+<span class="lineNum">     225 </span>                :            : {
+<span class="lineNum">     226 </span>                :            :     /* keep the list sorted */
+<span class="lineNum">     227 </span>                :<span class="lineCov">          6 :     SFLPoller *prev = NULL, *pl = agent-&gt;pollers;</span>
+<span class="lineNum">     228 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">         12 :     for(; pl != NULL; prev = pl, pl = pl-&gt;nxt) {</span>
+<span class="lineNum">     229 </span>                :<span class="lineCov">          6 :         int64_t cmp = sfl_dsi_compare(pdsi, &amp;pl-&gt;dsi);</span>
+<span class="lineNum">     230 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">          6 :         if(cmp == 0) return pl;  /* found - return existing one */</span>
+<span class="lineNum">     231 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">          6 :         if(cmp &lt; 0) break;       /* insert here */</span>
+<span class="lineNum">     232 </span>                :            :     }
+<span class="lineNum">     233 </span>                :            :     /* either we found the insert point, or reached the end of the list... */
+<span class="lineNum">     234 </span>                :            :     {
+<span class="lineNum">     235 </span>                :<span class="lineCov">          6 :         SFLPoller *newpl = (SFLPoller *)sflAlloc(agent, sizeof(SFLPoller));</span>
+<span class="lineNum">     236 </span>                :<span class="lineCov">          6 :         sfl_poller_init(newpl, agent, pdsi, magic, getCountersFn);</span>
+<span class="lineNum">     237 </span>        [<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          6 :         if(prev) prev-&gt;nxt = newpl;</span>
+<span class="lineNum">     238 </span>                :<span class="lineCov">          2 :         else agent-&gt;pollers = newpl;</span>
+<span class="lineNum">     239 </span>                :<span class="lineCov">          6 :         newpl-&gt;nxt = pl;</span>
+<span class="lineNum">     240 </span>                :<span class="lineCov">          6 :         return newpl;</span>
+<span class="lineNum">     241 </span>                :            :     }
+<span class="lineNum">     242 </span>                :            : }
+<span class="lineNum">     243 </span>                :            : 
+<span class="lineNum">     244 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     245 </span>                :            :   _________________  sfl_agent_removeSampler  __________________
+<span class="lineNum">     246 </span>                :            :   -----------------___________________________------------------
+<a name="247"><span class="lineNum">     247 </span>                :            : */</a>
+<span class="lineNum">     248 </span>                :            : 
+<span class="lineNum">     249 </span>                :<span class="lineCov">          6 : int sfl_agent_removeSampler(SFLAgent *agent, SFLDataSource_instance *pdsi)</span>
+<span class="lineNum">     250 </span>                :            : {
+<span class="lineNum">     251 </span>                :            :     /* find it, unlink it and free it */
+<span class="lineNum">     252 </span>                :<span class="lineCov">          6 :     SFLSampler *prev = NULL, *sm = agent-&gt;samplers;</span>
+<span class="lineNum">     253 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">         12 :     for(; sm != NULL; prev = sm, sm = sm-&gt;nxt) {</span>
+<span class="lineNum">     254 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 6 times"> + </span>]:<span class="lineCov">          6 :         if(sfl_dsi_compare(pdsi, &amp;sm-&gt;dsi) == 0) {</span>
+<span class="lineNum">     255 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if(prev == NULL) agent-&gt;samplers = sm-&gt;nxt;</span>
+<span class="lineNum">     256 </span>                :<span class="lineNoCov">          0 :             else prev-&gt;nxt = sm-&gt;nxt;</span>
+<span class="lineNum">     257 </span>                :<span class="lineNoCov">          0 :             sfl_agent_jumpTableRemove(agent, sm);</span>
+<span class="lineNum">     258 </span>                :<span class="lineNoCov">          0 :             sflFree(agent, sm);</span>
+<span class="lineNum">     259 </span>                :<span class="lineNoCov">          0 :             return 1;</span>
+<span class="lineNum">     260 </span>                :            :         }
+<span class="lineNum">     261 </span>                :            :     }
+<span class="lineNum">     262 </span>                :            :     /* not found */
+<span class="lineNum">     263 </span>                :<span class="lineCov">          6 :     return 0;</span>
+<span class="lineNum">     264 </span>                :            : }
+<span class="lineNum">     265 </span>                :            : 
+<span class="lineNum">     266 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     267 </span>                :            :   _________________  sfl_agent_removePoller   __________________
+<span class="lineNum">     268 </span>                :            :   -----------------___________________________------------------
+<a name="269"><span class="lineNum">     269 </span>                :            : */</a>
+<span class="lineNum">     270 </span>                :            : 
+<span class="lineNum">     271 </span>                :<span class="lineCov">          6 : int sfl_agent_removePoller(SFLAgent *agent, SFLDataSource_instance *pdsi)</span>
+<span class="lineNum">     272 </span>                :            : {
+<span class="lineNum">     273 </span>                :            :     /* find it, unlink it and free it */
+<span class="lineNum">     274 </span>                :<span class="lineCov">          6 :     SFLPoller *prev = NULL, *pl = agent-&gt;pollers;</span>
+<span class="lineNum">     275 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         10 :     for(; pl != NULL; prev = pl, pl = pl-&gt;nxt) {</span>
+<span class="lineNum">     276 </span>        [<span class="branchCov" title="Branch 1 was taken 6 times"> + </span><span class="branchCov" title="Branch 2 was taken 4 times"> + </span>]:<span class="lineCov">         10 :         if(sfl_dsi_compare(pdsi, &amp;pl-&gt;dsi) == 0) {</span>
+<span class="lineNum">     277 </span>        [<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          6 :             if(prev == NULL) agent-&gt;pollers = pl-&gt;nxt;</span>
+<span class="lineNum">     278 </span>                :<span class="lineCov">          2 :             else prev-&gt;nxt = pl-&gt;nxt;</span>
+<span class="lineNum">     279 </span>                :<span class="lineCov">          6 :             sflFree(agent, pl);</span>
+<span class="lineNum">     280 </span>                :<span class="lineCov">          6 :             return 1;</span>
+<span class="lineNum">     281 </span>                :            :         }
+<span class="lineNum">     282 </span>                :            :     }
+<span class="lineNum">     283 </span>                :            :     /* not found */
+<span class="lineNum">     284 </span>                :<span class="lineCov">          6 :     return 0;</span>
+<span class="lineNum">     285 </span>                :            : }
+<span class="lineNum">     286 </span>                :            : 
+<span class="lineNum">     287 </span>                :            : /*_________________--------------------------------__________________
+<span class="lineNum">     288 </span>                :            :   _________________  sfl_agent_jumpTableAdd        __________________
+<span class="lineNum">     289 </span>                :            :   -----------------________________________________------------------
+<a name="290"><span class="lineNum">     290 </span>                :            : */</a>
+<span class="lineNum">     291 </span>                :            : 
+<span class="lineNum">     292 </span>                :<span class="lineNoCov">          0 : static void sfl_agent_jumpTableAdd(SFLAgent *agent, SFLSampler *sampler)</span>
+<span class="lineNum">     293 </span>                :            : {
+<span class="lineNum">     294 </span>                :<span class="lineNoCov">          0 :     u_int32_t hashIndex = SFL_DS_INDEX(sampler-&gt;dsi) % SFL_HASHTABLE_SIZ;</span>
+<span class="lineNum">     295 </span>                :<span class="lineNoCov">          0 :     sampler-&gt;hash_nxt = agent-&gt;jumpTable[hashIndex];</span>
+<span class="lineNum">     296 </span>                :<span class="lineNoCov">          0 :     agent-&gt;jumpTable[hashIndex] = sampler;</span>
+<span class="lineNum">     297 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     298 </span>                :            : 
+<span class="lineNum">     299 </span>                :            : /*_________________--------------------------------__________________
+<span class="lineNum">     300 </span>                :            :   _________________  sfl_agent_jumpTableRemove     __________________
+<span class="lineNum">     301 </span>                :            :   -----------------________________________________------------------
+<a name="302"><span class="lineNum">     302 </span>                :            : */</a>
+<span class="lineNum">     303 </span>                :            : 
+<span class="lineNum">     304 </span>                :<span class="lineNoCov">          0 : static void sfl_agent_jumpTableRemove(SFLAgent *agent, SFLSampler *sampler)</span>
+<span class="lineNum">     305 </span>                :            : {
+<span class="lineNum">     306 </span>                :<span class="lineNoCov">          0 :     u_int32_t hashIndex = SFL_DS_INDEX(sampler-&gt;dsi) % SFL_HASHTABLE_SIZ;</span>
+<span class="lineNum">     307 </span>                :<span class="lineNoCov">          0 :     SFLSampler *search = agent-&gt;jumpTable[hashIndex], *prev = NULL;</span>
+<span class="lineNum">     308 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for( ; search != NULL; prev = search, search = search-&gt;hash_nxt) if(search == sampler) break;</span>
+<span class="lineNum">     309 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if(search) {</span>
+<span class="lineNum">     310 </span>                :            :         // found - unlink
+<span class="lineNum">     311 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if(prev) prev-&gt;hash_nxt = search-&gt;hash_nxt;</span>
+<span class="lineNum">     312 </span>                :<span class="lineNoCov">          0 :         else agent-&gt;jumpTable[hashIndex] = search-&gt;hash_nxt;</span>
+<span class="lineNum">     313 </span>                :<span class="lineNoCov">          0 :         search-&gt;hash_nxt = NULL;</span>
+<span class="lineNum">     314 </span>                :            :     }
+<span class="lineNum">     315 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     316 </span>                :            : 
+<span class="lineNum">     317 </span>                :            : /*_________________--------------------------------__________________
+<span class="lineNum">     318 </span>                :            :   _________________  sfl_agent_getSamplerByIfIndex __________________
+<span class="lineNum">     319 </span>                :            :   -----------------________________________________------------------
+<span class="lineNum">     320 </span>                :            :   fast lookup (pointers cached in hash table).  If there are multiple
+<span class="lineNum">     321 </span>                :            :   sampler instances for a given ifIndex, then this fn will return
+<span class="lineNum">     322 </span>                :            :   the one with the lowest instance number.  Since the samplers
+<span class="lineNum">     323 </span>                :            :   list is sorted, this means the other instances will be accesible
+<span class="lineNum">     324 </span>                :            :   by following the sampler-&gt;nxt pointer (until the ds_class
+<span class="lineNum">     325 </span>                :            :   or ds_index changes).  This is helpful if you need to offer
+<span class="lineNum">     326 </span>                :            :   the same flowSample to multiple samplers.
+<a name="327"><span class="lineNum">     327 </span>                :            : */</a>
+<span class="lineNum">     328 </span>                :            : 
+<span class="lineNum">     329 </span>                :<span class="lineNoCov">          0 : SFLSampler *sfl_agent_getSamplerByIfIndex(SFLAgent *agent, u_int32_t ifIndex)</span>
+<span class="lineNum">     330 </span>                :            : {
+<span class="lineNum">     331 </span>                :<span class="lineNoCov">          0 :     SFLSampler *search = agent-&gt;jumpTable[ifIndex % SFL_HASHTABLE_SIZ];</span>
+<span class="lineNum">     332 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for( ; search != NULL; search = search-&gt;hash_nxt) if(SFL_DS_INDEX(search-&gt;dsi) == ifIndex) break;</span>
+<span class="lineNum">     333 </span>                :<span class="lineNoCov">          0 :     return search;</span>
+<span class="lineNum">     334 </span>                :            : }
+<span class="lineNum">     335 </span>                :            : 
+<span class="lineNum">     336 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     337 </span>                :            :   _________________  sfl_agent_getSampler     __________________
+<span class="lineNum">     338 </span>                :            :   -----------------___________________________------------------
+<a name="339"><span class="lineNum">     339 </span>                :            : */</a>
+<span class="lineNum">     340 </span>                :            : 
+<span class="lineNum">     341 </span>                :<span class="lineNoCov">          0 : SFLSampler *sfl_agent_getSampler(SFLAgent *agent, SFLDataSource_instance *pdsi)</span>
+<span class="lineNum">     342 </span>                :            : {
+<span class="lineNum">     343 </span>                :            :     /* find it and return it */
+<span class="lineNum">     344 </span>                :<span class="lineNoCov">          0 :     SFLSampler *sm = agent-&gt;samplers;</span>
+<span class="lineNum">     345 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for(; sm != NULL; sm = sm-&gt;nxt)</span>
+<span class="lineNum">     346 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if(sfl_dsi_compare(pdsi, &amp;sm-&gt;dsi) == 0) return sm;</span>
+<span class="lineNum">     347 </span>                :            :     /* not found */
+<span class="lineNum">     348 </span>                :<span class="lineNoCov">          0 :     return NULL;</span>
+<span class="lineNum">     349 </span>                :            : }
+<span class="lineNum">     350 </span>                :            : 
+<span class="lineNum">     351 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     352 </span>                :            :   _________________  sfl_agent_getPoller      __________________
+<span class="lineNum">     353 </span>                :            :   -----------------___________________________------------------
+<a name="354"><span class="lineNum">     354 </span>                :            : */</a>
+<span class="lineNum">     355 </span>                :            : 
+<span class="lineNum">     356 </span>                :<span class="lineNoCov">          0 : SFLPoller *sfl_agent_getPoller(SFLAgent *agent, SFLDataSource_instance *pdsi)</span>
+<span class="lineNum">     357 </span>                :            : {
+<span class="lineNum">     358 </span>                :            :     /* find it and return it */
+<span class="lineNum">     359 </span>                :<span class="lineNoCov">          0 :     SFLPoller *pl = agent-&gt;pollers;</span>
+<span class="lineNum">     360 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for(; pl != NULL; pl = pl-&gt;nxt)</span>
+<span class="lineNum">     361 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if(sfl_dsi_compare(pdsi, &amp;pl-&gt;dsi) == 0) return pl;</span>
+<span class="lineNum">     362 </span>                :            :     /* not found */
+<span class="lineNum">     363 </span>                :<span class="lineNoCov">          0 :     return NULL;</span>
+<span class="lineNum">     364 </span>                :            : }
+<span class="lineNum">     365 </span>                :            : 
+<span class="lineNum">     366 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     367 </span>                :            :   _________________  sfl_agent_getReceiver    __________________
+<span class="lineNum">     368 </span>                :            :   -----------------___________________________------------------
+<a name="369"><span class="lineNum">     369 </span>                :            : */</a>
+<span class="lineNum">     370 </span>                :            : 
+<span class="lineNum">     371 </span>                :<span class="lineCov">          8 : SFLReceiver *sfl_agent_getReceiver(SFLAgent *agent, u_int32_t receiverIndex)</span>
+<span class="lineNum">     372 </span>                :            : {
+<span class="lineNum">     373 </span>                :<span class="lineCov">          8 :     u_int32_t rcvIdx = 0;</span>
+<span class="lineNum">     374 </span>                :<span class="lineCov">          8 :     SFLReceiver *rcv = agent-&gt;receivers;</span>
+<span class="lineNum">     375 </span>        [<span class="branchCov" title="Branch 0 was taken 8 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          8 :     for(;  rcv != NULL; rcv = rcv-&gt;nxt)</span>
+<span class="lineNum">     376 </span>        [<span class="branchCov" title="Branch 0 was taken 8 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          8 :         if(receiverIndex == ++rcvIdx) return rcv;</span>
+<span class="lineNum">     377 </span>                :            : 
+<span class="lineNum">     378 </span>                :            :     /* not found - ran off the end of the table */
+<span class="lineNum">     379 </span>                :<span class="lineCov">          8 :     return NULL;</span>
+<span class="lineNum">     380 </span>                :            : }
+<span class="lineNum">     381 </span>                :            : 
+<span class="lineNum">     382 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     383 </span>                :            :   _________________ sfl_agent_getNextSampler  __________________
+<span class="lineNum">     384 </span>                :            :   -----------------___________________________------------------
+<a name="385"><span class="lineNum">     385 </span>                :            : */</a>
+<span class="lineNum">     386 </span>                :            : 
+<span class="lineNum">     387 </span>                :<span class="lineNoCov">          0 : SFLSampler *sfl_agent_getNextSampler(SFLAgent *agent, SFLDataSource_instance *pdsi)</span>
+<span class="lineNum">     388 </span>                :            : {
+<span class="lineNum">     389 </span>                :            :     /* return the one lexograpically just after it - assume they are sorted
+<span class="lineNum">     390 </span>                :            :        correctly according to the lexographical ordering of the object ids */
+<span class="lineNum">     391 </span>                :<span class="lineNoCov">          0 :     SFLSampler *sm = sfl_agent_getSampler(agent, pdsi);</span>
+<span class="lineNum">     392 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     return sm ? sm-&gt;nxt : NULL;</span>
+<span class="lineNum">     393 </span>                :            : }
+<span class="lineNum">     394 </span>                :            : 
+<span class="lineNum">     395 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     396 </span>                :            :   _________________ sfl_agent_getNextPoller   __________________
+<span class="lineNum">     397 </span>                :            :   -----------------___________________________------------------
+<a name="398"><span class="lineNum">     398 </span>                :            : */</a>
+<span class="lineNum">     399 </span>                :            : 
+<span class="lineNum">     400 </span>                :<span class="lineNoCov">          0 : SFLPoller *sfl_agent_getNextPoller(SFLAgent *agent, SFLDataSource_instance *pdsi)</span>
+<span class="lineNum">     401 </span>                :            : {
+<span class="lineNum">     402 </span>                :            :     /* return the one lexograpically just after it - assume they are sorted
+<span class="lineNum">     403 </span>                :            :        correctly according to the lexographical ordering of the object ids */
+<span class="lineNum">     404 </span>                :<span class="lineNoCov">          0 :     SFLPoller *pl = sfl_agent_getPoller(agent, pdsi);</span>
+<span class="lineNum">     405 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     return pl ? pl-&gt;nxt : NULL;</span>
+<span class="lineNum">     406 </span>                :            : }
+<span class="lineNum">     407 </span>                :            : 
+<span class="lineNum">     408 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     409 </span>                :            :   _________________ sfl_agent_getNextReceiver __________________
+<span class="lineNum">     410 </span>                :            :   -----------------___________________________------------------
+<a name="411"><span class="lineNum">     411 </span>                :            : */</a>
+<span class="lineNum">     412 </span>                :            : 
+<span class="lineNum">     413 </span>                :<span class="lineNoCov">          0 : SFLReceiver *sfl_agent_getNextReceiver(SFLAgent *agent, u_int32_t receiverIndex)</span>
+<span class="lineNum">     414 </span>                :            : {
+<span class="lineNum">     415 </span>                :<span class="lineNoCov">          0 :     return sfl_agent_getReceiver(agent, receiverIndex + 1);</span>
+<span class="lineNum">     416 </span>                :            : }
+<span class="lineNum">     417 </span>                :            : 
+<span class="lineNum">     418 </span>                :            : 
+<span class="lineNum">     419 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     420 </span>                :            :   _________________ sfl_agent_resetReceiver   __________________
+<span class="lineNum">     421 </span>                :            :   -----------------___________________________------------------
+<a name="422"><span class="lineNum">     422 </span>                :            : */</a>
+<span class="lineNum">     423 </span>                :            : 
+<span class="lineNum">     424 </span>                :<span class="lineNoCov">          0 : void sfl_agent_resetReceiver(SFLAgent *agent, SFLReceiver *receiver)</span>
+<span class="lineNum">     425 </span>                :            : {
+<span class="lineNum">     426 </span>                :            :     /* tell samplers and pollers to stop sending to this receiver */
+<span class="lineNum">     427 </span>                :            :     /* first get his receiverIndex */
+<span class="lineNum">     428 </span>                :<span class="lineNoCov">          0 :     u_int32_t rcvIdx = 0;</span>
+<span class="lineNum">     429 </span>                :<span class="lineNoCov">          0 :     SFLReceiver *rcv = agent-&gt;receivers;</span>
+<span class="lineNum">     430 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for(; rcv != NULL; rcv = rcv-&gt;nxt) {</span>
+<span class="lineNum">     431 </span>                :<span class="lineNoCov">          0 :         rcvIdx++; /* thanks to Diego Valverde for pointing out this bugfix */</span>
+<span class="lineNum">     432 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if(rcv == receiver) {</span>
+<span class="lineNum">     433 </span>                :            :             /* now tell anyone that is using it to stop */
+<span class="lineNum">     434 </span>                :<span class="lineNoCov">          0 :             SFLSampler *sm = agent-&gt;samplers;</span>
+<span class="lineNum">     435 </span>                :<span class="lineNoCov">          0 :             SFLPoller *pl = agent-&gt;pollers;</span>
+<span class="lineNum">     436 </span>                :            : 
+<span class="lineNum">     437 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             for(; sm != NULL; sm = sm-&gt;nxt)</span>
+<span class="lineNum">     438 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 if(sfl_sampler_get_sFlowFsReceiver(sm) == rcvIdx) sfl_sampler_set_sFlowFsReceiver(sm, 0);</span>
+<span class="lineNum">     439 </span>                :            : 
+<span class="lineNum">     440 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             for(; pl != NULL; pl = pl-&gt;nxt)</span>
+<span class="lineNum">     441 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 if(sfl_poller_get_sFlowCpReceiver(pl) == rcvIdx) sfl_poller_set_sFlowCpReceiver(pl, 0);</span>
+<span class="lineNum">     442 </span>                :            : 
+<span class="lineNum">     443 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     444 </span>                :            :         }
+<span class="lineNum">     445 </span>                :            :     }
+<span class="lineNum">     446 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     447 </span>                :            : 
+<span class="lineNum">     448 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     449 </span>                :            :   _________________     sfl_agent_error       __________________
+<span class="lineNum">     450 </span>                :            :   -----------------___________________________------------------
+<span class="lineNum">     451 </span>                :            : */
+<a name="452"><span class="lineNum">     452 </span>                :            : #define MAX_ERRMSG_LEN 1000</a>
+<span class="lineNum">     453 </span>                :            : 
+<span class="lineNum">     454 </span>                :<span class="lineNoCov">          0 : void sfl_agent_error(SFLAgent *agent, char *modName, char *msg)</span>
+<span class="lineNum">     455 </span>                :            : {
+<span class="lineNum">     456 </span>                :            :     char errm[MAX_ERRMSG_LEN];
+<span class="lineNum">     457 </span>                :<span class="lineNoCov">          0 :     snprintf(errm, sizeof errm, &quot;sfl_agent_error: %s: %s\n&quot;, modName, msg);</span>
+<span class="lineNum">     458 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if(agent-&gt;errorFn) (*agent-&gt;errorFn)(agent-&gt;magic, agent, errm);</span>
+<span class="lineNum">     459 </span>                :            :     else {
+<span class="lineNum">     460 </span>                :<span class="lineNoCov">          0 :         fprintf(stderr, &quot;%s\n&quot;, errm);</span>
+<span class="lineNum">     461 </span>                :<span class="lineNoCov">          0 :         fflush(stderr);</span>
+<span class="lineNum">     462 </span>                :            :     }
+<span class="lineNum">     463 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     464 </span>                :            : 
+<span class="lineNum">     465 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     466 </span>                :            :   _________________     sfl_agent_sysError    __________________
+<span class="lineNum">     467 </span>                :            :   -----------------___________________________------------------
+<a name="468"><span class="lineNum">     468 </span>                :            : */</a>
+<span class="lineNum">     469 </span>                :            : 
+<span class="lineNum">     470 </span>                :<span class="lineNoCov">          0 : void sfl_agent_sysError(SFLAgent *agent, char *modName, char *msg)</span>
+<span class="lineNum">     471 </span>                :            : {
+<span class="lineNum">     472 </span>                :            :     char errm[MAX_ERRMSG_LEN];
+<span class="lineNum">     473 </span>                :<span class="lineNoCov">          0 :     snprintf(errm, sizeof errm, &quot;sfl_agent_sysError: %s: %s (errno = %d - %s)\n&quot;, modName, msg, errno, ovs_strerror(errno));</span>
+<span class="lineNum">     474 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if(agent-&gt;errorFn) (*agent-&gt;errorFn)(agent-&gt;magic, agent, errm);</span>
+<span class="lineNum">     475 </span>                :            :     else {
+<span class="lineNum">     476 </span>                :<span class="lineNoCov">          0 :         fprintf(stderr, &quot;%s\n&quot;, errm);</span>
+<span class="lineNum">     477 </span>                :<span class="lineNoCov">          0 :         fflush(stderr);</span>
+<span class="lineNum">     478 </span>                :            :     }
+<span class="lineNum">     479 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     480 </span>                :            : 
+<span class="lineNum">     481 </span>                :            : 
+<span class="lineNum">     482 </span>                :            : /*_________________---------------------------__________________
+<span class="lineNum">     483 </span>                :            :   _________________       alloc and free      __________________
+<span class="lineNum">     484 </span>                :            :   -----------------___________________________------------------
+<a name="485"><span class="lineNum">     485 </span>                :            : */</a>
+<span class="lineNum">     486 </span>                :            : 
+<span class="lineNum">     487 </span>                :<span class="lineCov">         10 : static void * sflAlloc(SFLAgent *agent, size_t bytes)</span>
+<span class="lineNum">     488 </span>                :            : {
+<span class="lineNum">     489 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         10 :     if(agent-&gt;allocFn) return (*agent-&gt;allocFn)(agent-&gt;magic, agent, bytes);</span>
+<span class="lineNum">     490 </span>                :<span class="lineCov">         10 :     else return SFL_ALLOC(bytes);</span>
+<a name="491"><span class="lineNum">     491 </span>                :            : }</a>
+<span class="lineNum">     492 </span>                :            : 
+<span class="lineNum">     493 </span>                :<span class="lineCov">          6 : static void sflFree(SFLAgent *agent, void *obj)</span>
+<span class="lineNum">     494 </span>                :            : {
+<span class="lineNum">     495 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          6 :     if(agent-&gt;freeFn) (*agent-&gt;freeFn)(agent-&gt;magic, agent, obj);</span>
+<span class="lineNum">     496 </span>                :<span class="lineNoCov">          0 :     else SFL_FREE(obj);</span>
+<span class="lineNum">     497 </span>                :<span class="lineCov">          6 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

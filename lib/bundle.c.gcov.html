@@ -1,0 +1,510 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/bundle.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - bundle.c<span style="font-size: 80%;"> (source / <a href="bundle.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">159</td>
+            <td class="headerCovTableEntry">179</td>
+            <td class="headerCovTableEntryMed">88.8 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">11</td>
+            <td class="headerCovTableEntry">11</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">80</td>
+            <td class="headerCovTableEntry">118</td>
+            <td class="headerCovTableEntryLo">67.8 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (c) 2011, 2012, 2013 Nicira, Inc.</a>
+<span class="lineNum">       2 </span>                :            :  *
+<span class="lineNum">       3 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       4 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       5 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       6 </span>                :            :  *
+<span class="lineNum">       7 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       8 </span>                :            :  *
+<span class="lineNum">       9 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      10 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      11 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      12 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      13 </span>                :            :  * limitations under the License.
+<span class="lineNum">      14 </span>                :            :  */
+<span class="lineNum">      15 </span>                :            : 
+<span class="lineNum">      16 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      17 </span>                :            : 
+<span class="lineNum">      18 </span>                :            : #include &quot;bundle.h&quot;
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &lt;arpa/inet.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;inttypes.h&gt;
+<span class="lineNum">      22 </span>                :            : 
+<span class="lineNum">      23 </span>                :            : #include &quot;dynamic-string.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;multipath.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;meta-flow.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;nx-match.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;ofp-actions.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;ofp-errors.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;ofp-util.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;openflow/nicira-ext.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;vlog.h&quot;
+<span class="lineNum">      33 </span>                :            : 
+<a name="34"><span class="lineNum">      34 </span>                :            : #define BUNDLE_MAX_SLAVES 2048</a>
+<span class="lineNum">      35 </span>                :            : 
+<span class="lineNum">      36 </span>                :<span class="lineCov">       7479 : VLOG_DEFINE_THIS_MODULE(bundle);</span>
+<a name="37"><span class="lineNum">      37 </span>                :            : </a>
+<span class="lineNum">      38 </span>                :            : static ofp_port_t
+<span class="lineNum">      39 </span>                :<span class="lineCov">    3250000 : execute_ab(const struct ofpact_bundle *bundle,</span>
+<span class="lineNum">      40 </span>                :            :            bool (*slave_enabled)(ofp_port_t ofp_port, void *aux), void *aux)
+<span class="lineNum">      41 </span>                :            : {
+<span class="lineNum">      42 </span>                :            :     size_t i;
+<span class="lineNum">      43 </span>                :            : 
+<span class="lineNum">      44 </span>        [<span class="branchCov" title="Branch 0 was taken 6350000 times"> + </span><span class="branchCov" title="Branch 1 was taken 50000 times"> + </span>]:<span class="lineCov">    6400000 :     for (i = 0; i &lt; bundle-&gt;n_slaves; i++) {</span>
+<span class="lineNum">      45 </span>                :<span class="lineCov">    6350000 :         ofp_port_t slave = bundle-&gt;slaves[i];</span>
+<span class="lineNum">      46 </span>        [<span class="branchCov" title="Branch 1 was taken 3200000 times"> + </span><span class="branchCov" title="Branch 2 was taken 3150000 times"> + </span>]:<span class="lineCov">    6350000 :         if (slave_enabled(slave, aux)) {</span>
+<span class="lineNum">      47 </span>                :<span class="lineCov">    3200000 :             return slave;</span>
+<span class="lineNum">      48 </span>                :            :         }
+<span class="lineNum">      49 </span>                :            :     }
+<span class="lineNum">      50 </span>                :            : 
+<span class="lineNum">      51 </span>                :<span class="lineCov">    3250000 :     return OFPP_NONE;</span>
+<span class="lineNum">      52 </span>                :            : }
+<a name="53"><span class="lineNum">      53 </span>                :            : </a>
+<span class="lineNum">      54 </span>                :            : static ofp_port_t
+<span class="lineNum">      55 </span>                :<span class="lineCov">    1900004 : execute_hrw(const struct ofpact_bundle *bundle,</span>
+<span class="lineNum">      56 </span>                :            :             const struct flow *flow, struct flow_wildcards *wc,
+<span class="lineNum">      57 </span>                :            :             bool (*slave_enabled)(ofp_port_t ofp_port, void *aux), void *aux)
+<span class="lineNum">      58 </span>                :            : {
+<span class="lineNum">      59 </span>                :            :     uint32_t flow_hash, best_hash;
+<span class="lineNum">      60 </span>                :            :     int best, i;
+<span class="lineNum">      61 </span>                :            : 
+<span class="lineNum">      62 </span>        [<span class="branchCov" title="Branch 0 was taken 1650004 times"> + </span><span class="branchCov" title="Branch 1 was taken 250000 times"> + </span>]:<span class="lineCov">    1900004 :     if (bundle-&gt;n_slaves &gt; 1) {</span>
+<span class="lineNum">      63 </span>                :<span class="lineCov">    1650004 :         flow_mask_hash_fields(flow, wc, bundle-&gt;fields);</span>
+<span class="lineNum">      64 </span>                :            :     }
+<span class="lineNum">      65 </span>                :            : 
+<span class="lineNum">      66 </span>                :<span class="lineCov">    1900004 :     flow_hash = flow_hash_fields(flow, bundle-&gt;fields, bundle-&gt;basis);</span>
+<span class="lineNum">      67 </span>                :<span class="lineCov">    1900004 :     best = -1;</span>
+<span class="lineNum">      68 </span>                :<span class="lineCov">    1900004 :     best_hash = 0;</span>
+<span class="lineNum">      69 </span>                :            : 
+<span class="lineNum">      70 </span>        [<span class="branchCov" title="Branch 0 was taken 8400008 times"> + </span><span class="branchCov" title="Branch 1 was taken 1900004 times"> + </span>]:<span class="lineCov">   10300012 :     for (i = 0; i &lt; bundle-&gt;n_slaves; i++) {</span>
+<span class="lineNum">      71 </span>        [<span class="branchCov" title="Branch 1 was taken 4150000 times"> + </span><span class="branchCov" title="Branch 2 was taken 4250008 times"> + </span>]:<span class="lineCov">    8400008 :         if (slave_enabled(bundle-&gt;slaves[i], aux)) {</span>
+<span class="lineNum">      72 </span>                :<span class="lineCov">    4150000 :             uint32_t hash = hash_2words(i, flow_hash);</span>
+<span class="lineNum">      73 </span>                :            : 
+<span class="lineNum">      74 </span>[<span class="branchCov" title="Branch 0 was taken 2450000 times"> + </span><span class="branchCov" title="Branch 1 was taken 1700000 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 996252 times"> + </span><span class="branchCov" title="Branch 3 was taken 1453748 times"> + </span>]:<span class="lineCov">    4150000 :             if (best &lt; 0 || hash &gt; best_hash) {</span>
+<span class="lineNum">      75 </span>                :<span class="lineCov">    2696252 :                 best_hash = hash;</span>
+<span class="lineNum">      76 </span>                :<span class="lineCov">    2696252 :                 best = i;</span>
+<span class="lineNum">      77 </span>                :            :             }
+<span class="lineNum">      78 </span>                :            :         }
+<span class="lineNum">      79 </span>                :            :     }
+<span class="lineNum">      80 </span>                :            : 
+<span class="lineNum">      81 </span>        [<span class="branchCov" title="Branch 0 was taken 1700000 times"> + </span><span class="branchCov" title="Branch 1 was taken 200004 times"> + </span>]:<span class="lineCov">    1900004 :     return best &gt;= 0 ? bundle-&gt;slaves[best] : OFPP_NONE;</span>
+<span class="lineNum">      82 </span>                :            : }
+<span class="lineNum">      83 </span>                :            : 
+<span class="lineNum">      84 </span>                :            : /* Executes 'bundle' on 'flow'.  Sets fields in 'wc' that were used to
+<span class="lineNum">      85 </span>                :            :  * calculate the result.  Uses 'slave_enabled' to determine if the slave
+<span class="lineNum">      86 </span>                :            :  * designated by 'ofp_port' is up.  Returns the chosen slave, or
+<a name="87"><span class="lineNum">      87 </span>                :            :  * OFPP_NONE if none of the slaves are acceptable. */</a>
+<span class="lineNum">      88 </span>                :            : ofp_port_t
+<span class="lineNum">      89 </span>                :<span class="lineCov">    5150004 : bundle_execute(const struct ofpact_bundle *bundle,</span>
+<span class="lineNum">      90 </span>                :            :                const struct flow *flow, struct flow_wildcards *wc,
+<span class="lineNum">      91 </span>                :            :                bool (*slave_enabled)(ofp_port_t ofp_port, void *aux),
+<span class="lineNum">      92 </span>                :            :                void *aux)
+<span class="lineNum">      93 </span>                :            : {
+<span class="lineNum">      94 </span>     [<span class="branchCov" title="Branch 0 was taken 1900004 times"> + </span><span class="branchCov" title="Branch 1 was taken 3250000 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">    5150004 :     switch (bundle-&gt;algorithm) {</span>
+<span class="lineNum">      95 </span>                :            :     case NX_BD_ALG_HRW:
+<span class="lineNum">      96 </span>                :<span class="lineCov">    1900004 :         return execute_hrw(bundle, flow, wc, slave_enabled, aux);</span>
+<span class="lineNum">      97 </span>                :            : 
+<span class="lineNum">      98 </span>                :            :     case NX_BD_ALG_ACTIVE_BACKUP:
+<span class="lineNum">      99 </span>                :<span class="lineCov">    3250000 :         return execute_ab(bundle, slave_enabled, aux);</span>
+<span class="lineNum">     100 </span>                :            : 
+<span class="lineNum">     101 </span>                :            :     default:
+<span class="lineNum">     102 </span>                :<span class="lineCov">    5150004 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     103 </span>                :            :     }
+<span class="lineNum">     104 </span>                :            : }
+<span class="lineNum">     105 </span>                :            : 
+<span class="lineNum">     106 </span>                :            : /* Checks that 'nab' specifies a bundle action which is supported by this
+<span class="lineNum">     107 </span>                :            :  * bundle module.  Uses the 'max_ports' parameter to validate each port using
+<span class="lineNum">     108 </span>                :            :  * ofputil_check_output_port().  Returns 0 if 'nab' is supported, otherwise an
+<a name="109"><span class="lineNum">     109 </span>                :            :  * OFPERR_* error code. */</a>
+<span class="lineNum">     110 </span>                :            : enum ofperr
+<span class="lineNum">     111 </span>                :<span class="lineCov">         17 : bundle_from_openflow(const struct nx_action_bundle *nab,</span>
+<span class="lineNum">     112 </span>                :            :                      struct ofpbuf *ofpacts)
+<span class="lineNum">     113 </span>                :            : {
+<span class="lineNum">     114 </span>                :            :     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     115 </span>                :            :     struct ofpact_bundle *bundle;
+<span class="lineNum">     116 </span>                :            :     uint16_t subtype;
+<span class="lineNum">     117 </span>                :            :     uint32_t slave_type;
+<span class="lineNum">     118 </span>                :            :     size_t slaves_size, i;
+<span class="lineNum">     119 </span>                :            :     enum ofperr error;
+<span class="lineNum">     120 </span>                :            : 
+<span class="lineNum">     121 </span>                :<span class="lineCov">         17 :     bundle = ofpact_put_BUNDLE(ofpacts);</span>
+<span class="lineNum">     122 </span>                :            : 
+<span class="lineNum">     123 </span>                :<span class="lineCov">         17 :     subtype = ntohs(nab-&gt;subtype);</span>
+<span class="lineNum">     124 </span>                :<span class="lineCov">         17 :     bundle-&gt;n_slaves = ntohs(nab-&gt;n_slaves);</span>
+<span class="lineNum">     125 </span>                :<span class="lineCov">         17 :     bundle-&gt;basis = ntohs(nab-&gt;basis);</span>
+<span class="lineNum">     126 </span>                :<span class="lineCov">         17 :     bundle-&gt;fields = ntohs(nab-&gt;fields);</span>
+<span class="lineNum">     127 </span>                :<span class="lineCov">         17 :     bundle-&gt;algorithm = ntohs(nab-&gt;algorithm);</span>
+<span class="lineNum">     128 </span>                :<span class="lineCov">         17 :     slave_type = ntohl(nab-&gt;slave_type);</span>
+<span class="lineNum">     129 </span>                :<span class="lineCov">         17 :     slaves_size = ntohs(nab-&gt;len) - sizeof *nab;</span>
+<span class="lineNum">     130 </span>                :            : 
+<span class="lineNum">     131 </span>                :<span class="lineCov">         17 :     error = OFPERR_OFPBAC_BAD_ARGUMENT;</span>
+<span class="lineNum">     132 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 17 times"> + </span>]:<span class="lineCov">         17 :     if (!flow_hash_fields_valid(bundle-&gt;fields)) {</span>
+<span class="lineNum">     133 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;unsupported fields %d&quot;, (int) bundle-&gt;fields);</span>
+<span class="lineNum">     134 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 17 times"> + </span>]:<span class="lineCov">         17 :     } else if (bundle-&gt;n_slaves &gt; BUNDLE_MAX_SLAVES) {</span>
+<span class="lineNum">     135 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;too may slaves&quot;);</span>
+<span class="lineNum">     136 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 15 times"> + </span>]:<span class="lineCov">         17 :     } else if (bundle-&gt;algorithm != NX_BD_ALG_HRW</span>
+<span class="lineNum">     137 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :                &amp;&amp; bundle-&gt;algorithm != NX_BD_ALG_ACTIVE_BACKUP) {</span>
+<span class="lineNum">     138 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;unsupported algorithm %d&quot;, (int) bundle-&gt;algorithm);</span>
+<span class="lineNum">     139 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 17 times"> + </span>]:<span class="lineCov">         17 :     } else if (slave_type != NXM_OF_IN_PORT) {</span>
+<span class="lineNum">     140 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;unsupported slave type %&quot;PRIu16, slave_type);</span>
+<span class="lineNum">     141 </span>                :            :     } else {
+<span class="lineNum">     142 </span>                :<span class="lineCov">         17 :         error = 0;</span>
+<span class="lineNum">     143 </span>                :            :     }
+<span class="lineNum">     144 </span>                :            : 
+<span class="lineNum">     145 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 17 times"> + </span>]:<span class="lineCov">         17 :     if (!is_all_zeros(nab-&gt;zero, sizeof nab-&gt;zero)) {</span>
+<span class="lineNum">     146 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;reserved field is nonzero&quot;);</span>
+<span class="lineNum">     147 </span>                :<span class="lineNoCov">          0 :         error = OFPERR_OFPBAC_BAD_ARGUMENT;</span>
+<span class="lineNum">     148 </span>                :            :     }
+<span class="lineNum">     149 </span>                :            : 
+<span class="lineNum">     150 </span>[<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 11 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 6 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         17 :     if (subtype == NXAST_BUNDLE &amp;&amp; (nab-&gt;ofs_nbits || nab-&gt;dst)) {</span>
+<span class="lineNum">         </span>        [<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 6 times"> + </span>]
+<span class="lineNum">     151 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;bundle action has nonzero reserved fields&quot;);</span>
+<span class="lineNum">     152 </span>                :<span class="lineNoCov">          0 :         error = OFPERR_OFPBAC_BAD_ARGUMENT;</span>
+<span class="lineNum">     153 </span>                :            :     }
+<span class="lineNum">     154 </span>                :            : 
+<span class="lineNum">     155 </span>        [<span class="branchCov" title="Branch 0 was taken 11 times"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">         17 :     if (subtype == NXAST_BUNDLE_LOAD) {</span>
+<span class="lineNum">     156 </span>                :<span class="lineCov">         11 :         bundle-&gt;dst.field = mf_from_nxm_header(ntohl(nab-&gt;dst));</span>
+<span class="lineNum">     157 </span>                :<span class="lineCov">         11 :         bundle-&gt;dst.ofs = nxm_decode_ofs(nab-&gt;ofs_nbits);</span>
+<span class="lineNum">     158 </span>                :<span class="lineCov">         11 :         bundle-&gt;dst.n_bits = nxm_decode_n_bits(nab-&gt;ofs_nbits);</span>
+<span class="lineNum">     159 </span>                :            : 
+<span class="lineNum">     160 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 11 times"> + </span>]:<span class="lineCov">         11 :         if (bundle-&gt;dst.n_bits &lt; 16) {</span>
+<span class="lineNum">     161 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN_RL(&amp;rl, &quot;bundle_load action requires at least 16 bit &quot;</span>
+<span class="lineNum">     162 </span>                :            :                          &quot;destination.&quot;);
+<span class="lineNum">     163 </span>                :<span class="lineNoCov">          0 :             error = OFPERR_OFPBAC_BAD_ARGUMENT;</span>
+<span class="lineNum">     164 </span>                :            :         }
+<span class="lineNum">     165 </span>                :            :     }
+<span class="lineNum">     166 </span>                :            : 
+<span class="lineNum">     167 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 17 times"> + </span>]:<span class="lineCov">         17 :     if (slaves_size &lt; bundle-&gt;n_slaves * sizeof(ovs_be16)) {</span>
+<span class="lineNum">     168 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;Nicira action %&quot;PRIu16&quot; only has %&quot;PRIuSIZE&quot; bytes &quot;</span>
+<span class="lineNum">     169 </span>                :            :                      &quot;allocated for slaves.  %&quot;PRIuSIZE&quot; bytes are required for &quot;
+<span class="lineNum">     170 </span>                :            :                      &quot;%&quot;PRIu16&quot; slaves.&quot;, subtype, slaves_size,
+<span class="lineNum">     171 </span>                :            :                      bundle-&gt;n_slaves * sizeof(ovs_be16), bundle-&gt;n_slaves);
+<span class="lineNum">     172 </span>                :<span class="lineNoCov">          0 :         error = OFPERR_OFPBAC_BAD_LEN;</span>
+<span class="lineNum">     173 </span>                :            :     }
+<span class="lineNum">     174 </span>                :            : 
+<span class="lineNum">     175 </span>        [<span class="branchCov" title="Branch 0 was taken 26 times"> + </span><span class="branchCov" title="Branch 1 was taken 17 times"> + </span>]:<span class="lineCov">         43 :     for (i = 0; i &lt; bundle-&gt;n_slaves; i++) {</span>
+<span class="lineNum">     176 </span>                :<span class="lineCov">         26 :         uint16_t ofp_port = ntohs(((ovs_be16 *)(nab + 1))[i]);</span>
+<span class="lineNum">     177 </span>                :<span class="lineCov">         26 :         ofpbuf_put(ofpacts, &amp;ofp_port, sizeof ofp_port);</span>
+<span class="lineNum">     178 </span>                :            :     }
+<span class="lineNum">     179 </span>                :            : 
+<span class="lineNum">     180 </span>                :<span class="lineCov">         17 :     bundle = ofpacts-&gt;frame;</span>
+<span class="lineNum">     181 </span>                :<span class="lineCov">         17 :     ofpact_update_len(ofpacts, &amp;bundle-&gt;ofpact);</span>
+<span class="lineNum">     182 </span>                :            : 
+<span class="lineNum">     183 </span>        [<span class="branchCov" title="Branch 0 was taken 17 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         17 :     if (!error) {</span>
+<span class="lineNum">     184 </span>                :<span class="lineCov">         17 :         error = bundle_check(bundle, OFPP_MAX, NULL);</span>
+<span class="lineNum">     185 </span>                :            :     }
+<span class="lineNum">     186 </span>                :<span class="lineCov">         17 :     return error;</span>
+<span class="lineNum">     187 </span>                :            : }
+<a name="188"><span class="lineNum">     188 </span>                :            : </a>
+<span class="lineNum">     189 </span>                :            : enum ofperr
+<span class="lineNum">     190 </span>                :<span class="lineCov">         38 : bundle_check(const struct ofpact_bundle *bundle, ofp_port_t max_ports,</span>
+<span class="lineNum">     191 </span>                :            :              const struct flow *flow)
+<span class="lineNum">     192 </span>                :            : {
+<span class="lineNum">     193 </span>                :            :     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     194 </span>                :            :     size_t i;
+<span class="lineNum">     195 </span>                :            : 
+<span class="lineNum">     196 </span>        [<span class="branchCov" title="Branch 0 was taken 24 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>]:<span class="lineCov">         38 :     if (bundle-&gt;dst.field) {</span>
+<span class="lineNum">     197 </span>                :<span class="lineCov">         24 :         enum ofperr error = mf_check_dst(&amp;bundle-&gt;dst, flow);</span>
+<span class="lineNum">     198 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 24 times"> + </span>]:<span class="lineCov">         24 :         if (error) {</span>
+<span class="lineNum">     199 </span>                :<span class="lineNoCov">          0 :             return error;</span>
+<span class="lineNum">     200 </span>                :            :         }
+<span class="lineNum">     201 </span>                :            :     }
+<span class="lineNum">     202 </span>                :            : 
+<span class="lineNum">     203 </span>        [<span class="branchCov" title="Branch 0 was taken 52 times"> + </span><span class="branchCov" title="Branch 1 was taken 38 times"> + </span>]:<span class="lineCov">         90 :     for (i = 0; i &lt; bundle-&gt;n_slaves; i++) {</span>
+<span class="lineNum">     204 </span>                :<span class="lineCov">         52 :         ofp_port_t ofp_port = bundle-&gt;slaves[i];</span>
+<span class="lineNum">     205 </span>                :            :         enum ofperr error;
+<span class="lineNum">     206 </span>                :            : 
+<span class="lineNum">     207 </span>                :<span class="lineCov">         52 :         error = ofpact_check_output_port(ofp_port, max_ports);</span>
+<span class="lineNum">     208 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 52 times"> + </span>]:<span class="lineCov">         52 :         if (error) {</span>
+<span class="lineNum">     209 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN_RL(&amp;rl, &quot;invalid slave %&quot;PRIu16, ofp_port);</span>
+<span class="lineNum">     210 </span>                :<span class="lineNoCov">          0 :             return error;</span>
+<span class="lineNum">     211 </span>                :            :         }
+<span class="lineNum">     212 </span>                :            : 
+<span class="lineNum">     213 </span>                :            :         /* Controller slaves are unsupported due to the lack of a max_len
+<span class="lineNum">     214 </span>                :            :          * argument. This may or may not change in the future.  There doesn't
+<span class="lineNum">     215 </span>                :            :          * seem to be a real-world use-case for supporting it. */
+<span class="lineNum">     216 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 52 times"> + </span>]:<span class="lineCov">         52 :         if (ofp_port == OFPP_CONTROLLER) {</span>
+<span class="lineNum">     217 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN_RL(&amp;rl, &quot;unsupported controller slave&quot;);</span>
+<span class="lineNum">     218 </span>                :<span class="lineNoCov">          0 :             return OFPERR_OFPBAC_BAD_OUT_PORT;</span>
+<span class="lineNum">     219 </span>                :            :         }
+<span class="lineNum">     220 </span>                :            :     }
+<span class="lineNum">     221 </span>                :            : 
+<span class="lineNum">     222 </span>                :<span class="lineCov">         38 :     return 0;</span>
+<span class="lineNum">     223 </span>                :            : }
+<a name="224"><span class="lineNum">     224 </span>                :            : </a>
+<span class="lineNum">     225 </span>                :            : void
+<span class="lineNum">     226 </span>                :<span class="lineCov">         15 : bundle_to_nxast(const struct ofpact_bundle *bundle, struct ofpbuf *openflow)</span>
+<span class="lineNum">     227 </span>                :            : {
+<span class="lineNum">     228 </span>                :<span class="lineCov">         15 :     int slaves_len = ROUND_UP(2 * bundle-&gt;n_slaves, OFP_ACTION_ALIGN);</span>
+<span class="lineNum">     229 </span>                :            :     struct nx_action_bundle *nab;
+<span class="lineNum">     230 </span>                :            :     ovs_be16 *slaves;
+<span class="lineNum">     231 </span>                :            :     size_t i;
+<span class="lineNum">     232 </span>                :            : 
+<span class="lineNum">     233 </span>                :<span class="lineCov">         30 :     nab = (bundle-&gt;dst.field</span>
+<span class="lineNum">     234 </span>                :            :            ? ofputil_put_NXAST_BUNDLE_LOAD(openflow)
+<span class="lineNum">     235 </span>        [<span class="branchCov" title="Branch 0 was taken 9 times"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">         15 :            : ofputil_put_NXAST_BUNDLE(openflow));</span>
+<span class="lineNum">     236 </span>                :<span class="lineCov">         15 :     nab-&gt;len = htons(ntohs(nab-&gt;len) + slaves_len);</span>
+<span class="lineNum">     237 </span>                :<span class="lineCov">         15 :     nab-&gt;algorithm = htons(bundle-&gt;algorithm);</span>
+<span class="lineNum">     238 </span>                :<span class="lineCov">         15 :     nab-&gt;fields = htons(bundle-&gt;fields);</span>
+<span class="lineNum">     239 </span>                :<span class="lineCov">         15 :     nab-&gt;basis = htons(bundle-&gt;basis);</span>
+<span class="lineNum">     240 </span>                :<span class="lineCov">         15 :     nab-&gt;slave_type = htonl(NXM_OF_IN_PORT);</span>
+<span class="lineNum">     241 </span>                :<span class="lineCov">         15 :     nab-&gt;n_slaves = htons(bundle-&gt;n_slaves);</span>
+<span class="lineNum">     242 </span>        [<span class="branchCov" title="Branch 0 was taken 9 times"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">         15 :     if (bundle-&gt;dst.field) {</span>
+<span class="lineNum">     243 </span>                :<span class="lineCov">          9 :         nab-&gt;ofs_nbits = nxm_encode_ofs_nbits(bundle-&gt;dst.ofs,</span>
+<span class="lineNum">     244 </span>                :<span class="lineCov">          9 :                                               bundle-&gt;dst.n_bits);</span>
+<span class="lineNum">     245 </span>                :<span class="lineCov">          9 :         nab-&gt;dst = htonl(bundle-&gt;dst.field-&gt;nxm_header);</span>
+<span class="lineNum">     246 </span>                :            :     }
+<span class="lineNum">     247 </span>                :            : 
+<span class="lineNum">     248 </span>                :<span class="lineCov">         15 :     slaves = ofpbuf_put_zeros(openflow, slaves_len);</span>
+<span class="lineNum">     249 </span>        [<span class="branchCov" title="Branch 0 was taken 22 times"> + </span><span class="branchCov" title="Branch 1 was taken 15 times"> + </span>]:<span class="lineCov">         37 :     for (i = 0; i &lt; bundle-&gt;n_slaves; i++) {</span>
+<span class="lineNum">     250 </span>                :<span class="lineCov">         22 :         slaves[i] = htons(ofp_to_u16(bundle-&gt;slaves[i]));</span>
+<span class="lineNum">     251 </span>                :            :     }
+<span class="lineNum">     252 </span>                :<span class="lineCov">         15 : }</span>
+<span class="lineNum">     253 </span>                :            : 
+<span class="lineNum">     254 </span>                :            : /* Helper for bundle_parse and bundle_parse_load.
+<span class="lineNum">     255 </span>                :            :  *
+<span class="lineNum">     256 </span>                :            :  * Returns NULL if successful, otherwise a malloc()'d string describing the
+<a name="257"><span class="lineNum">     257 </span>                :            :  * error.  The caller is responsible for freeing the returned string.*/</a>
+<span class="lineNum">     258 </span>                :            : static char * WARN_UNUSED_RESULT
+<span class="lineNum">     259 </span>                :<span class="lineCov">         19 : bundle_parse__(const char *s, char **save_ptr,</span>
+<span class="lineNum">     260 </span>                :            :                const char *fields, const char *basis, const char *algorithm,
+<span class="lineNum">     261 </span>                :            :                const char *slave_type, const char *dst,
+<span class="lineNum">     262 </span>                :            :                const char *slave_delim, struct ofpbuf *ofpacts)
+<span class="lineNum">     263 </span>                :            : {
+<span class="lineNum">     264 </span>                :            :     struct ofpact_bundle *bundle;
+<span class="lineNum">     265 </span>                :            : 
+<span class="lineNum">     266 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 18 times"> + </span>]:<span class="lineCov">         19 :     if (!slave_delim) {</span>
+<span class="lineNum">     267 </span>                :<span class="lineCov">          1 :         return xasprintf(&quot;%s: not enough arguments to bundle action&quot;, s);</span>
+<span class="lineNum">     268 </span>                :            :     }
+<span class="lineNum">     269 </span>                :            : 
+<span class="lineNum">     270 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 17 times"> + </span>]:<span class="lineCov">         18 :     if (strcasecmp(slave_delim, &quot;slaves&quot;)) {</span>
+<span class="lineNum">     271 </span>                :<span class="lineCov">          1 :         return xasprintf(&quot;%s: missing slave delimiter, expected `slaves' &quot;</span>
+<span class="lineNum">     272 </span>                :            :                          &quot;got `%s'&quot;, s, slave_delim);
+<span class="lineNum">     273 </span>                :            :     }
+<span class="lineNum">     274 </span>                :            : 
+<span class="lineNum">     275 </span>                :<span class="lineCov">         17 :     bundle = ofpact_put_BUNDLE(ofpacts);</span>
+<span class="lineNum">     276 </span>                :            : 
+<span class="lineNum">     277 </span>                :            :     for (;;) {
+<span class="lineNum">     278 </span>                :            :         ofp_port_t slave_port;
+<span class="lineNum">     279 </span>                :            :         char *slave;
+<span class="lineNum">     280 </span>                :            : 
+<span class="lineNum">     281 </span>                :<span class="lineCov">         47 :         slave = strtok_r(NULL, &quot;, []&quot;, save_ptr);</span>
+<span class="lineNum">     282 </span>[<span class="branchCov" title="Branch 0 was taken 30 times"> + </span><span class="branchCov" title="Branch 1 was taken 17 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 30 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         47 :         if (!slave || bundle-&gt;n_slaves &gt;= BUNDLE_MAX_SLAVES) {</span>
+<span class="lineNum">     283 </span>                :            :             break;
+<span class="lineNum">     284 </span>                :            :         }
+<span class="lineNum">     285 </span>                :            : 
+<span class="lineNum">     286 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 30 times"> + </span>]:<span class="lineCov">         30 :         if (!ofputil_port_from_string(slave, &amp;slave_port)) {</span>
+<span class="lineNum">     287 </span>                :<span class="lineNoCov">          0 :             return xasprintf(&quot;%s: bad port number&quot;, slave);</span>
+<span class="lineNum">     288 </span>                :            :         }
+<span class="lineNum">     289 </span>                :<span class="lineCov">         30 :         ofpbuf_put(ofpacts, &amp;slave_port, sizeof slave_port);</span>
+<span class="lineNum">     290 </span>                :            : 
+<span class="lineNum">     291 </span>                :<span class="lineCov">         30 :         bundle = ofpacts-&gt;frame;</span>
+<span class="lineNum">     292 </span>                :<span class="lineCov">         30 :         bundle-&gt;n_slaves++;</span>
+<span class="lineNum">     293 </span>                :<span class="lineCov">         30 :     }</span>
+<span class="lineNum">     294 </span>                :<span class="lineCov">         17 :     ofpact_update_len(ofpacts, &amp;bundle-&gt;ofpact);</span>
+<span class="lineNum">     295 </span>                :            : 
+<span class="lineNum">     296 </span>                :<span class="lineCov">         17 :     bundle-&gt;basis = atoi(basis);</span>
+<span class="lineNum">     297 </span>                :            : 
+<span class="lineNum">     298 </span>        [<span class="branchCov" title="Branch 0 was taken 5 times"> + </span><span class="branchCov" title="Branch 1 was taken 12 times"> + </span>]:<span class="lineCov">         17 :     if (!strcasecmp(fields, &quot;eth_src&quot;)) {</span>
+<span class="lineNum">     299 </span>                :<span class="lineCov">          5 :         bundle-&gt;fields = NX_HASH_FIELDS_ETH_SRC;</span>
+<span class="lineNum">     300 </span>        [<span class="branchCov" title="Branch 0 was taken 11 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">         12 :     } else if (!strcasecmp(fields, &quot;symmetric_l4&quot;)) {</span>
+<span class="lineNum">     301 </span>                :<span class="lineCov">         11 :         bundle-&gt;fields = NX_HASH_FIELDS_SYMMETRIC_L4;</span>
+<span class="lineNum">     302 </span>                :            :     } else {
+<span class="lineNum">     303 </span>                :<span class="lineCov">          1 :         return xasprintf(&quot;%s: unknown fields `%s'&quot;, s, fields);</span>
+<span class="lineNum">     304 </span>                :            :     }
+<span class="lineNum">     305 </span>                :            : 
+<span class="lineNum">     306 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 13 times"> + </span>]:<span class="lineCov">         16 :     if (!strcasecmp(algorithm, &quot;active_backup&quot;)) {</span>
+<span class="lineNum">     307 </span>                :<span class="lineCov">          3 :         bundle-&gt;algorithm = NX_BD_ALG_ACTIVE_BACKUP;</span>
+<span class="lineNum">     308 </span>        [<span class="branchCov" title="Branch 0 was taken 12 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">         13 :     } else if (!strcasecmp(algorithm, &quot;hrw&quot;)) {</span>
+<span class="lineNum">     309 </span>                :<span class="lineCov">         12 :         bundle-&gt;algorithm = NX_BD_ALG_HRW;</span>
+<span class="lineNum">     310 </span>                :            :     } else {
+<span class="lineNum">     311 </span>                :<span class="lineCov">          1 :         return xasprintf(&quot;%s: unknown algorithm `%s'&quot;, s, algorithm);</span>
+<span class="lineNum">     312 </span>                :            :     }
+<span class="lineNum">     313 </span>                :            : 
+<span class="lineNum">     314 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>]:<span class="lineCov">         15 :     if (strcasecmp(slave_type, &quot;ofport&quot;)) {</span>
+<span class="lineNum">     315 </span>                :<span class="lineCov">          1 :         return xasprintf(&quot;%s: unknown slave_type `%s'&quot;, s, slave_type);</span>
+<span class="lineNum">     316 </span>                :            :     }
+<span class="lineNum">     317 </span>                :            : 
+<span class="lineNum">     318 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchCov" title="Branch 1 was taken 4 times"> + </span>]:<span class="lineCov">         14 :     if (dst) {</span>
+<span class="lineNum">     319 </span>                :<span class="lineCov">         10 :         char *error = mf_parse_subfield(&amp;bundle-&gt;dst, dst);</span>
+<span class="lineNum">     320 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 10 times"> + </span>]:<span class="lineCov">         10 :         if (error) {</span>
+<span class="lineNum">     321 </span>                :<span class="lineNoCov">          0 :             return error;</span>
+<span class="lineNum">     322 </span>                :            :         }
+<span class="lineNum">     323 </span>                :            :     }
+<span class="lineNum">     324 </span>                :            : 
+<span class="lineNum">     325 </span>                :<span class="lineCov">         19 :     return NULL;</span>
+<span class="lineNum">     326 </span>                :            : }
+<span class="lineNum">     327 </span>                :            : 
+<span class="lineNum">     328 </span>                :            : /* Converts a bundle action string contained in 's' to an nx_action_bundle and
+<span class="lineNum">     329 </span>                :            :  * stores it in 'b'.  Sets 'b''s l2 pointer to NULL.
+<span class="lineNum">     330 </span>                :            :  *
+<span class="lineNum">     331 </span>                :            :  * Returns NULL if successful, otherwise a malloc()'d string describing the
+<a name="332"><span class="lineNum">     332 </span>                :            :  * error.  The caller is responsible for freeing the returned string. */</a>
+<span class="lineNum">     333 </span>                :            : char * WARN_UNUSED_RESULT
+<span class="lineNum">     334 </span>                :<span class="lineCov">          9 : bundle_parse(const char *s, struct ofpbuf *ofpacts)</span>
+<span class="lineNum">     335 </span>                :            : {
+<span class="lineNum">     336 </span>                :            :     char *fields, *basis, *algorithm, *slave_type, *slave_delim;
+<span class="lineNum">     337 </span>                :            :     char *tokstr, *save_ptr;
+<span class="lineNum">     338 </span>                :            :     char *error;
+<span class="lineNum">     339 </span>                :            : 
+<span class="lineNum">     340 </span>                :<span class="lineCov">          9 :     save_ptr = NULL;</span>
+<span class="lineNum">     341 </span>                :<span class="lineCov">          9 :     tokstr = xstrdup(s);</span>
+<span class="lineNum">     342 </span>                :<span class="lineCov">          9 :     fields = strtok_r(tokstr, &quot;, &quot;, &amp;save_ptr);</span>
+<span class="lineNum">     343 </span>                :<span class="lineCov">          9 :     basis = strtok_r(NULL, &quot;, &quot;, &amp;save_ptr);</span>
+<span class="lineNum">     344 </span>                :<span class="lineCov">          9 :     algorithm = strtok_r(NULL, &quot;, &quot;, &amp;save_ptr);</span>
+<span class="lineNum">     345 </span>                :<span class="lineCov">          9 :     slave_type = strtok_r(NULL, &quot;, &quot;, &amp;save_ptr);</span>
+<span class="lineNum">     346 </span>                :<span class="lineCov">          9 :     slave_delim = strtok_r(NULL, &quot;: &quot;, &amp;save_ptr);</span>
+<span class="lineNum">     347 </span>                :            : 
+<span class="lineNum">     348 </span>                :<span class="lineCov">          9 :     error = bundle_parse__(s, &amp;save_ptr, fields, basis, algorithm, slave_type,</span>
+<span class="lineNum">     349 </span>                :            :                            NULL, slave_delim, ofpacts);
+<span class="lineNum">     350 </span>                :<span class="lineCov">          9 :     free(tokstr);</span>
+<span class="lineNum">     351 </span>                :            : 
+<span class="lineNum">     352 </span>                :<span class="lineCov">          9 :     return error;</span>
+<span class="lineNum">     353 </span>                :            : }
+<span class="lineNum">     354 </span>                :            : 
+<span class="lineNum">     355 </span>                :            : /* Converts a bundle_load action string contained in 's' to an nx_action_bundle
+<span class="lineNum">     356 </span>                :            :  * and stores it in 'b'.  Sets 'b''s l2 pointer to NULL.
+<span class="lineNum">     357 </span>                :            :  *
+<span class="lineNum">     358 </span>                :            :  * Returns NULL if successful, otherwise a malloc()'d string describing the
+<a name="359"><span class="lineNum">     359 </span>                :            :  * error.  The caller is responsible for freeing the returned string.*/</a>
+<span class="lineNum">     360 </span>                :            : char * WARN_UNUSED_RESULT
+<span class="lineNum">     361 </span>                :<span class="lineCov">         10 : bundle_parse_load(const char *s, struct ofpbuf *ofpacts)</span>
+<span class="lineNum">     362 </span>                :            : {
+<span class="lineNum">     363 </span>                :            :     char *fields, *basis, *algorithm, *slave_type, *dst, *slave_delim;
+<span class="lineNum">     364 </span>                :            :     char *tokstr, *save_ptr;
+<span class="lineNum">     365 </span>                :            :     char *error;
+<span class="lineNum">     366 </span>                :            : 
+<span class="lineNum">     367 </span>                :<span class="lineCov">         10 :     save_ptr = NULL;</span>
+<span class="lineNum">     368 </span>                :<span class="lineCov">         10 :     tokstr = xstrdup(s);</span>
+<span class="lineNum">     369 </span>                :<span class="lineCov">         10 :     fields = strtok_r(tokstr, &quot;, &quot;, &amp;save_ptr);</span>
+<span class="lineNum">     370 </span>                :<span class="lineCov">         10 :     basis = strtok_r(NULL, &quot;, &quot;, &amp;save_ptr);</span>
+<span class="lineNum">     371 </span>                :<span class="lineCov">         10 :     algorithm = strtok_r(NULL, &quot;, &quot;, &amp;save_ptr);</span>
+<span class="lineNum">     372 </span>                :<span class="lineCov">         10 :     slave_type = strtok_r(NULL, &quot;, &quot;, &amp;save_ptr);</span>
+<span class="lineNum">     373 </span>                :<span class="lineCov">         10 :     dst = strtok_r(NULL, &quot;, &quot;, &amp;save_ptr);</span>
+<span class="lineNum">     374 </span>                :<span class="lineCov">         10 :     slave_delim = strtok_r(NULL, &quot;: &quot;, &amp;save_ptr);</span>
+<span class="lineNum">     375 </span>                :            : 
+<span class="lineNum">     376 </span>                :<span class="lineCov">         10 :     error = bundle_parse__(s, &amp;save_ptr, fields, basis, algorithm, slave_type,</span>
+<span class="lineNum">     377 </span>                :            :                            dst, slave_delim, ofpacts);
+<span class="lineNum">     378 </span>                :            : 
+<span class="lineNum">     379 </span>                :<span class="lineCov">         10 :     free(tokstr);</span>
+<span class="lineNum">     380 </span>                :            : 
+<span class="lineNum">     381 </span>                :<span class="lineCov">         10 :     return error;</span>
+<span class="lineNum">     382 </span>                :            : }
+<span class="lineNum">     383 </span>                :            : 
+<a name="384"><span class="lineNum">     384 </span>                :            : /* Appends a human-readable representation of 'nab' to 's'. */</a>
+<span class="lineNum">     385 </span>                :            : void
+<span class="lineNum">     386 </span>                :<span class="lineCov">         16 : bundle_format(const struct ofpact_bundle *bundle, struct ds *s)</span>
+<span class="lineNum">     387 </span>                :            : {
+<span class="lineNum">     388 </span>                :            :     const char *action, *fields, *algorithm;
+<span class="lineNum">     389 </span>                :            :     size_t i;
+<span class="lineNum">     390 </span>                :            : 
+<span class="lineNum">     391 </span>                :<span class="lineCov">         16 :     fields = flow_hash_fields_to_str(bundle-&gt;fields);</span>
+<span class="lineNum">     392 </span>                :            : 
+<span class="lineNum">     393 </span>     [<span class="branchCov" title="Branch 0 was taken 14 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">         16 :     switch (bundle-&gt;algorithm) {</span>
+<span class="lineNum">     394 </span>                :            :     case NX_BD_ALG_HRW:
+<span class="lineNum">     395 </span>                :<span class="lineCov">         14 :         algorithm = &quot;hrw&quot;;</span>
+<span class="lineNum">     396 </span>                :<span class="lineCov">         14 :         break;</span>
+<span class="lineNum">     397 </span>                :            :     case NX_BD_ALG_ACTIVE_BACKUP:
+<span class="lineNum">     398 </span>                :<span class="lineCov">          2 :         algorithm = &quot;active_backup&quot;;</span>
+<span class="lineNum">     399 </span>                :<span class="lineCov">          2 :         break;</span>
+<span class="lineNum">     400 </span>                :            :     default:
+<span class="lineNum">     401 </span>                :<span class="lineNoCov">          0 :         algorithm = &quot;&lt;unknown&gt;&quot;;</span>
+<span class="lineNum">     402 </span>                :            :     }
+<span class="lineNum">     403 </span>                :            : 
+<span class="lineNum">     404 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">         16 :     action = bundle-&gt;dst.field ? &quot;bundle_load&quot; : &quot;bundle&quot;;</span>
+<span class="lineNum">     405 </span>                :            : 
+<span class="lineNum">     406 </span>                :<span class="lineCov">         16 :     ds_put_format(s, &quot;%s(%s,%&quot;PRIu16&quot;,%s,%s,&quot;, action, fields,</span>
+<span class="lineNum">     407 </span>                :<span class="lineCov">         16 :                   bundle-&gt;basis, algorithm, &quot;ofport&quot;);</span>
+<span class="lineNum">     408 </span>                :            : 
+<span class="lineNum">     409 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">         16 :     if (bundle-&gt;dst.field) {</span>
+<span class="lineNum">     410 </span>                :<span class="lineCov">         10 :         mf_format_subfield(&amp;bundle-&gt;dst, s);</span>
+<span class="lineNum">     411 </span>                :<span class="lineCov">         10 :         ds_put_cstr(s, &quot;,&quot;);</span>
+<span class="lineNum">     412 </span>                :            :     }
+<span class="lineNum">     413 </span>                :            : 
+<span class="lineNum">     414 </span>                :<span class="lineCov">         16 :     ds_put_cstr(s, &quot;slaves:&quot;);</span>
+<span class="lineNum">     415 </span>        [<span class="branchCov" title="Branch 0 was taken 24 times"> + </span><span class="branchCov" title="Branch 1 was taken 16 times"> + </span>]:<span class="lineCov">         40 :     for (i = 0; i &lt; bundle-&gt;n_slaves; i++) {</span>
+<span class="lineNum">     416 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>]:<span class="lineCov">         24 :         if (i) {</span>
+<span class="lineNum">     417 </span>                :<span class="lineCov">         10 :             ds_put_cstr(s, &quot;,&quot;);</span>
+<span class="lineNum">     418 </span>                :            :         }
+<span class="lineNum">     419 </span>                :            : 
+<span class="lineNum">     420 </span>                :<span class="lineCov">         24 :         ofputil_format_port(bundle-&gt;slaves[i], s);</span>
+<span class="lineNum">     421 </span>                :            :     }
+<span class="lineNum">     422 </span>                :            : 
+<span class="lineNum">     423 </span>                :<span class="lineCov">         16 :     ds_put_cstr(s, &quot;)&quot;);</span>
+<span class="lineNum">     424 </span>                :<span class="lineCov">         16 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/entropy.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - entropy.c<span style="font-size: 80%;"> (source / <a href="entropy.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">12</td>
+            <td class="headerCovTableEntry">16</td>
+            <td class="headerCovTableEntryMed">75.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">3</td>
+            <td class="headerCovTableEntry">3</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">3</td>
+            <td class="headerCovTableEntry">12</td>
+            <td class="headerCovTableEntryLo">25.0 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (c) 2008, 2009, 2010, 2011, 2013 Nicira, Inc.</a>
+<span class="lineNum">       2 </span>                :            :  *
+<span class="lineNum">       3 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       4 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       5 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       6 </span>                :            :  *
+<span class="lineNum">       7 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       8 </span>                :            :  *
+<span class="lineNum">       9 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      10 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      11 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      12 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      13 </span>                :            :  * limitations under the License.
+<span class="lineNum">      14 </span>                :            :  */
+<span class="lineNum">      15 </span>                :            : 
+<span class="lineNum">      16 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      17 </span>                :            : 
+<span class="lineNum">      18 </span>                :            : #include &quot;entropy.h&quot;
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;fcntl.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;unistd.h&gt;
+<span class="lineNum">      23 </span>                :            : #ifdef _WIN32
+<span class="lineNum">      24 </span>                :            : #include &lt;Wincrypt.h&gt;
+<span class="lineNum">      25 </span>                :            : #endif
+<span class="lineNum">      26 </span>                :            : 
+<span class="lineNum">      27 </span>                :            : #include &quot;socket-util.h&quot;
+<a name="28"><span class="lineNum">      28 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      29 </span>                :            : 
+<span class="lineNum">      30 </span>                :<span class="lineCov">      15103 : VLOG_DEFINE_THIS_MODULE(entropy);</span>
+<span class="lineNum">      31 </span>                :            : 
+<span class="lineNum">      32 </span>                :            : static const char urandom[] = &quot;/dev/urandom&quot;;
+<span class="lineNum">      33 </span>                :            : 
+<span class="lineNum">      34 </span>                :            : /* Initializes 'buffer' with 'n' bytes of high-quality random numbers.  Returns
+<a name="35"><span class="lineNum">      35 </span>                :            :  * 0 if successful, otherwise a positive errno value or EOF on error. */</a>
+<span class="lineNum">      36 </span>                :            : int
+<span class="lineNum">      37 </span>                :<span class="lineCov">       8206 : get_entropy(void *buffer, size_t n)</span>
+<span class="lineNum">      38 </span>                :            : {
+<span class="lineNum">      39 </span>                :            : #ifndef _WIN32
+<span class="lineNum">      40 </span>                :            :     size_t bytes_read;
+<span class="lineNum">      41 </span>                :            :     int error;
+<span class="lineNum">      42 </span>                :            :     int fd;
+<span class="lineNum">      43 </span>                :            : 
+<span class="lineNum">      44 </span>                :<span class="lineCov">       8206 :     fd = open(urandom, O_RDONLY);</span>
+<span class="lineNum">      45 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 8206 times"> + </span>]:<span class="lineCov">       8206 :     if (fd &lt; 0) {</span>
+<span class="lineNum">      46 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;%s: open failed (%s)&quot;, urandom, ovs_strerror(errno));</span>
+<span class="lineNum">      47 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         return errno ? errno : EINVAL;</span>
+<span class="lineNum">      48 </span>                :            :     }
+<span class="lineNum">      49 </span>                :            : 
+<span class="lineNum">      50 </span>                :<span class="lineCov">       8206 :     error = read_fully(fd, buffer, n, &amp;bytes_read);</span>
+<span class="lineNum">      51 </span>                :<span class="lineCov">       8206 :     close(fd);</span>
+<span class="lineNum">      52 </span>                :            : 
+<span class="lineNum">      53 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 8206 times"> + </span>]:<span class="lineCov">       8206 :     if (error) {</span>
+<span class="lineNum">      54 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;%s: read error (%s)&quot;, urandom, ovs_retval_to_string(error));</span>
+<span class="lineNum">      55 </span>                :            :     }
+<span class="lineNum">      56 </span>                :            : #else
+<span class="lineNum">      57 </span>                :            :     int error = 0;
+<span class="lineNum">      58 </span>                :            :     HCRYPTPROV   crypt_prov = 0;
+<span class="lineNum">      59 </span>                :            : 
+<span class="lineNum">      60 </span>                :            :     CryptAcquireContext(&amp;crypt_prov, NULL, NULL,
+<span class="lineNum">      61 </span>                :            :                         PROV_RSA_FULL, CRYPT_VERIFYCONTEXT);
+<span class="lineNum">      62 </span>                :            :     if (!CryptGenRandom(crypt_prov, n, buffer)) {
+<span class="lineNum">      63 </span>                :            :         VLOG_ERR(&quot;CryptGenRandom: read error (%s)&quot;, ovs_lasterror_to_string());
+<span class="lineNum">      64 </span>                :            :         error = EINVAL;
+<span class="lineNum">      65 </span>                :            :     }
+<span class="lineNum">      66 </span>                :            : 
+<span class="lineNum">      67 </span>                :            :     CryptReleaseContext(crypt_prov, 0);
+<span class="lineNum">      68 </span>                :            : #endif
+<span class="lineNum">      69 </span>                :<span class="lineCov">       8206 :     return error;</span>
+<span class="lineNum">      70 </span>                :            : }
+<span class="lineNum">      71 </span>                :            : 
+<span class="lineNum">      72 </span>                :            : /* Initializes 'buffer' with 'n' bytes of high-quality random numbers.  Exits
+<a name="73"><span class="lineNum">      73 </span>                :            :  * if an error occurs. */</a>
+<span class="lineNum">      74 </span>                :            : void
+<span class="lineNum">      75 </span>                :<span class="lineCov">       8206 : get_entropy_or_die(void *buffer, size_t n)</span>
+<span class="lineNum">      76 </span>                :            : {
+<span class="lineNum">      77 </span>                :<span class="lineCov">       8206 :     int error = get_entropy(buffer, n);</span>
+<span class="lineNum">      78 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 8206 times"> + </span>]:<span class="lineCov">       8206 :     if (error) {</span>
+<span class="lineNum">      79 </span>                :<span class="lineNoCov">          0 :         VLOG_FATAL(&quot;%s: read error (%s)&quot;,</span>
+<span class="lineNum">      80 </span>                :            :                    urandom, ovs_retval_to_string(error));
+<span class="lineNum">      81 </span>                :            :     }
+<span class="lineNum">      82 </span>                :<span class="lineCov">       8206 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

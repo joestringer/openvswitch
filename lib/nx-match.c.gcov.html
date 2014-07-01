@@ -1,0 +1,1542 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/nx-match.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - nx-match.c<span style="font-size: 80%;"> (source / <a href="nx-match.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">591</td>
+            <td class="headerCovTableEntry">647</td>
+            <td class="headerCovTableEntryHi">91.3 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">66</td>
+            <td class="headerCovTableEntry">67</td>
+            <td class="headerCovTableEntryHi">98.5 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">230</td>
+            <td class="headerCovTableEntry">301</td>
+            <td class="headerCovTableEntryMed">76.4 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2010, 2011, 2012, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &quot;nx-match.h&quot;
+<span class="lineNum">      20 </span>                :            : 
+<span class="lineNum">      21 </span>                :            : #include &lt;netinet/icmp6.h&gt;
+<span class="lineNum">      22 </span>                :            : 
+<span class="lineNum">      23 </span>                :            : #include &quot;classifier.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;dynamic-string.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;meta-flow.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;ofp-actions.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;ofp-errors.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;ofp-util.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;openflow/nicira-ext.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;packets.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;unaligned.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;util.h&quot;
+<a name="34"><span class="lineNum">      34 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      35 </span>                :            : 
+<span class="lineNum">      36 </span>                :<span class="lineCov">       7479 : VLOG_DEFINE_THIS_MODULE(nx_match);</span>
+<span class="lineNum">      37 </span>                :            : 
+<span class="lineNum">      38 </span>                :            : /* Rate limit for nx_match parse errors.  These always indicate a bug in the
+<span class="lineNum">      39 </span>                :            :  * peer and so there's not much point in showing a lot of them. */
+<span class="lineNum">      40 </span>                :            : static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">      41 </span>                :            : 
+<span class="lineNum">      42 </span>                :            : /* Returns the width of the data for a field with the given 'header', in
+<a name="43"><span class="lineNum">      43 </span>                :            :  * bytes. */</a>
+<span class="lineNum">      44 </span>                :            : int
+<span class="lineNum">      45 </span>                :<span class="lineCov">       1526 : nxm_field_bytes(uint32_t header)</span>
+<span class="lineNum">      46 </span>                :            : {
+<span class="lineNum">      47 </span>                :<span class="lineCov">       1526 :     unsigned int length = NXM_LENGTH(header);</span>
+<span class="lineNum">      48 </span>        [<span class="branchCov" title="Branch 0 was taken 456 times"> + </span><span class="branchCov" title="Branch 1 was taken 1070 times"> + </span>]:<span class="lineCov">       1526 :     return NXM_HASMASK(header) ? length / 2 : length;</span>
+<span class="lineNum">      49 </span>                :            : }
+<span class="lineNum">      50 </span>                :            : 
+<span class="lineNum">      51 </span>                :            : /* Returns the width of the data for a field with the given 'header', in
+<a name="52"><span class="lineNum">      52 </span>                :            :  * bits. */</a>
+<span class="lineNum">      53 </span>                :            : int
+<span class="lineNum">      54 </span>                :<span class="lineNoCov">          0 : nxm_field_bits(uint32_t header)</span>
+<span class="lineNum">      55 </span>                :            : {
+<span class="lineNum">      56 </span>                :<span class="lineNoCov">          0 :     return nxm_field_bytes(header) * 8;</span>
+<span class="lineNum">      57 </span>                :            : }
+<span class="lineNum">      58 </span>                :            : 
+<span class="lineNum">      59 </span>                :            : /* nx_pull_match() and helpers. */
+<a name="60"><span class="lineNum">      60 </span>                :            : </a>
+<span class="lineNum">      61 </span>                :            : static uint32_t
+<span class="lineNum">      62 </span>                :<span class="lineCov">      87540 : nx_entry_ok(const void *p, unsigned int match_len)</span>
+<span class="lineNum">      63 </span>                :            : {
+<span class="lineNum">      64 </span>                :            :     unsigned int payload_len;
+<span class="lineNum">      65 </span>                :            :     ovs_be32 header_be;
+<span class="lineNum">      66 </span>                :            :     uint32_t header;
+<span class="lineNum">      67 </span>                :            : 
+<span class="lineNum">      68 </span>        [<span class="branchCov" title="Branch 0 was taken 42855 times"> + </span><span class="branchCov" title="Branch 1 was taken 44685 times"> + </span>]:<span class="lineCov">      87540 :     if (match_len &lt; 4) {</span>
+<span class="lineNum">      69 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 42855 times"> + </span>]:<span class="lineCov">      42855 :         if (match_len) {</span>
+<span class="lineNum">      70 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_DBG_RL(&amp;rl, &quot;nx_match ends with partial (%u-byte) nxm_header&quot;,</span>
+<span class="lineNum">      71 </span>                :            :                         match_len);
+<span class="lineNum">      72 </span>                :            :         }
+<span class="lineNum">      73 </span>                :<span class="lineCov">      42855 :         return 0;</span>
+<span class="lineNum">      74 </span>                :            :     }
+<span class="lineNum">      75 </span>                :<span class="lineCov">      44685 :     memcpy(&amp;header_be, p, 4);</span>
+<span class="lineNum">      76 </span>                :<span class="lineCov">      44685 :     header = ntohl(header_be);</span>
+<span class="lineNum">      77 </span>                :            : 
+<span class="lineNum">      78 </span>                :<span class="lineCov">      44685 :     payload_len = NXM_LENGTH(header);</span>
+<span class="lineNum">      79 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 44685 times"> + </span>]:<span class="lineCov">      44685 :     if (!payload_len) {</span>
+<span class="lineNum">      80 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_DBG_RL(&amp;rl, &quot;nxm_entry %08&quot;PRIx32&quot; has invalid payload &quot;</span>
+<span class="lineNum">      81 </span>                :            :                     &quot;length 0&quot;, header);
+<span class="lineNum">      82 </span>                :<span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">      83 </span>                :            :     }
+<span class="lineNum">      84 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 44685 times"> + </span>]:<span class="lineCov">      44685 :     if (match_len &lt; payload_len + 4) {</span>
+<span class="lineNum">      85 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_DBG_RL(&amp;rl, &quot;%&quot;PRIu32&quot;-byte nxm_entry but only &quot;</span>
+<span class="lineNum">      86 </span>                :            :                     &quot;%u bytes left in nx_match&quot;, payload_len + 4, match_len);
+<span class="lineNum">      87 </span>                :<span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">      88 </span>                :            :     }
+<span class="lineNum">      89 </span>                :            : 
+<span class="lineNum">      90 </span>                :<span class="lineCov">      87540 :     return header;</span>
+<span class="lineNum">      91 </span>                :            : }
+<span class="lineNum">      92 </span>                :            : 
+<span class="lineNum">      93 </span>                :            : /* Given NXM/OXM value 'value' and mask 'mask', each 'width' bytes long,
+<span class="lineNum">      94 </span>                :            :  * checks for any 1-bit in the value where there is a 0-bit in the mask.  If it
+<a name="95"><span class="lineNum">      95 </span>                :            :  * finds one, logs a warning. */</a>
+<span class="lineNum">      96 </span>                :            : static void
+<span class="lineNum">      97 </span>                :<span class="lineCov">       6457 : check_mask_consistency(const uint8_t *p, const struct mf_field *mf)</span>
+<span class="lineNum">      98 </span>                :            : {
+<span class="lineNum">      99 </span>                :<span class="lineCov">       6457 :     unsigned int width = mf-&gt;n_bytes;</span>
+<span class="lineNum">     100 </span>                :<span class="lineCov">       6457 :     const uint8_t *value = p + 4;</span>
+<span class="lineNum">     101 </span>                :<span class="lineCov">       6457 :     const uint8_t *mask = p + 4 + width;</span>
+<span class="lineNum">     102 </span>                :            :     unsigned int i;
+<span class="lineNum">     103 </span>                :            : 
+<span class="lineNum">     104 </span>        [<span class="branchCov" title="Branch 0 was taken 13540 times"> + </span><span class="branchCov" title="Branch 1 was taken 6451 times"> + </span>]:<span class="lineCov">      19991 :     for (i = 0; i &lt; width; i++) {</span>
+<span class="lineNum">     105 </span>        [<span class="branchCov" title="Branch 0 was taken 205 times"> + </span><span class="branchCov" title="Branch 1 was taken 13335 times"> + </span>]:<span class="lineCov">      13540 :         if (value[i] &amp; ~mask[i]) {</span>
+<span class="lineNum">     106 </span>        [<span class="branchCov" title="Branch 1 was taken 6 times"> + </span><span class="branchCov" title="Branch 2 was taken 199 times"> + </span>]:<span class="lineCov">        205 :             if (!VLOG_DROP_WARN(&amp;rl)) {</span>
+<span class="lineNum">     107 </span>                :<span class="lineCov">          6 :                 char *s = nx_match_to_string(p, width * 2 + 4);</span>
+<span class="lineNum">     108 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          6 :                 VLOG_WARN_RL(&amp;rl, &quot;NXM/OXM entry %s has 1-bits in value for &quot;</span>
+<span class="lineNum">     109 </span>                :            :                              &quot;bits wildcarded by the mask.  (Future versions &quot;
+<span class="lineNum">     110 </span>                :            :                              &quot;of OVS may report this as an OpenFlow error.)&quot;,
+<span class="lineNum">     111 </span>                :            :                              s);
+<span class="lineNum">     112 </span>                :<span class="lineCov">          6 :                 break;</span>
+<span class="lineNum">     113 </span>                :            :             }
+<span class="lineNum">     114 </span>                :            :         }
+<span class="lineNum">     115 </span>                :            :     }
+<span class="lineNum">     116 </span>                :<span class="lineCov">       6457 : }</span>
+<a name="117"><span class="lineNum">     117 </span>                :            : </a>
+<span class="lineNum">     118 </span>                :            : static enum ofperr
+<span class="lineNum">     119 </span>                :<span class="lineCov">      43379 : nx_pull_raw(const uint8_t *p, unsigned int match_len, bool strict,</span>
+<span class="lineNum">     120 </span>                :            :             struct match *match, ovs_be64 *cookie, ovs_be64 *cookie_mask)
+<span class="lineNum">     121 </span>                :            : {
+<span class="lineNum">     122 </span>                :            :     uint32_t header;
+<span class="lineNum">     123 </span>                :            : 
+<span class="lineNum">     124 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 43379 times"> + </span>]:<span class="lineCov">      43379 :     ovs_assert((cookie != NULL) == (cookie_mask != NULL));</span>
+<span class="lineNum">     125 </span>                :            : 
+<span class="lineNum">     126 </span>                :<span class="lineCov">      43379 :     match_init_catchall(match);</span>
+<span class="lineNum">     127 </span>        [<span class="branchCov" title="Branch 0 was taken 11692 times"> + </span><span class="branchCov" title="Branch 1 was taken 31687 times"> + </span>]:<span class="lineCov">      43379 :     if (cookie) {</span>
+<span class="lineNum">     128 </span>                :<span class="lineCov">      11692 :         *cookie = *cookie_mask = htonll(0);</span>
+<span class="lineNum">     129 </span>                :            :     }
+<span class="lineNum">     130 </span>        [<span class="branchCov" title="Branch 0 was taken 704 times"> + </span><span class="branchCov" title="Branch 1 was taken 42675 times"> + </span>]:<span class="lineCov">      43379 :     if (!match_len) {</span>
+<span class="lineNum">     131 </span>                :<span class="lineCov">        704 :         return 0;</span>
+<span class="lineNum">     132 </span>                :            :     }
+<span class="lineNum">     133 </span>                :            : 
+<span class="lineNum">     134 </span>        [<span class="branchCov" title="Branch 1 was taken 44107 times"> + </span><span class="branchCov" title="Branch 2 was taken 42563 times"> + </span>]:<span class="lineCov">      86670 :     for (;</span>
+<span class="lineNum">     135 </span>                :            :          (header = nx_entry_ok(p, match_len)) != 0;
+<span class="lineNum">     136 </span>                :<span class="lineCov">      43995 :          p += 4 + NXM_LENGTH(header), match_len -= 4 + NXM_LENGTH(header)) {</span>
+<span class="lineNum">     137 </span>                :            :         const struct mf_field *mf;
+<span class="lineNum">     138 </span>                :            :         enum ofperr error;
+<span class="lineNum">     139 </span>                :            : 
+<span class="lineNum">     140 </span>                :<span class="lineCov">      44107 :         mf = mf_from_nxm_header(header);</span>
+<span class="lineNum">     141 </span>        [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchCov" title="Branch 1 was taken 44079 times"> + </span>]:<span class="lineCov">      44107 :         if (!mf) {</span>
+<span class="lineNum">     142 </span>        [<span class="branchCov" title="Branch 0 was taken 26 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">         28 :             if (strict) {</span>
+<span class="lineNum">     143 </span>                :<span class="lineCov">         26 :                 error = OFPERR_OFPBMC_BAD_FIELD;</span>
+<span class="lineNum">     144 </span>                :            :             } else {
+<span class="lineNum">     145 </span>                :<span class="lineCov">          2 :                 continue;</span>
+<span class="lineNum">     146 </span>                :            :             }
+<span class="lineNum">     147 </span>        [<span class="branchCov" title="Branch 1 was taken 88 times"> + </span><span class="branchCov" title="Branch 2 was taken 43991 times"> + </span>]:<span class="lineCov">      44079 :         } else if (!mf_are_prereqs_ok(mf, &amp;match-&gt;flow)) {</span>
+<span class="lineNum">     148 </span>                :<span class="lineCov">         88 :             error = OFPERR_OFPBMC_BAD_PREREQ;</span>
+<span class="lineNum">     149 </span>        [<span class="branchCov" title="Branch 1 was taken 5 times"> + </span><span class="branchCov" title="Branch 2 was taken 43986 times"> + </span>]:<span class="lineCov">      43991 :         } else if (!mf_is_all_wild(mf, &amp;match-&gt;wc)) {</span>
+<span class="lineNum">     150 </span>                :<span class="lineCov">          5 :             error = OFPERR_OFPBMC_DUP_FIELD;</span>
+<span class="lineNum">     151 </span>                :            :         } else {
+<span class="lineNum">     152 </span>                :<span class="lineCov">      43986 :             unsigned int width = mf-&gt;n_bytes;</span>
+<span class="lineNum">     153 </span>                :            :             union mf_value value;
+<span class="lineNum">     154 </span>                :            : 
+<span class="lineNum">     155 </span>                :<span class="lineCov">      43986 :             memcpy(&amp;value, p + 4, width);</span>
+<span class="lineNum">     156 </span>        [<span class="branchCov" title="Branch 1 was taken 13 times"> + </span><span class="branchCov" title="Branch 2 was taken 43973 times"> + </span>]:<span class="lineCov">      43986 :             if (!mf_is_value_valid(mf, &amp;value)) {</span>
+<span class="lineNum">     157 </span>                :<span class="lineCov">         13 :                 error = OFPERR_OFPBMC_BAD_VALUE;</span>
+<span class="lineNum">     158 </span>        [<span class="branchCov" title="Branch 0 was taken 37516 times"> + </span><span class="branchCov" title="Branch 1 was taken 6457 times"> + </span>]:<span class="lineCov">      43973 :             } else if (!NXM_HASMASK(header)) {</span>
+<span class="lineNum">     159 </span>                :<span class="lineCov">      37516 :                 error = 0;</span>
+<span class="lineNum">     160 </span>                :<span class="lineCov">      37516 :                 mf_set_value(mf, &amp;value, match);</span>
+<span class="lineNum">     161 </span>                :            :             } else {
+<span class="lineNum">     162 </span>                :            :                 union mf_value mask;
+<span class="lineNum">     163 </span>                :            : 
+<span class="lineNum">     164 </span>                :<span class="lineCov">       6457 :                 memcpy(&amp;mask, p + 4 + width, width);</span>
+<span class="lineNum">     165 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 6457 times"> + </span>]:<span class="lineCov">       6457 :                 if (!mf_is_mask_valid(mf, &amp;mask)) {</span>
+<span class="lineNum">     166 </span>                :<span class="lineNoCov">          0 :                     error = OFPERR_OFPBMC_BAD_MASK;</span>
+<span class="lineNum">     167 </span>                :            :                 } else {
+<span class="lineNum">     168 </span>                :<span class="lineCov">       6457 :                     error = 0;</span>
+<span class="lineNum">     169 </span>                :<span class="lineCov">       6457 :                     check_mask_consistency(p, mf);</span>
+<span class="lineNum">     170 </span>                :<span class="lineCov">      43986 :                     mf_set(mf, &amp;value, &amp;mask, match);</span>
+<span class="lineNum">     171 </span>                :            :                 }
+<span class="lineNum">     172 </span>                :            :             }
+<span class="lineNum">     173 </span>                :            :         }
+<span class="lineNum">     174 </span>                :            : 
+<span class="lineNum">     175 </span>                :            :         /* Check if the match is for a cookie rather than a classifier rule. */
+<span class="lineNum">     176 </span>[<span class="branchCov" title="Branch 0 was taken 44094 times"> + </span><span class="branchCov" title="Branch 1 was taken 11 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 9 times"> + </span><span class="branchCov" title="Branch 3 was taken 44085 times"> + </span>]:<span class="lineCov">      44105 :         if ((header == NXM_NX_COOKIE || header == NXM_NX_COOKIE_W) &amp;&amp; cookie) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 4 was taken 20 times"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span>]
+<span class="lineNum">     177 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 20 times"> + </span>]:<span class="lineCov">         20 :             if (*cookie_mask) {</span>
+<span class="lineNum">     178 </span>                :<span class="lineNoCov">          0 :                 error = OFPERR_OFPBMC_DUP_FIELD;</span>
+<span class="lineNum">     179 </span>                :            :             } else {
+<span class="lineNum">     180 </span>                :<span class="lineCov">         20 :                 unsigned int width = sizeof *cookie;</span>
+<span class="lineNum">     181 </span>                :            : 
+<span class="lineNum">     182 </span>                :<span class="lineCov">         20 :                 memcpy(cookie, p + 4, width);</span>
+<span class="lineNum">     183 </span>        [<span class="branchCov" title="Branch 0 was taken 9 times"> + </span><span class="branchCov" title="Branch 1 was taken 11 times"> + </span>]:<span class="lineCov">         20 :                 if (NXM_HASMASK(header)) {</span>
+<span class="lineNum">     184 </span>                :<span class="lineCov">          9 :                     memcpy(cookie_mask, p + 4 + width, width);</span>
+<span class="lineNum">     185 </span>                :            :                 } else {
+<span class="lineNum">     186 </span>                :<span class="lineCov">         11 :                     *cookie_mask = OVS_BE64_MAX;</span>
+<span class="lineNum">     187 </span>                :            :                 }
+<span class="lineNum">     188 </span>                :<span class="lineCov">         20 :                 error = 0;</span>
+<span class="lineNum">     189 </span>                :            :             }
+<span class="lineNum">     190 </span>                :            :         }
+<span class="lineNum">     191 </span>                :            : 
+<span class="lineNum">     192 </span>        [<span class="branchCov" title="Branch 0 was taken 112 times"> + </span><span class="branchCov" title="Branch 1 was taken 43993 times"> + </span>]:<span class="lineCov">      44105 :         if (error) {</span>
+<span class="lineNum">     193 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 112 times"> + </span>]:<span class="lineCov">        112 :             VLOG_DBG_RL(&amp;rl, &quot;bad nxm_entry %#08&quot;PRIx32&quot; (vendor=%&quot;PRIu32&quot;, &quot;</span>
+<span class="lineNum">     194 </span>                :            :                         &quot;field=%&quot;PRIu32&quot;, hasmask=%&quot;PRIu32&quot;, len=%&quot;PRIu32&quot;), &quot;
+<span class="lineNum">     195 </span>                :            :                         &quot;(%s)&quot;, header,
+<span class="lineNum">     196 </span>                :            :                         NXM_VENDOR(header), NXM_FIELD(header),
+<span class="lineNum">     197 </span>                :            :                         NXM_HASMASK(header), NXM_LENGTH(header),
+<span class="lineNum">     198 </span>                :            :                         ofperr_to_string(error));
+<span class="lineNum">     199 </span>                :<span class="lineCov">        112 :             return error;</span>
+<span class="lineNum">     200 </span>                :            :         }
+<span class="lineNum">     201 </span>                :            :     }
+<span class="lineNum">     202 </span>                :            : 
+<span class="lineNum">     203 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 42563 times"> + </span>]:<span class="lineCov">      43379 :     return match_len ? OFPERR_OFPBMC_BAD_LEN : 0;</span>
+<span class="lineNum">     204 </span>                :            : }
+<a name="205"><span class="lineNum">     205 </span>                :            : </a>
+<span class="lineNum">     206 </span>                :            : static enum ofperr
+<span class="lineNum">     207 </span>                :<span class="lineCov">      42341 : nx_pull_match__(struct ofpbuf *b, unsigned int match_len, bool strict,</span>
+<span class="lineNum">     208 </span>                :            :                 struct match *match,
+<span class="lineNum">     209 </span>                :            :                 ovs_be64 *cookie, ovs_be64 *cookie_mask)
+<span class="lineNum">     210 </span>                :            : {
+<span class="lineNum">     211 </span>                :<span class="lineCov">      42341 :     uint8_t *p = NULL;</span>
+<span class="lineNum">     212 </span>                :            : 
+<span class="lineNum">     213 </span>        [<span class="branchCov" title="Branch 0 was taken 41971 times"> + </span><span class="branchCov" title="Branch 1 was taken 370 times"> + </span>]:<span class="lineCov">      42341 :     if (match_len) {</span>
+<span class="lineNum">     214 </span>                :<span class="lineCov">      41971 :         p = ofpbuf_try_pull(b, ROUND_UP(match_len, 8));</span>
+<span class="lineNum">     215 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 41971 times"> + </span>]:<span class="lineCov">      41971 :         if (!p) {</span>
+<span class="lineNum">     216 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_DBG_RL(&amp;rl, &quot;nx_match length %u, rounded up to a &quot;</span>
+<span class="lineNum">     217 </span>                :            :                         &quot;multiple of 8, is longer than space in message (max &quot;
+<span class="lineNum">     218 </span>                :            :                         &quot;length %&quot;PRIu32&quot;)&quot;, match_len, ofpbuf_size(b));
+<span class="lineNum">     219 </span>                :<span class="lineNoCov">          0 :             return OFPERR_OFPBMC_BAD_LEN;</span>
+<span class="lineNum">     220 </span>                :            :         }
+<span class="lineNum">     221 </span>                :            :     }
+<span class="lineNum">     222 </span>                :            : 
+<span class="lineNum">     223 </span>                :<span class="lineCov">      42341 :     return nx_pull_raw(p, match_len, strict, match, cookie, cookie_mask);</span>
+<span class="lineNum">     224 </span>                :            : }
+<span class="lineNum">     225 </span>                :            : 
+<span class="lineNum">     226 </span>                :            : /* Parses the nx_match formatted match description in 'b' with length
+<span class="lineNum">     227 </span>                :            :  * 'match_len'.  Stores the results in 'match'.  If 'cookie' and 'cookie_mask'
+<span class="lineNum">     228 </span>                :            :  * are valid pointers, then stores the cookie and mask in them if 'b' contains
+<span class="lineNum">     229 </span>                :            :  * a &quot;NXM_NX_COOKIE*&quot; match.  Otherwise, stores 0 in both.
+<span class="lineNum">     230 </span>                :            :  *
+<span class="lineNum">     231 </span>                :            :  * Fails with an error upon encountering an unknown NXM header.
+<span class="lineNum">     232 </span>                :            :  *
+<a name="233"><span class="lineNum">     233 </span>                :            :  * Returns 0 if successful, otherwise an OpenFlow error code. */</a>
+<span class="lineNum">     234 </span>                :            : enum ofperr
+<span class="lineNum">     235 </span>                :<span class="lineCov">      41971 : nx_pull_match(struct ofpbuf *b, unsigned int match_len, struct match *match,</span>
+<span class="lineNum">     236 </span>                :            :               ovs_be64 *cookie, ovs_be64 *cookie_mask)
+<span class="lineNum">     237 </span>                :            : {
+<span class="lineNum">     238 </span>                :<span class="lineCov">      41971 :     return nx_pull_match__(b, match_len, true, match, cookie, cookie_mask);</span>
+<span class="lineNum">     239 </span>                :            : }
+<span class="lineNum">     240 </span>                :            : 
+<span class="lineNum">     241 </span>                :            : /* Behaves the same as nx_pull_match(), but skips over unknown NXM headers,
+<a name="242"><span class="lineNum">     242 </span>                :            :  * instead of failing with an error. */</a>
+<span class="lineNum">     243 </span>                :            : enum ofperr
+<span class="lineNum">     244 </span>                :<span class="lineCov">        370 : nx_pull_match_loose(struct ofpbuf *b, unsigned int match_len,</span>
+<span class="lineNum">     245 </span>                :            :                     struct match *match,
+<span class="lineNum">     246 </span>                :            :                     ovs_be64 *cookie, ovs_be64 *cookie_mask)
+<span class="lineNum">     247 </span>                :            : {
+<span class="lineNum">     248 </span>                :<span class="lineCov">        370 :     return nx_pull_match__(b, match_len, false, match, cookie, cookie_mask);</span>
+<span class="lineNum">     249 </span>                :            : }
+<a name="250"><span class="lineNum">     250 </span>                :            : </a>
+<span class="lineNum">     251 </span>                :            : static enum ofperr
+<span class="lineNum">     252 </span>                :<span class="lineCov">       1038 : oxm_pull_match__(struct ofpbuf *b, bool strict, struct match *match)</span>
+<span class="lineNum">     253 </span>                :            : {
+<span class="lineNum">     254 </span>                :<span class="lineCov">       1038 :     struct ofp11_match_header *omh = ofpbuf_data(b);</span>
+<span class="lineNum">     255 </span>                :            :     uint8_t *p;
+<span class="lineNum">     256 </span>                :            :     uint16_t match_len;
+<span class="lineNum">     257 </span>                :            : 
+<span class="lineNum">     258 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1038 times"> + </span>]:<span class="lineCov">       1038 :     if (ofpbuf_size(b) &lt; sizeof *omh) {</span>
+<span class="lineNum">     259 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBMC_BAD_LEN;</span>
+<span class="lineNum">     260 </span>                :            :     }
+<span class="lineNum">     261 </span>                :            : 
+<span class="lineNum">     262 </span>                :<span class="lineCov">       1038 :     match_len = ntohs(omh-&gt;length);</span>
+<span class="lineNum">     263 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1038 times"> + </span>]:<span class="lineCov">       1038 :     if (match_len &lt; sizeof *omh) {</span>
+<span class="lineNum">     264 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBMC_BAD_LEN;</span>
+<span class="lineNum">     265 </span>                :            :     }
+<span class="lineNum">     266 </span>                :            : 
+<span class="lineNum">     267 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1038 times"> + </span>]:<span class="lineCov">       1038 :     if (omh-&gt;type != htons(OFPMT_OXM)) {</span>
+<span class="lineNum">     268 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBMC_BAD_TYPE;</span>
+<span class="lineNum">     269 </span>                :            :     }
+<span class="lineNum">     270 </span>                :            : 
+<span class="lineNum">     271 </span>                :<span class="lineCov">       1038 :     p = ofpbuf_try_pull(b, ROUND_UP(match_len, 8));</span>
+<span class="lineNum">     272 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1038 times"> + </span>]:<span class="lineCov">       1038 :     if (!p) {</span>
+<span class="lineNum">     273 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_DBG_RL(&amp;rl, &quot;oxm length %u, rounded up to a &quot;</span>
+<span class="lineNum">     274 </span>                :            :                     &quot;multiple of 8, is longer than space in message (max &quot;
+<span class="lineNum">     275 </span>                :            :                     &quot;length %&quot;PRIu32&quot;)&quot;, match_len, ofpbuf_size(b));
+<span class="lineNum">     276 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBMC_BAD_LEN;</span>
+<span class="lineNum">     277 </span>                :            :     }
+<span class="lineNum">     278 </span>                :            : 
+<span class="lineNum">     279 </span>                :<span class="lineCov">       1038 :     return nx_pull_raw(p + sizeof *omh, match_len - sizeof *omh,</span>
+<span class="lineNum">     280 </span>                :            :                        strict, match, NULL, NULL);
+<span class="lineNum">     281 </span>                :            : }
+<span class="lineNum">     282 </span>                :            : 
+<span class="lineNum">     283 </span>                :            : /* Parses the oxm formatted match description preceded by a struct
+<span class="lineNum">     284 </span>                :            :  * ofp11_match_header in 'b'.  Stores the result in 'match'.
+<span class="lineNum">     285 </span>                :            :  *
+<span class="lineNum">     286 </span>                :            :  * Fails with an error when encountering unknown OXM headers.
+<span class="lineNum">     287 </span>                :            :  *
+<a name="288"><span class="lineNum">     288 </span>                :            :  * Returns 0 if successful, otherwise an OpenFlow error code. */</a>
+<span class="lineNum">     289 </span>                :            : enum ofperr
+<span class="lineNum">     290 </span>                :<span class="lineCov">        905 : oxm_pull_match(struct ofpbuf *b, struct match *match)</span>
+<span class="lineNum">     291 </span>                :            : {
+<span class="lineNum">     292 </span>                :<span class="lineCov">        905 :     return oxm_pull_match__(b, true, match);</span>
+<span class="lineNum">     293 </span>                :            : }
+<span class="lineNum">     294 </span>                :            : 
+<span class="lineNum">     295 </span>                :            : /* Behaves the same as oxm_pull_match() with one exception.  Skips over unknown
+<a name="296"><span class="lineNum">     296 </span>                :            :  * OXM headers instead of failing with an error when they are encountered. */</a>
+<span class="lineNum">     297 </span>                :            : enum ofperr
+<span class="lineNum">     298 </span>                :<span class="lineCov">        133 : oxm_pull_match_loose(struct ofpbuf *b, struct match *match)</span>
+<span class="lineNum">     299 </span>                :            : {
+<span class="lineNum">     300 </span>                :<span class="lineCov">        133 :     return oxm_pull_match__(b, false, match);</span>
+<span class="lineNum">     301 </span>                :            : }
+<span class="lineNum">     302 </span>                :            : 
+<span class="lineNum">     303 </span>                :            : /* nx_put_match() and helpers.
+<span class="lineNum">     304 </span>                :            :  *
+<span class="lineNum">     305 </span>                :            :  * 'put' functions whose names end in 'w' add a wildcarded field.
+<span class="lineNum">     306 </span>                :            :  * 'put' functions whose names end in 'm' add a field that might be wildcarded.
+<span class="lineNum">     307 </span>                :            :  * Other 'put' functions add exact-match fields.
+<span class="lineNum">     308 </span>                :            :  */
+<a name="309"><span class="lineNum">     309 </span>                :            : </a>
+<span class="lineNum">     310 </span>                :            : static void
+<span class="lineNum">     311 </span>                :<span class="lineCov">      22060 : nxm_put_header(struct ofpbuf *b, uint32_t header)</span>
+<span class="lineNum">     312 </span>                :            : {
+<span class="lineNum">     313 </span>                :<span class="lineCov">      22060 :     ovs_be32 n_header = htonl(header);</span>
+<span class="lineNum">     314 </span>                :<span class="lineCov">      22060 :     ofpbuf_put(b, &amp;n_header, sizeof n_header);</span>
+<span class="lineNum">     315 </span>                :<span class="lineCov">      22060 : }</span>
+<a name="316"><span class="lineNum">     316 </span>                :            : </a>
+<span class="lineNum">     317 </span>                :            : static void
+<span class="lineNum">     318 </span>                :<span class="lineCov">        227 : nxm_put_8(struct ofpbuf *b, uint32_t header, uint8_t value)</span>
+<span class="lineNum">     319 </span>                :            : {
+<span class="lineNum">     320 </span>                :<span class="lineCov">        227 :     nxm_put_header(b, header);</span>
+<span class="lineNum">     321 </span>                :<span class="lineCov">        227 :     ofpbuf_put(b, &amp;value, sizeof value);</span>
+<span class="lineNum">     322 </span>                :<span class="lineCov">        227 : }</span>
+<a name="323"><span class="lineNum">     323 </span>                :            : </a>
+<span class="lineNum">     324 </span>                :            : static void
+<span class="lineNum">     325 </span>                :<span class="lineCov">          8 : nxm_put_8m(struct ofpbuf *b, uint32_t header, uint8_t value, uint8_t mask)</span>
+<span class="lineNum">     326 </span>                :            : {
+<span class="lineNum">     327 </span>     [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 8 times"> + </span>]:<span class="lineCov">          8 :     switch (mask) {</span>
+<span class="lineNum">     328 </span>                :            :     case 0:
+<span class="lineNum">     329 </span>                :<span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">     330 </span>                :            : 
+<span class="lineNum">     331 </span>                :            :     case UINT8_MAX:
+<span class="lineNum">     332 </span>                :<span class="lineNoCov">          0 :         nxm_put_8(b, header, value);</span>
+<span class="lineNum">     333 </span>                :<span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">     334 </span>                :            : 
+<span class="lineNum">     335 </span>                :            :     default:
+<span class="lineNum">     336 </span>                :<span class="lineCov">          8 :         nxm_put_header(b, NXM_MAKE_WILD_HEADER(header));</span>
+<span class="lineNum">     337 </span>                :<span class="lineCov">          8 :         ofpbuf_put(b, &amp;value, sizeof value);</span>
+<span class="lineNum">     338 </span>                :<span class="lineCov">          8 :         ofpbuf_put(b, &amp;mask, sizeof mask);</span>
+<span class="lineNum">     339 </span>                :            :     }
+<span class="lineNum">     340 </span>                :<span class="lineCov">          8 : }</span>
+<a name="341"><span class="lineNum">     341 </span>                :            : </a>
+<span class="lineNum">     342 </span>                :            : static void
+<span class="lineNum">     343 </span>                :<span class="lineCov">        908 : nxm_put_16(struct ofpbuf *b, uint32_t header, ovs_be16 value)</span>
+<span class="lineNum">     344 </span>                :            : {
+<span class="lineNum">     345 </span>                :<span class="lineCov">        908 :     nxm_put_header(b, header);</span>
+<span class="lineNum">     346 </span>                :<span class="lineCov">        908 :     ofpbuf_put(b, &amp;value, sizeof value);</span>
+<span class="lineNum">     347 </span>                :<span class="lineCov">        908 : }</span>
+<a name="348"><span class="lineNum">     348 </span>                :            : </a>
+<span class="lineNum">     349 </span>                :            : static void
+<span class="lineNum">     350 </span>                :<span class="lineCov">       3167 : nxm_put_16w(struct ofpbuf *b, uint32_t header, ovs_be16 value, ovs_be16 mask)</span>
+<span class="lineNum">     351 </span>                :            : {
+<span class="lineNum">     352 </span>                :<span class="lineCov">       3167 :     nxm_put_header(b, header);</span>
+<span class="lineNum">     353 </span>                :<span class="lineCov">       3167 :     ofpbuf_put(b, &amp;value, sizeof value);</span>
+<span class="lineNum">     354 </span>                :<span class="lineCov">       3167 :     ofpbuf_put(b, &amp;mask, sizeof mask);</span>
+<span class="lineNum">     355 </span>                :<span class="lineCov">       3167 : }</span>
+<a name="356"><span class="lineNum">     356 </span>                :            : </a>
+<span class="lineNum">     357 </span>                :            : static void
+<span class="lineNum">     358 </span>                :<span class="lineCov">      41629 : nxm_put_16m(struct ofpbuf *b, uint32_t header, ovs_be16 value, ovs_be16 mask)</span>
+<span class="lineNum">     359 </span>                :            : {
+<span class="lineNum">     360 </span>     [<span class="branchCov" title="Branch 0 was taken 38013 times"> + </span><span class="branchCov" title="Branch 1 was taken 449 times"> + </span><span class="branchCov" title="Branch 2 was taken 3167 times"> + </span>]:<span class="lineCov">      41629 :     switch (mask) {</span>
+<span class="lineNum">     361 </span>                :            :     case 0:
+<span class="lineNum">     362 </span>                :<span class="lineCov">      38013 :         break;</span>
+<span class="lineNum">     363 </span>                :            : 
+<span class="lineNum">     364 </span>                :            :     case OVS_BE16_MAX:
+<span class="lineNum">     365 </span>                :<span class="lineCov">        449 :         nxm_put_16(b, header, value);</span>
+<span class="lineNum">     366 </span>                :<span class="lineCov">        449 :         break;</span>
+<span class="lineNum">     367 </span>                :            : 
+<span class="lineNum">     368 </span>                :            :     default:
+<span class="lineNum">     369 </span>                :<span class="lineCov">       3167 :         nxm_put_16w(b, NXM_MAKE_WILD_HEADER(header), value, mask);</span>
+<span class="lineNum">     370 </span>                :<span class="lineCov">       3167 :         break;</span>
+<span class="lineNum">     371 </span>                :            :     }
+<span class="lineNum">     372 </span>                :<span class="lineCov">      41629 : }</span>
+<a name="373"><span class="lineNum">     373 </span>                :            : </a>
+<span class="lineNum">     374 </span>                :            : static void
+<span class="lineNum">     375 </span>                :<span class="lineCov">      16622 : nxm_put_32(struct ofpbuf *b, uint32_t header, ovs_be32 value)</span>
+<span class="lineNum">     376 </span>                :            : {
+<span class="lineNum">     377 </span>                :<span class="lineCov">      16622 :     nxm_put_header(b, header);</span>
+<span class="lineNum">     378 </span>                :<span class="lineCov">      16622 :     ofpbuf_put(b, &amp;value, sizeof value);</span>
+<span class="lineNum">     379 </span>                :<span class="lineCov">      16622 : }</span>
+<a name="380"><span class="lineNum">     380 </span>                :            : </a>
+<span class="lineNum">     381 </span>                :            : static void
+<span class="lineNum">     382 </span>                :<span class="lineCov">         36 : nxm_put_32w(struct ofpbuf *b, uint32_t header, ovs_be32 value, ovs_be32 mask)</span>
+<span class="lineNum">     383 </span>                :            : {
+<span class="lineNum">     384 </span>                :<span class="lineCov">         36 :     nxm_put_header(b, header);</span>
+<span class="lineNum">     385 </span>                :<span class="lineCov">         36 :     ofpbuf_put(b, &amp;value, sizeof value);</span>
+<span class="lineNum">     386 </span>                :<span class="lineCov">         36 :     ofpbuf_put(b, &amp;mask, sizeof mask);</span>
+<span class="lineNum">     387 </span>                :<span class="lineCov">         36 : }</span>
+<a name="388"><span class="lineNum">     388 </span>                :            : </a>
+<span class="lineNum">     389 </span>                :            : static void
+<span class="lineNum">     390 </span>                :<span class="lineCov">     230897 : nxm_put_32m(struct ofpbuf *b, uint32_t header, ovs_be32 value, ovs_be32 mask)</span>
+<span class="lineNum">     391 </span>                :            : {
+<span class="lineNum">     392 </span>     [<span class="branchCov" title="Branch 0 was taken 214439 times"> + </span><span class="branchCov" title="Branch 1 was taken 16422 times"> + </span><span class="branchCov" title="Branch 2 was taken 36 times"> + </span>]:<span class="lineCov">     230897 :     switch (mask) {</span>
+<span class="lineNum">     393 </span>                :            :     case 0:
+<span class="lineNum">     394 </span>                :<span class="lineCov">     214439 :         break;</span>
+<span class="lineNum">     395 </span>                :            : 
+<span class="lineNum">     396 </span>                :            :     case OVS_BE32_MAX:
+<span class="lineNum">     397 </span>                :<span class="lineCov">      16422 :         nxm_put_32(b, header, value);</span>
+<span class="lineNum">     398 </span>                :<span class="lineCov">      16422 :         break;</span>
+<span class="lineNum">     399 </span>                :            : 
+<span class="lineNum">     400 </span>                :            :     default:
+<span class="lineNum">     401 </span>                :<span class="lineCov">         36 :         nxm_put_32w(b, NXM_MAKE_WILD_HEADER(header), value, mask);</span>
+<span class="lineNum">     402 </span>                :<span class="lineCov">         36 :         break;</span>
+<span class="lineNum">     403 </span>                :            :     }
+<span class="lineNum">     404 </span>                :<span class="lineCov">     230897 : }</span>
+<a name="405"><span class="lineNum">     405 </span>                :            : </a>
+<span class="lineNum">     406 </span>                :            : static void
+<span class="lineNum">     407 </span>                :<span class="lineCov">         36 : nxm_put_64(struct ofpbuf *b, uint32_t header, ovs_be64 value)</span>
+<span class="lineNum">     408 </span>                :            : {
+<span class="lineNum">     409 </span>                :<span class="lineCov">         36 :     nxm_put_header(b, header);</span>
+<span class="lineNum">     410 </span>                :<span class="lineCov">         36 :     ofpbuf_put(b, &amp;value, sizeof value);</span>
+<span class="lineNum">     411 </span>                :<span class="lineCov">         36 : }</span>
+<a name="412"><span class="lineNum">     412 </span>                :            : </a>
+<span class="lineNum">     413 </span>                :            : static void
+<span class="lineNum">     414 </span>                :<span class="lineCov">         12 : nxm_put_64w(struct ofpbuf *b, uint32_t header, ovs_be64 value, ovs_be64 mask)</span>
+<span class="lineNum">     415 </span>                :            : {
+<span class="lineNum">     416 </span>                :<span class="lineCov">         12 :     nxm_put_header(b, header);</span>
+<span class="lineNum">     417 </span>                :<span class="lineCov">         12 :     ofpbuf_put(b, &amp;value, sizeof value);</span>
+<span class="lineNum">     418 </span>                :<span class="lineCov">         12 :     ofpbuf_put(b, &amp;mask, sizeof mask);</span>
+<span class="lineNum">     419 </span>                :<span class="lineCov">         12 : }</span>
+<a name="420"><span class="lineNum">     420 </span>                :            : </a>
+<span class="lineNum">     421 </span>                :            : static void
+<span class="lineNum">     422 </span>                :<span class="lineCov">      62766 : nxm_put_64m(struct ofpbuf *b, uint32_t header, ovs_be64 value, ovs_be64 mask)</span>
+<span class="lineNum">     423 </span>                :            : {
+<span class="lineNum">     424 </span>     [<span class="branchCov" title="Branch 0 was taken 62718 times"> + </span><span class="branchCov" title="Branch 1 was taken 36 times"> + </span><span class="branchCov" title="Branch 2 was taken 12 times"> + </span>]:<span class="lineCov">      62766 :     switch (mask) {</span>
+<span class="lineNum">     425 </span>                :            :     case 0:
+<span class="lineNum">     426 </span>                :<span class="lineCov">      62718 :         break;</span>
+<span class="lineNum">     427 </span>                :            : 
+<span class="lineNum">     428 </span>                :            :     case OVS_BE64_MAX:
+<span class="lineNum">     429 </span>                :<span class="lineCov">         36 :         nxm_put_64(b, header, value);</span>
+<span class="lineNum">     430 </span>                :<span class="lineCov">         36 :         break;</span>
+<span class="lineNum">     431 </span>                :            : 
+<span class="lineNum">     432 </span>                :            :     default:
+<span class="lineNum">     433 </span>                :<span class="lineCov">         12 :         nxm_put_64w(b, NXM_MAKE_WILD_HEADER(header), value, mask);</span>
+<span class="lineNum">     434 </span>                :<span class="lineCov">         12 :         break;</span>
+<span class="lineNum">     435 </span>                :            :     }
+<span class="lineNum">     436 </span>                :<span class="lineCov">      62766 : }</span>
+<a name="437"><span class="lineNum">     437 </span>                :            : </a>
+<span class="lineNum">     438 </span>                :            : static void
+<span class="lineNum">     439 </span>                :<span class="lineCov">        209 : nxm_put_eth(struct ofpbuf *b, uint32_t header,</span>
+<span class="lineNum">     440 </span>                :            :             const uint8_t value[ETH_ADDR_LEN])
+<span class="lineNum">     441 </span>                :            : {
+<span class="lineNum">     442 </span>                :<span class="lineCov">        209 :     nxm_put_header(b, header);</span>
+<span class="lineNum">     443 </span>                :<span class="lineCov">        209 :     ofpbuf_put(b, value, ETH_ADDR_LEN);</span>
+<span class="lineNum">     444 </span>                :<span class="lineCov">        209 : }</span>
+<a name="445"><span class="lineNum">     445 </span>                :            : </a>
+<span class="lineNum">     446 </span>                :            : static void
+<span class="lineNum">     447 </span>                :<span class="lineCov">      41968 : nxm_put_eth_masked(struct ofpbuf *b, uint32_t header,</span>
+<span class="lineNum">     448 </span>                :            :                    const uint8_t value[ETH_ADDR_LEN],
+<span class="lineNum">     449 </span>                :            :                    const uint8_t mask[ETH_ADDR_LEN])
+<span class="lineNum">     450 </span>                :            : {
+<span class="lineNum">     451 </span>        [<span class="branchCov" title="Branch 1 was taken 228 times"> + </span><span class="branchCov" title="Branch 2 was taken 41740 times"> + </span>]:<span class="lineCov">      41968 :     if (!eth_addr_is_zero(mask)) {</span>
+<span class="lineNum">     452 </span>        [<span class="branchCov" title="Branch 1 was taken 209 times"> + </span><span class="branchCov" title="Branch 2 was taken 19 times"> + </span>]:<span class="lineCov">        228 :         if (eth_mask_is_exact(mask)) {</span>
+<span class="lineNum">     453 </span>                :<span class="lineCov">        209 :             nxm_put_eth(b, header, value);</span>
+<span class="lineNum">     454 </span>                :            :         } else {
+<span class="lineNum">     455 </span>                :<span class="lineCov">         19 :             nxm_put_header(b, NXM_MAKE_WILD_HEADER(header));</span>
+<span class="lineNum">     456 </span>                :<span class="lineCov">         19 :             ofpbuf_put(b, value, ETH_ADDR_LEN);</span>
+<span class="lineNum">     457 </span>                :<span class="lineCov">         19 :             ofpbuf_put(b, mask, ETH_ADDR_LEN);</span>
+<span class="lineNum">     458 </span>                :            :         }
+<span class="lineNum">     459 </span>                :            :     }
+<span class="lineNum">     460 </span>                :<span class="lineCov">      41968 : }</span>
+<a name="461"><span class="lineNum">     461 </span>                :            : </a>
+<span class="lineNum">     462 </span>                :            : static void
+<span class="lineNum">     463 </span>                :<span class="lineCov">        218 : nxm_put_ipv6(struct ofpbuf *b, uint32_t header,</span>
+<span class="lineNum">     464 </span>                :            :              const struct in6_addr *value, const struct in6_addr *mask)
+<span class="lineNum">     465 </span>                :            : {
+<span class="lineNum">     466 </span>        [<span class="branchCov" title="Branch 1 was taken 170 times"> + </span><span class="branchCov" title="Branch 2 was taken 48 times"> + </span>]:<span class="lineCov">        218 :     if (ipv6_mask_is_any(mask)) {</span>
+<span class="lineNum">     467 </span>                :<span class="lineCov">        218 :         return;</span>
+<span class="lineNum">     468 </span>        [<span class="branchCov" title="Branch 1 was taken 33 times"> + </span><span class="branchCov" title="Branch 2 was taken 15 times"> + </span>]:<span class="lineCov">         48 :     } else if (ipv6_mask_is_exact(mask)) {</span>
+<span class="lineNum">     469 </span>                :<span class="lineCov">         33 :         nxm_put_header(b, header);</span>
+<span class="lineNum">     470 </span>                :<span class="lineCov">         33 :         ofpbuf_put(b, value, sizeof *value);</span>
+<span class="lineNum">     471 </span>                :            :     } else {
+<span class="lineNum">     472 </span>                :<span class="lineCov">         15 :         nxm_put_header(b, NXM_MAKE_WILD_HEADER(header));</span>
+<span class="lineNum">     473 </span>                :<span class="lineCov">         15 :         ofpbuf_put(b, value, sizeof *value);</span>
+<span class="lineNum">     474 </span>                :<span class="lineCov">         15 :         ofpbuf_put(b, mask, sizeof *mask);</span>
+<span class="lineNum">     475 </span>                :            :     }
+<span class="lineNum">     476 </span>                :            : }
+<a name="477"><span class="lineNum">     477 </span>                :            : </a>
+<span class="lineNum">     478 </span>                :            : static void
+<span class="lineNum">     479 </span>                :<span class="lineCov">        283 : nxm_put_frag(struct ofpbuf *b, const struct match *match)</span>
+<span class="lineNum">     480 </span>                :            : {
+<span class="lineNum">     481 </span>                :<span class="lineCov">        283 :     uint8_t nw_frag = match-&gt;flow.nw_frag;</span>
+<span class="lineNum">     482 </span>                :<span class="lineCov">        283 :     uint8_t nw_frag_mask = match-&gt;wc.masks.nw_frag;</span>
+<span class="lineNum">     483 </span>                :            : 
+<span class="lineNum">     484 </span>     [<span class="branchCov" title="Branch 0 was taken 251 times"> + </span><span class="branchCov" title="Branch 1 was taken 24 times"> + </span><span class="branchCov" title="Branch 2 was taken 8 times"> + </span>]:<span class="lineCov">        283 :     switch (nw_frag_mask) {</span>
+<span class="lineNum">     485 </span>                :            :     case 0:
+<span class="lineNum">     486 </span>                :<span class="lineCov">        251 :         break;</span>
+<span class="lineNum">     487 </span>                :            : 
+<span class="lineNum">     488 </span>                :            :     case FLOW_NW_FRAG_MASK:
+<span class="lineNum">     489 </span>                :<span class="lineCov">         24 :         nxm_put_8(b, NXM_NX_IP_FRAG, nw_frag);</span>
+<span class="lineNum">     490 </span>                :<span class="lineCov">         24 :         break;</span>
+<span class="lineNum">     491 </span>                :            : 
+<span class="lineNum">     492 </span>                :            :     default:
+<span class="lineNum">     493 </span>                :<span class="lineCov">          8 :         nxm_put_8m(b, NXM_NX_IP_FRAG, nw_frag,</span>
+<span class="lineNum">     494 </span>                :            :                    nw_frag_mask &amp; FLOW_NW_FRAG_MASK);
+<span class="lineNum">     495 </span>                :<span class="lineCov">          8 :         break;</span>
+<span class="lineNum">     496 </span>                :            :     }
+<span class="lineNum">     497 </span>                :<span class="lineCov">        283 : }</span>
+<span class="lineNum">     498 </span>                :            : 
+<span class="lineNum">     499 </span>                :            : /* Appends to 'b' a set of OXM or NXM matches for the IPv4 or IPv6 fields in
+<a name="500"><span class="lineNum">     500 </span>                :            :  * 'match'.  */</a>
+<span class="lineNum">     501 </span>                :            : static void
+<span class="lineNum">     502 </span>                :<span class="lineCov">        283 : nxm_put_ip(struct ofpbuf *b, const struct match *match, enum ofp_version oxm)</span>
+<span class="lineNum">     503 </span>                :            : {
+<span class="lineNum">     504 </span>                :<span class="lineCov">        283 :     const struct flow *flow = &amp;match-&gt;flow;</span>
+<span class="lineNum">     505 </span>                :            : 
+<span class="lineNum">     506 </span>        [<span class="branchCov" title="Branch 1 was taken 183 times"> + </span><span class="branchCov" title="Branch 2 was taken 100 times"> + </span>]:<span class="lineCov">        283 :     if (flow-&gt;dl_type == htons(ETH_TYPE_IP)) {</span>
+<span class="lineNum">     507 </span>                :<span class="lineCov">        183 :         nxm_put_32m(b, mf_oxm_header(MFF_IPV4_SRC, oxm),</span>
+<span class="lineNum">     508 </span>                :            :                     flow-&gt;nw_src, match-&gt;wc.masks.nw_src);
+<span class="lineNum">     509 </span>                :<span class="lineCov">        183 :         nxm_put_32m(b, mf_oxm_header(MFF_IPV4_DST, oxm),</span>
+<span class="lineNum">     510 </span>                :            :                     flow-&gt;nw_dst, match-&gt;wc.masks.nw_dst);
+<span class="lineNum">     511 </span>                :            :     } else {
+<span class="lineNum">     512 </span>                :<span class="lineCov">        100 :         nxm_put_ipv6(b, mf_oxm_header(MFF_IPV6_SRC, oxm),</span>
+<span class="lineNum">     513 </span>                :            :                      &amp;flow-&gt;ipv6_src, &amp;match-&gt;wc.masks.ipv6_src);
+<span class="lineNum">     514 </span>                :<span class="lineCov">        100 :         nxm_put_ipv6(b, mf_oxm_header(MFF_IPV6_DST, oxm),</span>
+<span class="lineNum">     515 </span>                :            :                      &amp;flow-&gt;ipv6_dst, &amp;match-&gt;wc.masks.ipv6_dst);
+<span class="lineNum">     516 </span>                :            :     }
+<span class="lineNum">     517 </span>                :            : 
+<span class="lineNum">     518 </span>                :<span class="lineCov">        283 :     nxm_put_frag(b, match);</span>
+<span class="lineNum">     519 </span>                :            : 
+<span class="lineNum">     520 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 277 times"> + </span>]:<span class="lineCov">        283 :     if (match-&gt;wc.masks.nw_tos &amp; IP_DSCP_MASK) {</span>
+<span class="lineNum">     521 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">          6 :         if (oxm) {</span>
+<span class="lineNum">     522 </span>                :<span class="lineCov">          3 :             nxm_put_8(b, mf_oxm_header(MFF_IP_DSCP_SHIFTED, oxm),</span>
+<span class="lineNum">     523 </span>                :<span class="lineCov">          3 :                       flow-&gt;nw_tos &gt;&gt; 2);</span>
+<span class="lineNum">     524 </span>                :            :         } else {
+<span class="lineNum">     525 </span>                :<span class="lineCov">          3 :             nxm_put_8(b, mf_oxm_header(MFF_IP_DSCP, oxm),</span>
+<span class="lineNum">     526 </span>                :<span class="lineCov">          3 :                       flow-&gt;nw_tos &amp; IP_DSCP_MASK);</span>
+<span class="lineNum">     527 </span>                :            :         }
+<span class="lineNum">     528 </span>                :            :     }
+<span class="lineNum">     529 </span>                :            : 
+<span class="lineNum">     530 </span>        [<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchCov" title="Branch 1 was taken 279 times"> + </span>]:<span class="lineCov">        283 :     if (match-&gt;wc.masks.nw_tos &amp; IP_ECN_MASK) {</span>
+<span class="lineNum">     531 </span>                :<span class="lineCov">          4 :         nxm_put_8(b, mf_oxm_header(MFF_IP_ECN, oxm),</span>
+<span class="lineNum">     532 </span>                :<span class="lineCov">          4 :                   flow-&gt;nw_tos &amp; IP_ECN_MASK);</span>
+<span class="lineNum">     533 </span>                :            :     }
+<span class="lineNum">     534 </span>                :            : 
+<span class="lineNum">     535 </span>[<span class="branchCov" title="Branch 0 was taken 189 times"> + </span><span class="branchCov" title="Branch 1 was taken 94 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 4 times"> + </span><span class="branchCov" title="Branch 3 was taken 185 times"> + </span>]:<span class="lineCov">        283 :     if (!oxm &amp;&amp; match-&gt;wc.masks.nw_ttl) {</span>
+<span class="lineNum">     536 </span>                :<span class="lineCov">          4 :         nxm_put_8(b, mf_oxm_header(MFF_IP_TTL, oxm), flow-&gt;nw_ttl);</span>
+<span class="lineNum">     537 </span>                :            :     }
+<span class="lineNum">     538 </span>                :            : 
+<span class="lineNum">     539 </span>                :<span class="lineCov">        283 :     nxm_put_32m(b, mf_oxm_header(MFF_IPV6_LABEL, oxm),</span>
+<span class="lineNum">     540 </span>                :            :                 flow-&gt;ipv6_label, match-&gt;wc.masks.ipv6_label);
+<span class="lineNum">     541 </span>                :            : 
+<span class="lineNum">     542 </span>        [<span class="branchCov" title="Branch 0 was taken 154 times"> + </span><span class="branchCov" title="Branch 1 was taken 129 times"> + </span>]:<span class="lineCov">        283 :     if (match-&gt;wc.masks.nw_proto) {</span>
+<span class="lineNum">     543 </span>                :<span class="lineCov">        154 :         nxm_put_8(b, mf_oxm_header(MFF_IP_PROTO, oxm), flow-&gt;nw_proto);</span>
+<span class="lineNum">     544 </span>                :            : 
+<span class="lineNum">     545 </span>        [<span class="branchCov" title="Branch 0 was taken 73 times"> + </span><span class="branchCov" title="Branch 1 was taken 81 times"> + </span>]:<span class="lineCov">        154 :         if (flow-&gt;nw_proto == IPPROTO_TCP) {</span>
+<span class="lineNum">     546 </span>                :<span class="lineCov">         73 :             nxm_put_16m(b, mf_oxm_header(MFF_TCP_SRC, oxm),</span>
+<span class="lineNum">     547 </span>                :<span class="lineCov">        146 :                         flow-&gt;tp_src, match-&gt;wc.masks.tp_src);</span>
+<span class="lineNum">     548 </span>                :<span class="lineCov">         73 :             nxm_put_16m(b, mf_oxm_header(MFF_TCP_DST, oxm),</span>
+<span class="lineNum">     549 </span>                :<span class="lineCov">        146 :                         flow-&gt;tp_dst, match-&gt;wc.masks.tp_dst);</span>
+<span class="lineNum">     550 </span>                :<span class="lineCov">         73 :             nxm_put_16m(b, mf_oxm_header(MFF_TCP_FLAGS, oxm),</span>
+<span class="lineNum">     551 </span>                :<span class="lineCov">        146 :                         flow-&gt;tcp_flags, match-&gt;wc.masks.tcp_flags);</span>
+<span class="lineNum">     552 </span>        [<span class="branchCov" title="Branch 0 was taken 36 times"> + </span><span class="branchCov" title="Branch 1 was taken 45 times"> + </span>]:<span class="lineCov">         81 :         } else if (flow-&gt;nw_proto == IPPROTO_UDP) {</span>
+<span class="lineNum">     553 </span>                :<span class="lineCov">         36 :             nxm_put_16m(b, mf_oxm_header(MFF_UDP_SRC, oxm),</span>
+<span class="lineNum">     554 </span>                :<span class="lineCov">         72 :                         flow-&gt;tp_src, match-&gt;wc.masks.tp_src);</span>
+<span class="lineNum">     555 </span>                :<span class="lineCov">         36 :             nxm_put_16m(b, mf_oxm_header(MFF_UDP_DST, oxm),</span>
+<span class="lineNum">     556 </span>                :<span class="lineCov">         72 :                         flow-&gt;tp_dst, match-&gt;wc.masks.tp_dst);</span>
+<span class="lineNum">     557 </span>        [<span class="branchCov" title="Branch 0 was taken 12 times"> + </span><span class="branchCov" title="Branch 1 was taken 33 times"> + </span>]:<span class="lineCov">         45 :         } else if (flow-&gt;nw_proto == IPPROTO_SCTP) {</span>
+<span class="lineNum">     558 </span>                :<span class="lineCov">         12 :             nxm_put_16m(b, mf_oxm_header(MFF_SCTP_SRC, oxm), flow-&gt;tp_src,</span>
+<span class="lineNum">     559 </span>                :<span class="lineCov">         12 :                         match-&gt;wc.masks.tp_src);</span>
+<span class="lineNum">     560 </span>                :<span class="lineCov">         12 :             nxm_put_16m(b, mf_oxm_header(MFF_SCTP_DST, oxm), flow-&gt;tp_dst,</span>
+<span class="lineNum">     561 </span>                :<span class="lineCov">         12 :                         match-&gt;wc.masks.tp_dst);</span>
+<span class="lineNum">     562 </span>        [<span class="branchCov" title="Branch 1 was taken 8 times"> + </span><span class="branchCov" title="Branch 2 was taken 25 times"> + </span>]:<span class="lineCov">         33 :         } else if (is_icmpv4(flow)) {</span>
+<span class="lineNum">     563 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">          8 :             if (match-&gt;wc.masks.tp_src) {</span>
+<span class="lineNum">     564 </span>                :<span class="lineCov">          2 :                 nxm_put_8(b, mf_oxm_header(MFF_ICMPV4_TYPE, oxm),</span>
+<span class="lineNum">     565 </span>                :<span class="lineCov">          2 :                           ntohs(flow-&gt;tp_src));</span>
+<span class="lineNum">     566 </span>                :            :             }
+<span class="lineNum">     567 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">          8 :             if (match-&gt;wc.masks.tp_dst) {</span>
+<span class="lineNum">     568 </span>                :<span class="lineCov">          2 :                 nxm_put_8(b, mf_oxm_header(MFF_ICMPV4_CODE, oxm),</span>
+<span class="lineNum">     569 </span>                :<span class="lineCov">          2 :                           ntohs(flow-&gt;tp_dst));</span>
+<span class="lineNum">     570 </span>                :            :             }
+<span class="lineNum">     571 </span>        [<span class="branchCov" title="Branch 1 was taken 22 times"> + </span><span class="branchCov" title="Branch 2 was taken 3 times"> + </span>]:<span class="lineCov">         25 :         } else if (is_icmpv6(flow)) {</span>
+<span class="lineNum">     572 </span>        [<span class="branchCov" title="Branch 0 was taken 21 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">         22 :             if (match-&gt;wc.masks.tp_src) {</span>
+<span class="lineNum">     573 </span>                :<span class="lineCov">         21 :                 nxm_put_8(b, mf_oxm_header(MFF_ICMPV6_TYPE, oxm),</span>
+<span class="lineNum">     574 </span>                :<span class="lineCov">         21 :                           ntohs(flow-&gt;tp_src));</span>
+<span class="lineNum">     575 </span>                :            :             }
+<span class="lineNum">     576 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 21 times"> + </span>]:<span class="lineCov">         22 :             if (match-&gt;wc.masks.tp_dst) {</span>
+<span class="lineNum">     577 </span>                :<span class="lineCov">          1 :                 nxm_put_8(b, mf_oxm_header(MFF_ICMPV6_CODE, oxm),</span>
+<span class="lineNum">     578 </span>                :<span class="lineCov">          1 :                           ntohs(flow-&gt;tp_dst));</span>
+<span class="lineNum">     579 </span>                :            :             }
+<span class="lineNum">     580 </span>  [<span class="branchCov" title="Branch 1 was taken 11 times"> + </span><span class="branchCov" title="Branch 2 was taken 11 times"> + </span><span class="branchCov" title="Branch 3 was taken 7 times"> + </span><span class="branchCov" title="Branch 4 was taken 4 times"> + </span>]:<span class="lineCov">         33 :             if (flow-&gt;tp_src == htons(ND_NEIGHBOR_SOLICIT) ||</span>
+<span class="lineNum">     581 </span>                :<span class="lineCov">         11 :                 flow-&gt;tp_src == htons(ND_NEIGHBOR_ADVERT)) {</span>
+<span class="lineNum">     582 </span>                :<span class="lineCov">         18 :                 nxm_put_ipv6(b, mf_oxm_header(MFF_ND_TARGET, oxm),</span>
+<span class="lineNum">     583 </span>                :            :                              &amp;flow-&gt;nd_target, &amp;match-&gt;wc.masks.nd_target);
+<span class="lineNum">     584 </span>        [<span class="branchCov" title="Branch 1 was taken 11 times"> + </span><span class="branchCov" title="Branch 2 was taken 7 times"> + </span>]:<span class="lineCov">         18 :                 if (flow-&gt;tp_src == htons(ND_NEIGHBOR_SOLICIT)) {</span>
+<span class="lineNum">     585 </span>                :<span class="lineCov">         11 :                     nxm_put_eth_masked(b, mf_oxm_header(MFF_ND_SLL, oxm),</span>
+<span class="lineNum">     586 </span>                :<span class="lineCov">         11 :                                        flow-&gt;arp_sha, match-&gt;wc.masks.arp_sha);</span>
+<span class="lineNum">     587 </span>                :            :                 }
+<span class="lineNum">     588 </span>        [<span class="branchCov" title="Branch 1 was taken 7 times"> + </span><span class="branchCov" title="Branch 2 was taken 11 times"> + </span>]:<span class="lineCov">         18 :                 if (flow-&gt;tp_src == htons(ND_NEIGHBOR_ADVERT)) {</span>
+<span class="lineNum">     589 </span>                :<span class="lineCov">          7 :                     nxm_put_eth_masked(b, mf_oxm_header(MFF_ND_TLL, oxm),</span>
+<span class="lineNum">     590 </span>                :<span class="lineCov">          7 :                                        flow-&gt;arp_tha, match-&gt;wc.masks.arp_tha);</span>
+<span class="lineNum">     591 </span>                :            :                 }
+<span class="lineNum">     592 </span>                :            :             }
+<span class="lineNum">     593 </span>                :            :         }
+<span class="lineNum">     594 </span>                :            :     }
+<span class="lineNum">     595 </span>                :<span class="lineCov">        283 : }</span>
+<span class="lineNum">     596 </span>                :            : 
+<span class="lineNum">     597 </span>                :            : /* Appends to 'b' the nx_match format that expresses 'match'.  For Flow Mod and
+<span class="lineNum">     598 </span>                :            :  * Flow Stats Requests messages, a 'cookie' and 'cookie_mask' may be supplied.
+<span class="lineNum">     599 </span>                :            :  * Otherwise, 'cookie_mask' should be zero.
+<span class="lineNum">     600 </span>                :            :  *
+<span class="lineNum">     601 </span>                :            :  * Specify 'oxm' as 0 to express the match in NXM format; otherwise, specify
+<span class="lineNum">     602 </span>                :            :  * 'oxm' as the OpenFlow version number for the OXM format to use.
+<span class="lineNum">     603 </span>                :            :  *
+<span class="lineNum">     604 </span>                :            :  * This function can cause 'b''s data to be reallocated.
+<span class="lineNum">     605 </span>                :            :  *
+<span class="lineNum">     606 </span>                :            :  * Returns the number of bytes appended to 'b', excluding padding.
+<span class="lineNum">     607 </span>                :            :  *
+<span class="lineNum">     608 </span>                :            :  * If 'match' is a catch-all rule that matches every packet, then this function
+<a name="609"><span class="lineNum">     609 </span>                :            :  * appends nothing to 'b' and returns 0. */</a>
+<span class="lineNum">     610 </span>                :            : static int
+<span class="lineNum">     611 </span>                :<span class="lineCov">      20922 : nx_put_raw(struct ofpbuf *b, enum ofp_version oxm, const struct match *match,</span>
+<span class="lineNum">     612 </span>                :            :            ovs_be64 cookie, ovs_be64 cookie_mask)
+<span class="lineNum">     613 </span>                :            : {
+<span class="lineNum">     614 </span>                :<span class="lineCov">      20922 :     const struct flow *flow = &amp;match-&gt;flow;</span>
+<span class="lineNum">     615 </span>                :<span class="lineCov">      20922 :     const size_t start_len = ofpbuf_size(b);</span>
+<span class="lineNum">     616 </span>                :            :     int match_len;
+<span class="lineNum">     617 </span>                :            :     int i;
+<span class="lineNum">     618 </span>                :            : 
+<span class="lineNum">     619 </span>                :            :     BUILD_ASSERT_DECL(FLOW_WC_SEQ == 27);
+<span class="lineNum">     620 </span>                :            : 
+<span class="lineNum">     621 </span>                :            :     /* Metadata. */
+<span class="lineNum">     622 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 20922 times"> + </span>]:<span class="lineCov">      20922 :     if (match-&gt;wc.masks.dp_hash) {</span>
+<span class="lineNum">     623 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!oxm) {</span>
+<span class="lineNum">     624 </span>                :<span class="lineNoCov">          0 :             nxm_put_32m(b, NXM_NX_DP_HASH, htonl(flow-&gt;dp_hash),</span>
+<span class="lineNum">     625 </span>                :            :                         htonl(match-&gt;wc.masks.dp_hash));
+<span class="lineNum">     626 </span>                :            :         }
+<span class="lineNum">     627 </span>                :            :     }
+<span class="lineNum">     628 </span>                :            : 
+<span class="lineNum">     629 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 20922 times"> + </span>]:<span class="lineCov">      20922 :     if (match-&gt;wc.masks.recirc_id) {</span>
+<span class="lineNum">     630 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!oxm) {</span>
+<span class="lineNum">     631 </span>                :<span class="lineNoCov">          0 :             nxm_put_32(b, NXM_NX_RECIRC_ID, htonl(flow-&gt;recirc_id));</span>
+<span class="lineNum">     632 </span>                :            :         }
+<span class="lineNum">     633 </span>                :            :     }
+<span class="lineNum">     634 </span>                :            : 
+<span class="lineNum">     635 </span>        [<span class="branchCov" title="Branch 0 was taken 645 times"> + </span><span class="branchCov" title="Branch 1 was taken 20277 times"> + </span>]:<span class="lineCov">      20922 :     if (match-&gt;wc.masks.in_port.ofp_port) {</span>
+<span class="lineNum">     636 </span>                :<span class="lineCov">        645 :         ofp_port_t in_port = flow-&gt;in_port.ofp_port;</span>
+<span class="lineNum">     637 </span>        [<span class="branchCov" title="Branch 0 was taken 199 times"> + </span><span class="branchCov" title="Branch 1 was taken 446 times"> + </span>]:<span class="lineCov">        645 :         if (oxm) {</span>
+<span class="lineNum">     638 </span>                :<span class="lineCov">        199 :             nxm_put_32(b, mf_oxm_header(MFF_IN_PORT_OXM, oxm),</span>
+<span class="lineNum">     639 </span>                :            :                        ofputil_port_to_ofp11(in_port));
+<span class="lineNum">     640 </span>                :            :         } else {
+<span class="lineNum">     641 </span>                :<span class="lineCov">        446 :             nxm_put_16(b, mf_oxm_header(MFF_IN_PORT, oxm),</span>
+<span class="lineNum">     642 </span>                :<span class="lineCov">        446 :                        htons(ofp_to_u16(in_port)));</span>
+<span class="lineNum">     643 </span>                :            :         }
+<span class="lineNum">     644 </span>                :            :     }
+<span class="lineNum">     645 </span>                :            : 
+<span class="lineNum">     646 </span>                :            :     /* Ethernet. */
+<span class="lineNum">     647 </span>                :<span class="lineCov">      20922 :     nxm_put_eth_masked(b, mf_oxm_header(MFF_ETH_SRC, oxm),</span>
+<span class="lineNum">     648 </span>                :<span class="lineCov">      20922 :                        flow-&gt;dl_src, match-&gt;wc.masks.dl_src);</span>
+<span class="lineNum">     649 </span>                :<span class="lineCov">      20922 :     nxm_put_eth_masked(b, mf_oxm_header(MFF_ETH_DST, oxm),</span>
+<span class="lineNum">     650 </span>                :<span class="lineCov">      20922 :                        flow-&gt;dl_dst, match-&gt;wc.masks.dl_dst);</span>
+<span class="lineNum">     651 </span>                :<span class="lineCov">      20922 :     nxm_put_16m(b, mf_oxm_header(MFF_ETH_TYPE, oxm),</span>
+<span class="lineNum">     652 </span>                :<span class="lineCov">      20922 :                 ofputil_dl_type_to_openflow(flow-&gt;dl_type),</span>
+<span class="lineNum">     653 </span>                :<span class="lineCov">      20922 :                 match-&gt;wc.masks.dl_type);</span>
+<span class="lineNum">     654 </span>                :            : 
+<span class="lineNum">     655 </span>                :            :     /* 802.1Q. */
+<span class="lineNum">     656 </span>        [<span class="branchCov" title="Branch 0 was taken 548 times"> + </span><span class="branchCov" title="Branch 1 was taken 20374 times"> + </span>]:<span class="lineCov">      20922 :     if (oxm) {</span>
+<span class="lineNum">     657 </span>                :<span class="lineCov">        548 :         ovs_be16 VID_CFI_MASK = htons(VLAN_VID_MASK | VLAN_CFI);</span>
+<span class="lineNum">     658 </span>                :<span class="lineCov">        548 :         ovs_be16 vid = flow-&gt;vlan_tci &amp; VID_CFI_MASK;</span>
+<span class="lineNum">     659 </span>                :<span class="lineCov">        548 :         ovs_be16 mask = match-&gt;wc.masks.vlan_tci &amp; VID_CFI_MASK;</span>
+<span class="lineNum">     660 </span>                :            : 
+<span class="lineNum">     661 </span>        [<span class="branchCov" title="Branch 1 was taken 10 times"> + </span><span class="branchCov" title="Branch 2 was taken 538 times"> + </span>]:<span class="lineCov">        548 :         if (mask == htons(VLAN_VID_MASK | VLAN_CFI)) {</span>
+<span class="lineNum">     662 </span>                :<span class="lineCov">         10 :             nxm_put_16(b, mf_oxm_header(MFF_VLAN_VID, oxm), vid);</span>
+<span class="lineNum">     663 </span>        [<span class="branchCov" title="Branch 0 was taken 18 times"> + </span><span class="branchCov" title="Branch 1 was taken 520 times"> + </span>]:<span class="lineCov">        538 :         } else if (mask) {</span>
+<span class="lineNum">     664 </span>                :<span class="lineCov">         18 :             nxm_put_16m(b, mf_oxm_header(MFF_VLAN_VID, oxm), vid, mask);</span>
+<span class="lineNum">     665 </span>                :            :         }
+<span class="lineNum">     666 </span>                :            : 
+<span class="lineNum">     667 </span>[<span class="branchCov" title="Branch 0 was taken 23 times"> + </span><span class="branchCov" title="Branch 1 was taken 525 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 7 times"> + </span><span class="branchCov" title="Branch 4 was taken 16 times"> + </span>]:<span class="lineCov">        548 :         if (vid &amp;&amp; vlan_tci_to_pcp(match-&gt;wc.masks.vlan_tci)) {</span>
+<span class="lineNum">     668 </span>                :<span class="lineCov">          7 :             nxm_put_8(b, mf_oxm_header(MFF_VLAN_PCP, oxm),</span>
+<span class="lineNum">     669 </span>                :<span class="lineCov">          7 :                       vlan_tci_to_pcp(flow-&gt;vlan_tci));</span>
+<span class="lineNum">     670 </span>                :            :         }
+<span class="lineNum">     671 </span>                :            : 
+<span class="lineNum">     672 </span>                :            :     } else {
+<span class="lineNum">     673 </span>                :<span class="lineCov">      20374 :         nxm_put_16m(b, mf_oxm_header(MFF_VLAN_TCI, oxm), flow-&gt;vlan_tci,</span>
+<span class="lineNum">     674 </span>                :<span class="lineCov">      20374 :                     match-&gt;wc.masks.vlan_tci);</span>
+<span class="lineNum">     675 </span>                :            :     }
+<span class="lineNum">     676 </span>                :            : 
+<span class="lineNum">     677 </span>                :            :     /* MPLS. */
+<span class="lineNum">     678 </span>        [<span class="branchCov" title="Branch 1 was taken 11 times"> + </span><span class="branchCov" title="Branch 2 was taken 20911 times"> + </span>]:<span class="lineCov">      20922 :     if (eth_type_mpls(flow-&gt;dl_type)) {</span>
+<span class="lineNum">     679 </span>        [<span class="branchCov" title="Branch 1 was taken 1 time"> + </span><span class="branchCov" title="Branch 2 was taken 10 times"> + </span>]:<span class="lineCov">         11 :         if (match-&gt;wc.masks.mpls_lse[0] &amp; htonl(MPLS_TC_MASK)) {</span>
+<span class="lineNum">     680 </span>                :<span class="lineCov">          1 :             nxm_put_8(b, mf_oxm_header(MFF_MPLS_TC, oxm),</span>
+<span class="lineNum">     681 </span>                :<span class="lineCov">          1 :                       mpls_lse_to_tc(flow-&gt;mpls_lse[0]));</span>
+<span class="lineNum">     682 </span>                :            :         }
+<span class="lineNum">     683 </span>                :            : 
+<span class="lineNum">     684 </span>        [<span class="branchCov" title="Branch 1 was taken 1 time"> + </span><span class="branchCov" title="Branch 2 was taken 10 times"> + </span>]:<span class="lineCov">         11 :         if (match-&gt;wc.masks.mpls_lse[0] &amp; htonl(MPLS_BOS_MASK)) {</span>
+<span class="lineNum">     685 </span>                :<span class="lineCov">          1 :             nxm_put_8(b, mf_oxm_header(MFF_MPLS_BOS, oxm),</span>
+<span class="lineNum">     686 </span>                :<span class="lineCov">          1 :                       mpls_lse_to_bos(flow-&gt;mpls_lse[0]));</span>
+<span class="lineNum">     687 </span>                :            :         }
+<span class="lineNum">     688 </span>                :            : 
+<span class="lineNum">     689 </span>        [<span class="branchCov" title="Branch 1 was taken 1 time"> + </span><span class="branchCov" title="Branch 2 was taken 10 times"> + </span>]:<span class="lineCov">         11 :         if (match-&gt;wc.masks.mpls_lse[0] &amp; htonl(MPLS_LABEL_MASK)) {</span>
+<span class="lineNum">     690 </span>                :<span class="lineCov">          1 :             nxm_put_32(b, mf_oxm_header(MFF_MPLS_LABEL, oxm),</span>
+<span class="lineNum">     691 </span>                :            :                        htonl(mpls_lse_to_label(flow-&gt;mpls_lse[0])));
+<span class="lineNum">     692 </span>                :            :         }
+<span class="lineNum">     693 </span>                :            :     }
+<span class="lineNum">     694 </span>                :            : 
+<span class="lineNum">     695 </span>                :            :     /* L3. */
+<span class="lineNum">     696 </span>        [<span class="branchCov" title="Branch 1 was taken 283 times"> + </span><span class="branchCov" title="Branch 2 was taken 20639 times"> + </span>]:<span class="lineCov">      20922 :     if (is_ip_any(flow)) {</span>
+<span class="lineNum">     697 </span>                :<span class="lineCov">        283 :         nxm_put_ip(b, match, oxm);</span>
+<span class="lineNum">     698 </span>  [<span class="branchCov" title="Branch 1 was taken 20599 times"> + </span><span class="branchCov" title="Branch 2 was taken 40 times"> + </span><span class="branchCov" title="Branch 3 was taken 13 times"> + </span><span class="branchCov" title="Branch 4 was taken 20586 times"> + </span>]:<span class="lineCov">      41238 :     } else if (flow-&gt;dl_type == htons(ETH_TYPE_ARP) ||</span>
+<span class="lineNum">     699 </span>                :<span class="lineCov">      20599 :                flow-&gt;dl_type == htons(ETH_TYPE_RARP)) {</span>
+<span class="lineNum">     700 </span>                :            :         /* ARP. */
+<span class="lineNum">     701 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 50 times"> + </span>]:<span class="lineCov">         53 :         if (match-&gt;wc.masks.nw_proto) {</span>
+<span class="lineNum">     702 </span>                :<span class="lineCov">          3 :             nxm_put_16(b, mf_oxm_header(MFF_ARP_OP, oxm),</span>
+<span class="lineNum">     703 </span>                :<span class="lineCov">          3 :                        htons(flow-&gt;nw_proto));</span>
+<span class="lineNum">     704 </span>                :            :         }
+<span class="lineNum">     705 </span>                :<span class="lineCov">         53 :         nxm_put_32m(b, mf_oxm_header(MFF_ARP_SPA, oxm),</span>
+<span class="lineNum">     706 </span>                :            :                     flow-&gt;nw_src, match-&gt;wc.masks.nw_src);
+<span class="lineNum">     707 </span>                :<span class="lineCov">         53 :         nxm_put_32m(b, mf_oxm_header(MFF_ARP_TPA, oxm),</span>
+<span class="lineNum">     708 </span>                :            :                     flow-&gt;nw_dst, match-&gt;wc.masks.nw_dst);
+<span class="lineNum">     709 </span>                :<span class="lineCov">         53 :         nxm_put_eth_masked(b, mf_oxm_header(MFF_ARP_SHA, oxm),</span>
+<span class="lineNum">     710 </span>                :<span class="lineCov">         53 :                            flow-&gt;arp_sha, match-&gt;wc.masks.arp_sha);</span>
+<span class="lineNum">     711 </span>                :<span class="lineCov">         53 :         nxm_put_eth_masked(b, mf_oxm_header(MFF_ARP_THA, oxm),</span>
+<span class="lineNum">     712 </span>                :<span class="lineCov">         53 :                            flow-&gt;arp_tha, match-&gt;wc.masks.arp_tha);</span>
+<span class="lineNum">     713 </span>                :            :     }
+<span class="lineNum">     714 </span>                :            : 
+<span class="lineNum">     715 </span>                :            :     /* Tunnel ID. */
+<span class="lineNum">     716 </span>                :<span class="lineCov">      20922 :     nxm_put_64m(b, mf_oxm_header(MFF_TUN_ID, oxm),</span>
+<span class="lineNum">     717 </span>                :            :                 flow-&gt;tunnel.tun_id, match-&gt;wc.masks.tunnel.tun_id);
+<span class="lineNum">     718 </span>                :            : 
+<span class="lineNum">     719 </span>                :            :     /* Other tunnel metadata. */
+<span class="lineNum">     720 </span>                :<span class="lineCov">      20922 :     nxm_put_32m(b, mf_oxm_header(MFF_TUN_SRC, oxm),</span>
+<span class="lineNum">     721 </span>                :            :                 flow-&gt;tunnel.ip_src, match-&gt;wc.masks.tunnel.ip_src);
+<span class="lineNum">     722 </span>                :<span class="lineCov">      20922 :     nxm_put_32m(b, mf_oxm_header(MFF_TUN_DST, oxm),</span>
+<span class="lineNum">     723 </span>                :            :                 flow-&gt;tunnel.ip_dst, match-&gt;wc.masks.tunnel.ip_dst);
+<span class="lineNum">     724 </span>                :            : 
+<span class="lineNum">     725 </span>                :            :     /* Registers. */
+<span class="lineNum">     726 </span>        [<span class="branchCov" title="Branch 0 was taken 167376 times"> + </span><span class="branchCov" title="Branch 1 was taken 20922 times"> + </span>]:<span class="lineCov">     188298 :     for (i = 0; i &lt; FLOW_N_REGS; i++) {</span>
+<span class="lineNum">     727 </span>                :<span class="lineCov">     167376 :         nxm_put_32m(b, mf_oxm_header(MFF_REG0 + i, oxm),</span>
+<span class="lineNum">     728 </span>                :            :                     htonl(flow-&gt;regs[i]), htonl(match-&gt;wc.masks.regs[i]));
+<span class="lineNum">     729 </span>                :            :     }
+<span class="lineNum">     730 </span>                :            : 
+<span class="lineNum">     731 </span>                :            :     /* Mark. */
+<span class="lineNum">     732 </span>                :<span class="lineCov">      20922 :     nxm_put_32m(b, mf_oxm_header(MFF_PKT_MARK, oxm), htonl(flow-&gt;pkt_mark),</span>
+<span class="lineNum">     733 </span>                :            :                 htonl(match-&gt;wc.masks.pkt_mark));
+<span class="lineNum">     734 </span>                :            : 
+<span class="lineNum">     735 </span>                :            :     /* OpenFlow 1.1+ Metadata. */
+<span class="lineNum">     736 </span>                :<span class="lineCov">      20922 :     nxm_put_64m(b, mf_oxm_header(MFF_METADATA, oxm),</span>
+<span class="lineNum">     737 </span>                :            :                 flow-&gt;metadata, match-&gt;wc.masks.metadata);
+<span class="lineNum">     738 </span>                :            : 
+<span class="lineNum">     739 </span>                :            :     /* Cookie. */
+<span class="lineNum">     740 </span>                :<span class="lineCov">      20922 :     nxm_put_64m(b, NXM_NX_COOKIE, cookie, cookie_mask);</span>
+<span class="lineNum">     741 </span>                :            : 
+<span class="lineNum">     742 </span>                :<span class="lineCov">      20922 :     match_len = ofpbuf_size(b) - start_len;</span>
+<span class="lineNum">     743 </span>                :<span class="lineCov">      20922 :     return match_len;</span>
+<span class="lineNum">     744 </span>                :            : }
+<span class="lineNum">     745 </span>                :            : 
+<span class="lineNum">     746 </span>                :            : /* Appends to 'b' the nx_match format that expresses 'match', plus enough zero
+<span class="lineNum">     747 </span>                :            :  * bytes to pad the nx_match out to a multiple of 8.  For Flow Mod and Flow
+<span class="lineNum">     748 </span>                :            :  * Stats Requests messages, a 'cookie' and 'cookie_mask' may be supplied.
+<span class="lineNum">     749 </span>                :            :  * Otherwise, 'cookie_mask' should be zero.
+<span class="lineNum">     750 </span>                :            :  *
+<span class="lineNum">     751 </span>                :            :  * This function can cause 'b''s data to be reallocated.
+<span class="lineNum">     752 </span>                :            :  *
+<span class="lineNum">     753 </span>                :            :  * Returns the number of bytes appended to 'b', excluding padding.  The return
+<span class="lineNum">     754 </span>                :            :  * value can be zero if it appended nothing at all to 'b' (which happens if
+<a name="755"><span class="lineNum">     755 </span>                :            :  * 'cr' is a catch-all rule that matches every packet). */</a>
+<span class="lineNum">     756 </span>                :            : int
+<span class="lineNum">     757 </span>                :<span class="lineCov">      20374 : nx_put_match(struct ofpbuf *b, const struct match *match,</span>
+<span class="lineNum">     758 </span>                :            :              ovs_be64 cookie, ovs_be64 cookie_mask)
+<span class="lineNum">     759 </span>                :            : {
+<span class="lineNum">     760 </span>                :<span class="lineCov">      20374 :     int match_len = nx_put_raw(b, 0, match, cookie, cookie_mask);</span>
+<span class="lineNum">     761 </span>                :            : 
+<span class="lineNum">     762 </span>                :<span class="lineCov">      20374 :     ofpbuf_put_zeros(b, PAD_SIZE(match_len, 8));</span>
+<span class="lineNum">     763 </span>                :<span class="lineCov">      20374 :     return match_len;</span>
+<span class="lineNum">     764 </span>                :            : }
+<span class="lineNum">     765 </span>                :            : 
+<span class="lineNum">     766 </span>                :            : /* Appends to 'b' an struct ofp11_match_header followed by the OXM format that
+<span class="lineNum">     767 </span>                :            :  * expresses 'cr', plus enough zero bytes to pad the data appended out to a
+<span class="lineNum">     768 </span>                :            :  * multiple of 8.
+<span class="lineNum">     769 </span>                :            :  *
+<span class="lineNum">     770 </span>                :            :  * OXM differs slightly among versions of OpenFlow.  Specify the OpenFlow
+<span class="lineNum">     771 </span>                :            :  * version in use as 'version'.
+<span class="lineNum">     772 </span>                :            :  *
+<span class="lineNum">     773 </span>                :            :  * This function can cause 'b''s data to be reallocated.
+<span class="lineNum">     774 </span>                :            :  *
+<span class="lineNum">     775 </span>                :            :  * Returns the number of bytes appended to 'b', excluding the padding.  Never
+<a name="776"><span class="lineNum">     776 </span>                :            :  * returns zero. */</a>
+<span class="lineNum">     777 </span>                :            : int
+<span class="lineNum">     778 </span>                :<span class="lineCov">        548 : oxm_put_match(struct ofpbuf *b, const struct match *match,</span>
+<span class="lineNum">     779 </span>                :            :               enum ofp_version version)
+<span class="lineNum">     780 </span>                :            : {
+<span class="lineNum">     781 </span>                :            :     int match_len;
+<span class="lineNum">     782 </span>                :            :     struct ofp11_match_header *omh;
+<span class="lineNum">     783 </span>                :<span class="lineCov">        548 :     size_t start_len = ofpbuf_size(b);</span>
+<span class="lineNum">     784 </span>                :<span class="lineCov">        548 :     ovs_be64 cookie = htonll(0), cookie_mask = htonll(0);</span>
+<span class="lineNum">     785 </span>                :            : 
+<span class="lineNum">     786 </span>                :<span class="lineCov">        548 :     ofpbuf_put_uninit(b, sizeof *omh);</span>
+<span class="lineNum">     787 </span>                :<span class="lineCov">        548 :     match_len = (nx_put_raw(b, version, match, cookie, cookie_mask)</span>
+<span class="lineNum">     788 </span>                :            :                  + sizeof *omh);
+<span class="lineNum">     789 </span>                :<span class="lineCov">        548 :     ofpbuf_put_zeros(b, PAD_SIZE(match_len, 8));</span>
+<span class="lineNum">     790 </span>                :            : 
+<span class="lineNum">     791 </span>                :<span class="lineCov">        548 :     omh = ofpbuf_at(b, start_len, sizeof *omh);</span>
+<span class="lineNum">     792 </span>                :<span class="lineCov">        548 :     omh-&gt;type = htons(OFPMT_OXM);</span>
+<span class="lineNum">     793 </span>                :<span class="lineCov">        548 :     omh-&gt;length = htons(match_len);</span>
+<span class="lineNum">     794 </span>                :            : 
+<span class="lineNum">     795 </span>                :<span class="lineCov">        548 :     return match_len;</span>
+<span class="lineNum">     796 </span>                :            : }
+<span class="lineNum">     797 </span>                :            : 
+<span class="lineNum">     798 </span>                :            : /* nx_match_to_string() and helpers. */
+<span class="lineNum">     799 </span>                :            : 
+<span class="lineNum">     800 </span>                :            : static void format_nxm_field_name(struct ds *, uint32_t header);
+<a name="801"><span class="lineNum">     801 </span>                :            : </a>
+<span class="lineNum">     802 </span>                :            : char *
+<span class="lineNum">     803 </span>                :<span class="lineCov">        311 : nx_match_to_string(const uint8_t *p, unsigned int match_len)</span>
+<span class="lineNum">     804 </span>                :            : {
+<span class="lineNum">     805 </span>                :            :     uint32_t header;
+<span class="lineNum">     806 </span>                :            :     struct ds s;
+<span class="lineNum">     807 </span>                :            : 
+<span class="lineNum">     808 </span>        [<span class="branchCov" title="Branch 0 was taken 19 times"> + </span><span class="branchCov" title="Branch 1 was taken 292 times"> + </span>]:<span class="lineCov">        311 :     if (!match_len) {</span>
+<span class="lineNum">     809 </span>                :<span class="lineCov">         19 :         return xstrdup(&quot;&lt;any&gt;&quot;);</span>
+<span class="lineNum">     810 </span>                :            :     }
+<span class="lineNum">     811 </span>                :            : 
+<span class="lineNum">     812 </span>                :<span class="lineCov">        292 :     ds_init(&amp;s);</span>
+<span class="lineNum">     813 </span>        [<span class="branchCov" title="Branch 1 was taken 578 times"> + </span><span class="branchCov" title="Branch 2 was taken 292 times"> + </span>]:<span class="lineCov">        870 :     while ((header = nx_entry_ok(p, match_len)) != 0) {</span>
+<span class="lineNum">     814 </span>                :<span class="lineCov">        578 :         unsigned int length = NXM_LENGTH(header);</span>
+<span class="lineNum">     815 </span>                :<span class="lineCov">        578 :         unsigned int value_len = nxm_field_bytes(header);</span>
+<span class="lineNum">     816 </span>                :<span class="lineCov">        578 :         const uint8_t *value = p + 4;</span>
+<span class="lineNum">     817 </span>                :<span class="lineCov">        578 :         const uint8_t *mask = value + value_len;</span>
+<span class="lineNum">     818 </span>                :            :         unsigned int i;
+<span class="lineNum">     819 </span>                :            : 
+<span class="lineNum">     820 </span>        [<span class="branchCov" title="Branch 0 was taken 286 times"> + </span><span class="branchCov" title="Branch 1 was taken 292 times"> + </span>]:<span class="lineCov">        578 :         if (s.length) {</span>
+<span class="lineNum">     821 </span>                :<span class="lineCov">        286 :             ds_put_cstr(&amp;s, &quot;, &quot;);</span>
+<span class="lineNum">     822 </span>                :            :         }
+<span class="lineNum">     823 </span>                :            : 
+<span class="lineNum">     824 </span>                :<span class="lineCov">        578 :         format_nxm_field_name(&amp;s, header);</span>
+<span class="lineNum">     825 </span>                :<span class="lineCov">        578 :         ds_put_char(&amp;s, '(');</span>
+<span class="lineNum">     826 </span>                :            : 
+<span class="lineNum">     827 </span>        [<span class="branchCov" title="Branch 0 was taken 1817 times"> + </span><span class="branchCov" title="Branch 1 was taken 578 times"> + </span>]:<span class="lineCov">       2395 :         for (i = 0; i &lt; value_len; i++) {</span>
+<span class="lineNum">     828 </span>                :<span class="lineCov">       1817 :             ds_put_format(&amp;s, &quot;%02x&quot;, value[i]);</span>
+<span class="lineNum">     829 </span>                :            :         }
+<span class="lineNum">     830 </span>        [<span class="branchCov" title="Branch 0 was taken 96 times"> + </span><span class="branchCov" title="Branch 1 was taken 482 times"> + </span>]:<span class="lineCov">        578 :         if (NXM_HASMASK(header)) {</span>
+<span class="lineNum">     831 </span>                :<span class="lineCov">         96 :             ds_put_char(&amp;s, '/');</span>
+<span class="lineNum">     832 </span>        [<span class="branchCov" title="Branch 0 was taken 450 times"> + </span><span class="branchCov" title="Branch 1 was taken 96 times"> + </span>]:<span class="lineCov">        546 :             for (i = 0; i &lt; value_len; i++) {</span>
+<span class="lineNum">     833 </span>                :<span class="lineCov">        450 :                 ds_put_format(&amp;s, &quot;%02x&quot;, mask[i]);</span>
+<span class="lineNum">     834 </span>                :            :             }
+<span class="lineNum">     835 </span>                :            :         }
+<span class="lineNum">     836 </span>                :<span class="lineCov">        578 :         ds_put_char(&amp;s, ')');</span>
+<span class="lineNum">     837 </span>                :            : 
+<span class="lineNum">     838 </span>                :<span class="lineCov">        578 :         p += 4 + length;</span>
+<span class="lineNum">     839 </span>                :<span class="lineCov">        578 :         match_len -= 4 + length;</span>
+<span class="lineNum">     840 </span>                :            :     }
+<span class="lineNum">     841 </span>                :            : 
+<span class="lineNum">     842 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 292 times"> + </span>]:<span class="lineCov">        292 :     if (match_len) {</span>
+<span class="lineNum">     843 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (s.length) {</span>
+<span class="lineNum">     844 </span>                :<span class="lineNoCov">          0 :             ds_put_cstr(&amp;s, &quot;, &quot;);</span>
+<span class="lineNum">     845 </span>                :            :         }
+<span class="lineNum">     846 </span>                :            : 
+<span class="lineNum">     847 </span>                :<span class="lineNoCov">          0 :         ds_put_format(&amp;s, &quot;&lt;%u invalid bytes&gt;&quot;, match_len);</span>
+<span class="lineNum">     848 </span>                :            :     }
+<span class="lineNum">     849 </span>                :            : 
+<span class="lineNum">     850 </span>                :<span class="lineCov">        311 :     return ds_steal_cstr(&amp;s);</span>
+<span class="lineNum">     851 </span>                :            : }
+<a name="852"><span class="lineNum">     852 </span>                :            : </a>
+<span class="lineNum">     853 </span>                :            : char *
+<span class="lineNum">     854 </span>                :<span class="lineCov">        119 : oxm_match_to_string(const struct ofpbuf *p, unsigned int match_len)</span>
+<span class="lineNum">     855 </span>                :            : {
+<span class="lineNum">     856 </span>                :<span class="lineCov">        119 :     const struct ofp11_match_header *omh = ofpbuf_data(p);</span>
+<span class="lineNum">     857 </span>                :            :     uint16_t match_len_;
+<span class="lineNum">     858 </span>                :            :     struct ds s;
+<span class="lineNum">     859 </span>                :            : 
+<span class="lineNum">     860 </span>                :<span class="lineCov">        119 :     ds_init(&amp;s);</span>
+<span class="lineNum">     861 </span>                :            : 
+<span class="lineNum">     862 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 119 times"> + </span>]:<span class="lineCov">        119 :     if (match_len &lt; sizeof *omh) {</span>
+<span class="lineNum">     863 </span>                :<span class="lineNoCov">          0 :         ds_put_format(&amp;s, &quot;&lt;match too short: %u&gt;&quot;, match_len);</span>
+<span class="lineNum">     864 </span>                :<span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">     865 </span>                :            :     }
+<span class="lineNum">     866 </span>                :            : 
+<span class="lineNum">     867 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 119 times"> + </span>]:<span class="lineCov">        119 :     if (omh-&gt;type != htons(OFPMT_OXM)) {</span>
+<span class="lineNum">     868 </span>                :<span class="lineNoCov">          0 :         ds_put_format(&amp;s, &quot;&lt;bad match type field: %u&gt;&quot;, ntohs(omh-&gt;type));</span>
+<span class="lineNum">     869 </span>                :<span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">     870 </span>                :            :     }
+<span class="lineNum">     871 </span>                :            : 
+<span class="lineNum">     872 </span>                :<span class="lineCov">        119 :     match_len_ = ntohs(omh-&gt;length);</span>
+<span class="lineNum">     873 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 119 times"> + </span>]:<span class="lineCov">        119 :     if (match_len_ &lt; sizeof *omh) {</span>
+<span class="lineNum">     874 </span>                :<span class="lineNoCov">          0 :         ds_put_format(&amp;s, &quot;&lt;match length field too short: %u&gt;&quot;, match_len_);</span>
+<span class="lineNum">     875 </span>                :<span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">     876 </span>                :            :     }
+<span class="lineNum">     877 </span>                :            : 
+<span class="lineNum">     878 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 119 times"> + </span>]:<span class="lineCov">        119 :     if (match_len_ != match_len) {</span>
+<span class="lineNum">     879 </span>                :<span class="lineNoCov">          0 :         ds_put_format(&amp;s, &quot;&lt;match length field incorrect: %u != %u&gt;&quot;,</span>
+<span class="lineNum">     880 </span>                :            :                       match_len_, match_len);
+<span class="lineNum">     881 </span>                :<span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">     882 </span>                :            :     }
+<span class="lineNum">     883 </span>                :            : 
+<span class="lineNum">     884 </span>                :<span class="lineCov">        119 :     return nx_match_to_string(ofpbuf_at(p, sizeof *omh, 0),</span>
+<span class="lineNum">     885 </span>                :            :                               match_len - sizeof *omh);
+<span class="lineNum">     886 </span>                :            : 
+<span class="lineNum">     887 </span>                :            : err:
+<span class="lineNum">     888 </span>                :<span class="lineCov">        119 :     return ds_steal_cstr(&amp;s);</span>
+<span class="lineNum">     889 </span>                :            : }
+<a name="890"><span class="lineNum">     890 </span>                :            : </a>
+<span class="lineNum">     891 </span>                :            : static void
+<span class="lineNum">     892 </span>                :<span class="lineCov">        578 : format_nxm_field_name(struct ds *s, uint32_t header)</span>
+<span class="lineNum">     893 </span>                :            : {
+<span class="lineNum">     894 </span>                :<span class="lineCov">        578 :     const struct mf_field *mf = mf_from_nxm_header(header);</span>
+<span class="lineNum">     895 </span>        [<span class="branchCov" title="Branch 0 was taken 575 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">        578 :     if (mf) {</span>
+<span class="lineNum">     896 </span>        [<span class="branchCov" title="Branch 0 was taken 221 times"> + </span><span class="branchCov" title="Branch 1 was taken 354 times"> + </span>]:<span class="lineCov">        575 :         ds_put_cstr(s, IS_OXM_HEADER(header) ? mf-&gt;oxm_name : mf-&gt;nxm_name);</span>
+<span class="lineNum">     897 </span>        [<span class="branchCov" title="Branch 0 was taken 95 times"> + </span><span class="branchCov" title="Branch 1 was taken 480 times"> + </span>]:<span class="lineCov">        575 :         if (NXM_HASMASK(header)) {</span>
+<span class="lineNum">     898 </span>                :<span class="lineCov">         95 :             ds_put_cstr(s, &quot;_W&quot;);</span>
+<span class="lineNum">     899 </span>                :            :         }
+<span class="lineNum">     900 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          3 :     } else if (header == NXM_NX_COOKIE) {</span>
+<span class="lineNum">     901 </span>                :<span class="lineCov">          2 :         ds_put_cstr(s, &quot;NXM_NX_COOKIE&quot;);</span>
+<span class="lineNum">     902 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          1 :     } else if (header == NXM_NX_COOKIE_W) {</span>
+<span class="lineNum">     903 </span>                :<span class="lineCov">          1 :         ds_put_cstr(s, &quot;NXM_NX_COOKIE_W&quot;);</span>
+<span class="lineNum">     904 </span>                :            :     } else {
+<span class="lineNum">     905 </span>                :<span class="lineNoCov">          0 :         ds_put_format(s, &quot;%d:%d&quot;, NXM_VENDOR(header), NXM_FIELD(header));</span>
+<span class="lineNum">     906 </span>                :            :     }
+<span class="lineNum">     907 </span>                :<span class="lineCov">        578 : }</span>
+<a name="908"><span class="lineNum">     908 </span>                :            : </a>
+<span class="lineNum">     909 </span>                :            : static uint32_t
+<span class="lineNum">     910 </span>                :<span class="lineCov">        768 : parse_nxm_field_name(const char *name, int name_len)</span>
+<span class="lineNum">     911 </span>                :            : {
+<span class="lineNum">     912 </span>                :            :     bool wild;
+<span class="lineNum">     913 </span>                :            :     int i;
+<span class="lineNum">     914 </span>                :            : 
+<span class="lineNum">     915 </span>                :            :     /* Check whether it's a field name. */
+<span class="lineNum">     916 </span>[<span class="branchCov" title="Branch 0 was taken 768 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 172 times"> + </span><span class="branchCov" title="Branch 3 was taken 596 times"> + </span>]:<span class="lineCov">        768 :     wild = name_len &gt; 2 &amp;&amp; !memcmp(&amp;name[name_len - 2], &quot;_W&quot;, 2);</span>
+<span class="lineNum">     917 </span>        [<span class="branchCov" title="Branch 0 was taken 172 times"> + </span><span class="branchCov" title="Branch 1 was taken 596 times"> + </span>]:<span class="lineCov">        768 :     if (wild) {</span>
+<span class="lineNum">     918 </span>                :<span class="lineCov">        172 :         name_len -= 2;</span>
+<span class="lineNum">     919 </span>                :            :     }
+<span class="lineNum">     920 </span>                :            : 
+<span class="lineNum">     921 </span>        [<span class="branchCov" title="Branch 0 was taken 27459 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>]:<span class="lineCov">      27473 :     for (i = 0; i &lt; MFF_N_IDS; i++) {</span>
+<span class="lineNum">     922 </span>                :<span class="lineCov">      27459 :         const struct mf_field *mf = mf_from_id(i);</span>
+<span class="lineNum">     923 </span>                :            :         uint32_t header;
+<span class="lineNum">     924 </span>                :            : 
+<span class="lineNum">     925 </span>[<span class="branchCov" title="Branch 0 was taken 23532 times"> + </span><span class="branchCov" title="Branch 1 was taken 3927 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 462 times"> + </span><span class="branchCov" title="Branch 3 was taken 23070 times"> + </span>]:<span class="lineCov">      27459 :         if (mf-&gt;nxm_name &amp;&amp;</span>
+<span class="lineNum">     926 </span>        [<span class="branchCov" title="Branch 0 was taken 462 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        462 :             !strncmp(mf-&gt;nxm_name, name, name_len) &amp;&amp;</span>
+<span class="lineNum">     927 </span>                :<span class="lineCov">        462 :             mf-&gt;nxm_name[name_len] == '\0') {</span>
+<span class="lineNum">     928 </span>                :<span class="lineCov">        462 :             header = mf-&gt;nxm_header;</span>
+<span class="lineNum">     929 </span>[<span class="branchCov" title="Branch 0 was taken 23070 times"> + </span><span class="branchCov" title="Branch 1 was taken 3927 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 292 times"> + </span><span class="branchCov" title="Branch 3 was taken 22778 times"> + </span>]:<span class="lineCov">      26997 :         } else if (mf-&gt;oxm_name &amp;&amp;</span>
+<span class="lineNum">     930 </span>        [<span class="branchCov" title="Branch 0 was taken 292 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        292 :                    !strncmp(mf-&gt;oxm_name, name, name_len) &amp;&amp;</span>
+<span class="lineNum">     931 </span>                :<span class="lineCov">        292 :                    mf-&gt;oxm_name[name_len] == '\0') {</span>
+<span class="lineNum">     932 </span>                :<span class="lineCov">        292 :             header = mf-&gt;oxm_header;</span>
+<span class="lineNum">     933 </span>                :            :         } else {
+<span class="lineNum">     934 </span>                :<span class="lineCov">      26705 :             continue;</span>
+<span class="lineNum">     935 </span>                :            :         }
+<span class="lineNum">     936 </span>                :            : 
+<span class="lineNum">     937 </span>        [<span class="branchCov" title="Branch 0 was taken 585 times"> + </span><span class="branchCov" title="Branch 1 was taken 169 times"> + </span>]:<span class="lineCov">        754 :         if (!wild) {</span>
+<span class="lineNum">     938 </span>                :<span class="lineCov">        585 :             return header;</span>
+<span class="lineNum">     939 </span>        [<span class="branchCov" title="Branch 0 was taken 169 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        169 :         } else if (mf-&gt;maskable != MFM_NONE) {</span>
+<span class="lineNum">     940 </span>                :<span class="lineCov">        169 :             return NXM_MAKE_WILD_HEADER(header);</span>
+<span class="lineNum">     941 </span>                :            :         }
+<span class="lineNum">     942 </span>                :            :     }
+<span class="lineNum">     943 </span>                :            : 
+<span class="lineNum">     944 </span>[<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchCov" title="Branch 1 was taken 10 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 4 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         14 :     if (!strncmp(&quot;NXM_NX_COOKIE&quot;, name, name_len) &amp;&amp;</span>
+<span class="lineNum">     945 </span>                :            :         (name_len == strlen(&quot;NXM_NX_COOKIE&quot;))) {
+<span class="lineNum">     946 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">          4 :         if (!wild) {</span>
+<span class="lineNum">     947 </span>                :<span class="lineCov">          1 :             return NXM_NX_COOKIE;</span>
+<span class="lineNum">     948 </span>                :            :         } else {
+<span class="lineNum">     949 </span>                :<span class="lineCov">          3 :             return NXM_NX_COOKIE_W;</span>
+<span class="lineNum">     950 </span>                :            :         }
+<span class="lineNum">     951 </span>                :            :     }
+<span class="lineNum">     952 </span>                :            : 
+<span class="lineNum">     953 </span>                :            :     /* Check whether it's a 32-bit field header value as hex.
+<span class="lineNum">     954 </span>                :            :      * (This isn't ordinarily useful except for testing error behavior.) */
+<span class="lineNum">     955 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         10 :     if (name_len == 8) {</span>
+<span class="lineNum">     956 </span>                :<span class="lineCov">         10 :         uint32_t header = hexits_value(name, name_len, NULL);</span>
+<span class="lineNum">     957 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         10 :         if (header != UINT_MAX) {</span>
+<span class="lineNum">     958 </span>                :<span class="lineCov">         10 :             return header;</span>
+<span class="lineNum">     959 </span>                :            :         }
+<span class="lineNum">     960 </span>                :            :     }
+<span class="lineNum">     961 </span>                :            : 
+<span class="lineNum">     962 </span>                :<span class="lineCov">        768 :     return 0;</span>
+<span class="lineNum">     963 </span>                :            : }
+<span class="lineNum">     964 </span>                :            : 
+<span class="lineNum">     965 </span>                :            : /* nx_match_from_string(). */
+<a name="966"><span class="lineNum">     966 </span>                :            : </a>
+<span class="lineNum">     967 </span>                :            : static int
+<span class="lineNum">     968 </span>                :<span class="lineCov">        369 : nx_match_from_string_raw(const char *s, struct ofpbuf *b)</span>
+<span class="lineNum">     969 </span>                :            : {
+<span class="lineNum">     970 </span>                :<span class="lineCov">        369 :     const char *full_s = s;</span>
+<span class="lineNum">     971 </span>                :<span class="lineCov">        369 :     const size_t start_len = ofpbuf_size(b);</span>
+<span class="lineNum">     972 </span>                :            : 
+<span class="lineNum">     973 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 367 times"> + </span>]:<span class="lineCov">        369 :     if (!strcmp(s, &quot;&lt;any&gt;&quot;)) {</span>
+<span class="lineNum">     974 </span>                :            :         /* Ensure that 'ofpbuf_data(b)' isn't actually null. */
+<span class="lineNum">     975 </span>                :<span class="lineCov">          2 :         ofpbuf_prealloc_tailroom(b, 1);</span>
+<span class="lineNum">     976 </span>                :<span class="lineCov">          2 :         return 0;</span>
+<span class="lineNum">     977 </span>                :            :     }
+<span class="lineNum">     978 </span>                :            : 
+<span class="lineNum">     979 </span>        [<span class="branchCov" title="Branch 0 was taken 768 times"> + </span><span class="branchCov" title="Branch 1 was taken 367 times"> + </span>]:<span class="lineCov">       1135 :     for (s += strspn(s, &quot;, &quot;); *s; s += strspn(s, &quot;, &quot;)) {</span>
+<span class="lineNum">     980 </span>                :            :         const char *name;
+<span class="lineNum">     981 </span>                :            :         uint32_t header;
+<span class="lineNum">     982 </span>                :            :         int name_len;
+<span class="lineNum">     983 </span>                :            :         size_t n;
+<span class="lineNum">     984 </span>                :            : 
+<span class="lineNum">     985 </span>                :<span class="lineCov">        768 :         name = s;</span>
+<span class="lineNum">     986 </span>                :<span class="lineCov">        768 :         name_len = strcspn(s, &quot;(&quot;);</span>
+<span class="lineNum">     987 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 768 times"> + </span>]:<span class="lineCov">        768 :         if (s[name_len] != '(') {</span>
+<span class="lineNum">     988 </span>                :<span class="lineNoCov">          0 :             ovs_fatal(0, &quot;%s: missing ( at end of nx_match&quot;, full_s);</span>
+<span class="lineNum">     989 </span>                :            :         }
+<span class="lineNum">     990 </span>                :            : 
+<span class="lineNum">     991 </span>                :<span class="lineCov">        768 :         header = parse_nxm_field_name(name, name_len);</span>
+<span class="lineNum">     992 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 768 times"> + </span>]:<span class="lineCov">        768 :         if (!header) {</span>
+<span class="lineNum">     993 </span>                :<span class="lineNoCov">          0 :             ovs_fatal(0, &quot;%s: unknown field `%.*s'&quot;, full_s, name_len, s);</span>
+<span class="lineNum">     994 </span>                :            :         }
+<span class="lineNum">     995 </span>                :            : 
+<span class="lineNum">     996 </span>                :<span class="lineCov">        768 :         s += name_len + 1;</span>
+<span class="lineNum">     997 </span>                :            : 
+<span class="lineNum">     998 </span>                :<span class="lineCov">        768 :         nxm_put_header(b, header);</span>
+<span class="lineNum">     999 </span>                :<span class="lineCov">        768 :         s = ofpbuf_put_hex(b, s, &amp;n);</span>
+<span class="lineNum">    1000 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 768 times"> + </span>]:<span class="lineCov">        768 :         if (n != nxm_field_bytes(header)) {</span>
+<span class="lineNum">    1001 </span>                :<span class="lineNoCov">          0 :             ovs_fatal(0, &quot;%.2s: hex digits expected&quot;, s);</span>
+<span class="lineNum">    1002 </span>                :            :         }
+<span class="lineNum">    1003 </span>        [<span class="branchCov" title="Branch 0 was taken 180 times"> + </span><span class="branchCov" title="Branch 1 was taken 588 times"> + </span>]:<span class="lineCov">        768 :         if (NXM_HASMASK(header)) {</span>
+<span class="lineNum">    1004 </span>                :<span class="lineCov">        180 :             s += strspn(s, &quot; &quot;);</span>
+<span class="lineNum">    1005 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 180 times"> + </span>]:<span class="lineCov">        180 :             if (*s != '/') {</span>
+<span class="lineNum">    1006 </span>                :<span class="lineNoCov">          0 :                 ovs_fatal(0, &quot;%s: missing / in masked field %.*s&quot;,</span>
+<span class="lineNum">    1007 </span>                :            :                           full_s, name_len, name);
+<span class="lineNum">    1008 </span>                :            :             }
+<span class="lineNum">    1009 </span>                :<span class="lineCov">        180 :             s = ofpbuf_put_hex(b, s + 1, &amp;n);</span>
+<span class="lineNum">    1010 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 180 times"> + </span>]:<span class="lineCov">        180 :             if (n != nxm_field_bytes(header)) {</span>
+<span class="lineNum">    1011 </span>                :<span class="lineNoCov">          0 :                 ovs_fatal(0, &quot;%.2s: hex digits expected&quot;, s);</span>
+<span class="lineNum">    1012 </span>                :            :             }
+<span class="lineNum">    1013 </span>                :            :         }
+<span class="lineNum">    1014 </span>                :            : 
+<span class="lineNum">    1015 </span>                :<span class="lineCov">        768 :         s += strspn(s, &quot; &quot;);</span>
+<span class="lineNum">    1016 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 768 times"> + </span>]:<span class="lineCov">        768 :         if (*s != ')') {</span>
+<span class="lineNum">    1017 </span>                :<span class="lineNoCov">          0 :             ovs_fatal(0, &quot;%s: missing ) following field %.*s&quot;,</span>
+<span class="lineNum">    1018 </span>                :            :                       full_s, name_len, name);
+<span class="lineNum">    1019 </span>                :            :         }
+<span class="lineNum">    1020 </span>                :<span class="lineCov">        768 :         s++;</span>
+<span class="lineNum">    1021 </span>                :            :     }
+<span class="lineNum">    1022 </span>                :            : 
+<span class="lineNum">    1023 </span>                :<span class="lineCov">        369 :     return ofpbuf_size(b) - start_len;</span>
+<span class="lineNum">    1024 </span>                :            : }
+<a name="1025"><span class="lineNum">    1025 </span>                :            : </a>
+<span class="lineNum">    1026 </span>                :            : int
+<span class="lineNum">    1027 </span>                :<span class="lineCov">        210 : nx_match_from_string(const char *s, struct ofpbuf *b)</span>
+<span class="lineNum">    1028 </span>                :            : {
+<span class="lineNum">    1029 </span>                :<span class="lineCov">        210 :     int match_len = nx_match_from_string_raw(s, b);</span>
+<span class="lineNum">    1030 </span>                :<span class="lineCov">        210 :     ofpbuf_put_zeros(b, PAD_SIZE(match_len, 8));</span>
+<span class="lineNum">    1031 </span>                :<span class="lineCov">        210 :     return match_len;</span>
+<span class="lineNum">    1032 </span>                :            : }
+<a name="1033"><span class="lineNum">    1033 </span>                :            : </a>
+<span class="lineNum">    1034 </span>                :            : int
+<span class="lineNum">    1035 </span>                :<span class="lineCov">        159 : oxm_match_from_string(const char *s, struct ofpbuf *b)</span>
+<span class="lineNum">    1036 </span>                :            : {
+<span class="lineNum">    1037 </span>                :            :     int match_len;
+<span class="lineNum">    1038 </span>                :            :     struct ofp11_match_header *omh;
+<span class="lineNum">    1039 </span>                :<span class="lineCov">        159 :     size_t start_len = ofpbuf_size(b);</span>
+<span class="lineNum">    1040 </span>                :            : 
+<span class="lineNum">    1041 </span>                :<span class="lineCov">        159 :     ofpbuf_put_uninit(b, sizeof *omh);</span>
+<span class="lineNum">    1042 </span>                :<span class="lineCov">        159 :     match_len = nx_match_from_string_raw(s, b) + sizeof *omh;</span>
+<span class="lineNum">    1043 </span>                :<span class="lineCov">        159 :     ofpbuf_put_zeros(b, PAD_SIZE(match_len, 8));</span>
+<span class="lineNum">    1044 </span>                :            : 
+<span class="lineNum">    1045 </span>                :<span class="lineCov">        159 :     omh = ofpbuf_at(b, start_len, sizeof *omh);</span>
+<span class="lineNum">    1046 </span>                :<span class="lineCov">        159 :     omh-&gt;type = htons(OFPMT_OXM);</span>
+<span class="lineNum">    1047 </span>                :<span class="lineCov">        159 :     omh-&gt;length = htons(match_len);</span>
+<span class="lineNum">    1048 </span>                :            : 
+<span class="lineNum">    1049 </span>                :<span class="lineCov">        159 :     return match_len;</span>
+<span class="lineNum">    1050 </span>                :            : }
+<span class="lineNum">    1051 </span>                :            : 
+<span class="lineNum">    1052 </span>                :            : /* Parses 's' as a &quot;move&quot; action, in the form described in ovs-ofctl(8), into
+<span class="lineNum">    1053 </span>                :            :  * '*move'.
+<span class="lineNum">    1054 </span>                :            :  *
+<span class="lineNum">    1055 </span>                :            :  * Returns NULL if successful, otherwise a malloc()'d string describing the
+<a name="1056"><span class="lineNum">    1056 </span>                :            :  * error.  The caller is responsible for freeing the returned string. */</a>
+<span class="lineNum">    1057 </span>                :            : char * WARN_UNUSED_RESULT
+<span class="lineNum">    1058 </span>                :<span class="lineCov">         15 : nxm_parse_reg_move(struct ofpact_reg_move *move, const char *s)</span>
+<span class="lineNum">    1059 </span>                :            : {
+<span class="lineNum">    1060 </span>                :<span class="lineCov">         15 :     const char *full_s = s;</span>
+<span class="lineNum">    1061 </span>                :            :     char *error;
+<span class="lineNum">    1062 </span>                :            : 
+<span class="lineNum">    1063 </span>                :<span class="lineCov">         15 :     error = mf_parse_subfield__(&amp;move-&gt;src, &amp;s);</span>
+<span class="lineNum">    1064 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 15 times"> + </span>]:<span class="lineCov">         15 :     if (error) {</span>
+<span class="lineNum">    1065 </span>                :<span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">    1066 </span>                :            :     }
+<span class="lineNum">    1067 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 15 times"> + </span>]:<span class="lineCov">         15 :     if (strncmp(s, &quot;-&gt;&quot;, 2)) {</span>
+<span class="lineNum">    1068 </span>                :<span class="lineNoCov">          0 :         return xasprintf(&quot;%s: missing `-&gt;' following source&quot;, full_s);</span>
+<span class="lineNum">    1069 </span>                :            :     }
+<span class="lineNum">    1070 </span>                :<span class="lineCov">         15 :     s += 2;</span>
+<span class="lineNum">    1071 </span>                :<span class="lineCov">         15 :     error = mf_parse_subfield(&amp;move-&gt;dst, s);</span>
+<span class="lineNum">    1072 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 15 times"> + </span>]:<span class="lineCov">         15 :     if (error) {</span>
+<span class="lineNum">    1073 </span>                :<span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">    1074 </span>                :            :     }
+<span class="lineNum">    1075 </span>                :            : 
+<span class="lineNum">    1076 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 15 times"> + </span>]:<span class="lineCov">         15 :     if (move-&gt;src.n_bits != move-&gt;dst.n_bits) {</span>
+<span class="lineNum">    1077 </span>                :<span class="lineNoCov">          0 :         return xasprintf(&quot;%s: source field is %d bits wide but destination is &quot;</span>
+<span class="lineNum">    1078 </span>                :            :                          &quot;%d bits wide&quot;, full_s,
+<span class="lineNum">    1079 </span>                :            :                          move-&gt;src.n_bits, move-&gt;dst.n_bits);
+<span class="lineNum">    1080 </span>                :            :     }
+<span class="lineNum">    1081 </span>                :<span class="lineCov">         15 :     return NULL;</span>
+<span class="lineNum">    1082 </span>                :            : }
+<span class="lineNum">    1083 </span>                :            : 
+<span class="lineNum">    1084 </span>                :            : /* Parses 's' as a &quot;load&quot; action, in the form described in ovs-ofctl(8), into
+<span class="lineNum">    1085 </span>                :            :  * '*load'.
+<span class="lineNum">    1086 </span>                :            :  *
+<span class="lineNum">    1087 </span>                :            :  * Returns NULL if successful, otherwise a malloc()'d string describing the
+<a name="1088"><span class="lineNum">    1088 </span>                :            :  * error.  The caller is responsible for freeing the returned string. */</a>
+<span class="lineNum">    1089 </span>                :            : char * WARN_UNUSED_RESULT
+<span class="lineNum">    1090 </span>                :<span class="lineCov">         81 : nxm_parse_reg_load(struct ofpact_reg_load *load, const char *s)</span>
+<span class="lineNum">    1091 </span>                :            : {
+<span class="lineNum">    1092 </span>                :<span class="lineCov">         81 :     const char *full_s = s;</span>
+<span class="lineNum">    1093 </span>                :<span class="lineCov">         81 :     uint64_t value = strtoull(s, (char **) &amp;s, 0);</span>
+<span class="lineNum">    1094 </span>                :            :     char *error;
+<span class="lineNum">    1095 </span>                :            : 
+<span class="lineNum">    1096 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 81 times"> + </span>]:<span class="lineCov">         81 :     if (strncmp(s, &quot;-&gt;&quot;, 2)) {</span>
+<span class="lineNum">    1097 </span>                :<span class="lineNoCov">          0 :         return xasprintf(&quot;%s: missing `-&gt;' following value&quot;, full_s);</span>
+<span class="lineNum">    1098 </span>                :            :     }
+<span class="lineNum">    1099 </span>                :<span class="lineCov">         81 :     s += 2;</span>
+<span class="lineNum">    1100 </span>                :<span class="lineCov">         81 :     error = mf_parse_subfield(&amp;load-&gt;dst, s);</span>
+<span class="lineNum">    1101 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 81 times"> + </span>]:<span class="lineCov">         81 :     if (error) {</span>
+<span class="lineNum">    1102 </span>                :<span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">    1103 </span>                :            :     }
+<span class="lineNum">    1104 </span>                :            : 
+<span class="lineNum">    1105 </span>[<span class="branchCov" title="Branch 0 was taken 79 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 79 times"> + </span>]:<span class="lineCov">         81 :     if (load-&gt;dst.n_bits &lt; 64 &amp;&amp; (value &gt;&gt; load-&gt;dst.n_bits) != 0) {</span>
+<span class="lineNum">    1106 </span>                :<span class="lineNoCov">          0 :         return xasprintf(&quot;%s: value %&quot;PRIu64&quot; does not fit into %d bits&quot;,</span>
+<span class="lineNum">    1107 </span>                :            :                          full_s, value, load-&gt;dst.n_bits);
+<span class="lineNum">    1108 </span>                :            :     }
+<span class="lineNum">    1109 </span>                :            : 
+<span class="lineNum">    1110 </span>                :<span class="lineCov">         81 :     load-&gt;subvalue.be64[0] = htonll(0);</span>
+<span class="lineNum">    1111 </span>                :<span class="lineCov">         81 :     load-&gt;subvalue.be64[1] = htonll(value);</span>
+<span class="lineNum">    1112 </span>                :<span class="lineCov">         81 :     return NULL;</span>
+<span class="lineNum">    1113 </span>                :            : }
+<span class="lineNum">    1114 </span>                :            : 
+<span class="lineNum">    1115 </span>                :            : /* nxm_format_reg_move(), nxm_format_reg_load(). */
+<a name="1116"><span class="lineNum">    1116 </span>                :            : </a>
+<span class="lineNum">    1117 </span>                :            : void
+<span class="lineNum">    1118 </span>                :<span class="lineCov">         17 : nxm_format_reg_move(const struct ofpact_reg_move *move, struct ds *s)</span>
+<span class="lineNum">    1119 </span>                :            : {
+<span class="lineNum">    1120 </span>                :<span class="lineCov">         17 :     ds_put_format(s, &quot;move:&quot;);</span>
+<span class="lineNum">    1121 </span>                :<span class="lineCov">         17 :     mf_format_subfield(&amp;move-&gt;src, s);</span>
+<span class="lineNum">    1122 </span>                :<span class="lineCov">         17 :     ds_put_cstr(s, &quot;-&gt;&quot;);</span>
+<span class="lineNum">    1123 </span>                :<span class="lineCov">         17 :     mf_format_subfield(&amp;move-&gt;dst, s);</span>
+<span class="lineNum">    1124 </span>                :<span class="lineCov">         17 : }</span>
+<a name="1125"><span class="lineNum">    1125 </span>                :            : </a>
+<span class="lineNum">    1126 </span>                :            : void
+<span class="lineNum">    1127 </span>                :<span class="lineCov">        235 : nxm_format_reg_load(const struct ofpact_reg_load *load, struct ds *s)</span>
+<span class="lineNum">    1128 </span>                :            : {
+<span class="lineNum">    1129 </span>                :<span class="lineCov">        235 :     ds_put_cstr(s, &quot;load:&quot;);</span>
+<span class="lineNum">    1130 </span>                :<span class="lineCov">        235 :     mf_format_subvalue(&amp;load-&gt;subvalue, s);</span>
+<span class="lineNum">    1131 </span>                :<span class="lineCov">        235 :     ds_put_cstr(s, &quot;-&gt;&quot;);</span>
+<span class="lineNum">    1132 </span>                :<span class="lineCov">        235 :     mf_format_subfield(&amp;load-&gt;dst, s);</span>
+<span class="lineNum">    1133 </span>                :<span class="lineCov">        235 : }</span>
+<a name="1134"><span class="lineNum">    1134 </span>                :            : </a>
+<span class="lineNum">    1135 </span>                :            : enum ofperr
+<span class="lineNum">    1136 </span>                :<span class="lineCov">         20 : nxm_reg_move_from_openflow(const struct nx_action_reg_move *narm,</span>
+<span class="lineNum">    1137 </span>                :            :                            struct ofpbuf *ofpacts)
+<span class="lineNum">    1138 </span>                :            : {
+<span class="lineNum">    1139 </span>                :            :     struct ofpact_reg_move *move;
+<span class="lineNum">    1140 </span>                :            : 
+<span class="lineNum">    1141 </span>                :<span class="lineCov">         20 :     move = ofpact_put_REG_MOVE(ofpacts);</span>
+<span class="lineNum">    1142 </span>                :<span class="lineCov">         20 :     move-&gt;src.field = mf_from_nxm_header(ntohl(narm-&gt;src));</span>
+<span class="lineNum">    1143 </span>                :<span class="lineCov">         20 :     move-&gt;src.ofs = ntohs(narm-&gt;src_ofs);</span>
+<span class="lineNum">    1144 </span>                :<span class="lineCov">         20 :     move-&gt;src.n_bits = ntohs(narm-&gt;n_bits);</span>
+<span class="lineNum">    1145 </span>                :<span class="lineCov">         20 :     move-&gt;dst.field = mf_from_nxm_header(ntohl(narm-&gt;dst));</span>
+<span class="lineNum">    1146 </span>                :<span class="lineCov">         20 :     move-&gt;dst.ofs = ntohs(narm-&gt;dst_ofs);</span>
+<span class="lineNum">    1147 </span>                :<span class="lineCov">         20 :     move-&gt;dst.n_bits = ntohs(narm-&gt;n_bits);</span>
+<span class="lineNum">    1148 </span>                :            : 
+<span class="lineNum">    1149 </span>                :<span class="lineCov">         20 :     return nxm_reg_move_check(move, NULL);</span>
+<span class="lineNum">    1150 </span>                :            : }
+<a name="1151"><span class="lineNum">    1151 </span>                :            : </a>
+<span class="lineNum">    1152 </span>                :            : enum ofperr
+<span class="lineNum">    1153 </span>                :<span class="lineCov">        295 : nxm_reg_load_from_openflow(const struct nx_action_reg_load *narl,</span>
+<span class="lineNum">    1154 </span>                :            :                            struct ofpbuf *ofpacts)
+<span class="lineNum">    1155 </span>                :            : {
+<span class="lineNum">    1156 </span>                :            :     struct ofpact_reg_load *load;
+<span class="lineNum">    1157 </span>                :            : 
+<span class="lineNum">    1158 </span>                :<span class="lineCov">        295 :     load = ofpact_put_REG_LOAD(ofpacts);</span>
+<span class="lineNum">    1159 </span>                :<span class="lineCov">        295 :     load-&gt;dst.field = mf_from_nxm_header(ntohl(narl-&gt;dst));</span>
+<span class="lineNum">    1160 </span>                :<span class="lineCov">        295 :     load-&gt;dst.ofs = nxm_decode_ofs(narl-&gt;ofs_nbits);</span>
+<span class="lineNum">    1161 </span>                :<span class="lineCov">        295 :     load-&gt;dst.n_bits = nxm_decode_n_bits(narl-&gt;ofs_nbits);</span>
+<span class="lineNum">    1162 </span>                :<span class="lineCov">        295 :     load-&gt;subvalue.be64[1] = narl-&gt;value;</span>
+<span class="lineNum">    1163 </span>                :            : 
+<span class="lineNum">    1164 </span>                :            :     /* Reject 'narl' if a bit numbered 'n_bits' or higher is set to 1 in
+<span class="lineNum">    1165 </span>                :            :      * narl-&gt;value. */
+<span class="lineNum">    1166 </span>  [<span class="branchCov" title="Branch 0 was taken 273 times"> + </span><span class="branchCov" title="Branch 1 was taken 22 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 273 times"> + </span>]:<span class="lineCov">        568 :     if (load-&gt;dst.n_bits &lt; 64 &amp;&amp;</span>
+<span class="lineNum">    1167 </span>                :<span class="lineCov">        273 :         ntohll(narl-&gt;value) &gt;&gt; load-&gt;dst.n_bits) {</span>
+<span class="lineNum">    1168 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBAC_BAD_ARGUMENT;</span>
+<span class="lineNum">    1169 </span>                :            :     }
+<span class="lineNum">    1170 </span>                :            : 
+<span class="lineNum">    1171 </span>                :<span class="lineCov">        295 :     return nxm_reg_load_check(load, NULL);</span>
+<span class="lineNum">    1172 </span>                :            : }
+<a name="1173"><span class="lineNum">    1173 </span>                :            : </a>
+<span class="lineNum">    1174 </span>                :            : enum ofperr
+<span class="lineNum">    1175 </span>                :<span class="lineCov">         46 : nxm_reg_move_check(const struct ofpact_reg_move *move, const struct flow *flow)</span>
+<span class="lineNum">    1176 </span>                :            : {
+<span class="lineNum">    1177 </span>                :            :     enum ofperr error;
+<span class="lineNum">    1178 </span>                :            : 
+<span class="lineNum">    1179 </span>                :<span class="lineCov">         46 :     error = mf_check_src(&amp;move-&gt;src, flow);</span>
+<span class="lineNum">    1180 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 46 times"> + </span>]:<span class="lineCov">         46 :     if (error) {</span>
+<span class="lineNum">    1181 </span>                :<span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">    1182 </span>                :            :     }
+<span class="lineNum">    1183 </span>                :            : 
+<span class="lineNum">    1184 </span>                :<span class="lineCov">         46 :     return mf_check_dst(&amp;move-&gt;dst, NULL);</span>
+<span class="lineNum">    1185 </span>                :            : }
+<a name="1186"><span class="lineNum">    1186 </span>                :            : </a>
+<span class="lineNum">    1187 </span>                :            : enum ofperr
+<span class="lineNum">    1188 </span>                :<span class="lineCov">        550 : nxm_reg_load_check(const struct ofpact_reg_load *load, const struct flow *flow)</span>
+<span class="lineNum">    1189 </span>                :            : {
+<span class="lineNum">    1190 </span>                :<span class="lineCov">        550 :     return mf_check_dst(&amp;load-&gt;dst, flow);</span>
+<span class="lineNum">    1191 </span>                :            : }
+<a name="1192"><span class="lineNum">    1192 </span>                :            : </a>
+<span class="lineNum">    1193 </span>                :            : void
+<span class="lineNum">    1194 </span>                :<span class="lineCov">         13 : nxm_reg_move_to_nxast(const struct ofpact_reg_move *move,</span>
+<span class="lineNum">    1195 </span>                :            :                       struct ofpbuf *openflow)
+<span class="lineNum">    1196 </span>                :            : {
+<span class="lineNum">    1197 </span>                :            :     struct nx_action_reg_move *narm;
+<span class="lineNum">    1198 </span>                :            : 
+<span class="lineNum">    1199 </span>                :<span class="lineCov">         13 :     narm = ofputil_put_NXAST_REG_MOVE(openflow);</span>
+<span class="lineNum">    1200 </span>                :<span class="lineCov">         13 :     narm-&gt;n_bits = htons(move-&gt;dst.n_bits);</span>
+<span class="lineNum">    1201 </span>                :<span class="lineCov">         13 :     narm-&gt;src_ofs = htons(move-&gt;src.ofs);</span>
+<span class="lineNum">    1202 </span>                :<span class="lineCov">         13 :     narm-&gt;dst_ofs = htons(move-&gt;dst.ofs);</span>
+<span class="lineNum">    1203 </span>                :<span class="lineCov">         13 :     narm-&gt;src = htonl(move-&gt;src.field-&gt;nxm_header);</span>
+<span class="lineNum">    1204 </span>                :<span class="lineCov">         13 :     narm-&gt;dst = htonl(move-&gt;dst.field-&gt;nxm_header);</span>
+<span class="lineNum">    1205 </span>                :<span class="lineCov">         13 : }</span>
+<a name="1206"><span class="lineNum">    1206 </span>                :            : </a>
+<span class="lineNum">    1207 </span>                :            : void
+<span class="lineNum">    1208 </span>                :<span class="lineCov">        139 : nxm_reg_load_to_nxast(const struct ofpact_reg_load *load,</span>
+<span class="lineNum">    1209 </span>                :            :                       struct ofpbuf *openflow)
+<span class="lineNum">    1210 </span>                :            : {
+<span class="lineNum">    1211 </span>                :            :     struct nx_action_reg_load *narl;
+<span class="lineNum">    1212 </span>                :            : 
+<span class="lineNum">    1213 </span>                :<span class="lineCov">        139 :     narl = ofputil_put_NXAST_REG_LOAD(openflow);</span>
+<span class="lineNum">    1214 </span>                :<span class="lineCov">        139 :     narl-&gt;ofs_nbits = nxm_encode_ofs_nbits(load-&gt;dst.ofs, load-&gt;dst.n_bits);</span>
+<span class="lineNum">    1215 </span>                :<span class="lineCov">        139 :     narl-&gt;dst = htonl(load-&gt;dst.field-&gt;nxm_header);</span>
+<span class="lineNum">    1216 </span>                :<span class="lineCov">        139 :     narl-&gt;value = load-&gt;subvalue.be64[1];</span>
+<span class="lineNum">    1217 </span>                :<span class="lineCov">        139 : }</span>
+<span class="lineNum">    1218 </span>                :            : 
+<span class="lineNum">    1219 </span>                :            : /* nxm_execute_reg_move(), nxm_execute_reg_load(). */
+<a name="1220"><span class="lineNum">    1220 </span>                :            : </a>
+<span class="lineNum">    1221 </span>                :            : void
+<span class="lineNum">    1222 </span>                :<span class="lineCov">         11 : nxm_execute_reg_move(const struct ofpact_reg_move *move,</span>
+<span class="lineNum">    1223 </span>                :            :                      struct flow *flow, struct flow_wildcards *wc)
+<span class="lineNum">    1224 </span>                :            : {
+<span class="lineNum">    1225 </span>                :            :     union mf_value src_value;
+<span class="lineNum">    1226 </span>                :            :     union mf_value dst_value;
+<span class="lineNum">    1227 </span>                :            : 
+<span class="lineNum">    1228 </span>                :<span class="lineCov">         11 :     mf_mask_field_and_prereqs(move-&gt;dst.field, &amp;wc-&gt;masks);</span>
+<span class="lineNum">    1229 </span>                :<span class="lineCov">         11 :     mf_mask_field_and_prereqs(move-&gt;src.field, &amp;wc-&gt;masks);</span>
+<span class="lineNum">    1230 </span>                :            : 
+<span class="lineNum">    1231 </span>                :<span class="lineCov">         11 :     mf_get_value(move-&gt;dst.field, flow, &amp;dst_value);</span>
+<span class="lineNum">    1232 </span>                :<span class="lineCov">         11 :     mf_get_value(move-&gt;src.field, flow, &amp;src_value);</span>
+<span class="lineNum">    1233 </span>                :<span class="lineCov">         11 :     bitwise_copy(&amp;src_value, move-&gt;src.field-&gt;n_bytes, move-&gt;src.ofs,</span>
+<span class="lineNum">    1234 </span>                :<span class="lineCov">         11 :                  &amp;dst_value, move-&gt;dst.field-&gt;n_bytes, move-&gt;dst.ofs,</span>
+<span class="lineNum">    1235 </span>                :            :                  move-&gt;src.n_bits);
+<span class="lineNum">    1236 </span>                :<span class="lineCov">         11 :     mf_set_flow_value(move-&gt;dst.field, &amp;dst_value, flow);</span>
+<span class="lineNum">    1237 </span>                :<span class="lineCov">         11 : }</span>
+<a name="1238"><span class="lineNum">    1238 </span>                :            : </a>
+<span class="lineNum">    1239 </span>                :            : void
+<span class="lineNum">    1240 </span>                :<span class="lineCov">        243 : nxm_execute_reg_load(const struct ofpact_reg_load *load, struct flow *flow,</span>
+<span class="lineNum">    1241 </span>                :            :                      struct flow_wildcards *wc)
+<span class="lineNum">    1242 </span>                :            : {
+<span class="lineNum">    1243 </span>                :            :     /* Since at the datapath interface we do not have set actions for
+<span class="lineNum">    1244 </span>                :            :      * individual fields, but larger sets of fields for a given protocol
+<span class="lineNum">    1245 </span>                :            :      * layer, the set action will in practice only ever apply to exactly
+<span class="lineNum">    1246 </span>                :            :      * matched flows for the given protocol layer.  For example, if the
+<span class="lineNum">    1247 </span>                :            :      * reg_load changes the IP TTL, the corresponding datapath action will
+<span class="lineNum">    1248 </span>                :            :      * rewrite also the IP addresses and TOS byte.  Since these other field
+<span class="lineNum">    1249 </span>                :            :      * values may not be explicitly set, they depend on the incoming flow field
+<span class="lineNum">    1250 </span>                :            :      * values, and are hence all of them are set in the wildcards masks, when
+<span class="lineNum">    1251 </span>                :            :      * the action is committed to the datapath.  For the rare case, where the
+<span class="lineNum">    1252 </span>                :            :      * reg_load action does not actually change the value, and no other flow
+<span class="lineNum">    1253 </span>                :            :      * field values are set (or loaded), the datapath action is skipped, and
+<span class="lineNum">    1254 </span>                :            :      * no mask bits are set.  Such a datapath flow should, however, be
+<span class="lineNum">    1255 </span>                :            :      * dependent on the specific field value, so the corresponding wildcard
+<span class="lineNum">    1256 </span>                :            :      * mask bits must be set, lest the datapath flow be applied to packets
+<span class="lineNum">    1257 </span>                :            :      * containing some other value in the field and the field value remain
+<span class="lineNum">    1258 </span>                :            :      * unchanged regardless of the incoming value.
+<span class="lineNum">    1259 </span>                :            :      *
+<span class="lineNum">    1260 </span>                :            :      * We set the masks here for the whole fields, and their prerequisities.
+<span class="lineNum">    1261 </span>                :            :      * Even if only the lower byte of a TCP destination port is set,
+<span class="lineNum">    1262 </span>                :            :      * we set the mask for the whole field, and also the ip_proto in the IP
+<span class="lineNum">    1263 </span>                :            :      * header, so that the kernel flow would not be applied on, e.g., a UDP
+<span class="lineNum">    1264 </span>                :            :      * packet, or any other IP protocol in addition to TCP packets.
+<span class="lineNum">    1265 </span>                :            :      */
+<span class="lineNum">    1266 </span>                :<span class="lineCov">        243 :     mf_mask_field_and_prereqs(load-&gt;dst.field, &amp;wc-&gt;masks);</span>
+<span class="lineNum">    1267 </span>                :<span class="lineCov">        243 :     mf_write_subfield_flow(&amp;load-&gt;dst, &amp;load-&gt;subvalue, flow);</span>
+<span class="lineNum">    1268 </span>                :<span class="lineCov">        243 : }</span>
+<a name="1269"><span class="lineNum">    1269 </span>                :            : </a>
+<span class="lineNum">    1270 </span>                :            : void
+<span class="lineNum">    1271 </span>                :<span class="lineCov">   33030152 : nxm_reg_load(const struct mf_subfield *dst, uint64_t src_data,</span>
+<span class="lineNum">    1272 </span>                :            :              struct flow *flow, struct flow_wildcards *wc)
+<span class="lineNum">    1273 </span>                :            : {
+<span class="lineNum">    1274 </span>                :            :     union mf_subvalue src_subvalue;
+<span class="lineNum">    1275 </span>                :            :     union mf_subvalue mask_value;
+<span class="lineNum">    1276 </span>                :<span class="lineCov">   33030152 :     ovs_be64 src_data_be = htonll(src_data);</span>
+<span class="lineNum">    1277 </span>                :            : 
+<span class="lineNum">    1278 </span>                :<span class="lineCov">   33030152 :     memset(&amp;mask_value, 0xff, sizeof mask_value);</span>
+<span class="lineNum">    1279 </span>                :<span class="lineCov">   33030152 :     mf_write_subfield_flow(dst, &amp;mask_value, &amp;wc-&gt;masks);</span>
+<span class="lineNum">    1280 </span>                :            : 
+<span class="lineNum">    1281 </span>                :<span class="lineCov">   33030152 :     bitwise_copy(&amp;src_data_be, sizeof src_data_be, 0,</span>
+<span class="lineNum">    1282 </span>                :            :                  &amp;src_subvalue, sizeof src_subvalue, 0,
+<span class="lineNum">    1283 </span>                :            :                  sizeof src_data_be * 8);
+<span class="lineNum">    1284 </span>                :<span class="lineCov">   33030152 :     mf_write_subfield_flow(dst, &amp;src_subvalue, flow);</span>
+<span class="lineNum">    1285 </span>                :<span class="lineCov">   33030152 : }</span>
+<span class="lineNum">    1286 </span>                :            : 
+<span class="lineNum">    1287 </span>                :            : /* nxm_parse_stack_action, works for both push() and pop(). */
+<span class="lineNum">    1288 </span>                :            : 
+<span class="lineNum">    1289 </span>                :            : /* Parses 's' as a &quot;push&quot; or &quot;pop&quot; action, in the form described in
+<span class="lineNum">    1290 </span>                :            :  * ovs-ofctl(8), into '*stack_action'.
+<span class="lineNum">    1291 </span>                :            :  *
+<span class="lineNum">    1292 </span>                :            :  * Returns NULL if successful, otherwise a malloc()'d string describing the
+<a name="1293"><span class="lineNum">    1293 </span>                :            :  * error.  The caller is responsible for freeing the returned string. */</a>
+<span class="lineNum">    1294 </span>                :            : char * WARN_UNUSED_RESULT
+<span class="lineNum">    1295 </span>                :<span class="lineCov">         21 : nxm_parse_stack_action(struct ofpact_stack *stack_action, const char *s)</span>
+<span class="lineNum">    1296 </span>                :            : {
+<span class="lineNum">    1297 </span>                :            :     char *error;
+<span class="lineNum">    1298 </span>                :            : 
+<span class="lineNum">    1299 </span>                :<span class="lineCov">         21 :     error = mf_parse_subfield__(&amp;stack_action-&gt;subfield, &amp;s);</span>
+<span class="lineNum">    1300 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 21 times"> + </span>]:<span class="lineCov">         21 :     if (error) {</span>
+<span class="lineNum">    1301 </span>                :<span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">    1302 </span>                :            :     }
+<span class="lineNum">    1303 </span>                :            : 
+<span class="lineNum">    1304 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 21 times"> + </span>]:<span class="lineCov">         21 :     if (*s != '\0') {</span>
+<span class="lineNum">    1305 </span>                :<span class="lineNoCov">          0 :         return xasprintf(&quot;%s: trailing garbage following push or pop&quot;, s);</span>
+<span class="lineNum">    1306 </span>                :            :     }
+<span class="lineNum">    1307 </span>                :            : 
+<span class="lineNum">    1308 </span>                :<span class="lineCov">         21 :     return NULL;</span>
+<span class="lineNum">    1309 </span>                :            : }
+<a name="1310"><span class="lineNum">    1310 </span>                :            : </a>
+<span class="lineNum">    1311 </span>                :            : void
+<span class="lineNum">    1312 </span>                :<span class="lineCov">       4117 : nxm_format_stack_push(const struct ofpact_stack *push, struct ds *s)</span>
+<span class="lineNum">    1313 </span>                :            : {
+<span class="lineNum">    1314 </span>                :<span class="lineCov">       4117 :     ds_put_cstr(s, &quot;push:&quot;);</span>
+<span class="lineNum">    1315 </span>                :<span class="lineCov">       4117 :     mf_format_subfield(&amp;push-&gt;subfield, s);</span>
+<span class="lineNum">    1316 </span>                :<span class="lineCov">       4117 : }</span>
+<a name="1317"><span class="lineNum">    1317 </span>                :            : </a>
+<span class="lineNum">    1318 </span>                :            : void
+<span class="lineNum">    1319 </span>                :<span class="lineCov">         12 : nxm_format_stack_pop(const struct ofpact_stack *pop, struct ds *s)</span>
+<span class="lineNum">    1320 </span>                :            : {
+<span class="lineNum">    1321 </span>                :<span class="lineCov">         12 :     ds_put_cstr(s, &quot;pop:&quot;);</span>
+<span class="lineNum">    1322 </span>                :<span class="lineCov">         12 :     mf_format_subfield(&amp;pop-&gt;subfield, s);</span>
+<span class="lineNum">    1323 </span>                :<span class="lineCov">         12 : }</span>
+<span class="lineNum">    1324 </span>                :            : 
+<a name="1325"><span class="lineNum">    1325 </span>                :            : /* Common set for both push and pop actions. */</a>
+<span class="lineNum">    1326 </span>                :            : static void
+<span class="lineNum">    1327 </span>                :<span class="lineCov">         44 : stack_action_from_openflow__(const struct nx_action_stack *nasp,</span>
+<span class="lineNum">    1328 </span>                :            :                                     struct ofpact_stack *stack_action)
+<span class="lineNum">    1329 </span>                :            : {
+<span class="lineNum">    1330 </span>                :<span class="lineCov">         44 :     stack_action-&gt;subfield.field = mf_from_nxm_header(ntohl(nasp-&gt;field));</span>
+<span class="lineNum">    1331 </span>                :<span class="lineCov">         44 :     stack_action-&gt;subfield.ofs = ntohs(nasp-&gt;offset);</span>
+<span class="lineNum">    1332 </span>                :<span class="lineCov">         44 :     stack_action-&gt;subfield.n_bits = ntohs(nasp-&gt;n_bits);</span>
+<span class="lineNum">    1333 </span>                :<span class="lineCov">         44 : }</span>
+<a name="1334"><span class="lineNum">    1334 </span>                :            : </a>
+<span class="lineNum">    1335 </span>                :            : static void
+<span class="lineNum">    1336 </span>                :<span class="lineCov">         23 : nxm_stack_to_nxast__(const struct ofpact_stack *stack_action,</span>
+<span class="lineNum">    1337 </span>                :            :                             struct nx_action_stack *nasp)
+<span class="lineNum">    1338 </span>                :            : {
+<span class="lineNum">    1339 </span>                :<span class="lineCov">         23 :     nasp-&gt;offset = htons(stack_action-&gt;subfield.ofs);</span>
+<span class="lineNum">    1340 </span>                :<span class="lineCov">         23 :     nasp-&gt;n_bits = htons(stack_action-&gt;subfield.n_bits);</span>
+<span class="lineNum">    1341 </span>                :<span class="lineCov">         23 :     nasp-&gt;field = htonl(stack_action-&gt;subfield.field-&gt;nxm_header);</span>
+<span class="lineNum">    1342 </span>                :<span class="lineCov">         23 : }</span>
+<a name="1343"><span class="lineNum">    1343 </span>                :            : </a>
+<span class="lineNum">    1344 </span>                :            : enum ofperr
+<span class="lineNum">    1345 </span>                :<span class="lineCov">         31 : nxm_stack_push_from_openflow(const struct nx_action_stack *nasp,</span>
+<span class="lineNum">    1346 </span>                :            :                              struct ofpbuf *ofpacts)
+<span class="lineNum">    1347 </span>                :            : {
+<span class="lineNum">    1348 </span>                :            :     struct ofpact_stack *push;
+<span class="lineNum">    1349 </span>                :            : 
+<span class="lineNum">    1350 </span>                :<span class="lineCov">         31 :     push = ofpact_put_STACK_PUSH(ofpacts);</span>
+<span class="lineNum">    1351 </span>                :<span class="lineCov">         31 :     stack_action_from_openflow__(nasp, push);</span>
+<span class="lineNum">    1352 </span>                :            : 
+<span class="lineNum">    1353 </span>                :<span class="lineCov">         31 :     return nxm_stack_push_check(push, NULL);</span>
+<span class="lineNum">    1354 </span>                :            : }
+<a name="1355"><span class="lineNum">    1355 </span>                :            : </a>
+<span class="lineNum">    1356 </span>                :            : enum ofperr
+<span class="lineNum">    1357 </span>                :<span class="lineCov">         13 : nxm_stack_pop_from_openflow(const struct nx_action_stack *nasp,</span>
+<span class="lineNum">    1358 </span>                :            :                              struct ofpbuf *ofpacts)
+<span class="lineNum">    1359 </span>                :            : {
+<span class="lineNum">    1360 </span>                :            :     struct ofpact_stack *pop;
+<span class="lineNum">    1361 </span>                :            : 
+<span class="lineNum">    1362 </span>                :<span class="lineCov">         13 :     pop = ofpact_put_STACK_POP(ofpacts);</span>
+<span class="lineNum">    1363 </span>                :<span class="lineCov">         13 :     stack_action_from_openflow__(nasp, pop);</span>
+<span class="lineNum">    1364 </span>                :            : 
+<span class="lineNum">    1365 </span>                :<span class="lineCov">         13 :     return nxm_stack_pop_check(pop, NULL);</span>
+<span class="lineNum">    1366 </span>                :            : }
+<a name="1367"><span class="lineNum">    1367 </span>                :            : </a>
+<span class="lineNum">    1368 </span>                :            : enum ofperr
+<span class="lineNum">    1369 </span>                :<span class="lineCov">         75 : nxm_stack_push_check(const struct ofpact_stack *push,</span>
+<span class="lineNum">    1370 </span>                :            :                      const struct flow *flow)
+<span class="lineNum">    1371 </span>                :            : {
+<span class="lineNum">    1372 </span>                :<span class="lineCov">         75 :     return mf_check_src(&amp;push-&gt;subfield, flow);</span>
+<span class="lineNum">    1373 </span>                :            : }
+<a name="1374"><span class="lineNum">    1374 </span>                :            : </a>
+<span class="lineNum">    1375 </span>                :            : enum ofperr
+<span class="lineNum">    1376 </span>                :<span class="lineCov">         30 : nxm_stack_pop_check(const struct ofpact_stack *pop,</span>
+<span class="lineNum">    1377 </span>                :            :                     const struct flow *flow)
+<span class="lineNum">    1378 </span>                :            : {
+<span class="lineNum">    1379 </span>                :<span class="lineCov">         30 :     return mf_check_dst(&amp;pop-&gt;subfield, flow);</span>
+<span class="lineNum">    1380 </span>                :            : }
+<a name="1381"><span class="lineNum">    1381 </span>                :            : </a>
+<span class="lineNum">    1382 </span>                :            : void
+<span class="lineNum">    1383 </span>                :<span class="lineCov">         16 : nxm_stack_push_to_nxast(const struct ofpact_stack *stack,</span>
+<span class="lineNum">    1384 </span>                :            :                         struct ofpbuf *openflow)
+<span class="lineNum">    1385 </span>                :            : {
+<span class="lineNum">    1386 </span>                :<span class="lineCov">         16 :     nxm_stack_to_nxast__(stack, ofputil_put_NXAST_STACK_PUSH(openflow));</span>
+<span class="lineNum">    1387 </span>                :<span class="lineCov">         16 : }</span>
+<a name="1388"><span class="lineNum">    1388 </span>                :            : </a>
+<span class="lineNum">    1389 </span>                :            : void
+<span class="lineNum">    1390 </span>                :<span class="lineCov">          7 : nxm_stack_pop_to_nxast(const struct ofpact_stack *stack,</span>
+<span class="lineNum">    1391 </span>                :            :                        struct ofpbuf *openflow)
+<span class="lineNum">    1392 </span>                :            : {
+<span class="lineNum">    1393 </span>                :<span class="lineCov">          7 :     nxm_stack_to_nxast__(stack, ofputil_put_NXAST_STACK_POP(openflow));</span>
+<span class="lineNum">    1394 </span>                :<span class="lineCov">          7 : }</span>
+<span class="lineNum">    1395 </span>                :            : 
+<a name="1396"><span class="lineNum">    1396 </span>                :            : /* nxm_execute_stack_push(), nxm_execute_stack_pop(). */</a>
+<span class="lineNum">    1397 </span>                :            : static void
+<span class="lineNum">    1398 </span>                :<span class="lineCov">       4106 : nx_stack_push(struct ofpbuf *stack, union mf_subvalue *v)</span>
+<span class="lineNum">    1399 </span>                :            : {
+<span class="lineNum">    1400 </span>                :<span class="lineCov">       4106 :     ofpbuf_put(stack, v, sizeof *v);</span>
+<span class="lineNum">    1401 </span>                :<span class="lineCov">       4106 : }</span>
+<a name="1402"><span class="lineNum">    1402 </span>                :            : </a>
+<span class="lineNum">    1403 </span>                :            : static union mf_subvalue *
+<span class="lineNum">    1404 </span>                :<span class="lineCov">          8 : nx_stack_pop(struct ofpbuf *stack)</span>
+<span class="lineNum">    1405 </span>                :            : {
+<span class="lineNum">    1406 </span>                :<span class="lineCov">          8 :     union mf_subvalue *v = NULL;</span>
+<span class="lineNum">    1407 </span>                :            : 
+<span class="lineNum">    1408 </span>        [<span class="branchCov" title="Branch 1 was taken 8 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">          8 :     if (ofpbuf_size(stack)) {</span>
+<span class="lineNum">    1409 </span>                :            : 
+<span class="lineNum">    1410 </span>                :<span class="lineCov">          8 :         ofpbuf_set_size(stack, ofpbuf_size(stack) - sizeof *v);</span>
+<span class="lineNum">    1411 </span>                :<span class="lineCov">          8 :         v = (union mf_subvalue *) ofpbuf_tail(stack);</span>
+<span class="lineNum">    1412 </span>                :            :     }
+<span class="lineNum">    1413 </span>                :            : 
+<span class="lineNum">    1414 </span>                :<span class="lineCov">          8 :     return v;</span>
+<span class="lineNum">    1415 </span>                :            : }
+<a name="1416"><span class="lineNum">    1416 </span>                :            : </a>
+<span class="lineNum">    1417 </span>                :            : void
+<span class="lineNum">    1418 </span>                :<span class="lineCov">       4106 : nxm_execute_stack_push(const struct ofpact_stack *push,</span>
+<span class="lineNum">    1419 </span>                :            :                        const struct flow *flow, struct flow_wildcards *wc,
+<span class="lineNum">    1420 </span>                :            :                        struct ofpbuf *stack)
+<span class="lineNum">    1421 </span>                :            : {
+<span class="lineNum">    1422 </span>                :            :     union mf_subvalue mask_value;
+<span class="lineNum">    1423 </span>                :            :     union mf_subvalue dst_value;
+<span class="lineNum">    1424 </span>                :            : 
+<span class="lineNum">    1425 </span>                :<span class="lineCov">       4106 :     memset(&amp;mask_value, 0xff, sizeof mask_value);</span>
+<span class="lineNum">    1426 </span>                :<span class="lineCov">       4106 :     mf_write_subfield_flow(&amp;push-&gt;subfield, &amp;mask_value, &amp;wc-&gt;masks);</span>
+<span class="lineNum">    1427 </span>                :            : 
+<span class="lineNum">    1428 </span>                :<span class="lineCov">       4106 :     mf_read_subfield(&amp;push-&gt;subfield, flow, &amp;dst_value);</span>
+<span class="lineNum">    1429 </span>                :<span class="lineCov">       4106 :     nx_stack_push(stack, &amp;dst_value);</span>
+<span class="lineNum">    1430 </span>                :<span class="lineCov">       4106 : }</span>
+<a name="1431"><span class="lineNum">    1431 </span>                :            : </a>
+<span class="lineNum">    1432 </span>                :            : void
+<span class="lineNum">    1433 </span>                :<span class="lineCov">          8 : nxm_execute_stack_pop(const struct ofpact_stack *pop,</span>
+<span class="lineNum">    1434 </span>                :            :                       struct flow *flow, struct flow_wildcards *wc,
+<span class="lineNum">    1435 </span>                :            :                       struct ofpbuf *stack)
+<span class="lineNum">    1436 </span>                :            : {
+<span class="lineNum">    1437 </span>                :            :     union mf_subvalue *src_value;
+<span class="lineNum">    1438 </span>                :            : 
+<span class="lineNum">    1439 </span>                :<span class="lineCov">          8 :     src_value = nx_stack_pop(stack);</span>
+<span class="lineNum">    1440 </span>                :            : 
+<span class="lineNum">    1441 </span>                :            :     /* Only pop if stack is not empty. Otherwise, give warning. */
+<span class="lineNum">    1442 </span>        [<span class="branchCov" title="Branch 0 was taken 8 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          8 :     if (src_value) {</span>
+<span class="lineNum">    1443 </span>                :            :         union mf_subvalue mask_value;
+<span class="lineNum">    1444 </span>                :            : 
+<span class="lineNum">    1445 </span>                :<span class="lineCov">          8 :         memset(&amp;mask_value, 0xff, sizeof mask_value);</span>
+<span class="lineNum">    1446 </span>                :<span class="lineCov">          8 :         mf_write_subfield_flow(&amp;pop-&gt;subfield, &amp;mask_value, &amp;wc-&gt;masks);</span>
+<span class="lineNum">    1447 </span>                :<span class="lineCov">          8 :         mf_write_subfield_flow(&amp;pop-&gt;subfield, src_value, flow);</span>
+<span class="lineNum">    1448 </span>                :            :     } else {
+<span class="lineNum">    1449 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!VLOG_DROP_WARN(&amp;rl)) {</span>
+<span class="lineNum">    1450 </span>                :<span class="lineNoCov">          0 :             char *flow_str = flow_to_string(flow);</span>
+<span class="lineNum">    1451 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN_RL(&amp;rl, &quot;Failed to pop from an empty stack. On flow \n&quot;</span>
+<span class="lineNum">    1452 </span>                :            :                            &quot; %s&quot;, flow_str);
+<span class="lineNum">    1453 </span>                :<span class="lineNoCov">          0 :             free(flow_str);</span>
+<span class="lineNum">    1454 </span>                :            :         }
+<span class="lineNum">    1455 </span>                :            :     }
+<span class="lineNum">    1456 </span>                :<span class="lineCov">          8 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

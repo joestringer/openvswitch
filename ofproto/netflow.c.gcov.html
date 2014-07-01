@@ -1,0 +1,555 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ofproto/netflow.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">ofproto</a> - netflow.c<span style="font-size: 80%;"> (source / <a href="netflow.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">190</td>
+            <td class="headerCovTableEntry">206</td>
+            <td class="headerCovTableEntryHi">92.2 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">16</td>
+            <td class="headerCovTableEntry">16</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">55</td>
+            <td class="headerCovTableEntry">78</td>
+            <td class="headerCovTableEntryLo">70.5 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2008, 2009, 2010, 2011, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;netflow.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &lt;arpa/inet.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;unistd.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &quot;byte-order.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;collectors.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;dpif.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;flow.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;lib/netflow.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;ofproto.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;ofproto/netflow.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;packets.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;socket-util.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;util.h&quot;
+<a name="36"><span class="lineNum">      36 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      37 </span>                :            : 
+<span class="lineNum">      38 </span>                :<span class="lineCov">        525 : VLOG_DEFINE_THIS_MODULE(netflow);</span>
+<span class="lineNum">      39 </span>                :            : 
+<span class="lineNum">      40 </span>                :            : struct netflow {
+<span class="lineNum">      41 </span>                :            :     uint8_t engine_type;          /* Value of engine_type to use. */
+<span class="lineNum">      42 </span>                :            :     uint8_t engine_id;            /* Value of engine_id to use. */
+<span class="lineNum">      43 </span>                :            :     long long int boot_time;      /* Time when netflow_create() was called. */
+<span class="lineNum">      44 </span>                :            :     struct collectors *collectors; /* NetFlow collectors. */
+<span class="lineNum">      45 </span>                :            :     bool add_id_to_iface;         /* Put the 7 least significiant bits of
+<span class="lineNum">      46 </span>                :            :                                    * 'engine_id' into the most significant
+<span class="lineNum">      47 </span>                :            :                                    * bits of the interface fields. */
+<span class="lineNum">      48 </span>                :            :     uint32_t netflow_cnt;         /* Flow sequence number for NetFlow. */
+<span class="lineNum">      49 </span>                :            :     struct ofpbuf packet;         /* NetFlow packet being accumulated. */
+<span class="lineNum">      50 </span>                :            :     long long int active_timeout; /* Timeout for flows that are still active. */
+<span class="lineNum">      51 </span>                :            :     long long int next_timeout;   /* Next scheduled active timeout. */
+<span class="lineNum">      52 </span>                :            :     long long int reconfig_time;  /* When we reconfigured the timeouts. */
+<span class="lineNum">      53 </span>                :            : 
+<span class="lineNum">      54 </span>                :            :     struct hmap flows;            /* Contains 'netflow_flows'. */
+<span class="lineNum">      55 </span>                :            : 
+<span class="lineNum">      56 </span>                :            :     struct ovs_refcount ref_cnt;
+<span class="lineNum">      57 </span>                :            : };
+<span class="lineNum">      58 </span>                :            : 
+<span class="lineNum">      59 </span>                :            : struct netflow_flow {
+<span class="lineNum">      60 </span>                :            :     struct hmap_node hmap_node;
+<span class="lineNum">      61 </span>                :            : 
+<span class="lineNum">      62 </span>                :            :     long long int last_expired;   /* Time this flow last timed out. */
+<span class="lineNum">      63 </span>                :            :     long long int created;        /* Time flow was created since time out. */
+<span class="lineNum">      64 </span>                :            : 
+<span class="lineNum">      65 </span>                :            :     ofp_port_t output_iface;      /* Output interface index. */
+<span class="lineNum">      66 </span>                :            :     uint16_t tcp_flags;           /* Bitwise-OR of all TCP flags seen. */
+<span class="lineNum">      67 </span>                :            : 
+<span class="lineNum">      68 </span>                :            :     ofp_port_t in_port;           /* Input port. */
+<span class="lineNum">      69 </span>                :            :     ovs_be32 nw_src;              /* IPv4 source address. */
+<span class="lineNum">      70 </span>                :            :     ovs_be32 nw_dst;              /* IPv4 destination address. */
+<span class="lineNum">      71 </span>                :            :     uint8_t nw_tos;               /* IP ToS (including DSCP and ECN). */
+<span class="lineNum">      72 </span>                :            :     uint8_t nw_proto;             /* IP protocol. */
+<span class="lineNum">      73 </span>                :            :     ovs_be16 tp_src;              /* TCP/UDP/SCTP source port. */
+<span class="lineNum">      74 </span>                :            :     ovs_be16 tp_dst;              /* TCP/UDP/SCTP destination port. */
+<span class="lineNum">      75 </span>                :            : 
+<span class="lineNum">      76 </span>                :            :     uint64_t packet_count;        /* Packets from subrules. */
+<span class="lineNum">      77 </span>                :            :     uint64_t byte_count;          /* Bytes from subrules. */
+<span class="lineNum">      78 </span>                :            :     long long int used;           /* Last-used time (0 if never used). */
+<span class="lineNum">      79 </span>                :            : };
+<span class="lineNum">      80 </span>                :            : 
+<span class="lineNum">      81 </span>                :            : static struct ovs_mutex mutex = OVS_MUTEX_INITIALIZER;
+<span class="lineNum">      82 </span>                :            : static atomic_uint netflow_count = ATOMIC_VAR_INIT(0);
+<span class="lineNum">      83 </span>                :            : 
+<span class="lineNum">      84 </span>                :            : static struct netflow_flow *netflow_flow_lookup(const struct netflow *,
+<span class="lineNum">      85 </span>                :            :                                                 const struct flow *)
+<span class="lineNum">      86 </span>                :            :     OVS_REQUIRES(mutex);
+<span class="lineNum">      87 </span>                :            : static uint32_t netflow_flow_hash(const struct flow *);
+<span class="lineNum">      88 </span>                :            : static void netflow_expire__(struct netflow *, struct netflow_flow *)
+<span class="lineNum">      89 </span>                :            :     OVS_REQUIRES(mutex);
+<span class="lineNum">      90 </span>                :            : static void netflow_run__(struct netflow *) OVS_REQUIRES(mutex);
+<a name="91"><span class="lineNum">      91 </span>                :            : </a>
+<span class="lineNum">      92 </span>                :            : void
+<span class="lineNum">      93 </span>                :<span class="lineCov">         38 : netflow_mask_wc(struct flow *flow, struct flow_wildcards *wc)</span>
+<span class="lineNum">      94 </span>                :            : {
+<span class="lineNum">      95 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 38 times"> + </span>]:<span class="lineCov">         38 :     if (flow-&gt;dl_type != htons(ETH_TYPE_IP)) {</span>
+<span class="lineNum">      96 </span>                :<span class="lineCov">         38 :         return;</span>
+<span class="lineNum">      97 </span>                :            :     }
+<span class="lineNum">      98 </span>                :<span class="lineCov">         38 :     memset(&amp;wc-&gt;masks.nw_proto, 0xff, sizeof wc-&gt;masks.nw_proto);</span>
+<span class="lineNum">      99 </span>                :<span class="lineCov">         38 :     memset(&amp;wc-&gt;masks.nw_src, 0xff, sizeof wc-&gt;masks.nw_src);</span>
+<span class="lineNum">     100 </span>                :<span class="lineCov">         38 :     memset(&amp;wc-&gt;masks.nw_dst, 0xff, sizeof wc-&gt;masks.nw_dst);</span>
+<span class="lineNum">     101 </span>                :<span class="lineCov">         38 :     flow_unwildcard_tp_ports(flow, wc);</span>
+<span class="lineNum">     102 </span>                :<span class="lineCov">         38 :     wc-&gt;masks.nw_tos |= IP_DSCP_MASK;</span>
+<span class="lineNum">     103 </span>                :            : }
+<a name="104"><span class="lineNum">     104 </span>                :            : </a>
+<span class="lineNum">     105 </span>                :            : static void
+<span class="lineNum">     106 </span>                :<span class="lineCov">         36 : gen_netflow_rec(struct netflow *nf, struct netflow_flow *nf_flow,</span>
+<span class="lineNum">     107 </span>                :            :                 uint32_t packet_count, uint32_t byte_count)
+<span class="lineNum">     108 </span>                :            :     OVS_REQUIRES(mutex)
+<span class="lineNum">     109 </span>                :            : {
+<span class="lineNum">     110 </span>                :            :     struct netflow_v5_header *nf_hdr;
+<span class="lineNum">     111 </span>                :            :     struct netflow_v5_record *nf_rec;
+<span class="lineNum">     112 </span>                :            : 
+<span class="lineNum">     113 </span>        [<span class="branchCov" title="Branch 1 was taken 32 times"> + </span><span class="branchCov" title="Branch 2 was taken 4 times"> + </span>]:<span class="lineCov">         36 :     if (!ofpbuf_size(&amp;nf-&gt;packet)) {</span>
+<span class="lineNum">     114 </span>                :            :         struct timespec now;
+<span class="lineNum">     115 </span>                :            : 
+<span class="lineNum">     116 </span>                :<span class="lineCov">         32 :         time_wall_timespec(&amp;now);</span>
+<span class="lineNum">     117 </span>                :            : 
+<span class="lineNum">     118 </span>                :<span class="lineCov">         32 :         nf_hdr = ofpbuf_put_zeros(&amp;nf-&gt;packet, sizeof *nf_hdr);</span>
+<span class="lineNum">     119 </span>                :<span class="lineCov">         32 :         nf_hdr-&gt;version = htons(NETFLOW_V5_VERSION);</span>
+<span class="lineNum">     120 </span>                :<span class="lineCov">         32 :         nf_hdr-&gt;count = htons(0);</span>
+<span class="lineNum">     121 </span>                :<span class="lineCov">         32 :         nf_hdr-&gt;sysuptime = htonl(time_msec() - nf-&gt;boot_time);</span>
+<span class="lineNum">     122 </span>                :<span class="lineCov">         32 :         nf_hdr-&gt;unix_secs = htonl(now.tv_sec);</span>
+<span class="lineNum">     123 </span>                :<span class="lineCov">         32 :         nf_hdr-&gt;unix_nsecs = htonl(now.tv_nsec);</span>
+<span class="lineNum">     124 </span>                :<span class="lineCov">         32 :         nf_hdr-&gt;flow_seq = htonl(nf-&gt;netflow_cnt++);</span>
+<span class="lineNum">     125 </span>                :<span class="lineCov">         32 :         nf_hdr-&gt;engine_type = nf-&gt;engine_type;</span>
+<span class="lineNum">     126 </span>                :<span class="lineCov">         32 :         nf_hdr-&gt;engine_id = nf-&gt;engine_id;</span>
+<span class="lineNum">     127 </span>                :<span class="lineCov">         32 :         nf_hdr-&gt;sampling_interval = htons(0);</span>
+<span class="lineNum">     128 </span>                :            :     }
+<span class="lineNum">     129 </span>                :            : 
+<span class="lineNum">     130 </span>                :<span class="lineCov">         36 :     nf_hdr = ofpbuf_data(&amp;nf-&gt;packet);</span>
+<span class="lineNum">     131 </span>                :<span class="lineCov">         36 :     nf_hdr-&gt;count = htons(ntohs(nf_hdr-&gt;count) + 1);</span>
+<span class="lineNum">     132 </span>                :            : 
+<span class="lineNum">     133 </span>                :<span class="lineCov">         36 :     nf_rec = ofpbuf_put_zeros(&amp;nf-&gt;packet, sizeof *nf_rec);</span>
+<span class="lineNum">     134 </span>                :<span class="lineCov">         36 :     nf_rec-&gt;src_addr = nf_flow-&gt;nw_src;</span>
+<span class="lineNum">     135 </span>                :<span class="lineCov">         36 :     nf_rec-&gt;dst_addr = nf_flow-&gt;nw_dst;</span>
+<span class="lineNum">     136 </span>                :<span class="lineCov">         36 :     nf_rec-&gt;nexthop = htonl(0);</span>
+<span class="lineNum">     137 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 36 times"> + </span>]:<span class="lineCov">         36 :     if (nf-&gt;add_id_to_iface) {</span>
+<span class="lineNum">     138 </span>                :<span class="lineNoCov">          0 :         uint16_t iface = (nf-&gt;engine_id &amp; 0x7f) &lt;&lt; 9;</span>
+<span class="lineNum">     139 </span>                :<span class="lineNoCov">          0 :         nf_rec-&gt;input = htons(iface | (ofp_to_u16(nf_flow-&gt;in_port) &amp; 0x1ff));</span>
+<span class="lineNum">     140 </span>                :<span class="lineNoCov">          0 :         nf_rec-&gt;output = htons(iface</span>
+<span class="lineNum">     141 </span>                :<span class="lineNoCov">          0 :             | (ofp_to_u16(nf_flow-&gt;output_iface) &amp; 0x1ff));</span>
+<span class="lineNum">     142 </span>                :            :     } else {
+<span class="lineNum">     143 </span>                :<span class="lineCov">         36 :         nf_rec-&gt;input = htons(ofp_to_u16(nf_flow-&gt;in_port));</span>
+<span class="lineNum">     144 </span>                :<span class="lineCov">         36 :         nf_rec-&gt;output = htons(ofp_to_u16(nf_flow-&gt;output_iface));</span>
+<span class="lineNum">     145 </span>                :            :     }
+<span class="lineNum">     146 </span>                :<span class="lineCov">         36 :     nf_rec-&gt;packet_count = htonl(packet_count);</span>
+<span class="lineNum">     147 </span>                :<span class="lineCov">         36 :     nf_rec-&gt;byte_count = htonl(byte_count);</span>
+<span class="lineNum">     148 </span>                :<span class="lineCov">         36 :     nf_rec-&gt;init_time = htonl(nf_flow-&gt;created - nf-&gt;boot_time);</span>
+<span class="lineNum">     149 </span>                :<span class="lineCov">         36 :     nf_rec-&gt;used_time = htonl(MAX(nf_flow-&gt;created, nf_flow-&gt;used)</span>
+<span class="lineNum">     150 </span>                :<span class="lineCov">         36 :                              - nf-&gt;boot_time);</span>
+<span class="lineNum">     151 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchCov" title="Branch 1 was taken 26 times"> + </span>]:<span class="lineCov">         36 :     if (nf_flow-&gt;nw_proto == IPPROTO_ICMP) {</span>
+<span class="lineNum">     152 </span>                :            :         /* In NetFlow, the ICMP type and code are concatenated and
+<span class="lineNum">     153 </span>                :            :          * placed in the 'dst_port' field. */
+<span class="lineNum">     154 </span>                :<span class="lineCov">         10 :         uint8_t type = ntohs(nf_flow-&gt;tp_src);</span>
+<span class="lineNum">     155 </span>                :<span class="lineCov">         10 :         uint8_t code = ntohs(nf_flow-&gt;tp_dst);</span>
+<span class="lineNum">     156 </span>                :<span class="lineCov">         10 :         nf_rec-&gt;src_port = htons(0);</span>
+<span class="lineNum">     157 </span>                :<span class="lineCov">         10 :         nf_rec-&gt;dst_port = htons((type &lt;&lt; 8) | code);</span>
+<span class="lineNum">     158 </span>                :            :     } else {
+<span class="lineNum">     159 </span>                :<span class="lineCov">         26 :         nf_rec-&gt;src_port = nf_flow-&gt;tp_src;</span>
+<span class="lineNum">     160 </span>                :<span class="lineCov">         26 :         nf_rec-&gt;dst_port = nf_flow-&gt;tp_dst;</span>
+<span class="lineNum">     161 </span>                :            :     }
+<span class="lineNum">     162 </span>                :<span class="lineCov">         36 :     nf_rec-&gt;tcp_flags = (uint8_t) nf_flow-&gt;tcp_flags;</span>
+<span class="lineNum">     163 </span>                :<span class="lineCov">         36 :     nf_rec-&gt;ip_proto = nf_flow-&gt;nw_proto;</span>
+<span class="lineNum">     164 </span>                :<span class="lineCov">         36 :     nf_rec-&gt;ip_tos = nf_flow-&gt;nw_tos &amp; IP_DSCP_MASK;</span>
+<span class="lineNum">     165 </span>                :            : 
+<span class="lineNum">     166 </span>                :            :     /* NetFlow messages are limited to 30 records. */
+<span class="lineNum">     167 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 36 times"> + </span>]:<span class="lineCov">         36 :     if (ntohs(nf_hdr-&gt;count) &gt;= 30) {</span>
+<span class="lineNum">     168 </span>                :<span class="lineNoCov">          0 :         netflow_run__(nf);</span>
+<span class="lineNum">     169 </span>                :            :     }
+<span class="lineNum">     170 </span>                :<span class="lineCov">         36 : }</span>
+<a name="171"><span class="lineNum">     171 </span>                :            : </a>
+<span class="lineNum">     172 </span>                :            : void
+<span class="lineNum">     173 </span>                :<span class="lineCov">        264 : netflow_flow_update(struct netflow *nf, const struct flow *flow,</span>
+<span class="lineNum">     174 </span>                :            :                     ofp_port_t output_iface,
+<span class="lineNum">     175 </span>                :            :                     const struct dpif_flow_stats *stats)
+<span class="lineNum">     176 </span>                :            :     OVS_EXCLUDED(mutex)
+<span class="lineNum">     177 </span>                :            : {
+<span class="lineNum">     178 </span>                :            :     struct netflow_flow *nf_flow;
+<span class="lineNum">     179 </span>                :            :     long long int used;
+<span class="lineNum">     180 </span>                :            : 
+<span class="lineNum">     181 </span>                :            :     /* NetFlow only reports on IP packets. */
+<span class="lineNum">     182 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 264 times"> + </span>]:<span class="lineCov">        264 :     if (flow-&gt;dl_type != htons(ETH_TYPE_IP)) {</span>
+<span class="lineNum">     183 </span>                :<span class="lineCov">        264 :         return;</span>
+<span class="lineNum">     184 </span>                :            :     }
+<span class="lineNum">     185 </span>                :            : 
+<span class="lineNum">     186 </span>                :<span class="lineCov">        264 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     187 </span>                :<span class="lineCov">        264 :     nf_flow = netflow_flow_lookup(nf, flow);</span>
+<span class="lineNum">     188 </span>        [<span class="branchCov" title="Branch 0 was taken 22 times"> + </span><span class="branchCov" title="Branch 1 was taken 242 times"> + </span>]:<span class="lineCov">        264 :     if (!nf_flow) {</span>
+<span class="lineNum">     189 </span>                :<span class="lineCov">         22 :         nf_flow = xzalloc(sizeof *nf_flow);</span>
+<span class="lineNum">     190 </span>                :<span class="lineCov">         22 :         nf_flow-&gt;in_port = flow-&gt;in_port.ofp_port;</span>
+<span class="lineNum">     191 </span>                :<span class="lineCov">         22 :         nf_flow-&gt;nw_src = flow-&gt;nw_src;</span>
+<span class="lineNum">     192 </span>                :<span class="lineCov">         22 :         nf_flow-&gt;nw_dst = flow-&gt;nw_dst;</span>
+<span class="lineNum">     193 </span>                :<span class="lineCov">         22 :         nf_flow-&gt;nw_tos = flow-&gt;nw_tos;</span>
+<span class="lineNum">     194 </span>                :<span class="lineCov">         22 :         nf_flow-&gt;nw_proto = flow-&gt;nw_proto;</span>
+<span class="lineNum">     195 </span>                :<span class="lineCov">         22 :         nf_flow-&gt;tp_src = flow-&gt;tp_src;</span>
+<span class="lineNum">     196 </span>                :<span class="lineCov">         22 :         nf_flow-&gt;tp_dst = flow-&gt;tp_dst;</span>
+<span class="lineNum">     197 </span>                :<span class="lineCov">         22 :         nf_flow-&gt;created = stats-&gt;used;</span>
+<span class="lineNum">     198 </span>                :<span class="lineCov">         22 :         nf_flow-&gt;output_iface = output_iface;</span>
+<span class="lineNum">     199 </span>                :<span class="lineCov">         22 :         hmap_insert(&amp;nf-&gt;flows, &amp;nf_flow-&gt;hmap_node, netflow_flow_hash(flow));</span>
+<span class="lineNum">     200 </span>                :            :     }
+<span class="lineNum">     201 </span>                :            : 
+<span class="lineNum">     202 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 264 times"> + </span>]:<span class="lineCov">        264 :     if (nf_flow-&gt;output_iface != output_iface) {</span>
+<span class="lineNum">     203 </span>                :<span class="lineNoCov">          0 :         netflow_expire__(nf, nf_flow);</span>
+<span class="lineNum">     204 </span>                :<span class="lineNoCov">          0 :         nf_flow-&gt;created = stats-&gt;used;</span>
+<span class="lineNum">     205 </span>                :<span class="lineNoCov">          0 :         nf_flow-&gt;output_iface = output_iface;</span>
+<span class="lineNum">     206 </span>                :            :     }
+<span class="lineNum">     207 </span>                :            : 
+<span class="lineNum">     208 </span>                :<span class="lineCov">        264 :     nf_flow-&gt;packet_count += stats-&gt;n_packets;</span>
+<span class="lineNum">     209 </span>                :<span class="lineCov">        264 :     nf_flow-&gt;byte_count += stats-&gt;n_bytes;</span>
+<span class="lineNum">     210 </span>                :<span class="lineCov">        264 :     nf_flow-&gt;tcp_flags |= stats-&gt;tcp_flags;</span>
+<span class="lineNum">     211 </span>                :            : 
+<span class="lineNum">     212 </span>                :<span class="lineCov">        264 :     used = MAX(nf_flow-&gt;used, stats-&gt;used);</span>
+<span class="lineNum">     213 </span>        [<span class="branchCov" title="Branch 0 was taken 252 times"> + </span><span class="branchCov" title="Branch 1 was taken 12 times"> + </span>]:<span class="lineCov">        264 :     if (nf_flow-&gt;used != used) {</span>
+<span class="lineNum">     214 </span>                :<span class="lineCov">        252 :         nf_flow-&gt;used = used;</span>
+<span class="lineNum">     215 </span>[<span class="branchCov" title="Branch 0 was taken 252 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 236 times"> + </span><span class="branchCov" title="Branch 3 was taken 16 times"> + </span>]:<span class="lineCov">        252 :         if (!nf-&gt;active_timeout || !nf_flow-&gt;last_expired</span>
+<span class="lineNum">     216 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 236 times"> + </span>]:<span class="lineCov">        236 :             || nf-&gt;reconfig_time &gt; nf_flow-&gt;last_expired) {</span>
+<span class="lineNum">     217 </span>                :            :             /* Keep the time updated to prevent a flood of expiration in
+<span class="lineNum">     218 </span>                :            :              * the future. */
+<span class="lineNum">     219 </span>                :<span class="lineCov">         16 :             nf_flow-&gt;last_expired = time_msec();</span>
+<span class="lineNum">     220 </span>                :            :         }
+<span class="lineNum">     221 </span>                :            :     }
+<span class="lineNum">     222 </span>                :            : 
+<span class="lineNum">     223 </span>                :<span class="lineCov">        264 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     224 </span>                :            : }
+<a name="225"><span class="lineNum">     225 </span>                :            : </a>
+<span class="lineNum">     226 </span>                :            : static void
+<span class="lineNum">     227 </span>                :<span class="lineCov">         42 : netflow_expire__(struct netflow *nf, struct netflow_flow *nf_flow)</span>
+<span class="lineNum">     228 </span>                :            :     OVS_REQUIRES(mutex)
+<span class="lineNum">     229 </span>                :            : {
+<span class="lineNum">     230 </span>                :            :     uint64_t pkts, bytes;
+<span class="lineNum">     231 </span>                :            : 
+<span class="lineNum">     232 </span>                :<span class="lineCov">         42 :     pkts = nf_flow-&gt;packet_count;</span>
+<span class="lineNum">     233 </span>                :<span class="lineCov">         42 :     bytes = nf_flow-&gt;byte_count;</span>
+<span class="lineNum">     234 </span>                :            : 
+<span class="lineNum">     235 </span>                :<span class="lineCov">         42 :     nf_flow-&gt;last_expired += nf-&gt;active_timeout;</span>
+<span class="lineNum">     236 </span>                :            : 
+<span class="lineNum">     237 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 36 times"> + </span>]:<span class="lineCov">         42 :     if (pkts == 0) {</span>
+<span class="lineNum">     238 </span>                :<span class="lineCov">         42 :         return;</span>
+<span class="lineNum">     239 </span>                :            :     }
+<span class="lineNum">     240 </span>                :            : 
+<span class="lineNum">     241 </span>        [<span class="branchCov" title="Branch 0 was taken 36 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         36 :     if ((bytes &gt;&gt; 32) &lt;= 175) {</span>
+<span class="lineNum">     242 </span>                :            :         /* NetFlow v5 records are limited to 32-bit counters.  If we've wrapped
+<span class="lineNum">     243 </span>                :            :          * a counter, send as multiple records so we don't lose track of any
+<span class="lineNum">     244 </span>                :            :          * traffic.  We try to evenly distribute the packet and byte counters,
+<span class="lineNum">     245 </span>                :            :          * so that the bytes-per-packet lengths don't look wonky across the
+<span class="lineNum">     246 </span>                :            :          * records. */
+<span class="lineNum">     247 </span>        [<span class="branchCov" title="Branch 0 was taken 36 times"> + </span><span class="branchCov" title="Branch 1 was taken 36 times"> + </span>]:<span class="lineCov">         72 :         while (bytes) {</span>
+<span class="lineNum">     248 </span>                :<span class="lineCov">         36 :             int n_recs = (bytes + UINT32_MAX - 1) / UINT32_MAX;</span>
+<span class="lineNum">     249 </span>                :<span class="lineCov">         36 :             uint32_t pkt_count = pkts / n_recs;</span>
+<span class="lineNum">     250 </span>                :<span class="lineCov">         36 :             uint32_t byte_count = bytes / n_recs;</span>
+<span class="lineNum">     251 </span>                :            : 
+<span class="lineNum">     252 </span>                :<span class="lineCov">         36 :             gen_netflow_rec(nf, nf_flow, pkt_count, byte_count);</span>
+<span class="lineNum">     253 </span>                :            : 
+<span class="lineNum">     254 </span>                :<span class="lineCov">         36 :             pkts -= pkt_count;</span>
+<span class="lineNum">     255 </span>                :<span class="lineCov">         36 :             bytes -= byte_count;</span>
+<span class="lineNum">     256 </span>                :            :         }
+<span class="lineNum">     257 </span>                :            :     } else {
+<span class="lineNum">     258 </span>                :            :         /* In 600 seconds, a 10GbE link can theoretically transmit 75 * 10**10
+<span class="lineNum">     259 </span>                :            :          * == 175 * 2**32 bytes.  The byte counter is bigger than that, so it's
+<span class="lineNum">     260 </span>                :            :          * probably a bug--for example, the netdev code uses UINT64_MAX to
+<span class="lineNum">     261 </span>                :            :          * report &quot;unknown value&quot;, and perhaps that has leaked through to here.
+<span class="lineNum">     262 </span>                :            :          *
+<span class="lineNum">     263 </span>                :            :          * We wouldn't want to hit the loop above in this case, because it
+<span class="lineNum">     264 </span>                :            :          * would try to send up to UINT32_MAX netflow records, which would take
+<span class="lineNum">     265 </span>                :            :          * a long time.
+<span class="lineNum">     266 </span>                :            :          */
+<span class="lineNum">     267 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 1);
+<span class="lineNum">     268 </span>                :            : 
+<span class="lineNum">     269 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;impossible byte counter %&quot;PRIu64, bytes);</span>
+<span class="lineNum">     270 </span>                :            :     }
+<span class="lineNum">     271 </span>                :            : 
+<span class="lineNum">     272 </span>                :            :     /* Update flow tracking data. */
+<span class="lineNum">     273 </span>                :<span class="lineCov">         36 :     nf_flow-&gt;packet_count = 0;</span>
+<span class="lineNum">     274 </span>                :<span class="lineCov">         36 :     nf_flow-&gt;byte_count = 0;</span>
+<span class="lineNum">     275 </span>                :<span class="lineCov">         36 :     nf_flow-&gt;tcp_flags = 0;</span>
+<span class="lineNum">     276 </span>                :            : }
+<a name="277"><span class="lineNum">     277 </span>                :            : </a>
+<span class="lineNum">     278 </span>                :            : void
+<span class="lineNum">     279 </span>                :<span class="lineCov">         26 : netflow_flow_clear(struct netflow *nf, struct flow *flow) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     280 </span>                :            : {
+<span class="lineNum">     281 </span>                :            :     struct netflow_flow *nf_flow;
+<span class="lineNum">     282 </span>                :            : 
+<span class="lineNum">     283 </span>                :<span class="lineCov">         26 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     284 </span>                :<span class="lineCov">         26 :     nf_flow = netflow_flow_lookup(nf, flow);</span>
+<span class="lineNum">     285 </span>        [<span class="branchCov" title="Branch 0 was taken 22 times"> + </span><span class="branchCov" title="Branch 1 was taken 4 times"> + </span>]:<span class="lineCov">         26 :     if (nf_flow) {</span>
+<span class="lineNum">     286 </span>                :<span class="lineCov">         22 :         netflow_expire__(nf, nf_flow);</span>
+<span class="lineNum">     287 </span>                :<span class="lineCov">         22 :         hmap_remove(&amp;nf-&gt;flows, &amp;nf_flow-&gt;hmap_node);</span>
+<span class="lineNum">     288 </span>                :<span class="lineCov">         22 :         free(nf_flow);</span>
+<span class="lineNum">     289 </span>                :            :     }
+<span class="lineNum">     290 </span>                :<span class="lineCov">         26 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     291 </span>                :<span class="lineCov">         26 : }</span>
+<span class="lineNum">     292 </span>                :            : 
+<span class="lineNum">     293 </span>                :            : /* Returns true if it's time to send out a round of NetFlow active timeouts,
+<a name="294"><span class="lineNum">     294 </span>                :            :  * false otherwise. */</a>
+<span class="lineNum">     295 </span>                :            : static void
+<span class="lineNum">     296 </span>                :<span class="lineCov">       1147 : netflow_run__(struct netflow *nf) OVS_REQUIRES(mutex)</span>
+<span class="lineNum">     297 </span>                :            : {
+<span class="lineNum">     298 </span>                :<span class="lineCov">       1147 :     long long int now = time_msec();</span>
+<span class="lineNum">     299 </span>                :            :     struct netflow_flow *nf_flow, *next;
+<span class="lineNum">     300 </span>                :            : 
+<span class="lineNum">     301 </span>        [<span class="branchCov" title="Branch 1 was taken 30 times"> + </span><span class="branchCov" title="Branch 2 was taken 1117 times"> + </span>]:<span class="lineCov">       1147 :     if (ofpbuf_size(&amp;nf-&gt;packet)) {</span>
+<span class="lineNum">     302 </span>                :<span class="lineCov">         30 :         collectors_send(nf-&gt;collectors, ofpbuf_data(&amp;nf-&gt;packet), ofpbuf_size(&amp;nf-&gt;packet));</span>
+<span class="lineNum">     303 </span>                :<span class="lineCov">         30 :         ofpbuf_set_size(&amp;nf-&gt;packet, 0);</span>
+<span class="lineNum">     304 </span>                :            :     }
+<span class="lineNum">     305 </span>                :            : 
+<span class="lineNum">     306 </span>[<span class="branchCov" title="Branch 0 was taken 1147 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 1011 times"> + </span><span class="branchCov" title="Branch 3 was taken 136 times"> + </span>]:<span class="lineCov">       1147 :     if (!nf-&gt;active_timeout || now &lt; nf-&gt;next_timeout) {</span>
+<span class="lineNum">     307 </span>                :<span class="lineCov">       1147 :         return;</span>
+<span class="lineNum">     308 </span>                :            :     }
+<span class="lineNum">     309 </span>                :            : 
+<span class="lineNum">     310 </span>                :<span class="lineCov">        136 :     nf-&gt;next_timeout = now + 1000;</span>
+<span class="lineNum">     311 </span>                :            : 
+<span class="lineNum">     312 </span>[<span class="branchCov" title="Branch 1 was taken 243 times"> + </span><span class="branchCov" title="Branch 2 was taken 136 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 243 times"> + </span><span class="branchCov" title="Branch 5 was taken 136 times"> + </span>]:<span class="lineCov">        379 :     HMAP_FOR_EACH_SAFE (nf_flow, next, hmap_node, &amp;nf-&gt;flows) {</span>
+<span class="lineNum">     313 </span>        [<span class="branchCov" title="Branch 0 was taken 20 times"> + </span><span class="branchCov" title="Branch 1 was taken 223 times"> + </span>]:<span class="lineCov">        243 :         if (now &gt; nf_flow-&gt;last_expired + nf-&gt;active_timeout) {</span>
+<span class="lineNum">     314 </span>                :<span class="lineCov">         20 :             bool idle = nf_flow-&gt;used &lt; nf_flow-&gt;last_expired;</span>
+<span class="lineNum">     315 </span>                :<span class="lineCov">         20 :             netflow_expire__(nf, nf_flow);</span>
+<span class="lineNum">     316 </span>                :            : 
+<span class="lineNum">     317 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 20 times"> + </span>]:<span class="lineCov">         20 :             if (idle) {</span>
+<span class="lineNum">     318 </span>                :            :                 /* If the netflow_flow hasn't been used in a while, it's
+<span class="lineNum">     319 </span>                :            :                  * possible the upper layer lost track of it. */
+<span class="lineNum">     320 </span>                :<span class="lineNoCov">          0 :                 hmap_remove(&amp;nf-&gt;flows, &amp;nf_flow-&gt;hmap_node);</span>
+<span class="lineNum">     321 </span>                :<span class="lineNoCov">          0 :                 free(nf_flow);</span>
+<span class="lineNum">     322 </span>                :            :             }
+<span class="lineNum">     323 </span>                :            :         }
+<span class="lineNum">     324 </span>                :            :     }
+<span class="lineNum">     325 </span>                :            : }
+<a name="326"><span class="lineNum">     326 </span>                :            : </a>
+<span class="lineNum">     327 </span>                :            : void
+<span class="lineNum">     328 </span>                :<span class="lineCov">       1147 : netflow_run(struct netflow *nf)</span>
+<span class="lineNum">     329 </span>                :            : {
+<span class="lineNum">     330 </span>                :<span class="lineCov">       1147 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     331 </span>                :<span class="lineCov">       1147 :     netflow_run__(nf);</span>
+<span class="lineNum">     332 </span>                :<span class="lineCov">       1147 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     333 </span>                :<span class="lineCov">       1147 : }</span>
+<a name="334"><span class="lineNum">     334 </span>                :            : </a>
+<span class="lineNum">     335 </span>                :            : void
+<span class="lineNum">     336 </span>                :<span class="lineCov">       1147 : netflow_wait(struct netflow *nf) OVS_EXCLUDED(mutex)</span>
+<span class="lineNum">     337 </span>                :            : {
+<span class="lineNum">     338 </span>                :<span class="lineCov">       1147 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     339 </span>        [<span class="branchCov" title="Branch 0 was taken 1147 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       1147 :     if (nf-&gt;active_timeout) {</span>
+<span class="lineNum">     340 </span>                :<span class="lineCov">       1147 :         poll_timer_wait_until(nf-&gt;next_timeout);</span>
+<span class="lineNum">     341 </span>                :            :     }
+<span class="lineNum">     342 </span>        [<span class="branchCov" title="Branch 1 was taken 25 times"> + </span><span class="branchCov" title="Branch 2 was taken 1122 times"> + </span>]:<span class="lineCov">       1147 :     if (ofpbuf_size(&amp;nf-&gt;packet)) {</span>
+<span class="lineNum">     343 </span>                :<span class="lineCov">         25 :         poll_immediate_wake();</span>
+<span class="lineNum">     344 </span>                :            :     }
+<span class="lineNum">     345 </span>                :<span class="lineCov">       1147 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     346 </span>                :<span class="lineCov">       1147 : }</span>
+<a name="347"><span class="lineNum">     347 </span>                :            : </a>
+<span class="lineNum">     348 </span>                :            : int
+<span class="lineNum">     349 </span>                :<span class="lineCov">          6 : netflow_set_options(struct netflow *nf,</span>
+<span class="lineNum">     350 </span>                :            :                     const struct netflow_options *nf_options)
+<span class="lineNum">     351 </span>                :            :     OVS_EXCLUDED(mutex)
+<span class="lineNum">     352 </span>                :            : {
+<span class="lineNum">     353 </span>                :<span class="lineCov">          6 :     int error = 0;</span>
+<span class="lineNum">     354 </span>                :            :     long long int old_timeout;
+<span class="lineNum">     355 </span>                :            : 
+<span class="lineNum">     356 </span>                :<span class="lineCov">          6 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     357 </span>                :<span class="lineCov">          6 :     nf-&gt;engine_type = nf_options-&gt;engine_type;</span>
+<span class="lineNum">     358 </span>                :<span class="lineCov">          6 :     nf-&gt;engine_id = nf_options-&gt;engine_id;</span>
+<span class="lineNum">     359 </span>                :<span class="lineCov">          6 :     nf-&gt;add_id_to_iface = nf_options-&gt;add_id_to_iface;</span>
+<span class="lineNum">     360 </span>                :            : 
+<span class="lineNum">     361 </span>                :<span class="lineCov">          6 :     collectors_destroy(nf-&gt;collectors);</span>
+<span class="lineNum">     362 </span>                :<span class="lineCov">          6 :     collectors_create(&amp;nf_options-&gt;collectors, 0, &amp;nf-&gt;collectors);</span>
+<span class="lineNum">     363 </span>                :            : 
+<span class="lineNum">     364 </span>                :<span class="lineCov">          6 :     old_timeout = nf-&gt;active_timeout;</span>
+<span class="lineNum">     365 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          6 :     if (nf_options-&gt;active_timeout &gt;= 0) {</span>
+<span class="lineNum">     366 </span>                :<span class="lineCov">          6 :         nf-&gt;active_timeout = nf_options-&gt;active_timeout;</span>
+<span class="lineNum">     367 </span>                :            :     } else {
+<span class="lineNum">     368 </span>                :<span class="lineNoCov">          0 :         nf-&gt;active_timeout = NF_ACTIVE_TIMEOUT_DEFAULT;</span>
+<span class="lineNum">     369 </span>                :            :     }
+<span class="lineNum">     370 </span>                :<span class="lineCov">          6 :     nf-&gt;active_timeout *= 1000;</span>
+<span class="lineNum">     371 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          6 :     if (old_timeout != nf-&gt;active_timeout) {</span>
+<span class="lineNum">     372 </span>                :<span class="lineCov">          6 :         nf-&gt;reconfig_time = time_msec();</span>
+<span class="lineNum">     373 </span>                :<span class="lineCov">          6 :         nf-&gt;next_timeout = time_msec();</span>
+<span class="lineNum">     374 </span>                :            :     }
+<span class="lineNum">     375 </span>                :<span class="lineCov">          6 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     376 </span>                :            : 
+<span class="lineNum">     377 </span>                :<span class="lineCov">          6 :     return error;</span>
+<span class="lineNum">     378 </span>                :            : }
+<a name="379"><span class="lineNum">     379 </span>                :            : </a>
+<span class="lineNum">     380 </span>                :            : struct netflow *
+<span class="lineNum">     381 </span>                :<span class="lineCov">          6 : netflow_create(void)</span>
+<span class="lineNum">     382 </span>                :            : {
+<span class="lineNum">     383 </span>                :<span class="lineCov">          6 :     struct netflow *nf = xzalloc(sizeof *nf);</span>
+<span class="lineNum">     384 </span>                :            :     int junk;
+<span class="lineNum">     385 </span>                :            : 
+<span class="lineNum">     386 </span>                :<span class="lineCov">          6 :     nf-&gt;engine_type = 0;</span>
+<span class="lineNum">     387 </span>                :<span class="lineCov">          6 :     nf-&gt;engine_id = 0;</span>
+<span class="lineNum">     388 </span>                :<span class="lineCov">          6 :     nf-&gt;boot_time = time_msec();</span>
+<span class="lineNum">     389 </span>                :<span class="lineCov">          6 :     nf-&gt;collectors = NULL;</span>
+<span class="lineNum">     390 </span>                :<span class="lineCov">          6 :     nf-&gt;add_id_to_iface = false;</span>
+<span class="lineNum">     391 </span>                :<span class="lineCov">          6 :     nf-&gt;netflow_cnt = 0;</span>
+<span class="lineNum">     392 </span>                :<span class="lineCov">          6 :     hmap_init(&amp;nf-&gt;flows);</span>
+<span class="lineNum">     393 </span>                :<span class="lineCov">          6 :     ovs_refcount_init(&amp;nf-&gt;ref_cnt);</span>
+<span class="lineNum">     394 </span>                :<span class="lineCov">          6 :     ofpbuf_init(&amp;nf-&gt;packet, 1500);</span>
+<span class="lineNum">     395 </span>                :<span class="lineCov">          6 :     atomic_add(&amp;netflow_count, 1, &amp;junk);</span>
+<span class="lineNum">     396 </span>                :<span class="lineCov">          6 :     return nf;</span>
+<span class="lineNum">     397 </span>                :            : }
+<a name="398"><span class="lineNum">     398 </span>                :            : </a>
+<span class="lineNum">     399 </span>                :            : struct netflow *
+<span class="lineNum">     400 </span>                :<span class="lineCov">        330 : netflow_ref(const struct netflow *nf_)</span>
+<span class="lineNum">     401 </span>                :            : {
+<span class="lineNum">     402 </span>                :<span class="lineCov">        330 :     struct netflow *nf = CONST_CAST(struct netflow *, nf_);</span>
+<span class="lineNum">     403 </span>        [<span class="branchCov" title="Branch 0 was taken 104 times"> + </span><span class="branchCov" title="Branch 1 was taken 226 times"> + </span>]:<span class="lineCov">        330 :     if (nf) {</span>
+<span class="lineNum">     404 </span>                :<span class="lineCov">        104 :         ovs_refcount_ref(&amp;nf-&gt;ref_cnt);</span>
+<span class="lineNum">     405 </span>                :            :     }
+<span class="lineNum">     406 </span>                :<span class="lineCov">        330 :     return nf;</span>
+<span class="lineNum">     407 </span>                :            : }
+<a name="408"><span class="lineNum">     408 </span>                :            : </a>
+<span class="lineNum">     409 </span>                :            : void
+<span class="lineNum">     410 </span>                :<span class="lineCov">        383 : netflow_unref(struct netflow *nf)</span>
+<span class="lineNum">     411 </span>                :            : {
+<span class="lineNum">     412 </span>[<span class="branchCov" title="Branch 0 was taken 48 times"> + </span><span class="branchCov" title="Branch 1 was taken 335 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 48 times"> + </span>]:<span class="lineCov">        383 :     if (nf &amp;&amp; ovs_refcount_unref(&amp;nf-&gt;ref_cnt) == 1) {</span>
+<span class="lineNum">     413 </span>                :            :         int orig;
+<span class="lineNum">     414 </span>                :            : 
+<span class="lineNum">     415 </span>                :<span class="lineNoCov">          0 :         atomic_sub(&amp;netflow_count, 1, &amp;orig);</span>
+<span class="lineNum">     416 </span>                :<span class="lineNoCov">          0 :         collectors_destroy(nf-&gt;collectors);</span>
+<span class="lineNum">     417 </span>                :<span class="lineNoCov">          0 :         ofpbuf_uninit(&amp;nf-&gt;packet);</span>
+<span class="lineNum">     418 </span>                :<span class="lineNoCov">          0 :         free(nf);</span>
+<span class="lineNum">     419 </span>                :            :     }
+<span class="lineNum">     420 </span>                :<span class="lineCov">        383 : }</span>
+<span class="lineNum">     421 </span>                :            : 
+<a name="422"><span class="lineNum">     422 </span>                :            : /* Returns true if there exist any netflow objects, false otherwise. */</a>
+<span class="lineNum">     423 </span>                :            : bool
+<span class="lineNum">     424 </span>                :<span class="lineCov">        949 : netflow_exists(void)</span>
+<span class="lineNum">     425 </span>                :            : {
+<span class="lineNum">     426 </span>                :            :     int n;
+<span class="lineNum">     427 </span>                :            : 
+<span class="lineNum">     428 </span>                :<span class="lineCov">        949 :     atomic_read(&amp;netflow_count, &amp;n);</span>
+<span class="lineNum">     429 </span>                :<span class="lineCov">        949 :     return n &gt; 0;</span>
+<span class="lineNum">     430 </span>                :            : }
+<span class="lineNum">     431 </span>                :            : 
+<span class="lineNum">     432 </span>                :            : /* Helpers. */
+<a name="433"><span class="lineNum">     433 </span>                :            : </a>
+<span class="lineNum">     434 </span>                :            : static struct netflow_flow *
+<span class="lineNum">     435 </span>                :<span class="lineCov">        290 : netflow_flow_lookup(const struct netflow *nf, const struct flow *flow)</span>
+<span class="lineNum">     436 </span>                :            :     OVS_REQUIRES(mutex)
+<span class="lineNum">     437 </span>                :            : {
+<span class="lineNum">     438 </span>                :            :     struct netflow_flow *nf_flow;
+<span class="lineNum">     439 </span>                :            : 
+<span class="lineNum">     440 </span>        [<span class="branchCov" title="Branch 3 was taken 264 times"> + </span><span class="branchCov" title="Branch 4 was taken 26 times"> + </span>]:<span class="lineCov">        290 :     HMAP_FOR_EACH_WITH_HASH (nf_flow, hmap_node, netflow_flow_hash(flow),</span>
+<span class="lineNum">     441 </span>                :            :                              &amp;nf-&gt;flows) {
+<span class="lineNum">     442 </span>        [<span class="branchCov" title="Branch 0 was taken 264 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        264 :         if (flow-&gt;in_port.ofp_port == nf_flow-&gt;in_port</span>
+<span class="lineNum">     443 </span>        [<span class="branchCov" title="Branch 0 was taken 264 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        264 :             &amp;&amp; flow-&gt;nw_src == nf_flow-&gt;nw_src</span>
+<span class="lineNum">     444 </span>        [<span class="branchCov" title="Branch 0 was taken 264 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        264 :             &amp;&amp; flow-&gt;nw_dst == nf_flow-&gt;nw_dst</span>
+<span class="lineNum">     445 </span>        [<span class="branchCov" title="Branch 0 was taken 264 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        264 :             &amp;&amp; flow-&gt;nw_tos == nf_flow-&gt;nw_tos</span>
+<span class="lineNum">     446 </span>        [<span class="branchCov" title="Branch 0 was taken 264 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        264 :             &amp;&amp; flow-&gt;nw_proto == nf_flow-&gt;nw_proto</span>
+<span class="lineNum">     447 </span>        [<span class="branchCov" title="Branch 0 was taken 264 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        264 :             &amp;&amp; flow-&gt;tp_src == nf_flow-&gt;tp_src</span>
+<span class="lineNum">     448 </span>        [<span class="branchCov" title="Branch 0 was taken 264 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        264 :             &amp;&amp; flow-&gt;tp_dst == nf_flow-&gt;tp_dst) {</span>
+<span class="lineNum">     449 </span>                :<span class="lineCov">        264 :             return nf_flow;</span>
+<span class="lineNum">     450 </span>                :            :         }
+<span class="lineNum">     451 </span>                :            :     }
+<span class="lineNum">     452 </span>                :            : 
+<span class="lineNum">     453 </span>                :<span class="lineCov">        290 :     return NULL;</span>
+<span class="lineNum">     454 </span>                :            : }
+<a name="455"><span class="lineNum">     455 </span>                :            : </a>
+<span class="lineNum">     456 </span>                :            : static uint32_t
+<span class="lineNum">     457 </span>                :<span class="lineCov">        312 : netflow_flow_hash(const struct flow *flow)</span>
+<span class="lineNum">     458 </span>                :            : {
+<span class="lineNum">     459 </span>                :<span class="lineCov">        312 :     uint32_t hash = 0;</span>
+<span class="lineNum">     460 </span>                :            : 
+<span class="lineNum">     461 </span>                :<span class="lineCov">        312 :     hash = mhash_add(hash, (OVS_FORCE uint32_t) flow-&gt;in_port.ofp_port);</span>
+<span class="lineNum">     462 </span>                :<span class="lineCov">        312 :     hash = mhash_add(hash, ntohl(flow-&gt;nw_src));</span>
+<span class="lineNum">     463 </span>                :<span class="lineCov">        312 :     hash = mhash_add(hash, ntohl(flow-&gt;nw_dst));</span>
+<span class="lineNum">     464 </span>                :<span class="lineCov">        312 :     hash = mhash_add(hash, flow-&gt;nw_tos);</span>
+<span class="lineNum">     465 </span>                :<span class="lineCov">        312 :     hash = mhash_add(hash, flow-&gt;nw_proto);</span>
+<span class="lineNum">     466 </span>                :<span class="lineCov">        312 :     hash = mhash_add(hash, ntohs(flow-&gt;tp_src));</span>
+<span class="lineNum">     467 </span>                :<span class="lineCov">        312 :     hash = mhash_add(hash, ntohs(flow-&gt;tp_dst));</span>
+<span class="lineNum">     468 </span>                :            : 
+<span class="lineNum">     469 </span>                :<span class="lineCov">        312 :     return mhash_finish(hash, 28);</span>
+<span class="lineNum">     470 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

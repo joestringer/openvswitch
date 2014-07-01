@@ -1,0 +1,181 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/token-bucket.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - token-bucket.c<span style="font-size: 80%;"> (source / <a href="token-bucket.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">15</td>
+            <td class="headerCovTableEntry">33</td>
+            <td class="headerCovTableEntryLo">45.5 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">1</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntryLo">25.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">6</td>
+            <td class="headerCovTableEntry">10</td>
+            <td class="headerCovTableEntryLo">60.0 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2012 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &quot;token-bucket.h&quot;
+<span class="lineNum">      20 </span>                :            : 
+<span class="lineNum">      21 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      22 </span>                :            : #include &quot;sat-math.h&quot;
+<span class="lineNum">      23 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      25 </span>                :            : 
+<span class="lineNum">      26 </span>                :            : /* Initializes 'tb' to accumulate 'rate' tokens per millisecond, with a
+<span class="lineNum">      27 </span>                :            :  * maximum of 'burst' tokens.
+<span class="lineNum">      28 </span>                :            :  *
+<span class="lineNum">      29 </span>                :            :  * The token bucket is initially full.
+<span class="lineNum">      30 </span>                :            :  *
+<a name="31"><span class="lineNum">      31 </span>                :            :  * It may be more convenient to use TOKEN_BUCKET_INIT. */</a>
+<span class="lineNum">      32 </span>                :            : void
+<span class="lineNum">      33 </span>                :<span class="lineNoCov">          0 : token_bucket_init(struct token_bucket *tb,</span>
+<span class="lineNum">      34 </span>                :            :                   unsigned int rate, unsigned int burst)
+<span class="lineNum">      35 </span>                :            : {
+<span class="lineNum">      36 </span>                :<span class="lineNoCov">          0 :     tb-&gt;rate = rate;</span>
+<span class="lineNum">      37 </span>                :<span class="lineNoCov">          0 :     tb-&gt;burst = burst;</span>
+<span class="lineNum">      38 </span>                :<span class="lineNoCov">          0 :     tb-&gt;tokens = 0;</span>
+<span class="lineNum">      39 </span>                :<span class="lineNoCov">          0 :     tb-&gt;last_fill = LLONG_MIN;</span>
+<span class="lineNum">      40 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      41 </span>                :            : 
+<span class="lineNum">      42 </span>                :            : /* Changes 'tb' to accumulate 'rate' tokens per millisecond, with a maximum of
+<span class="lineNum">      43 </span>                :            :  * 'burst' tokens.
+<span class="lineNum">      44 </span>                :            :  *
+<span class="lineNum">      45 </span>                :            :  * 'tb' must already have been initialized with TOKEN_BUCKET_INIT or
+<a name="46"><span class="lineNum">      46 </span>                :            :  * token_bucket_init(). */</a>
+<span class="lineNum">      47 </span>                :            : void
+<span class="lineNum">      48 </span>                :<span class="lineNoCov">          0 : token_bucket_set(struct token_bucket *tb,</span>
+<span class="lineNum">      49 </span>                :            :                  unsigned int rate, unsigned int burst)
+<span class="lineNum">      50 </span>                :            : {
+<span class="lineNum">      51 </span>                :<span class="lineNoCov">          0 :     tb-&gt;rate = rate;</span>
+<span class="lineNum">      52 </span>                :<span class="lineNoCov">          0 :     tb-&gt;burst = burst;</span>
+<span class="lineNum">      53 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (burst &gt; tb-&gt;tokens) {</span>
+<span class="lineNum">      54 </span>                :<span class="lineNoCov">          0 :         tb-&gt;tokens = burst;</span>
+<span class="lineNum">      55 </span>                :            :     }
+<span class="lineNum">      56 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      57 </span>                :            : 
+<span class="lineNum">      58 </span>                :            : /* Attempts to remove 'n' tokens from 'tb'.  Returns true if successful, false
+<span class="lineNum">      59 </span>                :            :  * if 'tb' contained fewer than 'n' tokens (and thus 'n' tokens could not be
+<a name="60"><span class="lineNum">      60 </span>                :            :  * removed) . */</a>
+<span class="lineNum">      61 </span>                :            : bool
+<span class="lineNum">      62 </span>                :<span class="lineCov">      46582 : token_bucket_withdraw(struct token_bucket *tb, unsigned int n)</span>
+<span class="lineNum">      63 </span>                :            : {
+<span class="lineNum">      64 </span>        [<span class="branchCov" title="Branch 0 was taken 31489 times"> + </span><span class="branchCov" title="Branch 1 was taken 15093 times"> + </span>]:<span class="lineCov">      46582 :     if (tb-&gt;tokens &lt; n) {</span>
+<span class="lineNum">      65 </span>                :<span class="lineCov">      31489 :         long long int now = time_msec();</span>
+<span class="lineNum">      66 </span>        [<span class="branchCov" title="Branch 0 was taken 9077 times"> + </span><span class="branchCov" title="Branch 1 was taken 22412 times"> + </span>]:<span class="lineCov">      31489 :         if (now &gt; tb-&gt;last_fill) {</span>
+<span class="lineNum">      67 </span>                :<span class="lineCov">       9077 :             unsigned long long int elapsed_ull</span>
+<span class="lineNum">      68 </span>                :<span class="lineCov">       9077 :                 = (unsigned long long int) now - tb-&gt;last_fill;</span>
+<span class="lineNum">      69 </span>                :<span class="lineCov">       9077 :             unsigned int elapsed = MIN(UINT_MAX, elapsed_ull);</span>
+<span class="lineNum">      70 </span>                :<span class="lineCov">       9077 :             unsigned int add = sat_mul(tb-&gt;rate, elapsed);</span>
+<span class="lineNum">      71 </span>                :<span class="lineCov">       9077 :             unsigned int tokens = sat_add(tb-&gt;tokens, add);</span>
+<span class="lineNum">      72 </span>                :<span class="lineCov">       9077 :             tb-&gt;tokens = MIN(tokens, tb-&gt;burst);</span>
+<span class="lineNum">      73 </span>                :<span class="lineCov">       9077 :             tb-&gt;last_fill = now;</span>
+<span class="lineNum">      74 </span>                :            :         }
+<span class="lineNum">      75 </span>                :            : 
+<span class="lineNum">      76 </span>        [<span class="branchCov" title="Branch 0 was taken 30070 times"> + </span><span class="branchCov" title="Branch 1 was taken 1419 times"> + </span>]:<span class="lineCov">      31489 :         if (tb-&gt;tokens &lt; n) {</span>
+<span class="lineNum">      77 </span>                :<span class="lineCov">      30070 :             return false;</span>
+<span class="lineNum">      78 </span>                :            :         }
+<span class="lineNum">      79 </span>                :            :     }
+<span class="lineNum">      80 </span>                :            : 
+<span class="lineNum">      81 </span>                :<span class="lineCov">      16512 :     tb-&gt;tokens -= n;</span>
+<span class="lineNum">      82 </span>                :<span class="lineCov">      46582 :     return true;</span>
+<span class="lineNum">      83 </span>                :            : }
+<span class="lineNum">      84 </span>                :            : 
+<span class="lineNum">      85 </span>                :            : /* Causes the poll loop to wake up when at least 'n' tokens will be available
+<a name="86"><span class="lineNum">      86 </span>                :            :  * for withdrawal from 'tb'. */</a>
+<span class="lineNum">      87 </span>                :            : void
+<span class="lineNum">      88 </span>                :<span class="lineNoCov">          0 : token_bucket_wait(struct token_bucket *tb, unsigned int n)</span>
+<span class="lineNum">      89 </span>                :            : {
+<span class="lineNum">      90 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (tb-&gt;tokens &gt;= n) {</span>
+<span class="lineNum">      91 </span>                :<span class="lineNoCov">          0 :         poll_immediate_wake();</span>
+<span class="lineNum">      92 </span>                :            :     } else {
+<span class="lineNum">      93 </span>                :<span class="lineNoCov">          0 :         unsigned int need = n - tb-&gt;tokens;</span>
+<span class="lineNum">      94 </span>                :<span class="lineNoCov">          0 :         poll_timer_wait_until(tb-&gt;last_fill + need / tb-&gt;rate + 1);</span>
+<span class="lineNum">      95 </span>                :            :     }
+<span class="lineNum">      96 </span>                :<span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

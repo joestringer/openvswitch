@@ -1,0 +1,968 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/cmap.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - cmap.c<span style="font-size: 80%;"> (source / <a href="cmap.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">250</td>
+            <td class="headerCovTableEntry">273</td>
+            <td class="headerCovTableEntryHi">91.6 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">31</td>
+            <td class="headerCovTableEntry">33</td>
+            <td class="headerCovTableEntryHi">93.9 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">108</td>
+            <td class="headerCovTableEntry">136</td>
+            <td class="headerCovTableEntryMed">79.4 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;cmap.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      20 </span>                :            : #include &quot;ovs-rcu.h&quot;
+<span class="lineNum">      21 </span>                :            : #include &quot;random.h&quot;
+<span class="lineNum">      22 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      23 </span>                :            : 
+<span class="lineNum">      24 </span>                :            : /* Optimistic Concurrent Cuckoo Hash
+<span class="lineNum">      25 </span>                :            :  * =================================
+<span class="lineNum">      26 </span>                :            :  *
+<span class="lineNum">      27 </span>                :            :  * A &quot;cuckoo hash&quot; is an open addressing hash table schema, designed such that
+<span class="lineNum">      28 </span>                :            :  * a given element can be in one of only a small number of buckets 'd', each of
+<span class="lineNum">      29 </span>                :            :  * which holds up to a small number 'k' elements.  Thus, the expected and
+<span class="lineNum">      30 </span>                :            :  * worst-case lookup times are O(1) because they require comparing no more than
+<span class="lineNum">      31 </span>                :            :  * a fixed number of elements (k * d).  Inserting a new element can require
+<span class="lineNum">      32 </span>                :            :  * moving around existing elements, but it is also O(1) amortized expected
+<span class="lineNum">      33 </span>                :            :  * time.
+<span class="lineNum">      34 </span>                :            :  *
+<span class="lineNum">      35 </span>                :            :  * An optimistic concurrent hash table goes one step further, making it
+<span class="lineNum">      36 </span>                :            :  * possible for a single writer to execute concurrently with any number of
+<span class="lineNum">      37 </span>                :            :  * readers without requiring the readers to take any locks.
+<span class="lineNum">      38 </span>                :            :  *
+<span class="lineNum">      39 </span>                :            :  * This cuckoo hash implementation uses:
+<span class="lineNum">      40 </span>                :            :  *
+<span class="lineNum">      41 </span>                :            :  *    - Two hash functions (d=2).  More hash functions allow for a higher load
+<span class="lineNum">      42 </span>                :            :  *      factor, but increasing 'k' is easier and the benefits of increasing 'd'
+<span class="lineNum">      43 </span>                :            :  *      quickly fall off with the 'k' values used here.  Also, the method of
+<span class="lineNum">      44 </span>                :            :  *      generating hashes used in this implementation is hard to reasonably
+<span class="lineNum">      45 </span>                :            :  *      extend beyond d=2.  Finally, each additional hash function means that a
+<span class="lineNum">      46 </span>                :            :  *      lookup has to look at least one extra cache line.
+<span class="lineNum">      47 </span>                :            :  *
+<span class="lineNum">      48 </span>                :            :  *    - 5 or 7 elements per bucket (k=5 or k=7), chosen to make buckets
+<span class="lineNum">      49 </span>                :            :  *      exactly one cache line in size.
+<span class="lineNum">      50 </span>                :            :  *
+<span class="lineNum">      51 </span>                :            :  * According to Erlingsson [4], these parameters suggest a maximum load factor
+<span class="lineNum">      52 </span>                :            :  * of about 93%.  The current implementation is conservative, expanding the
+<span class="lineNum">      53 </span>                :            :  * hash table when it is over 85% full.
+<span class="lineNum">      54 </span>                :            :  *
+<span class="lineNum">      55 </span>                :            :  *
+<span class="lineNum">      56 </span>                :            :  * Hash Functions
+<span class="lineNum">      57 </span>                :            :  * ==============
+<span class="lineNum">      58 </span>                :            :  *
+<span class="lineNum">      59 </span>                :            :  * A cuckoo hash requires multiple hash functions.  When reorganizing the hash
+<span class="lineNum">      60 </span>                :            :  * becomes too difficult, it also requires the ability to change the hash
+<span class="lineNum">      61 </span>                :            :  * functions.  Requiring the client to provide multiple hashes and to be able
+<span class="lineNum">      62 </span>                :            :  * to change them to new hashes upon insertion is inconvenient.
+<span class="lineNum">      63 </span>                :            :  *
+<span class="lineNum">      64 </span>                :            :  * This implementation takes another approach.  The client provides a single,
+<span class="lineNum">      65 </span>                :            :  * fixed hash.  The cuckoo hash internally &quot;rehashes&quot; this hash against a
+<span class="lineNum">      66 </span>                :            :  * randomly selected basis value (see rehash()).  This rehashed value is one of
+<span class="lineNum">      67 </span>                :            :  * the two hashes.  The other hash is computed by 16-bit circular rotation of
+<span class="lineNum">      68 </span>                :            :  * the rehashed value.  Updating the basis changes the hash functions.
+<span class="lineNum">      69 </span>                :            :  *
+<span class="lineNum">      70 </span>                :            :  * To work properly, the hash functions used by a cuckoo hash must be
+<span class="lineNum">      71 </span>                :            :  * independent.  If one hash function is a function of the other (e.g. h2(x) =
+<span class="lineNum">      72 </span>                :            :  * h1(x) + 1, or h2(x) = hash(h1(x))), then insertion will eventually fail
+<span class="lineNum">      73 </span>                :            :  * catastrophically (loop forever) because of collisions.  With this rehashing
+<span class="lineNum">      74 </span>                :            :  * technique, the two hashes are completely independent for masks up to 16 bits
+<span class="lineNum">      75 </span>                :            :  * wide.  For masks wider than 16 bits, only 32-n bits are independent between
+<span class="lineNum">      76 </span>                :            :  * the two hashes.  Thus, it becomes risky to grow a cuckoo hash table beyond
+<span class="lineNum">      77 </span>                :            :  * about 2**24 buckets (about 71 million elements with k=5 and maximum load
+<span class="lineNum">      78 </span>                :            :  * 85%).  Fortunately, Open vSwitch does not normally deal with hash tables
+<span class="lineNum">      79 </span>                :            :  * this large.
+<span class="lineNum">      80 </span>                :            :  *
+<span class="lineNum">      81 </span>                :            :  *
+<span class="lineNum">      82 </span>                :            :  * Handling Duplicates
+<span class="lineNum">      83 </span>                :            :  * ===================
+<span class="lineNum">      84 </span>                :            :  *
+<span class="lineNum">      85 </span>                :            :  * This cuckoo hash table implementation deals with duplicate client-provided
+<span class="lineNum">      86 </span>                :            :  * hash values by chaining: the second and subsequent cmap_nodes with a given
+<span class="lineNum">      87 </span>                :            :  * hash are chained off the initially inserted node's 'next' member.  The hash
+<span class="lineNum">      88 </span>                :            :  * table maintains the invariant that a single client-provided hash value
+<span class="lineNum">      89 </span>                :            :  * exists in only a single chain in a single bucket (even though that hash
+<span class="lineNum">      90 </span>                :            :  * could be stored in two buckets).
+<span class="lineNum">      91 </span>                :            :  *
+<span class="lineNum">      92 </span>                :            :  *
+<span class="lineNum">      93 </span>                :            :  * References
+<span class="lineNum">      94 </span>                :            :  * ==========
+<span class="lineNum">      95 </span>                :            :  *
+<span class="lineNum">      96 </span>                :            :  * [1] D. Zhou, B. Fan, H. Lim, M. Kaminsky, D. G. Andersen, &quot;Scalable, High
+<span class="lineNum">      97 </span>                :            :  *     Performance Ethernet Forwarding with CuckooSwitch&quot;.  In Proc. 9th
+<span class="lineNum">      98 </span>                :            :  *     CoNEXT, Dec. 2013.
+<span class="lineNum">      99 </span>                :            :  *
+<span class="lineNum">     100 </span>                :            :  * [2] B. Fan, D. G. Andersen, and M. Kaminsky. &quot;MemC3: Compact and concurrent
+<span class="lineNum">     101 </span>                :            :  *     memcache with dumber caching and smarter hashing&quot;.  In Proc. 10th USENIX
+<span class="lineNum">     102 </span>                :            :  *     NSDI, Apr. 2013
+<span class="lineNum">     103 </span>                :            :  *
+<span class="lineNum">     104 </span>                :            :  * [3] R. Pagh and F. Rodler. &quot;Cuckoo hashing&quot;. Journal of Algorithms, 51(2):
+<span class="lineNum">     105 </span>                :            :  *     122-144, May 2004.
+<span class="lineNum">     106 </span>                :            :  *
+<span class="lineNum">     107 </span>                :            :  * [4] U. Erlingsson, M. Manasse, F. McSherry, &quot;A Cool and Practical
+<span class="lineNum">     108 </span>                :            :  *     Alternative to Traditional Hash Tables&quot;.  In Proc. 7th Workshop on
+<span class="lineNum">     109 </span>                :            :  *     Distributed Data and Structures (WDAS'06), 2006.
+<span class="lineNum">     110 </span>                :            :  */
+<span class="lineNum">     111 </span>                :            : /* An entry is an int and a pointer: 8 bytes on 32-bit, 12 bytes on 64-bit. */
+<span class="lineNum">     112 </span>                :            : #define CMAP_ENTRY_SIZE (4 + (UINTPTR_MAX == UINT32_MAX ? 4 : 8))
+<span class="lineNum">     113 </span>                :            : 
+<span class="lineNum">     114 </span>                :            : /* Number of entries per bucket: 7 on 32-bit, 5 on 64-bit. */
+<span class="lineNum">     115 </span>                :            : #define CMAP_K ((CACHE_LINE_SIZE - 4) / CMAP_ENTRY_SIZE)
+<span class="lineNum">     116 </span>                :            : 
+<span class="lineNum">     117 </span>                :            : /* Pad to make a bucket a full cache line in size: 4 on 32-bit, 0 on 64-bit. */
+<span class="lineNum">     118 </span>                :            : #define CMAP_PADDING ((CACHE_LINE_SIZE - 4) - (CMAP_K * CMAP_ENTRY_SIZE))
+<span class="lineNum">     119 </span>                :            : 
+<span class="lineNum">     120 </span>                :            : /* A cuckoo hash bucket.  Designed to be cache-aligned and exactly one cache
+<span class="lineNum">     121 </span>                :            :  * line long. */
+<span class="lineNum">     122 </span>                :            : struct cmap_bucket {
+<span class="lineNum">     123 </span>                :            :     /* Allows readers to track in-progress changes.  Initially zero, each
+<span class="lineNum">     124 </span>                :            :      * writer increments this value just before and just after each change (see
+<span class="lineNum">     125 </span>                :            :      * cmap_set_bucket()).  Thus, a reader can ensure that it gets a consistent
+<span class="lineNum">     126 </span>                :            :      * snapshot by waiting for the counter to become even (see
+<span class="lineNum">     127 </span>                :            :      * read_even_counter()), then checking that its value does not change while
+<span class="lineNum">     128 </span>                :            :      * examining the bucket (see cmap_find()). */
+<span class="lineNum">     129 </span>                :            :     atomic_uint32_t counter;
+<span class="lineNum">     130 </span>                :            : 
+<span class="lineNum">     131 </span>                :            :     /* (hash, node) slots.  They are parallel arrays instead of an array of
+<span class="lineNum">     132 </span>                :            :      * structs to reduce the amount of space lost to padding.
+<span class="lineNum">     133 </span>                :            :      *
+<span class="lineNum">     134 </span>                :            :      * The slots are in no particular order.  A null pointer indicates that a
+<span class="lineNum">     135 </span>                :            :      * pair is unused.  In-use slots are not necessarily in the earliest
+<span class="lineNum">     136 </span>                :            :      * slots. */
+<span class="lineNum">     137 </span>                :            :     atomic_uint32_t hashes[CMAP_K];
+<span class="lineNum">     138 </span>                :            :     struct cmap_node nodes[CMAP_K];
+<span class="lineNum">     139 </span>                :            : 
+<span class="lineNum">     140 </span>                :            :     /* Padding to make cmap_bucket exactly one cache line long. */
+<span class="lineNum">     141 </span>                :            : #if CMAP_PADDING &gt; 0
+<span class="lineNum">     142 </span>                :            :     uint8_t pad[CMAP_PADDING];
+<span class="lineNum">     143 </span>                :            : #endif
+<span class="lineNum">     144 </span>                :            : };
+<span class="lineNum">     145 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct cmap_bucket) == CACHE_LINE_SIZE);
+<span class="lineNum">     146 </span>                :            : 
+<span class="lineNum">     147 </span>                :            : /* Default maximum load factor (as a fraction of UINT32_MAX + 1) before
+<span class="lineNum">     148 </span>                :            :  * enlarging a cmap.  Reasonable values lie between about 75% and 93%.  Smaller
+<span class="lineNum">     149 </span>                :            :  * values waste memory; larger values increase the average insertion time. */
+<span class="lineNum">     150 </span>                :            : #define CMAP_MAX_LOAD ((uint32_t) (UINT32_MAX * .85))
+<span class="lineNum">     151 </span>                :            : 
+<span class="lineNum">     152 </span>                :            : /* The implementation of a concurrent hash map. */
+<span class="lineNum">     153 </span>                :            : struct cmap_impl {
+<span class="lineNum">     154 </span>                :            :     unsigned int n;             /* Number of in-use elements. */
+<span class="lineNum">     155 </span>                :            :     unsigned int max_n;         /* Max elements before enlarging. */
+<span class="lineNum">     156 </span>                :            :     uint32_t mask;              /* Number of 'buckets', minus one. */
+<span class="lineNum">     157 </span>                :            :     uint32_t basis;             /* Basis for rehashing client's hash values. */
+<span class="lineNum">     158 </span>                :            : 
+<span class="lineNum">     159 </span>                :            :     /* Padding to make cmap_impl exactly one cache line long. */
+<span class="lineNum">     160 </span>                :            :     uint8_t pad[CACHE_LINE_SIZE - sizeof(unsigned int) * 4];
+<span class="lineNum">     161 </span>                :            : 
+<span class="lineNum">     162 </span>                :            :     struct cmap_bucket buckets[];
+<span class="lineNum">     163 </span>                :            : };
+<a name="164"><span class="lineNum">     164 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct cmap_impl) == CACHE_LINE_SIZE);</a>
+<span class="lineNum">     165 </span>                :            : 
+<span class="lineNum">     166 </span>                :<span class="lineCov">   13667845 : static uint32_t cmap_get_hash__(const atomic_uint32_t *hash,</span>
+<span class="lineNum">     167 </span>                :            :                                 memory_order order)
+<span class="lineNum">     168 </span>                :            : {
+<span class="lineNum">     169 </span>                :            :     uint32_t hash__;
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>                :<span class="lineCov">   13667845 :     atomic_read_explicit(CONST_CAST(ATOMIC(uint32_t) *, hash), &amp;hash__, order);</span>
+<span class="lineNum">     172 </span>                :<span class="lineCov">   13667845 :     return hash__;</span>
+<span class="lineNum">     173 </span>                :            : }
+<span class="lineNum">     174 </span>                :            : 
+<span class="lineNum">     175 </span>                :            : #define cmap_get_hash(HASH) \
+<span class="lineNum">     176 </span>                :            :     cmap_get_hash__(HASH, memory_order_acquire)
+<span class="lineNum">     177 </span>                :            : #define cmap_get_hash_protected(HASH) \
+<span class="lineNum">     178 </span>                :            :     cmap_get_hash__(HASH, memory_order_relaxed)
+<span class="lineNum">     179 </span>                :            : 
+<span class="lineNum">     180 </span>                :            : static struct cmap_impl *cmap_rehash(struct cmap *, uint32_t mask);
+<span class="lineNum">     181 </span>                :            : 
+<span class="lineNum">     182 </span>                :            : /* Given a rehashed value 'hash', returns the other hash for that rehashed
+<span class="lineNum">     183 </span>                :            :  * value.  This is symmetric: other_hash(other_hash(x)) == x.  (See also &quot;Hash
+<a name="184"><span class="lineNum">     184 </span>                :            :  * Functions&quot; at the top of this file.) */</a>
+<span class="lineNum">     185 </span>                :            : static uint32_t
+<span class="lineNum">     186 </span>                :<span class="lineCov">    6017701 : other_hash(uint32_t hash)</span>
+<span class="lineNum">     187 </span>                :            : {
+<span class="lineNum">     188 </span>                :<span class="lineCov">    6017701 :     return (hash &lt;&lt; 16) | (hash &gt;&gt; 16);</span>
+<span class="lineNum">     189 </span>                :            : }
+<span class="lineNum">     190 </span>                :            : 
+<span class="lineNum">     191 </span>                :            : /* Returns the rehashed value for 'hash' within 'impl'.  (See also &quot;Hash
+<a name="192"><span class="lineNum">     192 </span>                :            :  * Functions&quot; at the top of this file.) */</a>
+<span class="lineNum">     193 </span>                :            : static uint32_t
+<span class="lineNum">     194 </span>                :<span class="lineCov">    6017701 : rehash(const struct cmap_impl *impl, uint32_t hash)</span>
+<span class="lineNum">     195 </span>                :            : {
+<span class="lineNum">     196 </span>                :<span class="lineCov">    6017701 :     return mhash_finish(impl-&gt;basis, hash);</span>
+<span class="lineNum">     197 </span>                :            : }
+<a name="198"><span class="lineNum">     198 </span>                :            : </a>
+<span class="lineNum">     199 </span>                :            : static struct cmap_impl *
+<span class="lineNum">     200 </span>                :<span class="lineCov">    6125445 : cmap_get_impl(const struct cmap *cmap)</span>
+<span class="lineNum">     201 </span>                :            : {
+<span class="lineNum">     202 </span>                :<span class="lineCov">    6125445 :     return ovsrcu_get(struct cmap_impl *, &amp;cmap-&gt;impl);</span>
+<span class="lineNum">     203 </span>                :            : }
+<a name="204"><span class="lineNum">     204 </span>                :            : </a>
+<span class="lineNum">     205 </span>                :            : static uint32_t
+<span class="lineNum">     206 </span>                :<span class="lineCov">        349 : calc_max_n(uint32_t mask)</span>
+<span class="lineNum">     207 </span>                :            : {
+<span class="lineNum">     208 </span>                :<span class="lineCov">        349 :     return ((uint64_t) (mask + 1) * CMAP_K * CMAP_MAX_LOAD) &gt;&gt; 32;</span>
+<span class="lineNum">     209 </span>                :            : }
+<a name="210"><span class="lineNum">     210 </span>                :            : </a>
+<span class="lineNum">     211 </span>                :            : static struct cmap_impl *
+<span class="lineNum">     212 </span>                :<span class="lineCov">        349 : cmap_impl_create(uint32_t mask)</span>
+<span class="lineNum">     213 </span>                :            : {
+<span class="lineNum">     214 </span>                :            :     struct cmap_impl *impl;
+<span class="lineNum">     215 </span>                :            : 
+<span class="lineNum">     216 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 349 times"> + </span>]:<span class="lineCov">        349 :     ovs_assert(is_pow2(mask + 1));</span>
+<span class="lineNum">     217 </span>                :            : 
+<span class="lineNum">     218 </span>                :<span class="lineCov">        349 :     impl = xzalloc_cacheline(sizeof *impl</span>
+<span class="lineNum">     219 </span>                :<span class="lineCov">        349 :                              + (mask + 1) * sizeof *impl-&gt;buckets);</span>
+<span class="lineNum">     220 </span>                :<span class="lineCov">        349 :     impl-&gt;n = 0;</span>
+<span class="lineNum">     221 </span>                :<span class="lineCov">        349 :     impl-&gt;max_n = calc_max_n(mask);</span>
+<span class="lineNum">     222 </span>                :<span class="lineCov">        349 :     impl-&gt;mask = mask;</span>
+<span class="lineNum">     223 </span>                :<span class="lineCov">        349 :     impl-&gt;basis = random_uint32();</span>
+<span class="lineNum">     224 </span>                :            : 
+<span class="lineNum">     225 </span>                :<span class="lineCov">        349 :     return impl;</span>
+<span class="lineNum">     226 </span>                :            : }
+<span class="lineNum">     227 </span>                :            : 
+<a name="228"><span class="lineNum">     228 </span>                :            : /* Initializes 'cmap' as an empty concurrent hash map. */</a>
+<span class="lineNum">     229 </span>                :            : void
+<span class="lineNum">     230 </span>                :<span class="lineCov">        260 : cmap_init(struct cmap *cmap)</span>
+<span class="lineNum">     231 </span>                :            : {
+<span class="lineNum">     232 </span>                :<span class="lineCov">        260 :     ovsrcu_set(&amp;cmap-&gt;impl, cmap_impl_create(0));</span>
+<span class="lineNum">     233 </span>                :<span class="lineCov">        260 : }</span>
+<span class="lineNum">     234 </span>                :            : 
+<span class="lineNum">     235 </span>                :            : /* Destroys 'cmap'.
+<span class="lineNum">     236 </span>                :            :  *
+<span class="lineNum">     237 </span>                :            :  * The client is responsible for destroying any data previously held in
+<a name="238"><span class="lineNum">     238 </span>                :            :  * 'cmap'. */</a>
+<span class="lineNum">     239 </span>                :            : void
+<span class="lineNum">     240 </span>                :<span class="lineCov">          3 : cmap_destroy(struct cmap *cmap)</span>
+<span class="lineNum">     241 </span>                :            : {
+<span class="lineNum">     242 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          3 :     if (cmap) {</span>
+<span class="lineNum">     243 </span>                :<span class="lineCov">          3 :         free_cacheline(cmap_get_impl(cmap));</span>
+<span class="lineNum">     244 </span>                :            :     }
+<span class="lineNum">     245 </span>                :<span class="lineCov">          3 : }</span>
+<span class="lineNum">     246 </span>                :            : 
+<a name="247"><span class="lineNum">     247 </span>                :            : /* Returns the number of elements in 'cmap'. */</a>
+<span class="lineNum">     248 </span>                :            : size_t
+<span class="lineNum">     249 </span>                :<span class="lineCov">      27000 : cmap_count(const struct cmap *cmap)</span>
+<span class="lineNum">     250 </span>                :            : {
+<span class="lineNum">     251 </span>                :<span class="lineCov">      27000 :     return cmap_get_impl(cmap)-&gt;n;</span>
+<span class="lineNum">     252 </span>                :            : }
+<span class="lineNum">     253 </span>                :            : 
+<a name="254"><span class="lineNum">     254 </span>                :            : /* Returns true if 'cmap' is empty, false otherwise. */</a>
+<span class="lineNum">     255 </span>                :            : bool
+<span class="lineNum">     256 </span>                :<span class="lineCov">      18000 : cmap_is_empty(const struct cmap *cmap)</span>
+<span class="lineNum">     257 </span>                :            : {
+<span class="lineNum">     258 </span>                :<span class="lineCov">      18000 :     return cmap_count(cmap) == 0;</span>
+<span class="lineNum">     259 </span>                :            : }
+<a name="260"><span class="lineNum">     260 </span>                :            : </a>
+<span class="lineNum">     261 </span>                :            : static uint32_t
+<span class="lineNum">     262 </span>                :<span class="lineCov">   12401767 : read_counter(struct cmap_bucket *bucket)</span>
+<span class="lineNum">     263 </span>                :            : {
+<span class="lineNum">     264 </span>                :            :     uint32_t counter;
+<span class="lineNum">     265 </span>                :            : 
+<span class="lineNum">     266 </span>                :<span class="lineCov">   12401767 :     atomic_read_explicit(&amp;bucket-&gt;counter, &amp;counter, memory_order_acquire);</span>
+<span class="lineNum">     267 </span>                :<span class="lineCov">   12401767 :     return counter;</span>
+<span class="lineNum">     268 </span>                :            : }
+<a name="269"><span class="lineNum">     269 </span>                :            : </a>
+<span class="lineNum">     270 </span>                :            : static uint32_t
+<span class="lineNum">     271 </span>                :<span class="lineCov">    6397207 : read_even_counter(struct cmap_bucket *bucket)</span>
+<span class="lineNum">     272 </span>                :            : {
+<span class="lineNum">     273 </span>                :            :     uint32_t counter;
+<span class="lineNum">     274 </span>                :            : 
+<span class="lineNum">     275 </span>                :            :     do {
+<span class="lineNum">     276 </span>                :<span class="lineCov">    6397207 :         counter = read_counter(bucket);</span>
+<span class="lineNum">     277 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 6397207 times"> + </span>]:<span class="lineCov">    6397207 :     } while (OVS_UNLIKELY(counter &amp; 1));</span>
+<span class="lineNum">     278 </span>                :            : 
+<span class="lineNum">     279 </span>                :<span class="lineCov">    6397207 :     return counter;</span>
+<span class="lineNum">     280 </span>                :            : }
+<a name="281"><span class="lineNum">     281 </span>                :            : </a>
+<span class="lineNum">     282 </span>                :            : static bool
+<span class="lineNum">     283 </span>                :<span class="lineCov">    6004560 : counter_changed(struct cmap_bucket *b, uint32_t c)</span>
+<span class="lineNum">     284 </span>                :            : {
+<span class="lineNum">     285 </span>                :<span class="lineCov">    6004560 :     return OVS_UNLIKELY(read_counter(b) != c);</span>
+<span class="lineNum">     286 </span>                :            : }
+<span class="lineNum">     287 </span>                :            : 
+<span class="lineNum">     288 </span>                :            : /* Searches 'cmap' for an element with the specified 'hash'.  If one or more is
+<span class="lineNum">     289 </span>                :            :  * found, returns a pointer to the first one, otherwise a null pointer.  All of
+<span class="lineNum">     290 </span>                :            :  * the nodes on the returned list are guaranteed to have exactly the given
+<span class="lineNum">     291 </span>                :            :  * 'hash'.
+<span class="lineNum">     292 </span>                :            :  *
+<span class="lineNum">     293 </span>                :            :  * This function works even if 'cmap' is changing concurrently.  If 'cmap' is
+<span class="lineNum">     294 </span>                :            :  * not changing, then cmap_find_protected() is slightly faster.
+<span class="lineNum">     295 </span>                :            :  *
+<a name="296"><span class="lineNum">     296 </span>                :            :  * CMAP_FOR_EACH_WITH_HASH is usually more convenient. */</a>
+<span class="lineNum">     297 </span>                :            : struct cmap_node *
+<span class="lineNum">     298 </span>                :<span class="lineCov">    6003668 : cmap_find(const struct cmap *cmap, uint32_t hash)</span>
+<span class="lineNum">     299 </span>                :            : {
+<span class="lineNum">     300 </span>                :<span class="lineCov">    6003668 :     struct cmap_impl *impl = cmap_get_impl(cmap);</span>
+<span class="lineNum">     301 </span>                :<span class="lineCov">    6003668 :     uint32_t h1 = rehash(impl, hash);</span>
+<span class="lineNum">     302 </span>                :<span class="lineCov">    6003668 :     uint32_t h2 = other_hash(h1);</span>
+<span class="lineNum">     303 </span>                :            :     struct cmap_bucket *b1;
+<span class="lineNum">     304 </span>                :            :     struct cmap_bucket *b2;
+<span class="lineNum">     305 </span>                :            :     uint32_t c1, c2;
+<span class="lineNum">     306 </span>                :            :     int i;
+<span class="lineNum">     307 </span>                :            : 
+<span class="lineNum">     308 </span>                :            : retry:
+<span class="lineNum">     309 </span>                :<span class="lineCov">    6003668 :     b1 = &amp;impl-&gt;buckets[h1 &amp; impl-&gt;mask];</span>
+<span class="lineNum">     310 </span>                :<span class="lineCov">    6003668 :     c1 = read_even_counter(b1);</span>
+<span class="lineNum">     311 </span>        [<span class="branchCov" title="Branch 0 was taken 13007117 times"> + </span><span class="branchCov" title="Branch 1 was taken 393539 times"> + </span>]:<span class="lineCov">   13400656 :     for (i = 0; i &lt; CMAP_K; i++) {</span>
+<span class="lineNum">     312 </span>                :<span class="lineCov">   13007117 :         struct cmap_node *node = cmap_node_next(&amp;b1-&gt;nodes[i]);</span>
+<span class="lineNum">     313 </span>                :            : 
+<span class="lineNum">     314 </span>[<span class="branchCov" title="Branch 0 was taken 12341712 times"> + </span><span class="branchCov" title="Branch 1 was taken 665405 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 5610129 times"> + </span><span class="branchCov" title="Branch 4 was taken 6731583 times"> + </span>]:<span class="lineCov">   13007117 :         if (node &amp;&amp; cmap_get_hash(&amp;b1-&gt;hashes[i]) == hash) {</span>
+<span class="lineNum">     315 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 5610129 times"> + </span>]:<span class="lineCov">    5610129 :             if (counter_changed(b1, c1)) {</span>
+<span class="lineNum">     316 </span>                :<span class="lineNoCov">          0 :                 goto retry;</span>
+<span class="lineNum">     317 </span>                :            :             }
+<span class="lineNum">     318 </span>                :<span class="lineCov">    5610129 :             return node;</span>
+<span class="lineNum">     319 </span>                :            :         }
+<span class="lineNum">     320 </span>                :            :     }
+<span class="lineNum">     321 </span>                :            : 
+<span class="lineNum">     322 </span>                :<span class="lineCov">     393539 :     b2 = &amp;impl-&gt;buckets[h2 &amp; impl-&gt;mask];</span>
+<span class="lineNum">     323 </span>                :<span class="lineCov">     393539 :     c2 = read_even_counter(b2);</span>
+<span class="lineNum">     324 </span>        [<span class="branchCov" title="Branch 0 was taken 1350713 times"> + </span><span class="branchCov" title="Branch 1 was taken 892 times"> + </span>]:<span class="lineCov">    1351605 :     for (i = 0; i &lt; CMAP_K; i++) {</span>
+<span class="lineNum">     325 </span>                :<span class="lineCov">    1350713 :         struct cmap_node *node = cmap_node_next(&amp;b2-&gt;nodes[i]);</span>
+<span class="lineNum">     326 </span>                :            : 
+<span class="lineNum">     327 </span>[<span class="branchCov" title="Branch 0 was taken 1253298 times"> + </span><span class="branchCov" title="Branch 1 was taken 97415 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 392647 times"> + </span><span class="branchCov" title="Branch 4 was taken 860651 times"> + </span>]:<span class="lineCov">    1350713 :         if (node &amp;&amp; cmap_get_hash(&amp;b2-&gt;hashes[i]) == hash) {</span>
+<span class="lineNum">     328 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 392647 times"> + </span>]:<span class="lineCov">     392647 :             if (counter_changed(b2, c2)) {</span>
+<span class="lineNum">     329 </span>                :<span class="lineNoCov">          0 :                 goto retry;</span>
+<span class="lineNum">     330 </span>                :            :             }
+<span class="lineNum">     331 </span>                :<span class="lineCov">     392647 :             return node;</span>
+<span class="lineNum">     332 </span>                :            :         }
+<span class="lineNum">     333 </span>                :            :     }
+<span class="lineNum">     334 </span>                :            : 
+<span class="lineNum">     335 </span>[<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 892 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 892 times"> + </span>]:<span class="lineCov">        892 :     if (counter_changed(b1, c1) || counter_changed(b2, c2)) {</span>
+<span class="lineNum">     336 </span>                :            :         goto retry;
+<span class="lineNum">     337 </span>                :            :     }
+<span class="lineNum">     338 </span>                :<span class="lineCov">    6003668 :     return NULL;</span>
+<span class="lineNum">     339 </span>                :            : }
+<a name="340"><span class="lineNum">     340 </span>                :            : </a>
+<span class="lineNum">     341 </span>                :            : static int
+<span class="lineNum">     342 </span>                :<span class="lineCov">       7314 : cmap_find_slot_protected(struct cmap_bucket *b, uint32_t hash)</span>
+<span class="lineNum">     343 </span>                :            : {
+<span class="lineNum">     344 </span>                :            :     int i;
+<span class="lineNum">     345 </span>                :            : 
+<span class="lineNum">     346 </span>        [<span class="branchCov" title="Branch 0 was taken 17006 times"> + </span><span class="branchCov" title="Branch 1 was taken 444 times"> + </span>]:<span class="lineCov">      17450 :     for (i = 0; i &lt; CMAP_K; i++) {</span>
+<span class="lineNum">     347 </span>                :<span class="lineCov">      17006 :         struct cmap_node *node = cmap_node_next_protected(&amp;b-&gt;nodes[i]);</span>
+<span class="lineNum">     348 </span>                :            : 
+<span class="lineNum">     349 </span>[<span class="branchCov" title="Branch 0 was taken 14494 times"> + </span><span class="branchCov" title="Branch 1 was taken 2512 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 6870 times"> + </span><span class="branchCov" title="Branch 4 was taken 7624 times"> + </span>]:<span class="lineCov">      17006 :         if (node &amp;&amp; cmap_get_hash_protected(&amp;b-&gt;hashes[i]) == hash) {</span>
+<span class="lineNum">     350 </span>                :<span class="lineCov">       6870 :             return i;</span>
+<span class="lineNum">     351 </span>                :            :         }
+<span class="lineNum">     352 </span>                :            :     }
+<span class="lineNum">     353 </span>                :<span class="lineCov">       7314 :     return -1;</span>
+<span class="lineNum">     354 </span>                :            : }
+<a name="355"><span class="lineNum">     355 </span>                :            : </a>
+<span class="lineNum">     356 </span>                :            : static struct cmap_node *
+<span class="lineNum">     357 </span>                :<span class="lineNoCov">          0 : cmap_find_bucket_protected(struct cmap_impl *impl, uint32_t hash, uint32_t h)</span>
+<span class="lineNum">     358 </span>                :            : {
+<span class="lineNum">     359 </span>                :<span class="lineNoCov">          0 :     struct cmap_bucket *b = &amp;impl-&gt;buckets[h &amp; impl-&gt;mask];</span>
+<span class="lineNum">     360 </span>                :            :     int i;
+<span class="lineNum">     361 </span>                :            : 
+<span class="lineNum">     362 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (i = 0; i &lt; CMAP_K; i++) {</span>
+<span class="lineNum">     363 </span>                :<span class="lineNoCov">          0 :         struct cmap_node *node = cmap_node_next_protected(&amp;b-&gt;nodes[i]);</span>
+<span class="lineNum">     364 </span>                :            : 
+<span class="lineNum">     365 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (node &amp;&amp; cmap_get_hash_protected(&amp;b-&gt;hashes[i]) == hash) {</span>
+<span class="lineNum">     366 </span>                :<span class="lineNoCov">          0 :             return node;</span>
+<span class="lineNum">     367 </span>                :            :         }
+<span class="lineNum">     368 </span>                :            :     }
+<span class="lineNum">     369 </span>                :<span class="lineNoCov">          0 :     return NULL;</span>
+<span class="lineNum">     370 </span>                :            : }
+<span class="lineNum">     371 </span>                :            : 
+<span class="lineNum">     372 </span>                :            : /* Like cmap_find(), but only for use if 'cmap' cannot change concurrently.
+<span class="lineNum">     373 </span>                :            :  *
+<a name="374"><span class="lineNum">     374 </span>                :            :  * CMAP_FOR_EACH_WITH_HASH_PROTECTED is usually more convenient. */</a>
+<span class="lineNum">     375 </span>                :            : struct cmap_node *
+<span class="lineNum">     376 </span>                :<span class="lineNoCov">          0 : cmap_find_protected(const struct cmap *cmap, uint32_t hash)</span>
+<span class="lineNum">     377 </span>                :            : {
+<span class="lineNum">     378 </span>                :<span class="lineNoCov">          0 :     struct cmap_impl *impl = cmap_get_impl(cmap);</span>
+<span class="lineNum">     379 </span>                :<span class="lineNoCov">          0 :     uint32_t h1 = rehash(impl, hash);</span>
+<span class="lineNum">     380 </span>                :<span class="lineNoCov">          0 :     uint32_t h2 = other_hash(hash);</span>
+<span class="lineNum">     381 </span>                :            :     struct cmap_node *node;
+<span class="lineNum">     382 </span>                :            : 
+<span class="lineNum">     383 </span>                :<span class="lineNoCov">          0 :     node = cmap_find_bucket_protected(impl, hash, h1);</span>
+<span class="lineNum">     384 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (node) {</span>
+<span class="lineNum">     385 </span>                :<span class="lineNoCov">          0 :         return node;</span>
+<span class="lineNum">     386 </span>                :            :     }
+<span class="lineNum">     387 </span>                :<span class="lineNoCov">          0 :     return cmap_find_bucket_protected(impl, hash, h2);</span>
+<span class="lineNum">     388 </span>                :            : }
+<a name="389"><span class="lineNum">     389 </span>                :            : </a>
+<span class="lineNum">     390 </span>                :            : static int
+<span class="lineNum">     391 </span>                :<span class="lineCov">        386 : cmap_find_empty_slot_protected(const struct cmap_bucket *b)</span>
+<span class="lineNum">     392 </span>                :            : {
+<span class="lineNum">     393 </span>                :            :     int i;
+<span class="lineNum">     394 </span>                :            : 
+<span class="lineNum">     395 </span>        [<span class="branchCov" title="Branch 0 was taken 1734 times"> + </span><span class="branchCov" title="Branch 1 was taken 228 times"> + </span>]:<span class="lineCov">       1962 :     for (i = 0; i &lt; CMAP_K; i++) {</span>
+<span class="lineNum">     396 </span>        [<span class="branchCov" title="Branch 1 was taken 158 times"> + </span><span class="branchCov" title="Branch 2 was taken 1576 times"> + </span>]:<span class="lineCov">       1734 :         if (!cmap_node_next_protected(&amp;b-&gt;nodes[i])) {</span>
+<span class="lineNum">     397 </span>                :<span class="lineCov">        158 :             return i;</span>
+<span class="lineNum">     398 </span>                :            :         }
+<span class="lineNum">     399 </span>                :            :     }
+<span class="lineNum">     400 </span>                :<span class="lineCov">        386 :     return -1;</span>
+<span class="lineNum">     401 </span>                :            : }
+<a name="402"><span class="lineNum">     402 </span>                :            : </a>
+<span class="lineNum">     403 </span>                :            : static void
+<span class="lineNum">     404 </span>                :<span class="lineCov">       5519 : cmap_set_bucket(struct cmap_bucket *b, int i,</span>
+<span class="lineNum">     405 </span>                :            :                 struct cmap_node *node, uint32_t hash)
+<span class="lineNum">     406 </span>                :            : {
+<span class="lineNum">     407 </span>                :            :     uint32_t c;
+<span class="lineNum">     408 </span>                :            : 
+<span class="lineNum">     409 </span>                :<span class="lineCov">       5519 :     atomic_read_explicit(&amp;b-&gt;counter, &amp;c, memory_order_acquire);</span>
+<span class="lineNum">     410 </span>                :<span class="lineCov">       5519 :     atomic_store_explicit(&amp;b-&gt;counter, c + 1, memory_order_release);</span>
+<span class="lineNum">     411 </span>                :<span class="lineCov">       5519 :     ovsrcu_set(&amp;b-&gt;nodes[i].next, node); /* Also atomic. */</span>
+<span class="lineNum">     412 </span>                :<span class="lineCov">       5519 :     atomic_store_explicit(&amp;b-&gt;hashes[i], hash, memory_order_release);</span>
+<span class="lineNum">     413 </span>                :<span class="lineCov">       5519 :     atomic_store_explicit(&amp;b-&gt;counter, c + 2, memory_order_release);</span>
+<span class="lineNum">     414 </span>                :<span class="lineCov">       5519 : }</span>
+<span class="lineNum">     415 </span>                :            : 
+<span class="lineNum">     416 </span>                :            : /* Searches 'b' for a node with the given 'hash'.  If it finds one, adds
+<span class="lineNum">     417 </span>                :            :  * 'new_node' to the node's linked list and returns true.  If it does not find
+<a name="418"><span class="lineNum">     418 </span>                :            :  * one, returns false. */</a>
+<span class="lineNum">     419 </span>                :            : static bool
+<span class="lineNum">     420 </span>                :<span class="lineCov">      11963 : cmap_insert_dup(struct cmap_node *new_node, uint32_t hash,</span>
+<span class="lineNum">     421 </span>                :            :                 struct cmap_bucket *b)
+<span class="lineNum">     422 </span>                :            : {
+<span class="lineNum">     423 </span>                :            :     int i;
+<span class="lineNum">     424 </span>                :            : 
+<span class="lineNum">     425 </span>        [<span class="branchCov" title="Branch 0 was taken 55164 times"> + </span><span class="branchCov" title="Branch 1 was taken 10712 times"> + </span>]:<span class="lineCov">      65876 :     for (i = 0; i &lt; CMAP_K; i++) {</span>
+<span class="lineNum">     426 </span>                :<span class="lineCov">      55164 :         struct cmap_node *node = cmap_node_next_protected(&amp;b-&gt;nodes[i]);</span>
+<span class="lineNum">     427 </span>                :            : 
+<span class="lineNum">     428 </span>        [<span class="branchCov" title="Branch 1 was taken 1251 times"> + </span><span class="branchCov" title="Branch 2 was taken 53913 times"> + </span>]:<span class="lineCov">      55164 :         if (cmap_get_hash_protected(&amp;b-&gt;hashes[i]) == hash) {</span>
+<span class="lineNum">     429 </span>        [<span class="branchCov" title="Branch 0 was taken 999 times"> + </span><span class="branchCov" title="Branch 1 was taken 252 times"> + </span>]:<span class="lineCov">       1251 :             if (node) {</span>
+<span class="lineNum">     430 </span>                :            :                 struct cmap_node *p;
+<span class="lineNum">     431 </span>                :            : 
+<span class="lineNum">     432 </span>                :            :                 /* The common case is that 'new_node' is a singleton,
+<span class="lineNum">     433 </span>                :            :                  * with a null 'next' pointer.  Rehashing can add a
+<span class="lineNum">     434 </span>                :            :                  * longer chain, but due to our invariant of always
+<span class="lineNum">     435 </span>                :            :                  * having all nodes with the same (user) hash value at
+<span class="lineNum">     436 </span>                :            :                  * a single chain, rehashing will always insert the
+<span class="lineNum">     437 </span>                :            :                  * chain to an empty node.  The only way we can end up
+<span class="lineNum">     438 </span>                :            :                  * here is by the user inserting a chain of nodes at
+<span class="lineNum">     439 </span>                :            :                  * once.  Find the end of the chain starting at
+<span class="lineNum">     440 </span>                :            :                  * 'new_node', then splice 'node' to the end of that
+<span class="lineNum">     441 </span>                :            :                  * chain. */
+<span class="lineNum">     442 </span>                :<span class="lineCov">        999 :                 p = new_node;</span>
+<span class="lineNum">     443 </span>                :            :                 for (;;) {
+<span class="lineNum">     444 </span>                :<span class="lineCov">        999 :                     struct cmap_node *next = cmap_node_next_protected(p);</span>
+<span class="lineNum">     445 </span>                :            : 
+<span class="lineNum">     446 </span>        [<span class="branchCov" title="Branch 0 was taken 999 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        999 :                     if (!next) {</span>
+<span class="lineNum">     447 </span>                :<span class="lineCov">        999 :                         break;</span>
+<span class="lineNum">     448 </span>                :            :                     }
+<span class="lineNum">     449 </span>                :<span class="lineNoCov">          0 :                     p = next;</span>
+<span class="lineNum">     450 </span>                :<span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     451 </span>                :<span class="lineCov">        999 :                 ovsrcu_set_hidden(&amp;p-&gt;next, node);</span>
+<span class="lineNum">     452 </span>                :            :             } else {
+<span class="lineNum">     453 </span>                :            :                 /* The hash value is there from some previous insertion, but
+<span class="lineNum">     454 </span>                :            :                  * the associated node has been removed.  We're not really
+<span class="lineNum">     455 </span>                :            :                  * inserting a duplicate, but we can still reuse the slot.
+<span class="lineNum">     456 </span>                :            :                  * Carry on. */
+<span class="lineNum">     457 </span>                :            :             }
+<span class="lineNum">     458 </span>                :            : 
+<span class="lineNum">     459 </span>                :            :             /* Change the bucket to point to 'new_node'.  This is a degenerate
+<span class="lineNum">     460 </span>                :            :              * form of cmap_set_bucket() that doesn't update the counter since
+<span class="lineNum">     461 </span>                :            :              * we're only touching one field and in a way that doesn't change
+<span class="lineNum">     462 </span>                :            :              * the bucket's meaning for readers. */
+<span class="lineNum">     463 </span>                :<span class="lineCov">       1251 :             ovsrcu_set(&amp;b-&gt;nodes[i].next, new_node);</span>
+<span class="lineNum">     464 </span>                :            : 
+<span class="lineNum">     465 </span>                :<span class="lineCov">       1251 :             return true;</span>
+<span class="lineNum">     466 </span>                :            :         }
+<span class="lineNum">     467 </span>                :            :     }
+<span class="lineNum">     468 </span>                :<span class="lineCov">      11963 :     return false;</span>
+<span class="lineNum">     469 </span>                :            : }
+<span class="lineNum">     470 </span>                :            : 
+<span class="lineNum">     471 </span>                :            : /* Searches 'b' for an empty slot.  If successful, stores 'node' and 'hash' in
+<a name="472"><span class="lineNum">     472 </span>                :            :  * the slot and returns true.  Otherwise, returns false. */</a>
+<span class="lineNum">     473 </span>                :            : static bool
+<span class="lineNum">     474 </span>                :<span class="lineCov">       5866 : cmap_insert_bucket(struct cmap_node *node, uint32_t hash,</span>
+<span class="lineNum">     475 </span>                :            :                    struct cmap_bucket *b)
+<span class="lineNum">     476 </span>                :            : {
+<span class="lineNum">     477 </span>                :            :     int i;
+<span class="lineNum">     478 </span>                :            : 
+<span class="lineNum">     479 </span>        [<span class="branchCov" title="Branch 0 was taken 16607 times"> + </span><span class="branchCov" title="Branch 1 was taken 668 times"> + </span>]:<span class="lineCov">      17275 :     for (i = 0; i &lt; CMAP_K; i++) {</span>
+<span class="lineNum">     480 </span>        [<span class="branchCov" title="Branch 1 was taken 5198 times"> + </span><span class="branchCov" title="Branch 2 was taken 11409 times"> + </span>]:<span class="lineCov">      16607 :         if (!cmap_node_next_protected(&amp;b-&gt;nodes[i])) {</span>
+<span class="lineNum">     481 </span>                :<span class="lineCov">       5198 :             cmap_set_bucket(b, i, node, hash);</span>
+<span class="lineNum">     482 </span>                :<span class="lineCov">       5198 :             return true;</span>
+<span class="lineNum">     483 </span>                :            :         }
+<span class="lineNum">     484 </span>                :            :     }
+<span class="lineNum">     485 </span>                :<span class="lineCov">       5866 :     return false;</span>
+<span class="lineNum">     486 </span>                :            : }
+<span class="lineNum">     487 </span>                :            : 
+<span class="lineNum">     488 </span>                :            : /* Returns the other bucket that b-&gt;nodes[slot] could occupy in 'impl'.  (This
+<a name="489"><span class="lineNum">     489 </span>                :            :  * might be the same as 'b'.) */</a>
+<span class="lineNum">     490 </span>                :            : static struct cmap_bucket *
+<span class="lineNum">     491 </span>                :<span class="lineCov">        556 : other_bucket_protected(struct cmap_impl *impl, struct cmap_bucket *b, int slot)</span>
+<span class="lineNum">     492 </span>                :            : {
+<span class="lineNum">     493 </span>                :<span class="lineCov">        556 :     uint32_t h1 = rehash(impl, cmap_get_hash_protected(&amp;b-&gt;hashes[slot]));</span>
+<span class="lineNum">     494 </span>                :<span class="lineCov">        556 :     uint32_t h2 = other_hash(h1);</span>
+<span class="lineNum">     495 </span>                :<span class="lineCov">        556 :     uint32_t b_idx = b - impl-&gt;buckets;</span>
+<span class="lineNum">     496 </span>        [<span class="branchCov" title="Branch 0 was taken 529 times"> + </span><span class="branchCov" title="Branch 1 was taken 27 times"> + </span>]:<span class="lineCov">        556 :     uint32_t other_h = (h1 &amp; impl-&gt;mask) == b_idx ? h2 : h1;</span>
+<span class="lineNum">     497 </span>                :            : 
+<span class="lineNum">     498 </span>                :<span class="lineCov">        556 :     return &amp;impl-&gt;buckets[other_h &amp; impl-&gt;mask];</span>
+<span class="lineNum">     499 </span>                :            : }
+<span class="lineNum">     500 </span>                :            : 
+<span class="lineNum">     501 </span>                :            : /* 'new_node' is to be inserted into 'impl', but both candidate buckets 'b1'
+<span class="lineNum">     502 </span>                :            :  * and 'b2' are full.  This function attempts to rearrange buckets within
+<span class="lineNum">     503 </span>                :            :  * 'impl' to make room for 'new_node'.
+<span class="lineNum">     504 </span>                :            :  *
+<span class="lineNum">     505 </span>                :            :  * The implementation is a general-purpose breadth-first search.  At first
+<span class="lineNum">     506 </span>                :            :  * glance, this is more complex than a random walk through 'impl' (suggested by
+<span class="lineNum">     507 </span>                :            :  * some references), but random walks have a tendency to loop back through a
+<span class="lineNum">     508 </span>                :            :  * single bucket.  We have to move nodes backward along the path that we find,
+<span class="lineNum">     509 </span>                :            :  * so that no node actually disappears from the hash table, which means a
+<span class="lineNum">     510 </span>                :            :  * random walk would have to be careful to deal with loops.  By contrast, a
+<span class="lineNum">     511 </span>                :            :  * successful breadth-first search always finds a *shortest* path through the
+<span class="lineNum">     512 </span>                :            :  * hash table, and a shortest path will never contain loops, so it avoids that
+<span class="lineNum">     513 </span>                :            :  * problem entirely.
+<a name="514"><span class="lineNum">     514 </span>                :            :  */</a>
+<span class="lineNum">     515 </span>                :            : static bool
+<span class="lineNum">     516 </span>                :<span class="lineCov">        158 : cmap_insert_bfs(struct cmap_impl *impl, struct cmap_node *new_node,</span>
+<span class="lineNum">     517 </span>                :            :                 uint32_t hash, struct cmap_bucket *b1, struct cmap_bucket *b2)
+<span class="lineNum">     518 </span>                :            : {
+<span class="lineNum">     519 </span>                :            :     enum { MAX_DEPTH = 4 };
+<span class="lineNum">     520 </span>                :            : 
+<span class="lineNum">     521 </span>                :            :     /* A path from 'start' to 'end' via the 'n' steps in 'slots[]'.
+<span class="lineNum">     522 </span>                :            :      *
+<span class="lineNum">     523 </span>                :            :      * One can follow the path via:
+<span class="lineNum">     524 </span>                :            :      *
+<span class="lineNum">     525 </span>                :            :      *     struct cmap_bucket *b;
+<span class="lineNum">     526 </span>                :            :      *     int i;
+<span class="lineNum">     527 </span>                :            :      *
+<span class="lineNum">     528 </span>                :            :      *     b = path-&gt;start;
+<span class="lineNum">     529 </span>                :            :      *     for (i = 0; i &lt; path-&gt;n; i++) {
+<span class="lineNum">     530 </span>                :            :      *         b = other_bucket_protected(impl, b, path-&gt;slots[i]);
+<span class="lineNum">     531 </span>                :            :      *     }
+<span class="lineNum">     532 </span>                :            :      *     ovs_assert(b == path-&gt;end);
+<span class="lineNum">     533 </span>                :            :      */
+<span class="lineNum">     534 </span>                :            :     struct cmap_path {
+<span class="lineNum">     535 </span>                :            :         struct cmap_bucket *start; /* First bucket along the path. */
+<span class="lineNum">     536 </span>                :            :         struct cmap_bucket *end;   /* Last bucket on the path. */
+<span class="lineNum">     537 </span>                :            :         uint8_t slots[MAX_DEPTH];  /* Slots used for each hop. */
+<span class="lineNum">     538 </span>                :            :         int n;                     /* Number of slots[]. */
+<span class="lineNum">     539 </span>                :            :     };
+<span class="lineNum">     540 </span>                :            : 
+<span class="lineNum">     541 </span>                :            :     /* We need to limit the amount of work we do trying to find a path.  It
+<span class="lineNum">     542 </span>                :            :      * might actually be impossible to rearrange the cmap, and after some time
+<span class="lineNum">     543 </span>                :            :      * it is likely to be easier to rehash the entire cmap.
+<span class="lineNum">     544 </span>                :            :      *
+<span class="lineNum">     545 </span>                :            :      * This value of MAX_QUEUE is an arbitrary limit suggested by one of the
+<span class="lineNum">     546 </span>                :            :      * references.  Empirically, it seems to work OK. */
+<span class="lineNum">     547 </span>                :            :     enum { MAX_QUEUE = 500 };
+<span class="lineNum">     548 </span>                :            :     struct cmap_path queue[MAX_QUEUE];
+<span class="lineNum">     549 </span>                :<span class="lineCov">        158 :     int head = 0;</span>
+<span class="lineNum">     550 </span>                :<span class="lineCov">        158 :     int tail = 0;</span>
+<span class="lineNum">     551 </span>                :            : 
+<span class="lineNum">     552 </span>                :            :     /* Add 'b1' and 'b2' as starting points for the search. */
+<span class="lineNum">     553 </span>                :<span class="lineCov">        158 :     queue[head].start = b1;</span>
+<span class="lineNum">     554 </span>                :<span class="lineCov">        158 :     queue[head].end = b1;</span>
+<span class="lineNum">     555 </span>                :<span class="lineCov">        158 :     queue[head].n = 0;</span>
+<span class="lineNum">     556 </span>                :<span class="lineCov">        158 :     head++;</span>
+<span class="lineNum">     557 </span>        [<span class="branchCov" title="Branch 0 was taken 152 times"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">        158 :     if (b1 != b2) {</span>
+<span class="lineNum">     558 </span>                :<span class="lineCov">        152 :         queue[head].start = b2;</span>
+<span class="lineNum">     559 </span>                :<span class="lineCov">        152 :         queue[head].end = b2;</span>
+<span class="lineNum">     560 </span>                :<span class="lineCov">        152 :         queue[head].n = 0;</span>
+<span class="lineNum">     561 </span>                :<span class="lineCov">        152 :         head++;</span>
+<span class="lineNum">     562 </span>                :            :     }
+<span class="lineNum">     563 </span>                :            : 
+<span class="lineNum">     564 </span>        [<span class="branchCov" title="Branch 0 was taken 178 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        178 :     while (tail &lt; head) {</span>
+<span class="lineNum">     565 </span>                :<span class="lineCov">        178 :         const struct cmap_path *path = &amp;queue[tail++];</span>
+<span class="lineNum">     566 </span>                :<span class="lineCov">        178 :         struct cmap_bucket *this = path-&gt;end;</span>
+<span class="lineNum">     567 </span>                :            :         int i;
+<span class="lineNum">     568 </span>                :            : 
+<span class="lineNum">     569 </span>        [<span class="branchCov" title="Branch 0 was taken 393 times"> + </span><span class="branchCov" title="Branch 1 was taken 20 times"> + </span>]:<span class="lineCov">        413 :         for (i = 0; i &lt; CMAP_K; i++) {</span>
+<span class="lineNum">     570 </span>                :<span class="lineCov">        393 :             struct cmap_bucket *next = other_bucket_protected(impl, this, i);</span>
+<span class="lineNum">     571 </span>                :            :             int j;
+<span class="lineNum">     572 </span>                :            : 
+<span class="lineNum">     573 </span>        [<span class="branchCov" title="Branch 0 was taken 7 times"> + </span><span class="branchCov" title="Branch 1 was taken 386 times"> + </span>]:<span class="lineCov">        393 :             if (this == next) {</span>
+<span class="lineNum">     574 </span>                :<span class="lineCov">          7 :                 continue;</span>
+<span class="lineNum">     575 </span>                :            :             }
+<span class="lineNum">     576 </span>                :            : 
+<span class="lineNum">     577 </span>                :<span class="lineCov">        386 :             j = cmap_find_empty_slot_protected(next);</span>
+<span class="lineNum">     578 </span>        [<span class="branchCov" title="Branch 0 was taken 158 times"> + </span><span class="branchCov" title="Branch 1 was taken 228 times"> + </span>]:<span class="lineCov">        386 :             if (j &gt;= 0) {</span>
+<span class="lineNum">     579 </span>                :            :                 /* We've found a path along which we can rearrange the hash
+<span class="lineNum">     580 </span>                :            :                  * table:  Start at path-&gt;start, follow all the slots in
+<span class="lineNum">     581 </span>                :            :                  * path-&gt;slots[], then follow slot 'i', then the bucket you
+<span class="lineNum">     582 </span>                :            :                  * arrive at has slot 'j' empty. */
+<span class="lineNum">     583 </span>                :            :                 struct cmap_bucket *buckets[MAX_DEPTH + 2];
+<span class="lineNum">     584 </span>                :            :                 int slots[MAX_DEPTH + 2];
+<span class="lineNum">     585 </span>                :            :                 int k;
+<span class="lineNum">     586 </span>                :            : 
+<span class="lineNum">     587 </span>                :            :                 /* Figure out the full sequence of slots. */
+<span class="lineNum">     588 </span>        [<span class="branchCov" title="Branch 0 was taken 5 times"> + </span><span class="branchCov" title="Branch 1 was taken 158 times"> + </span>]:<span class="lineCov">        163 :                 for (k = 0; k &lt; path-&gt;n; k++) {</span>
+<span class="lineNum">     589 </span>                :<span class="lineCov">          5 :                     slots[k] = path-&gt;slots[k];</span>
+<span class="lineNum">     590 </span>                :            :                 }
+<span class="lineNum">     591 </span>                :<span class="lineCov">        158 :                 slots[path-&gt;n] = i;</span>
+<span class="lineNum">     592 </span>                :<span class="lineCov">        158 :                 slots[path-&gt;n + 1] = j;</span>
+<span class="lineNum">     593 </span>                :            : 
+<span class="lineNum">     594 </span>                :            :                 /* Figure out the full sequence of buckets. */
+<span class="lineNum">     595 </span>                :<span class="lineCov">        158 :                 buckets[0] = path-&gt;start;</span>
+<span class="lineNum">     596 </span>        [<span class="branchCov" title="Branch 0 was taken 163 times"> + </span><span class="branchCov" title="Branch 1 was taken 158 times"> + </span>]:<span class="lineCov">        321 :                 for (k = 0; k &lt;= path-&gt;n; k++) {</span>
+<span class="lineNum">     597 </span>                :<span class="lineCov">        163 :                     buckets[k + 1] = other_bucket_protected(impl, buckets[k], slots[k]);</span>
+<span class="lineNum">     598 </span>                :            :                 }
+<span class="lineNum">     599 </span>                :            : 
+<span class="lineNum">     600 </span>                :            :                 /* Now the path is fully expressed.  One can start from
+<span class="lineNum">     601 </span>                :            :                  * buckets[0], go via slots[0] to buckets[1], via slots[1] to
+<span class="lineNum">     602 </span>                :            :                  * buckets[2], and so on.
+<span class="lineNum">     603 </span>                :            :                  *
+<span class="lineNum">     604 </span>                :            :                  * Move all the nodes across the path &quot;backward&quot;.  After each
+<span class="lineNum">     605 </span>                :            :                  * step some node appears in two buckets.  Thus, every node is
+<span class="lineNum">     606 </span>                :            :                  * always visible to a concurrent search. */
+<span class="lineNum">     607 </span>        [<span class="branchCov" title="Branch 0 was taken 163 times"> + </span><span class="branchCov" title="Branch 1 was taken 158 times"> + </span>]:<span class="lineCov">        321 :                 for (k = path-&gt;n + 1; k &gt; 0; k--) {</span>
+<span class="lineNum">     608 </span>                :<span class="lineCov">        163 :                     int slot = slots[k - 1];</span>
+<span class="lineNum">     609 </span>                :            : 
+<span class="lineNum">     610 </span>                :<span class="lineCov">        163 :                     cmap_set_bucket(buckets[k], slots[k],</span>
+<span class="lineNum">     611 </span>                :<span class="lineCov">        163 :                                     cmap_node_next_protected(&amp;buckets[k - 1]-&gt;nodes[slot]),</span>
+<span class="lineNum">     612 </span>                :<span class="lineCov">        163 :                                     cmap_get_hash_protected(&amp;buckets[k - 1]-&gt;hashes[slot]));</span>
+<span class="lineNum">     613 </span>                :            :                 }
+<span class="lineNum">     614 </span>                :            : 
+<span class="lineNum">     615 </span>                :            :                 /* Finally, replace the first node on the path by
+<span class="lineNum">     616 </span>                :            :                  * 'new_node'. */
+<span class="lineNum">     617 </span>                :<span class="lineCov">        158 :                 cmap_set_bucket(buckets[0], slots[0], new_node, hash);</span>
+<span class="lineNum">     618 </span>                :            : 
+<span class="lineNum">     619 </span>                :<span class="lineCov">        158 :                 return true;</span>
+<span class="lineNum">     620 </span>                :            :             }
+<span class="lineNum">     621 </span>                :            : 
+<span class="lineNum">     622 </span>[<span class="branchCov" title="Branch 0 was taken 228 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 228 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        228 :             if (path-&gt;n &lt; MAX_DEPTH &amp;&amp; head &lt; MAX_QUEUE) {</span>
+<span class="lineNum">     623 </span>                :<span class="lineCov">        228 :                 struct cmap_path *new_path = &amp;queue[head++];</span>
+<span class="lineNum">     624 </span>                :            : 
+<span class="lineNum">     625 </span>                :<span class="lineCov">        228 :                 *new_path = *path;</span>
+<span class="lineNum">     626 </span>                :<span class="lineCov">        228 :                 new_path-&gt;end = next;</span>
+<span class="lineNum">     627 </span>                :<span class="lineCov">        228 :                 new_path-&gt;slots[new_path-&gt;n++] = i;</span>
+<span class="lineNum">     628 </span>                :            :             }
+<span class="lineNum">     629 </span>                :            :         }
+<span class="lineNum">     630 </span>                :            :     }
+<span class="lineNum">     631 </span>                :            : 
+<span class="lineNum">     632 </span>                :<span class="lineCov">        158 :     return false;</span>
+<span class="lineNum">     633 </span>                :            : }
+<span class="lineNum">     634 </span>                :            : 
+<span class="lineNum">     635 </span>                :            : /* Adds 'node', with the given 'hash', to 'impl'.
+<span class="lineNum">     636 </span>                :            :  *
+<span class="lineNum">     637 </span>                :            :  * 'node' is ordinarily a single node, with a null 'next' pointer.  When
+<a name="638"><span class="lineNum">     638 </span>                :            :  * rehashing, however, it may be a longer chain of nodes. */</a>
+<span class="lineNum">     639 </span>                :            : static bool
+<span class="lineNum">     640 </span>                :<span class="lineCov">       6607 : cmap_try_insert(struct cmap_impl *impl, struct cmap_node *node, uint32_t hash)</span>
+<span class="lineNum">     641 </span>                :            : {
+<span class="lineNum">     642 </span>                :<span class="lineCov">       6607 :     uint32_t h1 = rehash(impl, hash);</span>
+<span class="lineNum">     643 </span>                :<span class="lineCov">       6607 :     uint32_t h2 = other_hash(h1);</span>
+<span class="lineNum">     644 </span>                :<span class="lineCov">       6607 :     struct cmap_bucket *b1 = &amp;impl-&gt;buckets[h1 &amp; impl-&gt;mask];</span>
+<span class="lineNum">     645 </span>                :<span class="lineCov">       6607 :     struct cmap_bucket *b2 = &amp;impl-&gt;buckets[h2 &amp; impl-&gt;mask];</span>
+<span class="lineNum">     646 </span>                :            : 
+<span class="lineNum">     647 </span>                :<span class="lineCov">      18570 :     return (OVS_UNLIKELY(cmap_insert_dup(node, hash, b1) ||</span>
+<span class="lineNum">     648 </span>  [<span class="branchCov" title="Branch 0 was taken 510 times"> + </span><span class="branchCov" title="Branch 1 was taken 4846 times"> + </span><span class="branchCov" title="Branch 2 was taken 158 times"> + </span><span class="branchCov" title="Branch 3 was taken 352 times"> + </span>]:<span class="lineCov">       5866 :                          cmap_insert_dup(node, hash, b2)) ||</span>
+<span class="lineNum">     649 </span>                :<span class="lineCov">       5866 :             OVS_LIKELY(cmap_insert_bucket(node, hash, b1) ||</span>
+<span class="lineNum">     650 </span>  [<span class="branchCov" title="Branch 0 was taken 5356 times"> + </span><span class="branchCov" title="Branch 1 was taken 1251 times"> + </span><span class="branchCov" title="Branch 2 was taken 5356 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span> :<span class="lineCov">      17319 :                        cmap_insert_bucket(node, hash, b2)) ||</span>
+<span class="lineNum">         </span>         <span class="branchCov" title="Branch 4 was taken 158 times"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span>]
+<span class="lineNum">     651 </span>                :<span class="lineCov">        158 :             cmap_insert_bfs(impl, node, hash, b1, b2));</span>
+<span class="lineNum">     652 </span>                :            : }
+<span class="lineNum">     653 </span>                :            : 
+<span class="lineNum">     654 </span>                :            : /* Inserts 'node', with the given 'hash', into 'cmap'.  The caller must ensure
+<span class="lineNum">     655 </span>                :            :  * that 'cmap' cannot change concurrently (from another thread).  If duplicates
+<span class="lineNum">     656 </span>                :            :  * are undesirable, the caller must have already verified that 'cmap' does not
+<a name="657"><span class="lineNum">     657 </span>                :            :  * contain a duplicate of 'node'. */</a>
+<span class="lineNum">     658 </span>                :            : void
+<span class="lineNum">     659 </span>                :<span class="lineCov">       4149 : cmap_insert(struct cmap *cmap, struct cmap_node *node, uint32_t hash)</span>
+<span class="lineNum">     660 </span>                :            : {
+<span class="lineNum">     661 </span>                :<span class="lineCov">       4149 :     struct cmap_impl *impl = cmap_get_impl(cmap);</span>
+<span class="lineNum">     662 </span>                :            : 
+<span class="lineNum">     663 </span>                :<span class="lineCov">       4149 :     ovsrcu_set_hidden(&amp;node-&gt;next, NULL);</span>
+<span class="lineNum">     664 </span>                :            : 
+<span class="lineNum">     665 </span>        [<span class="branchCov" title="Branch 0 was taken 89 times"> + </span><span class="branchCov" title="Branch 1 was taken 4060 times"> + </span>]:<span class="lineCov">       4149 :     if (OVS_UNLIKELY(impl-&gt;n &gt;= impl-&gt;max_n)) {</span>
+<span class="lineNum">     666 </span>                :<span class="lineCov">         89 :         impl = cmap_rehash(cmap, (impl-&gt;mask &lt;&lt; 1) | 1);</span>
+<span class="lineNum">     667 </span>                :            :     }
+<span class="lineNum">     668 </span>                :            : 
+<span class="lineNum">     669 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 4149 times"> + </span>]:<span class="lineCov">       4149 :     while (OVS_UNLIKELY(!cmap_try_insert(impl, node, hash))) {</span>
+<span class="lineNum">     670 </span>                :<span class="lineNoCov">          0 :         impl = cmap_rehash(cmap, impl-&gt;mask);</span>
+<span class="lineNum">     671 </span>                :            :     }
+<span class="lineNum">     672 </span>                :<span class="lineCov">       4149 :     impl-&gt;n++;</span>
+<span class="lineNum">     673 </span>                :<span class="lineCov">       4149 : }</span>
+<a name="674"><span class="lineNum">     674 </span>                :            : </a>
+<span class="lineNum">     675 </span>                :            : static bool
+<span class="lineNum">     676 </span>                :<span class="lineCov">       7314 : cmap_replace__(struct cmap_impl *impl, struct cmap_node *node,</span>
+<span class="lineNum">     677 </span>                :            :                struct cmap_node *replacement, uint32_t hash, uint32_t h)
+<span class="lineNum">     678 </span>                :            : {
+<span class="lineNum">     679 </span>                :<span class="lineCov">       7314 :     struct cmap_bucket *b = &amp;impl-&gt;buckets[h &amp; impl-&gt;mask];</span>
+<span class="lineNum">     680 </span>                :            :     int slot;
+<span class="lineNum">     681 </span>                :            : 
+<span class="lineNum">     682 </span>                :<span class="lineCov">       7314 :     slot = cmap_find_slot_protected(b, hash);</span>
+<span class="lineNum">     683 </span>        [<span class="branchCov" title="Branch 0 was taken 444 times"> + </span><span class="branchCov" title="Branch 1 was taken 6870 times"> + </span>]:<span class="lineCov">       7314 :     if (slot &lt; 0) {</span>
+<span class="lineNum">     684 </span>                :<span class="lineCov">        444 :         return false;</span>
+<span class="lineNum">     685 </span>                :            :     }
+<span class="lineNum">     686 </span>                :            : 
+<span class="lineNum">     687 </span>                :            :     /* The pointer to 'node' is changed to point to 'replacement',
+<span class="lineNum">     688 </span>                :            :      * which is the next node if no replacement node is given. */
+<span class="lineNum">     689 </span>        [<span class="branchCov" title="Branch 0 was taken 3870 times"> + </span><span class="branchCov" title="Branch 1 was taken 3000 times"> + </span>]:<span class="lineCov">       6870 :     if (!replacement) {</span>
+<span class="lineNum">     690 </span>                :<span class="lineCov">       3870 :         replacement = cmap_node_next_protected(node);</span>
+<span class="lineNum">     691 </span>                :            :     } else {
+<span class="lineNum">     692 </span>                :            :         /* 'replacement' takes the position of 'node' in the list. */
+<span class="lineNum">     693 </span>                :<span class="lineCov">       3000 :         ovsrcu_set_hidden(&amp;replacement-&gt;next, cmap_node_next_protected(node));</span>
+<span class="lineNum">     694 </span>                :            :     }
+<span class="lineNum">     695 </span>                :            : 
+<span class="lineNum">     696 </span>                :<span class="lineCov">       6870 :     struct cmap_node *iter = &amp;b-&gt;nodes[slot];</span>
+<span class="lineNum">     697 </span>                :            :     for (;;) {
+<span class="lineNum">     698 </span>                :<span class="lineCov">     770480 :         struct cmap_node *next = cmap_node_next_protected(iter);</span>
+<span class="lineNum">     699 </span>                :            : 
+<span class="lineNum">     700 </span>        [<span class="branchCov" title="Branch 0 was taken 6870 times"> + </span><span class="branchCov" title="Branch 1 was taken 763610 times"> + </span>]:<span class="lineCov">     770480 :         if (next == node) {</span>
+<span class="lineNum">     701 </span>                :<span class="lineCov">       6870 :             ovsrcu_set(&amp;iter-&gt;next, replacement);</span>
+<span class="lineNum">     702 </span>                :<span class="lineCov">       6870 :             return true;</span>
+<span class="lineNum">     703 </span>                :            :         }
+<span class="lineNum">     704 </span>                :<span class="lineCov">     763610 :         iter = next;</span>
+<span class="lineNum">     705 </span>                :<span class="lineCov">     770924 :     }</span>
+<span class="lineNum">     706 </span>                :            : }
+<span class="lineNum">     707 </span>                :            : 
+<span class="lineNum">     708 </span>                :            : /* Removes 'node' from 'cmap'.  The caller must ensure that 'cmap' cannot
+<span class="lineNum">     709 </span>                :            :  * change concurrently (from another thread).
+<span class="lineNum">     710 </span>                :            :  *
+<span class="lineNum">     711 </span>                :            :  * 'node' must not be destroyed or modified or inserted back into 'cmap' or
+<span class="lineNum">     712 </span>                :            :  * into any other concurrent hash map while any other thread might be accessing
+<span class="lineNum">     713 </span>                :            :  * it.  One correct way to do this is to free it from an RCU callback with
+<a name="714"><span class="lineNum">     714 </span>                :            :  * ovsrcu_postpone(). */</a>
+<span class="lineNum">     715 </span>                :            : void
+<span class="lineNum">     716 </span>                :<span class="lineCov">       3870 : cmap_remove(struct cmap *cmap, struct cmap_node *node, uint32_t hash)</span>
+<span class="lineNum">     717 </span>                :            : {
+<span class="lineNum">     718 </span>                :<span class="lineCov">       3870 :     cmap_replace(cmap, node, NULL, hash);</span>
+<span class="lineNum">     719 </span>                :<span class="lineCov">       3870 :     cmap_get_impl(cmap)-&gt;n--;</span>
+<span class="lineNum">     720 </span>                :<span class="lineCov">       3870 : }</span>
+<span class="lineNum">     721 </span>                :            : 
+<span class="lineNum">     722 </span>                :            : /* Replaces 'old_node' in 'cmap' with 'new_node'.  The caller must
+<span class="lineNum">     723 </span>                :            :  * ensure that 'cmap' cannot change concurrently (from another thread).
+<span class="lineNum">     724 </span>                :            :  *
+<span class="lineNum">     725 </span>                :            :  * 'old_node' must not be destroyed or modified or inserted back into 'cmap' or
+<span class="lineNum">     726 </span>                :            :  * into any other concurrent hash map while any other thread might be accessing
+<span class="lineNum">     727 </span>                :            :  * it.  One correct way to do this is to free it from an RCU callback with
+<a name="728"><span class="lineNum">     728 </span>                :            :  * ovsrcu_postpone(). */</a>
+<span class="lineNum">     729 </span>                :            : void
+<span class="lineNum">     730 </span>                :<span class="lineCov">       6870 : cmap_replace(struct cmap *cmap, struct cmap_node *old_node,</span>
+<span class="lineNum">     731 </span>                :            :              struct cmap_node *new_node, uint32_t hash)
+<span class="lineNum">     732 </span>                :            : {
+<span class="lineNum">     733 </span>                :<span class="lineCov">       6870 :     struct cmap_impl *impl = cmap_get_impl(cmap);</span>
+<span class="lineNum">     734 </span>                :<span class="lineCov">       6870 :     uint32_t h1 = rehash(impl, hash);</span>
+<span class="lineNum">     735 </span>                :<span class="lineCov">       6870 :     uint32_t h2 = other_hash(h1);</span>
+<span class="lineNum">     736 </span>                :            :     bool ok;
+<span class="lineNum">     737 </span>                :            : 
+<span class="lineNum">     738 </span>                :<span class="lineCov">       6870 :     ok = cmap_replace__(impl, old_node, new_node, hash, h1)</span>
+<span class="lineNum">     739 </span>[<span class="branchCov" title="Branch 0 was taken 444 times"> + </span><span class="branchCov" title="Branch 1 was taken 6426 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 444 times"> + </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span>]:<span class="lineCov">       6870 :         || cmap_replace__(impl, old_node, new_node, hash, h2);</span>
+<span class="lineNum">     740 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 6870 times"> + </span>]:<span class="lineCov">       6870 :     ovs_assert(ok);</span>
+<span class="lineNum">     741 </span>                :<span class="lineCov">       6870 : }</span>
+<a name="742"><span class="lineNum">     742 </span>                :            : </a>
+<span class="lineNum">     743 </span>                :            : static bool
+<span class="lineNum">     744 </span>                :<span class="lineCov">         89 : cmap_try_rehash(const struct cmap_impl *old, struct cmap_impl *new)</span>
+<span class="lineNum">     745 </span>                :            : {
+<span class="lineNum">     746 </span>                :            :     const struct cmap_bucket *b;
+<span class="lineNum">     747 </span>                :            : 
+<span class="lineNum">     748 </span>        [<span class="branchCov" title="Branch 0 was taken 839 times"> + </span><span class="branchCov" title="Branch 1 was taken 89 times"> + </span>]:<span class="lineCov">        928 :     for (b = old-&gt;buckets; b &lt;= &amp;old-&gt;buckets[old-&gt;mask]; b++) {</span>
+<span class="lineNum">     749 </span>                :            :         int i;
+<span class="lineNum">     750 </span>                :            : 
+<span class="lineNum">     751 </span>        [<span class="branchCov" title="Branch 0 was taken 4195 times"> + </span><span class="branchCov" title="Branch 1 was taken 839 times"> + </span>]:<span class="lineCov">       5034 :         for (i = 0; i &lt; CMAP_K; i++) {</span>
+<span class="lineNum">     752 </span>                :            :             /* possible optimization here because we know the hashes are
+<span class="lineNum">     753 </span>                :            :              * unique */
+<span class="lineNum">     754 </span>                :<span class="lineCov">       4195 :             struct cmap_node *node = cmap_node_next_protected(&amp;b-&gt;nodes[i]);</span>
+<span class="lineNum">     755 </span>                :            : 
+<span class="lineNum">     756 </span>  [<span class="branchCov" title="Branch 0 was taken 2458 times"> + </span><span class="branchCov" title="Branch 1 was taken 1737 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 2458 times"> + </span>]:<span class="lineCov">       6653 :             if (node &amp;&amp;</span>
+<span class="lineNum">     757 </span>                :<span class="lineCov">       2458 :                 !cmap_try_insert(new, node,</span>
+<span class="lineNum">     758 </span>                :            :                                  cmap_get_hash_protected(&amp;b-&gt;hashes[i]))) {
+<span class="lineNum">     759 </span>                :<span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     760 </span>                :            :             }
+<span class="lineNum">     761 </span>                :            :         }
+<span class="lineNum">     762 </span>                :            :     }
+<span class="lineNum">     763 </span>                :<span class="lineCov">         89 :     return true;</span>
+<span class="lineNum">     764 </span>                :            : }
+<a name="765"><span class="lineNum">     765 </span>                :            : </a>
+<span class="lineNum">     766 </span>                :            : static struct cmap_impl *
+<span class="lineNum">     767 </span>                :<span class="lineCov">         89 : cmap_rehash(struct cmap *cmap, uint32_t mask)</span>
+<span class="lineNum">     768 </span>                :            : {
+<span class="lineNum">     769 </span>                :<span class="lineCov">         89 :     struct cmap_impl *old = cmap_get_impl(cmap);</span>
+<span class="lineNum">     770 </span>                :            :     struct cmap_impl *new;
+<span class="lineNum">     771 </span>                :            : 
+<span class="lineNum">     772 </span>                :<span class="lineCov">         89 :     new = cmap_impl_create(mask);</span>
+<span class="lineNum">     773 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 89 times"> + </span>]:<span class="lineCov">         89 :     ovs_assert(old-&gt;n &lt; new-&gt;max_n);</span>
+<span class="lineNum">     774 </span>                :            : 
+<span class="lineNum">     775 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 89 times"> + </span>]:<span class="lineCov">         89 :     while (!cmap_try_rehash(old, new)) {</span>
+<span class="lineNum">     776 </span>                :<span class="lineNoCov">          0 :         memset(new-&gt;buckets, 0, (mask + 1) * sizeof *new-&gt;buckets);</span>
+<span class="lineNum">     777 </span>                :<span class="lineNoCov">          0 :         new-&gt;basis = random_uint32();</span>
+<span class="lineNum">     778 </span>                :            :     }
+<span class="lineNum">     779 </span>                :            : 
+<span class="lineNum">     780 </span>                :<span class="lineCov">         89 :     new-&gt;n = old-&gt;n;</span>
+<span class="lineNum">     781 </span>                :<span class="lineCov">         89 :     ovsrcu_set(&amp;cmap-&gt;impl, new);</span>
+<span class="lineNum">     782 </span>                :<span class="lineCov">         89 :     ovsrcu_postpone(free_cacheline, old);</span>
+<span class="lineNum">     783 </span>                :            : 
+<span class="lineNum">     784 </span>                :<span class="lineCov">         89 :     return new;</span>
+<span class="lineNum">     785 </span>                :            : }
+<span class="lineNum">     786 </span>                :            : 
+<span class="lineNum">     787 </span>                :            : /* Initializes 'cursor' for iterating through 'cmap'.
+<span class="lineNum">     788 </span>                :            :  *
+<a name="789"><span class="lineNum">     789 </span>                :            :  * Use via CMAP_FOR_EACH. */</a>
+<span class="lineNum">     790 </span>                :            : void
+<span class="lineNum">     791 </span>                :<span class="lineCov">      66156 : cmap_cursor_init(struct cmap_cursor *cursor, const struct cmap *cmap)</span>
+<span class="lineNum">     792 </span>                :            : {
+<span class="lineNum">     793 </span>                :<span class="lineCov">      66156 :     cursor-&gt;impl = cmap_get_impl(cmap);</span>
+<span class="lineNum">     794 </span>                :<span class="lineCov">      66156 :     cursor-&gt;bucket_idx = 0;</span>
+<span class="lineNum">     795 </span>                :<span class="lineCov">      66156 :     cursor-&gt;entry_idx = 0;</span>
+<span class="lineNum">     796 </span>                :<span class="lineCov">      66156 : }</span>
+<span class="lineNum">     797 </span>                :            : 
+<span class="lineNum">     798 </span>                :            : /* Returns the next node for 'cursor' to visit, following 'node', or NULL if
+<span class="lineNum">     799 </span>                :            :  * the last node has been visited.
+<span class="lineNum">     800 </span>                :            :  *
+<a name="801"><span class="lineNum">     801 </span>                :            :  * Use via CMAP_FOR_EACH. */</a>
+<span class="lineNum">     802 </span>                :            : struct cmap_node *
+<span class="lineNum">     803 </span>                :<span class="lineCov">    6254998 : cmap_cursor_next(struct cmap_cursor *cursor, const struct cmap_node *node)</span>
+<span class="lineNum">     804 </span>                :            : {
+<span class="lineNum">     805 </span>                :<span class="lineCov">    6254998 :     const struct cmap_impl *impl = cursor-&gt;impl;</span>
+<span class="lineNum">     806 </span>                :            : 
+<span class="lineNum">     807 </span>        [<span class="branchCov" title="Branch 0 was taken 6188842 times"> + </span><span class="branchCov" title="Branch 1 was taken 66156 times"> + </span>]:<span class="lineCov">    6254998 :     if (node) {</span>
+<span class="lineNum">     808 </span>                :<span class="lineCov">    6188842 :         struct cmap_node *next = cmap_node_next(node);</span>
+<span class="lineNum">     809 </span>                :            : 
+<span class="lineNum">     810 </span>        [<span class="branchCov" title="Branch 0 was taken 1997001 times"> + </span><span class="branchCov" title="Branch 1 was taken 4191841 times"> + </span>]:<span class="lineCov">    6188842 :         if (next) {</span>
+<span class="lineNum">     811 </span>                :<span class="lineCov">    1997001 :             return next;</span>
+<span class="lineNum">     812 </span>                :            :         }
+<span class="lineNum">     813 </span>                :            :     }
+<span class="lineNum">     814 </span>                :            : 
+<span class="lineNum">     815 </span>        [<span class="branchCov" title="Branch 0 was taken 6291944 times"> + </span><span class="branchCov" title="Branch 1 was taken 60206 times"> + </span>]:<span class="lineCov">    6352150 :     while (cursor-&gt;bucket_idx &lt;= impl-&gt;mask) {</span>
+<span class="lineNum">     816 </span>                :<span class="lineCov">    6291944 :         const struct cmap_bucket *b = &amp;impl-&gt;buckets[cursor-&gt;bucket_idx];</span>
+<span class="lineNum">     817 </span>                :            : 
+<span class="lineNum">     818 </span>        [<span class="branchCov" title="Branch 0 was taken 10485356 times"> + </span><span class="branchCov" title="Branch 1 was taken 2094153 times"> + </span>]:<span class="lineCov">   12579509 :         while (cursor-&gt;entry_idx &lt; CMAP_K) {</span>
+<span class="lineNum">     819 </span>                :<span class="lineCov">   10485356 :             struct cmap_node *node = cmap_node_next(&amp;b-&gt;nodes[cursor-&gt;entry_idx++]);</span>
+<span class="lineNum">     820 </span>                :            : 
+<span class="lineNum">     821 </span>        [<span class="branchCov" title="Branch 0 was taken 4197791 times"> + </span><span class="branchCov" title="Branch 1 was taken 6287565 times"> + </span>]:<span class="lineCov">   10485356 :             if (node) {</span>
+<span class="lineNum">     822 </span>                :<span class="lineCov">    4197791 :                 return node;</span>
+<span class="lineNum">     823 </span>                :            :             }
+<span class="lineNum">     824 </span>                :            :         }
+<span class="lineNum">     825 </span>                :            : 
+<span class="lineNum">     826 </span>                :<span class="lineCov">    2094153 :         cursor-&gt;bucket_idx++;</span>
+<span class="lineNum">     827 </span>                :<span class="lineCov">    2094153 :         cursor-&gt;entry_idx = 0;</span>
+<span class="lineNum">     828 </span>                :            :     }
+<span class="lineNum">     829 </span>                :            : 
+<span class="lineNum">     830 </span>                :<span class="lineCov">    6254998 :     return NULL;</span>
+<span class="lineNum">     831 </span>                :            : }
+<span class="lineNum">     832 </span>                :            : 
+<span class="lineNum">     833 </span>                :            : /* Returns the next node in 'cmap' in hash order, or NULL if no nodes remain in
+<span class="lineNum">     834 </span>                :            :  * 'cmap'.  Uses '*pos' to determine where to begin iteration, and updates
+<span class="lineNum">     835 </span>                :            :  * '*pos' to pass on the next iteration into them before returning.
+<span class="lineNum">     836 </span>                :            :  *
+<span class="lineNum">     837 </span>                :            :  * It's better to use plain CMAP_FOR_EACH and related functions, since they are
+<span class="lineNum">     838 </span>                :            :  * faster and better at dealing with cmaps that change during iteration.
+<span class="lineNum">     839 </span>                :            :  *
+<a name="840"><span class="lineNum">     840 </span>                :            :  * Before beginning iteration, set '*pos' to all zeros. */</a>
+<span class="lineNum">     841 </span>                :            : struct cmap_node *
+<span class="lineNum">     842 </span>                :<span class="lineCov">      13640 : cmap_next_position(const struct cmap *cmap,</span>
+<span class="lineNum">     843 </span>                :            :                    struct cmap_position *pos)
+<span class="lineNum">     844 </span>                :            : {
+<span class="lineNum">     845 </span>                :<span class="lineCov">      13640 :     struct cmap_impl *impl = cmap_get_impl(cmap);</span>
+<span class="lineNum">     846 </span>                :<span class="lineCov">      13640 :     unsigned int bucket = pos-&gt;bucket;</span>
+<span class="lineNum">     847 </span>                :<span class="lineCov">      13640 :     unsigned int entry = pos-&gt;entry;</span>
+<span class="lineNum">     848 </span>                :<span class="lineCov">      13640 :     unsigned int offset = pos-&gt;offset;</span>
+<span class="lineNum">     849 </span>                :            : 
+<span class="lineNum">     850 </span>        [<span class="branchCov" title="Branch 0 was taken 223272 times"> + </span><span class="branchCov" title="Branch 1 was taken 1003 times"> + </span>]:<span class="lineCov">     224275 :     while (bucket &lt;= impl-&gt;mask) {</span>
+<span class="lineNum">     851 </span>                :<span class="lineCov">     223272 :         const struct cmap_bucket *b = &amp;impl-&gt;buckets[bucket];</span>
+<span class="lineNum">     852 </span>                :            : 
+<span class="lineNum">     853 </span>        [<span class="branchCov" title="Branch 0 was taken 1062507 times"> + </span><span class="branchCov" title="Branch 1 was taken 210635 times"> + </span>]:<span class="lineCov">    1273142 :         while (entry &lt; CMAP_K) {</span>
+<span class="lineNum">     854 </span>                :<span class="lineCov">    1062507 :             const struct cmap_node *node = cmap_node_next(&amp;b-&gt;nodes[entry]);</span>
+<span class="lineNum">     855 </span>                :            :             unsigned int i;
+<span class="lineNum">     856 </span>                :            : 
+<span class="lineNum">     857 </span>        [<span class="branchCov" title="Branch 0 was taken 12637 times"> + </span><span class="branchCov" title="Branch 1 was taken 1049870 times"> + </span>]:<span class="lineCov">    1062507 :             for (i = 0; node; i++) {</span>
+<span class="lineNum">     858 </span>        [<span class="branchCov" title="Branch 0 was taken 12637 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      12637 :                 if (i == offset) {</span>
+<span class="lineNum">     859 </span>        [<span class="branchCov" title="Branch 1 was taken 2997 times"> + </span><span class="branchCov" title="Branch 2 was taken 9640 times"> + </span>]:<span class="lineCov">      12637 :                     if (cmap_node_next(node)) {</span>
+<span class="lineNum">     860 </span>                :<span class="lineCov">       2997 :                         offset++;</span>
+<span class="lineNum">     861 </span>                :            :                     } else {
+<span class="lineNum">     862 </span>                :<span class="lineCov">       9640 :                         entry++;</span>
+<span class="lineNum">     863 </span>                :<span class="lineCov">       9640 :                         offset = 0;</span>
+<span class="lineNum">     864 </span>                :            :                     }
+<span class="lineNum">     865 </span>                :<span class="lineCov">      12637 :                     pos-&gt;bucket = bucket;</span>
+<span class="lineNum">     866 </span>                :<span class="lineCov">      12637 :                     pos-&gt;entry = entry;</span>
+<span class="lineNum">     867 </span>                :<span class="lineCov">      12637 :                     pos-&gt;offset = offset;</span>
+<span class="lineNum">     868 </span>                :<span class="lineCov">      12637 :                     return CONST_CAST(struct cmap_node *, node);</span>
+<span class="lineNum">     869 </span>                :            :                 }
+<span class="lineNum">     870 </span>                :            :             }
+<span class="lineNum">     871 </span>                :            : 
+<span class="lineNum">     872 </span>                :<span class="lineCov">    1049870 :             entry++;</span>
+<span class="lineNum">     873 </span>                :<span class="lineCov">    1049870 :             offset = 0;</span>
+<span class="lineNum">     874 </span>                :            :         }
+<span class="lineNum">     875 </span>                :            : 
+<span class="lineNum">     876 </span>                :<span class="lineCov">     210635 :         bucket++;</span>
+<span class="lineNum">     877 </span>                :<span class="lineCov">     210635 :         entry = offset = 0;</span>
+<span class="lineNum">     878 </span>                :            :     }
+<span class="lineNum">     879 </span>                :            : 
+<span class="lineNum">     880 </span>                :<span class="lineCov">       1003 :     pos-&gt;bucket = pos-&gt;entry = pos-&gt;offset = 0;</span>
+<span class="lineNum">     881 </span>                :<span class="lineCov">      13640 :     return NULL;</span>
+<span class="lineNum">     882 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

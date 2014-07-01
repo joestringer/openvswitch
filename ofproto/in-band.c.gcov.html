@@ -1,0 +1,599 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ofproto/in-band.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">ofproto</a> - in-band.c<span style="font-size: 80%;"> (source / <a href="in-band.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntry">199</td>
+            <td class="headerCovTableEntryLo">2.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">2</td>
+            <td class="headerCovTableEntry">14</td>
+            <td class="headerCovTableEntryLo">14.3 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">1</td>
+            <td class="headerCovTableEntry">101</td>
+            <td class="headerCovTableEntryLo">1.0 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2008, 2009, 2010, 2011, 2012, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;in-band.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &lt;arpa/inet.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;inttypes.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;net/if.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      25 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      26 </span>                :            : #include &quot;classifier.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;dhcp.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;flow.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;netdev.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;netlink.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;odp-util.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;ofp-actions.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;ofproto.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;ofproto-provider.h&quot;
+<span class="lineNum">      36 </span>                :            : #include &quot;openflow/openflow.h&quot;
+<span class="lineNum">      37 </span>                :            : #include &quot;packets.h&quot;
+<span class="lineNum">      38 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      39 </span>                :            : #include &quot;timeval.h&quot;
+<a name="40"><span class="lineNum">      40 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      41 </span>                :            : 
+<span class="lineNum">      42 </span>                :<span class="lineCov">        525 : VLOG_DEFINE_THIS_MODULE(in_band);</span>
+<span class="lineNum">      43 </span>                :            : 
+<span class="lineNum">      44 </span>                :            : /* Priorities used in classifier for in-band rules.  These values are higher
+<span class="lineNum">      45 </span>                :            :  * than any that may be set with OpenFlow, and &quot;18&quot; kind of looks like &quot;IB&quot;.
+<span class="lineNum">      46 </span>                :            :  * The ordering of priorities is not important because all of the rules set up
+<span class="lineNum">      47 </span>                :            :  * by in-band control have the same action.  The only reason to use more than
+<span class="lineNum">      48 </span>                :            :  * one priority is to make the kind of flow easier to see during debugging. */
+<span class="lineNum">      49 </span>                :            : enum {
+<span class="lineNum">      50 </span>                :            :     /* One set per bridge. */
+<span class="lineNum">      51 </span>                :            :     IBR_FROM_LOCAL_DHCP = 180000, /* (a) From local port, DHCP. */
+<span class="lineNum">      52 </span>                :            :     IBR_TO_LOCAL_ARP,             /* (b) To local port, ARP. */
+<span class="lineNum">      53 </span>                :            :     IBR_FROM_LOCAL_ARP,           /* (c) From local port, ARP. */
+<span class="lineNum">      54 </span>                :            : 
+<span class="lineNum">      55 </span>                :            :     /* One set per unique next-hop MAC. */
+<span class="lineNum">      56 </span>                :            :     IBR_TO_NEXT_HOP_ARP,          /* (d) To remote MAC, ARP. */
+<span class="lineNum">      57 </span>                :            :     IBR_FROM_NEXT_HOP_ARP,        /* (e) From remote MAC, ARP. */
+<span class="lineNum">      58 </span>                :            : 
+<span class="lineNum">      59 </span>                :            :     /* One set per unique remote IP address. */
+<span class="lineNum">      60 </span>                :            :     IBR_TO_REMOTE_ARP,            /* (f) To remote IP, ARP. */
+<span class="lineNum">      61 </span>                :            :     IBR_FROM_REMOTE_ARP,          /* (g) From remote IP, ARP. */
+<span class="lineNum">      62 </span>                :            : 
+<span class="lineNum">      63 </span>                :            :     /* One set per unique remote (IP,port) pair. */
+<span class="lineNum">      64 </span>                :            :     IBR_TO_REMOTE_TCP,            /* (h) To remote IP, TCP port. */
+<span class="lineNum">      65 </span>                :            :     IBR_FROM_REMOTE_TCP           /* (i) From remote IP, TCP port. */
+<span class="lineNum">      66 </span>                :            : };
+<span class="lineNum">      67 </span>                :            : 
+<span class="lineNum">      68 </span>                :            : /* Track one remote IP and next hop information. */
+<span class="lineNum">      69 </span>                :            : struct in_band_remote {
+<span class="lineNum">      70 </span>                :            :     struct sockaddr_in remote_addr; /* IP address, in network byte order. */
+<span class="lineNum">      71 </span>                :            :     uint8_t remote_mac[ETH_ADDR_LEN]; /* Next-hop MAC, all-zeros if unknown. */
+<span class="lineNum">      72 </span>                :            :     uint8_t last_remote_mac[ETH_ADDR_LEN]; /* Previous nonzero next-hop MAC. */
+<span class="lineNum">      73 </span>                :            :     struct netdev *remote_netdev; /* Device to send to next-hop MAC. */
+<span class="lineNum">      74 </span>                :            : };
+<span class="lineNum">      75 </span>                :            : 
+<span class="lineNum">      76 </span>                :            : /* What to do to an in_band_rule. */
+<span class="lineNum">      77 </span>                :            : enum in_band_op {
+<span class="lineNum">      78 </span>                :            :     ADD,                       /* Add the rule to ofproto's flow table. */
+<span class="lineNum">      79 </span>                :            :     DEL                        /* Delete the rule from ofproto's flow table. */
+<span class="lineNum">      80 </span>                :            : };
+<span class="lineNum">      81 </span>                :            : 
+<span class="lineNum">      82 </span>                :            : /* A rule to add to or delete from ofproto's flow table.  */
+<span class="lineNum">      83 </span>                :            : struct in_band_rule {
+<span class="lineNum">      84 </span>                :            :     struct hmap_node hmap_node; /* In struct in_band's &quot;rules&quot; hmap. */
+<span class="lineNum">      85 </span>                :            :     struct match match;
+<span class="lineNum">      86 </span>                :            :     unsigned int priority;
+<span class="lineNum">      87 </span>                :            :     enum in_band_op op;
+<span class="lineNum">      88 </span>                :            : };
+<span class="lineNum">      89 </span>                :            : 
+<span class="lineNum">      90 </span>                :            : struct in_band {
+<span class="lineNum">      91 </span>                :            :     struct ofproto *ofproto;
+<span class="lineNum">      92 </span>                :            :     int queue_id;
+<span class="lineNum">      93 </span>                :            : 
+<span class="lineNum">      94 </span>                :            :     /* Remote information. */
+<span class="lineNum">      95 </span>                :            :     time_t next_remote_refresh; /* Refresh timer. */
+<span class="lineNum">      96 </span>                :            :     struct in_band_remote *remotes;
+<span class="lineNum">      97 </span>                :            :     size_t n_remotes;
+<span class="lineNum">      98 </span>                :            : 
+<span class="lineNum">      99 </span>                :            :     /* Local information. */
+<span class="lineNum">     100 </span>                :            :     time_t next_local_refresh;       /* Refresh timer. */
+<span class="lineNum">     101 </span>                :            :     uint8_t local_mac[ETH_ADDR_LEN]; /* Current MAC. */
+<span class="lineNum">     102 </span>                :            :     struct netdev *local_netdev;     /* Local port's network device. */
+<span class="lineNum">     103 </span>                :            : 
+<span class="lineNum">     104 </span>                :            :     /* Flow tracking. */
+<span class="lineNum">     105 </span>                :            :     struct hmap rules;          /* Contains &quot;struct in_band_rule&quot;s. */
+<span class="lineNum">     106 </span>                :            : };
+<span class="lineNum">     107 </span>                :            : 
+<span class="lineNum">     108 </span>                :            : static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(60, 60);
+<a name="109"><span class="lineNum">     109 </span>                :            : </a>
+<span class="lineNum">     110 </span>                :            : static int
+<span class="lineNum">     111 </span>                :<span class="lineNoCov">          0 : refresh_remote(struct in_band *ib, struct in_band_remote *r)</span>
+<span class="lineNum">     112 </span>                :            : {
+<span class="lineNum">     113 </span>                :            :     struct in_addr next_hop_inaddr;
+<span class="lineNum">     114 </span>                :            :     char *next_hop_dev;
+<span class="lineNum">     115 </span>                :            :     int retval;
+<span class="lineNum">     116 </span>                :            : 
+<span class="lineNum">     117 </span>                :            :     /* Find the next-hop IP address. */
+<span class="lineNum">     118 </span>                :<span class="lineNoCov">          0 :     memset(r-&gt;remote_mac, 0, sizeof r-&gt;remote_mac);</span>
+<span class="lineNum">     119 </span>                :<span class="lineNoCov">          0 :     retval = netdev_get_next_hop(ib-&gt;local_netdev, &amp;r-&gt;remote_addr.sin_addr,</span>
+<span class="lineNum">     120 </span>                :            :                                  &amp;next_hop_inaddr, &amp;next_hop_dev);
+<span class="lineNum">     121 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (retval) {</span>
+<span class="lineNum">     122 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN(&quot;cannot find route for controller (&quot;IP_FMT&quot;): %s&quot;,</span>
+<span class="lineNum">     123 </span>                :            :                   IP_ARGS(r-&gt;remote_addr.sin_addr.s_addr),
+<span class="lineNum">     124 </span>                :            :                   ovs_strerror(retval));
+<span class="lineNum">     125 </span>                :<span class="lineNoCov">          0 :         return 1;</span>
+<span class="lineNum">     126 </span>                :            :     }
+<span class="lineNum">     127 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!next_hop_inaddr.s_addr) {</span>
+<span class="lineNum">     128 </span>                :<span class="lineNoCov">          0 :         next_hop_inaddr = r-&gt;remote_addr.sin_addr;</span>
+<span class="lineNum">     129 </span>                :            :     }
+<span class="lineNum">     130 </span>                :            : 
+<span class="lineNum">     131 </span>                :            :     /* Open the next-hop network device. */
+<span class="lineNum">     132 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!r-&gt;remote_netdev</span>
+<span class="lineNum">     133 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         || strcmp(netdev_get_name(r-&gt;remote_netdev), next_hop_dev))</span>
+<span class="lineNum">     134 </span>                :            :     {
+<span class="lineNum">     135 </span>                :<span class="lineNoCov">          0 :         netdev_close(r-&gt;remote_netdev);</span>
+<span class="lineNum">     136 </span>                :            : 
+<span class="lineNum">     137 </span>                :<span class="lineNoCov">          0 :         retval = netdev_open(next_hop_dev, &quot;system&quot;, &amp;r-&gt;remote_netdev);</span>
+<span class="lineNum">     138 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (retval) {</span>
+<span class="lineNum">     139 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN_RL(&amp;rl, &quot;cannot open netdev %s (next hop &quot;</span>
+<span class="lineNum">     140 </span>                :            :                          &quot;to controller &quot;IP_FMT&quot;): %s&quot;,
+<span class="lineNum">     141 </span>                :            :                          next_hop_dev, IP_ARGS(r-&gt;remote_addr.sin_addr.s_addr),
+<span class="lineNum">     142 </span>                :            :                          ovs_strerror(retval));
+<span class="lineNum">     143 </span>                :<span class="lineNoCov">          0 :             free(next_hop_dev);</span>
+<span class="lineNum">     144 </span>                :<span class="lineNoCov">          0 :             return 1;</span>
+<span class="lineNum">     145 </span>                :            :         }
+<span class="lineNum">     146 </span>                :            :     }
+<span class="lineNum">     147 </span>                :<span class="lineNoCov">          0 :     free(next_hop_dev);</span>
+<span class="lineNum">     148 </span>                :            : 
+<span class="lineNum">     149 </span>                :            :     /* Look up the MAC address of the next-hop IP address. */
+<span class="lineNum">     150 </span>                :<span class="lineNoCov">          0 :     retval = netdev_arp_lookup(r-&gt;remote_netdev, next_hop_inaddr.s_addr,</span>
+<span class="lineNum">     151 </span>                :<span class="lineNoCov">          0 :                                r-&gt;remote_mac);</span>
+<span class="lineNum">     152 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (retval) {</span>
+<span class="lineNum">     153 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_DBG_RL(&amp;rl, &quot;cannot look up remote MAC address (&quot;IP_FMT&quot;): %s&quot;,</span>
+<span class="lineNum">     154 </span>                :            :                     IP_ARGS(next_hop_inaddr.s_addr), ovs_strerror(retval));
+<span class="lineNum">     155 </span>                :            :     }
+<span class="lineNum">     156 </span>                :            : 
+<span class="lineNum">     157 </span>                :            :     /* If we don't have a MAC address, then refresh quickly, since we probably
+<span class="lineNum">     158 </span>                :            :      * will get a MAC address soon (via ARP).  Otherwise, we can afford to wait
+<span class="lineNum">     159 </span>                :            :      * a little while. */
+<span class="lineNum">     160 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     return eth_addr_is_zero(r-&gt;remote_mac) ? 1 : 10;</span>
+<span class="lineNum">     161 </span>                :            : }
+<a name="162"><span class="lineNum">     162 </span>                :            : </a>
+<span class="lineNum">     163 </span>                :            : static bool
+<span class="lineNum">     164 </span>                :<span class="lineNoCov">          0 : refresh_remotes(struct in_band *ib)</span>
+<span class="lineNum">     165 </span>                :            : {
+<span class="lineNum">     166 </span>                :            :     struct in_band_remote *r;
+<span class="lineNum">     167 </span>                :            :     bool any_changes;
+<span class="lineNum">     168 </span>                :            : 
+<span class="lineNum">     169 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (time_now() &lt; ib-&gt;next_remote_refresh) {</span>
+<span class="lineNum">     170 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     171 </span>                :            :     }
+<span class="lineNum">     172 </span>                :            : 
+<span class="lineNum">     173 </span>                :<span class="lineNoCov">          0 :     any_changes = false;</span>
+<span class="lineNum">     174 </span>                :<span class="lineNoCov">          0 :     ib-&gt;next_remote_refresh = TIME_MAX;</span>
+<span class="lineNum">     175 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (r = ib-&gt;remotes; r &lt; &amp;ib-&gt;remotes[ib-&gt;n_remotes]; r++) {</span>
+<span class="lineNum">     176 </span>                :            :         uint8_t old_remote_mac[ETH_ADDR_LEN];
+<span class="lineNum">     177 </span>                :            :         time_t next_refresh;
+<span class="lineNum">     178 </span>                :            : 
+<span class="lineNum">     179 </span>                :            :         /* Save old MAC. */
+<span class="lineNum">     180 </span>                :<span class="lineNoCov">          0 :         memcpy(old_remote_mac, r-&gt;remote_mac, ETH_ADDR_LEN);</span>
+<span class="lineNum">     181 </span>                :            : 
+<span class="lineNum">     182 </span>                :            :         /* Refresh remote information. */
+<span class="lineNum">     183 </span>                :<span class="lineNoCov">          0 :         next_refresh = refresh_remote(ib, r) + time_now();</span>
+<span class="lineNum">     184 </span>                :<span class="lineNoCov">          0 :         ib-&gt;next_remote_refresh = MIN(ib-&gt;next_remote_refresh, next_refresh);</span>
+<span class="lineNum">     185 </span>                :            : 
+<span class="lineNum">     186 </span>                :            :         /* If the MAC changed, log the changes. */
+<span class="lineNum">     187 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!eth_addr_equals(r-&gt;remote_mac, old_remote_mac)) {</span>
+<span class="lineNum">     188 </span>                :<span class="lineNoCov">          0 :             any_changes = true;</span>
+<span class="lineNum">     189 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (!eth_addr_is_zero(r-&gt;remote_mac)</span>
+<span class="lineNum">     190 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 &amp;&amp; !eth_addr_equals(r-&gt;last_remote_mac, r-&gt;remote_mac)) {</span>
+<span class="lineNum">     191 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_DBG(&quot;remote MAC address changed from &quot;ETH_ADDR_FMT</span>
+<span class="lineNum">     192 </span>                :            :                          &quot; to &quot;ETH_ADDR_FMT,
+<span class="lineNum">     193 </span>                :            :                          ETH_ADDR_ARGS(r-&gt;last_remote_mac),
+<span class="lineNum">     194 </span>                :            :                          ETH_ADDR_ARGS(r-&gt;remote_mac));
+<span class="lineNum">     195 </span>                :<span class="lineNoCov">          0 :                 memcpy(r-&gt;last_remote_mac, r-&gt;remote_mac, ETH_ADDR_LEN);</span>
+<span class="lineNum">     196 </span>                :            :             }
+<span class="lineNum">     197 </span>                :            :         }
+<span class="lineNum">     198 </span>                :            :     }
+<span class="lineNum">     199 </span>                :            : 
+<span class="lineNum">     200 </span>                :<span class="lineNoCov">          0 :     return any_changes;</span>
+<span class="lineNum">     201 </span>                :            : }
+<span class="lineNum">     202 </span>                :            : 
+<span class="lineNum">     203 </span>                :            : /* Refreshes the MAC address of the local port into ib-&gt;local_mac, if it is due
+<a name="204"><span class="lineNum">     204 </span>                :            :  * for a refresh.  Returns true if anything changed, otherwise false.  */</a>
+<span class="lineNum">     205 </span>                :            : static bool
+<span class="lineNum">     206 </span>                :<span class="lineNoCov">          0 : refresh_local(struct in_band *ib)</span>
+<span class="lineNum">     207 </span>                :            : {
+<span class="lineNum">     208 </span>                :            :     uint8_t ea[ETH_ADDR_LEN];
+<span class="lineNum">     209 </span>                :            :     time_t now;
+<span class="lineNum">     210 </span>                :            : 
+<span class="lineNum">     211 </span>                :<span class="lineNoCov">          0 :     now = time_now();</span>
+<span class="lineNum">     212 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (now &lt; ib-&gt;next_local_refresh) {</span>
+<span class="lineNum">     213 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     214 </span>                :            :     }
+<span class="lineNum">     215 </span>                :<span class="lineNoCov">          0 :     ib-&gt;next_local_refresh = now + 1;</span>
+<span class="lineNum">     216 </span>                :            : 
+<span class="lineNum">     217 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (netdev_get_etheraddr(ib-&gt;local_netdev, ea)</span>
+<span class="lineNum">     218 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         || eth_addr_equals(ea, ib-&gt;local_mac)) {</span>
+<span class="lineNum">     219 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     220 </span>                :            :     }
+<span class="lineNum">     221 </span>                :            : 
+<span class="lineNum">     222 </span>                :<span class="lineNoCov">          0 :     memcpy(ib-&gt;local_mac, ea, ETH_ADDR_LEN);</span>
+<span class="lineNum">     223 </span>                :<span class="lineNoCov">          0 :     return true;</span>
+<span class="lineNum">     224 </span>                :            : }
+<span class="lineNum">     225 </span>                :            : 
+<span class="lineNum">     226 </span>                :            : /* Returns true if packets in 'flow' should be directed to the local port.
+<span class="lineNum">     227 </span>                :            :  * (This keeps the flow table from preventing DHCP replies from being seen by
+<a name="228"><span class="lineNum">     228 </span>                :            :  * the local port.) */</a>
+<span class="lineNum">     229 </span>                :            : bool
+<span class="lineNum">     230 </span>                :<span class="lineNoCov">          0 : in_band_must_output_to_local_port(const struct flow *flow)</span>
+<span class="lineNum">     231 </span>                :            : {
+<span class="lineNum">     232 </span>                :<span class="lineNoCov">          0 :     return (flow-&gt;dl_type == htons(ETH_TYPE_IP)</span>
+<span class="lineNum">     233 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; flow-&gt;nw_proto == IPPROTO_UDP</span>
+<span class="lineNum">     234 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; flow-&gt;tp_src == htons(DHCP_SERVER_PORT)</span>
+<span class="lineNum">     235 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; flow-&gt;tp_dst == htons(DHCP_CLIENT_PORT));</span>
+<span class="lineNum">     236 </span>                :            : }
+<a name="237"><span class="lineNum">     237 </span>                :            : </a>
+<span class="lineNum">     238 </span>                :            : static void
+<span class="lineNum">     239 </span>                :<span class="lineNoCov">          0 : add_rule(struct in_band *ib, const struct match *match, unsigned int priority)</span>
+<span class="lineNum">     240 </span>                :            : {
+<span class="lineNum">     241 </span>                :<span class="lineNoCov">          0 :     uint32_t hash = match_hash(match, 0);</span>
+<span class="lineNum">     242 </span>                :            :     struct in_band_rule *rule;
+<span class="lineNum">     243 </span>                :            : 
+<span class="lineNum">     244 </span>        [<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     HMAP_FOR_EACH_WITH_HASH (rule, hmap_node, hash, &amp;ib-&gt;rules) {</span>
+<span class="lineNum">     245 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (match_equal(&amp;rule-&gt;match, match)) {</span>
+<span class="lineNum">     246 </span>                :<span class="lineNoCov">          0 :             rule-&gt;op = ADD;</span>
+<span class="lineNum">     247 </span>                :<span class="lineNoCov">          0 :             return;</span>
+<span class="lineNum">     248 </span>                :            :         }
+<span class="lineNum">     249 </span>                :            :     }
+<span class="lineNum">     250 </span>                :            : 
+<span class="lineNum">     251 </span>                :<span class="lineNoCov">          0 :     rule = xmalloc(sizeof *rule);</span>
+<span class="lineNum">     252 </span>                :<span class="lineNoCov">          0 :     rule-&gt;match = *match;</span>
+<span class="lineNum">     253 </span>                :<span class="lineNoCov">          0 :     rule-&gt;priority = priority;</span>
+<span class="lineNum">     254 </span>                :<span class="lineNoCov">          0 :     rule-&gt;op = ADD;</span>
+<span class="lineNum">     255 </span>                :<span class="lineNoCov">          0 :     hmap_insert(&amp;ib-&gt;rules, &amp;rule-&gt;hmap_node, hash);</span>
+<span class="lineNum">     256 </span>                :            : }
+<a name="257"><span class="lineNum">     257 </span>                :            : </a>
+<span class="lineNum">     258 </span>                :            : static void
+<span class="lineNum">     259 </span>                :<span class="lineNoCov">          0 : update_rules(struct in_band *ib)</span>
+<span class="lineNum">     260 </span>                :            : {
+<span class="lineNum">     261 </span>                :            :     struct in_band_rule *ib_rule;
+<span class="lineNum">     262 </span>                :            :     struct in_band_remote *r;
+<span class="lineNum">     263 </span>                :            :     struct match match;
+<span class="lineNum">     264 </span>                :            : 
+<span class="lineNum">     265 </span>                :            :     /* Mark all the existing rules for deletion.  (Afterward we will re-add any
+<span class="lineNum">     266 </span>                :            :      * rules that are still valid.) */
+<span class="lineNum">     267 </span>        [<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     HMAP_FOR_EACH (ib_rule, hmap_node, &amp;ib-&gt;rules) {</span>
+<span class="lineNum">     268 </span>                :<span class="lineNoCov">          0 :         ib_rule-&gt;op = DEL;</span>
+<span class="lineNum">     269 </span>                :            :     }
+<span class="lineNum">     270 </span>                :            : 
+<span class="lineNum">     271 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (ib-&gt;n_remotes &amp;&amp; !eth_addr_is_zero(ib-&gt;local_mac)) {</span>
+<span class="lineNum">     272 </span>                :            :         /* (a) Allow DHCP requests sent from the local port. */
+<span class="lineNum">     273 </span>                :<span class="lineNoCov">          0 :         match_init_catchall(&amp;match);</span>
+<span class="lineNum">     274 </span>                :<span class="lineNoCov">          0 :         match_set_in_port(&amp;match, OFPP_LOCAL);</span>
+<span class="lineNum">     275 </span>                :<span class="lineNoCov">          0 :         match_set_dl_type(&amp;match, htons(ETH_TYPE_IP));</span>
+<span class="lineNum">     276 </span>                :<span class="lineNoCov">          0 :         match_set_dl_src(&amp;match, ib-&gt;local_mac);</span>
+<span class="lineNum">     277 </span>                :<span class="lineNoCov">          0 :         match_set_nw_proto(&amp;match, IPPROTO_UDP);</span>
+<span class="lineNum">     278 </span>                :<span class="lineNoCov">          0 :         match_set_tp_src(&amp;match, htons(DHCP_CLIENT_PORT));</span>
+<span class="lineNum">     279 </span>                :<span class="lineNoCov">          0 :         match_set_tp_dst(&amp;match, htons(DHCP_SERVER_PORT));</span>
+<span class="lineNum">     280 </span>                :<span class="lineNoCov">          0 :         add_rule(ib, &amp;match, IBR_FROM_LOCAL_DHCP);</span>
+<span class="lineNum">     281 </span>                :            : 
+<span class="lineNum">     282 </span>                :            :         /* (b) Allow ARP replies to the local port's MAC address. */
+<span class="lineNum">     283 </span>                :<span class="lineNoCov">          0 :         match_init_catchall(&amp;match);</span>
+<span class="lineNum">     284 </span>                :<span class="lineNoCov">          0 :         match_set_dl_type(&amp;match, htons(ETH_TYPE_ARP));</span>
+<span class="lineNum">     285 </span>                :<span class="lineNoCov">          0 :         match_set_dl_dst(&amp;match, ib-&gt;local_mac);</span>
+<span class="lineNum">     286 </span>                :<span class="lineNoCov">          0 :         match_set_nw_proto(&amp;match, ARP_OP_REPLY);</span>
+<span class="lineNum">     287 </span>                :<span class="lineNoCov">          0 :         add_rule(ib, &amp;match, IBR_TO_LOCAL_ARP);</span>
+<span class="lineNum">     288 </span>                :            : 
+<span class="lineNum">     289 </span>                :            :         /* (c) Allow ARP requests from the local port's MAC address.  */
+<span class="lineNum">     290 </span>                :<span class="lineNoCov">          0 :         match_init_catchall(&amp;match);</span>
+<span class="lineNum">     291 </span>                :<span class="lineNoCov">          0 :         match_set_dl_type(&amp;match, htons(ETH_TYPE_ARP));</span>
+<span class="lineNum">     292 </span>                :<span class="lineNoCov">          0 :         match_set_dl_src(&amp;match, ib-&gt;local_mac);</span>
+<span class="lineNum">     293 </span>                :<span class="lineNoCov">          0 :         match_set_nw_proto(&amp;match, ARP_OP_REQUEST);</span>
+<span class="lineNum">     294 </span>                :<span class="lineNoCov">          0 :         add_rule(ib, &amp;match, IBR_FROM_LOCAL_ARP);</span>
+<span class="lineNum">     295 </span>                :            :     }
+<span class="lineNum">     296 </span>                :            : 
+<span class="lineNum">     297 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (r = ib-&gt;remotes; r &lt; &amp;ib-&gt;remotes[ib-&gt;n_remotes]; r++) {</span>
+<span class="lineNum">     298 </span>                :<span class="lineNoCov">          0 :         const uint8_t *remote_mac = r-&gt;remote_mac;</span>
+<span class="lineNum">     299 </span>                :            : 
+<span class="lineNum">     300 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (eth_addr_is_zero(remote_mac)) {</span>
+<span class="lineNum">     301 </span>                :<span class="lineNoCov">          0 :             continue;</span>
+<span class="lineNum">     302 </span>                :            :         }
+<span class="lineNum">     303 </span>                :            : 
+<span class="lineNum">     304 </span>                :            :         /* (d) Allow ARP replies to the next hop's MAC address. */
+<span class="lineNum">     305 </span>                :<span class="lineNoCov">          0 :         match_init_catchall(&amp;match);</span>
+<span class="lineNum">     306 </span>                :<span class="lineNoCov">          0 :         match_set_dl_type(&amp;match, htons(ETH_TYPE_ARP));</span>
+<span class="lineNum">     307 </span>                :<span class="lineNoCov">          0 :         match_set_dl_dst(&amp;match, remote_mac);</span>
+<span class="lineNum">     308 </span>                :<span class="lineNoCov">          0 :         match_set_nw_proto(&amp;match, ARP_OP_REPLY);</span>
+<span class="lineNum">     309 </span>                :<span class="lineNoCov">          0 :         add_rule(ib, &amp;match, IBR_TO_NEXT_HOP_ARP);</span>
+<span class="lineNum">     310 </span>                :            : 
+<span class="lineNum">     311 </span>                :            :         /* (e) Allow ARP requests from the next hop's MAC address. */
+<span class="lineNum">     312 </span>                :<span class="lineNoCov">          0 :         match_init_catchall(&amp;match);</span>
+<span class="lineNum">     313 </span>                :<span class="lineNoCov">          0 :         match_set_dl_type(&amp;match, htons(ETH_TYPE_ARP));</span>
+<span class="lineNum">     314 </span>                :<span class="lineNoCov">          0 :         match_set_dl_src(&amp;match, remote_mac);</span>
+<span class="lineNum">     315 </span>                :<span class="lineNoCov">          0 :         match_set_nw_proto(&amp;match, ARP_OP_REQUEST);</span>
+<span class="lineNum">     316 </span>                :<span class="lineNoCov">          0 :         add_rule(ib, &amp;match, IBR_FROM_NEXT_HOP_ARP);</span>
+<span class="lineNum">     317 </span>                :            :     }
+<span class="lineNum">     318 </span>                :            : 
+<span class="lineNum">     319 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (r = ib-&gt;remotes; r &lt; &amp;ib-&gt;remotes[ib-&gt;n_remotes]; r++) {</span>
+<span class="lineNum">     320 </span>                :<span class="lineNoCov">          0 :         const struct sockaddr_in *a = &amp;r-&gt;remote_addr;</span>
+<span class="lineNum">     321 </span>                :            : 
+<span class="lineNum">     322 </span>                :            :         /* (f) Allow ARP replies containing the remote's IP address as a
+<span class="lineNum">     323 </span>                :            :          * target. */
+<span class="lineNum">     324 </span>                :<span class="lineNoCov">          0 :         match_init_catchall(&amp;match);</span>
+<span class="lineNum">     325 </span>                :<span class="lineNoCov">          0 :         match_set_dl_type(&amp;match, htons(ETH_TYPE_ARP));</span>
+<span class="lineNum">     326 </span>                :<span class="lineNoCov">          0 :         match_set_nw_proto(&amp;match, ARP_OP_REPLY);</span>
+<span class="lineNum">     327 </span>                :<span class="lineNoCov">          0 :         match_set_nw_dst(&amp;match, a-&gt;sin_addr.s_addr);</span>
+<span class="lineNum">     328 </span>                :<span class="lineNoCov">          0 :         add_rule(ib, &amp;match, IBR_TO_REMOTE_ARP);</span>
+<span class="lineNum">     329 </span>                :            : 
+<span class="lineNum">     330 </span>                :            :         /* (g) Allow ARP requests containing the remote's IP address as a
+<span class="lineNum">     331 </span>                :            :          * source. */
+<span class="lineNum">     332 </span>                :<span class="lineNoCov">          0 :         match_init_catchall(&amp;match);</span>
+<span class="lineNum">     333 </span>                :<span class="lineNoCov">          0 :         match_set_dl_type(&amp;match, htons(ETH_TYPE_ARP));</span>
+<span class="lineNum">     334 </span>                :<span class="lineNoCov">          0 :         match_set_nw_proto(&amp;match, ARP_OP_REQUEST);</span>
+<span class="lineNum">     335 </span>                :<span class="lineNoCov">          0 :         match_set_nw_src(&amp;match, a-&gt;sin_addr.s_addr);</span>
+<span class="lineNum">     336 </span>                :<span class="lineNoCov">          0 :         add_rule(ib, &amp;match, IBR_FROM_REMOTE_ARP);</span>
+<span class="lineNum">     337 </span>                :            : 
+<span class="lineNum">     338 </span>                :            :         /* (h) Allow TCP traffic to the remote's IP and port. */
+<span class="lineNum">     339 </span>                :<span class="lineNoCov">          0 :         match_init_catchall(&amp;match);</span>
+<span class="lineNum">     340 </span>                :<span class="lineNoCov">          0 :         match_set_dl_type(&amp;match, htons(ETH_TYPE_IP));</span>
+<span class="lineNum">     341 </span>                :<span class="lineNoCov">          0 :         match_set_nw_proto(&amp;match, IPPROTO_TCP);</span>
+<span class="lineNum">     342 </span>                :<span class="lineNoCov">          0 :         match_set_nw_dst(&amp;match, a-&gt;sin_addr.s_addr);</span>
+<span class="lineNum">     343 </span>                :<span class="lineNoCov">          0 :         match_set_tp_dst(&amp;match, a-&gt;sin_port);</span>
+<span class="lineNum">     344 </span>                :<span class="lineNoCov">          0 :         add_rule(ib, &amp;match, IBR_TO_REMOTE_TCP);</span>
+<span class="lineNum">     345 </span>                :            : 
+<span class="lineNum">     346 </span>                :            :         /* (i) Allow TCP traffic from the remote's IP and port. */
+<span class="lineNum">     347 </span>                :<span class="lineNoCov">          0 :         match_init_catchall(&amp;match);</span>
+<span class="lineNum">     348 </span>                :<span class="lineNoCov">          0 :         match_set_dl_type(&amp;match, htons(ETH_TYPE_IP));</span>
+<span class="lineNum">     349 </span>                :<span class="lineNoCov">          0 :         match_set_nw_proto(&amp;match, IPPROTO_TCP);</span>
+<span class="lineNum">     350 </span>                :<span class="lineNoCov">          0 :         match_set_nw_src(&amp;match, a-&gt;sin_addr.s_addr);</span>
+<span class="lineNum">     351 </span>                :<span class="lineNoCov">          0 :         match_set_tp_src(&amp;match, a-&gt;sin_port);</span>
+<span class="lineNum">     352 </span>                :<span class="lineNoCov">          0 :         add_rule(ib, &amp;match, IBR_FROM_REMOTE_TCP);</span>
+<span class="lineNum">     353 </span>                :            :     }
+<span class="lineNum">     354 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     355 </span>                :            : 
+<span class="lineNum">     356 </span>                :            : /* Updates the OpenFlow flow table for the current state of in-band control.
+<span class="lineNum">     357 </span>                :            :  * Returns true ordinarily.  Returns false if no remotes are configured on 'ib'
+<span class="lineNum">     358 </span>                :            :  * and 'ib' doesn't have any rules left to remove from the OpenFlow flow
+<span class="lineNum">     359 </span>                :            :  * table.  Thus, a false return value means that the caller can destroy 'ib'
+<a name="360"><span class="lineNum">     360 </span>                :            :  * without leaving extra flows hanging around in the flow table. */</a>
+<span class="lineNum">     361 </span>                :            : bool
+<span class="lineNum">     362 </span>                :<span class="lineNoCov">          0 : in_band_run(struct in_band *ib)</span>
+<span class="lineNum">     363 </span>                :            : {
+<span class="lineNum">     364 </span>                :            :     uint64_t ofpacts_stub[128 / 8];
+<span class="lineNum">     365 </span>                :            :     struct ofpbuf ofpacts;
+<span class="lineNum">     366 </span>                :            : 
+<span class="lineNum">     367 </span>                :            :     struct in_band_rule *rule, *next;
+<span class="lineNum">     368 </span>                :            : 
+<span class="lineNum">     369 </span>                :<span class="lineNoCov">          0 :     ofpbuf_use_stub(&amp;ofpacts, ofpacts_stub, sizeof ofpacts_stub);</span>
+<span class="lineNum">     370 </span>                :            : 
+<span class="lineNum">     371 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (ib-&gt;queue_id &gt;= 0) {</span>
+<span class="lineNum">     372 </span>                :<span class="lineNoCov">          0 :         ofpact_put_SET_QUEUE(&amp;ofpacts)-&gt;queue_id = ib-&gt;queue_id;</span>
+<span class="lineNum">     373 </span>                :            :     }
+<span class="lineNum">     374 </span>                :<span class="lineNoCov">          0 :     ofpact_put_OUTPUT(&amp;ofpacts)-&gt;port = OFPP_NORMAL;</span>
+<span class="lineNum">     375 </span>                :            : 
+<span class="lineNum">     376 </span>                :<span class="lineNoCov">          0 :     refresh_local(ib);</span>
+<span class="lineNum">     377 </span>                :<span class="lineNoCov">          0 :     refresh_remotes(ib);</span>
+<span class="lineNum">     378 </span>                :            : 
+<span class="lineNum">     379 </span>                :<span class="lineNoCov">          0 :     update_rules(ib);</span>
+<span class="lineNum">     380 </span>                :            : 
+<span class="lineNum">     381 </span>[<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>][<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]:<span class="lineNoCov">          0 :     HMAP_FOR_EACH_SAFE (rule, next, hmap_node, &amp;ib-&gt;rules) {</span>
+<span class="lineNum">     382 </span>     [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         switch (rule-&gt;op) {</span>
+<span class="lineNum">     383 </span>                :            :         case ADD:
+<span class="lineNum">     384 </span>                :<span class="lineNoCov">          0 :             ofproto_add_flow(ib-&gt;ofproto, &amp;rule-&gt;match, rule-&gt;priority,</span>
+<span class="lineNum">     385 </span>                :<span class="lineNoCov">          0 :                              ofpbuf_data(&amp;ofpacts), ofpbuf_size(&amp;ofpacts));</span>
+<span class="lineNum">     386 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     387 </span>                :            : 
+<span class="lineNum">     388 </span>                :            :         case DEL:
+<span class="lineNum">     389 </span>                :<span class="lineNoCov">          0 :             ofproto_delete_flow(ib-&gt;ofproto, &amp;rule-&gt;match, rule-&gt;priority);</span>
+<span class="lineNum">     390 </span>                :<span class="lineNoCov">          0 :             hmap_remove(&amp;ib-&gt;rules, &amp;rule-&gt;hmap_node);</span>
+<span class="lineNum">     391 </span>                :<span class="lineNoCov">          0 :             free(rule);</span>
+<span class="lineNum">     392 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     393 </span>                :            :         }
+<span class="lineNum">     394 </span>                :            :     }
+<span class="lineNum">     395 </span>                :            : 
+<span class="lineNum">     396 </span>                :<span class="lineNoCov">          0 :     ofpbuf_uninit(&amp;ofpacts);</span>
+<span class="lineNum">     397 </span>                :            : 
+<span class="lineNum">     398 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :     return ib-&gt;n_remotes || !hmap_is_empty(&amp;ib-&gt;rules);</span>
+<span class="lineNum">     399 </span>                :            : }
+<a name="400"><span class="lineNum">     400 </span>                :            : </a>
+<span class="lineNum">     401 </span>                :            : void
+<span class="lineNum">     402 </span>                :<span class="lineNoCov">          0 : in_band_wait(struct in_band *in_band)</span>
+<span class="lineNum">     403 </span>                :            : {
+<span class="lineNum">     404 </span>                :<span class="lineNoCov">          0 :     long long int wakeup</span>
+<span class="lineNum">     405 </span>                :<span class="lineNoCov">          0 :             = MIN(in_band-&gt;next_remote_refresh, in_band-&gt;next_local_refresh);</span>
+<span class="lineNum">     406 </span>                :<span class="lineNoCov">          0 :     poll_timer_wait_until(wakeup * 1000);</span>
+<span class="lineNum">     407 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="408"><span class="lineNum">     408 </span>                :            : </a>
+<span class="lineNum">     409 </span>                :            : int
+<span class="lineNum">     410 </span>                :<span class="lineNoCov">          0 : in_band_create(struct ofproto *ofproto, const char *local_name,</span>
+<span class="lineNum">     411 </span>                :            :                struct in_band **in_bandp)
+<span class="lineNum">     412 </span>                :            : {
+<span class="lineNum">     413 </span>                :            :     struct in_band *in_band;
+<span class="lineNum">     414 </span>                :            :     struct netdev *local_netdev;
+<span class="lineNum">     415 </span>                :            :     int error;
+<span class="lineNum">     416 </span>                :            : 
+<span class="lineNum">     417 </span>                :<span class="lineNoCov">          0 :     *in_bandp = NULL;</span>
+<span class="lineNum">     418 </span>                :<span class="lineNoCov">          0 :     error = netdev_open(local_name, &quot;internal&quot;, &amp;local_netdev);</span>
+<span class="lineNum">     419 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (error) {</span>
+<span class="lineNum">     420 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;failed to initialize in-band control: cannot open &quot;</span>
+<span class="lineNum">     421 </span>                :            :                  &quot;datapath local port %s (%s)&quot;,
+<span class="lineNum">     422 </span>                :            :                  local_name, ovs_strerror(error));
+<span class="lineNum">     423 </span>                :<span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     424 </span>                :            :     }
+<span class="lineNum">     425 </span>                :            : 
+<span class="lineNum">     426 </span>                :<span class="lineNoCov">          0 :     in_band = xzalloc(sizeof *in_band);</span>
+<span class="lineNum">     427 </span>                :<span class="lineNoCov">          0 :     in_band-&gt;ofproto = ofproto;</span>
+<span class="lineNum">     428 </span>                :<span class="lineNoCov">          0 :     in_band-&gt;queue_id = -1;</span>
+<span class="lineNum">     429 </span>                :<span class="lineNoCov">          0 :     in_band-&gt;next_remote_refresh = TIME_MIN;</span>
+<span class="lineNum">     430 </span>                :<span class="lineNoCov">          0 :     in_band-&gt;next_local_refresh = TIME_MIN;</span>
+<span class="lineNum">     431 </span>                :<span class="lineNoCov">          0 :     in_band-&gt;local_netdev = local_netdev;</span>
+<span class="lineNum">     432 </span>                :<span class="lineNoCov">          0 :     hmap_init(&amp;in_band-&gt;rules);</span>
+<span class="lineNum">     433 </span>                :            : 
+<span class="lineNum">     434 </span>                :<span class="lineNoCov">          0 :     *in_bandp = in_band;</span>
+<span class="lineNum">     435 </span>                :            : 
+<span class="lineNum">     436 </span>                :<span class="lineNoCov">          0 :     return 0;</span>
+<span class="lineNum">     437 </span>                :            : }
+<a name="438"><span class="lineNum">     438 </span>                :            : </a>
+<span class="lineNum">     439 </span>                :            : void
+<span class="lineNum">     440 </span>                :<span class="lineCov">         23 : in_band_destroy(struct in_band *ib)</span>
+<span class="lineNum">     441 </span>                :            : {
+<span class="lineNum">     442 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 23 times"> + </span>]:<span class="lineCov">         23 :     if (ib) {</span>
+<span class="lineNum">     443 </span>                :            :         struct in_band_rule *rule, *next;
+<span class="lineNum">     444 </span>                :            : 
+<span class="lineNum">     445 </span>[<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>][<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]:<span class="lineNoCov">          0 :         HMAP_FOR_EACH_SAFE (rule, next, hmap_node, &amp;ib-&gt;rules) {</span>
+<span class="lineNum">     446 </span>                :<span class="lineNoCov">          0 :             hmap_remove(&amp;ib-&gt;rules, &amp;rule-&gt;hmap_node);</span>
+<span class="lineNum">     447 </span>                :<span class="lineNoCov">          0 :             free(rule);</span>
+<span class="lineNum">     448 </span>                :            :         }
+<span class="lineNum">     449 </span>                :<span class="lineNoCov">          0 :         hmap_destroy(&amp;ib-&gt;rules);</span>
+<span class="lineNum">     450 </span>                :<span class="lineNoCov">          0 :         in_band_set_remotes(ib, NULL, 0);</span>
+<span class="lineNum">     451 </span>                :<span class="lineNoCov">          0 :         netdev_close(ib-&gt;local_netdev);</span>
+<span class="lineNum">     452 </span>                :<span class="lineNoCov">          0 :         free(ib);</span>
+<span class="lineNum">     453 </span>                :            :     }
+<span class="lineNum">     454 </span>                :<span class="lineCov">         23 : }</span>
+<a name="455"><span class="lineNum">     455 </span>                :            : </a>
+<span class="lineNum">     456 </span>                :            : static bool
+<span class="lineNum">     457 </span>                :<span class="lineNoCov">          0 : any_addresses_changed(struct in_band *ib,</span>
+<span class="lineNum">     458 </span>                :            :                       const struct sockaddr_in *addresses, size_t n)
+<span class="lineNum">     459 </span>                :            : {
+<span class="lineNum">     460 </span>                :            :     size_t i;
+<span class="lineNum">     461 </span>                :            : 
+<span class="lineNum">     462 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (n != ib-&gt;n_remotes) {</span>
+<span class="lineNum">     463 </span>                :<span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">     464 </span>                :            :     }
+<span class="lineNum">     465 </span>                :            : 
+<span class="lineNum">     466 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (i = 0; i &lt; n; i++) {</span>
+<span class="lineNum">     467 </span>                :<span class="lineNoCov">          0 :         const struct sockaddr_in *old = &amp;ib-&gt;remotes[i].remote_addr;</span>
+<span class="lineNum">     468 </span>                :<span class="lineNoCov">          0 :         const struct sockaddr_in *new = &amp;addresses[i];</span>
+<span class="lineNum">     469 </span>                :            : 
+<span class="lineNum">     470 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (old-&gt;sin_addr.s_addr != new-&gt;sin_addr.s_addr ||</span>
+<span class="lineNum">     471 </span>                :<span class="lineNoCov">          0 :             old-&gt;sin_port != new-&gt;sin_port) {</span>
+<span class="lineNum">     472 </span>                :<span class="lineNoCov">          0 :             return true;</span>
+<span class="lineNum">     473 </span>                :            :         }
+<span class="lineNum">     474 </span>                :            :     }
+<span class="lineNum">     475 </span>                :            : 
+<span class="lineNum">     476 </span>                :<span class="lineNoCov">          0 :     return false;</span>
+<span class="lineNum">     477 </span>                :            : }
+<a name="478"><span class="lineNum">     478 </span>                :            : </a>
+<span class="lineNum">     479 </span>                :            : void
+<span class="lineNum">     480 </span>                :<span class="lineNoCov">          0 : in_band_set_remotes(struct in_band *ib,</span>
+<span class="lineNum">     481 </span>                :            :                     const struct sockaddr_in *addresses, size_t n)
+<span class="lineNum">     482 </span>                :            : {
+<span class="lineNum">     483 </span>                :            :     size_t i;
+<span class="lineNum">     484 </span>                :            : 
+<span class="lineNum">     485 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!any_addresses_changed(ib, addresses, n)) {</span>
+<span class="lineNum">     486 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     487 </span>                :            :     }
+<span class="lineNum">     488 </span>                :            : 
+<span class="lineNum">     489 </span>                :            :     /* Clear old remotes. */
+<span class="lineNum">     490 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (i = 0; i &lt; ib-&gt;n_remotes; i++) {</span>
+<span class="lineNum">     491 </span>                :<span class="lineNoCov">          0 :         netdev_close(ib-&gt;remotes[i].remote_netdev);</span>
+<span class="lineNum">     492 </span>                :            :     }
+<span class="lineNum">     493 </span>                :<span class="lineNoCov">          0 :     free(ib-&gt;remotes);</span>
+<span class="lineNum">     494 </span>                :            : 
+<span class="lineNum">     495 </span>                :            :     /* Set up new remotes. */
+<span class="lineNum">     496 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     ib-&gt;remotes = n ? xzalloc(n * sizeof *ib-&gt;remotes) : NULL;</span>
+<span class="lineNum">     497 </span>                :<span class="lineNoCov">          0 :     ib-&gt;n_remotes = n;</span>
+<span class="lineNum">     498 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (i = 0; i &lt; n; i++) {</span>
+<span class="lineNum">     499 </span>                :<span class="lineNoCov">          0 :         ib-&gt;remotes[i].remote_addr = addresses[i];</span>
+<span class="lineNum">     500 </span>                :            :     }
+<span class="lineNum">     501 </span>                :            : 
+<span class="lineNum">     502 </span>                :            :     /* Force refresh in next call to in_band_run(). */
+<span class="lineNum">     503 </span>                :<span class="lineNoCov">          0 :     ib-&gt;next_remote_refresh = TIME_MIN;</span>
+<span class="lineNum">     504 </span>                :            : }
+<span class="lineNum">     505 </span>                :            : 
+<span class="lineNum">     506 </span>                :            : /* Sets the OpenFlow queue used by flows set up by 'ib' to 'queue_id'.  If
+<span class="lineNum">     507 </span>                :            :  * 'queue_id' is negative, 'ib' will not set any queue (which is also the
+<a name="508"><span class="lineNum">     508 </span>                :            :  * default). */</a>
+<span class="lineNum">     509 </span>                :            : void
+<span class="lineNum">     510 </span>                :<span class="lineNoCov">          0 : in_band_set_queue(struct in_band *ib, int queue_id)</span>
+<span class="lineNum">     511 </span>                :            : {
+<span class="lineNum">     512 </span>                :<span class="lineNoCov">          0 :     ib-&gt;queue_id = queue_id;</span>
+<span class="lineNum">     513 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     514 </span>                :            : 
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

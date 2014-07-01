@@ -1,0 +1,350 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ofproto/fail-open.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">ofproto</a> - fail-open.c<span style="font-size: 80%;"> (source / <a href="fail-open.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntry">83</td>
+            <td class="headerCovTableEntryLo">4.8 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">2</td>
+            <td class="headerCovTableEntry">11</td>
+            <td class="headerCovTableEntryLo">18.2 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">1</td>
+            <td class="headerCovTableEntry">36</td>
+            <td class="headerCovTableEntryLo">2.8 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2008, 2009, 2010, 2011, 2012, 2013 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;fail-open.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &lt;inttypes.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &quot;classifier.h&quot;
+<span class="lineNum">      22 </span>                :            : #include &quot;connmgr.h&quot;
+<span class="lineNum">      23 </span>                :            : #include &quot;flow.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;mac-learning.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;odp-util.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;ofp-actions.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;ofp-util.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;ofpbuf.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;ofproto.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;ofproto-provider.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;pktbuf.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;rconn.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;vconn.h&quot;
+<a name="36"><span class="lineNum">      36 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      37 </span>                :            : 
+<span class="lineNum">      38 </span>                :<span class="lineCov">        525 : VLOG_DEFINE_THIS_MODULE(fail_open);</span>
+<span class="lineNum">      39 </span>                :            : 
+<span class="lineNum">      40 </span>                :            : /*
+<span class="lineNum">      41 </span>                :            :  * Fail-open mode.
+<span class="lineNum">      42 </span>                :            :  *
+<span class="lineNum">      43 </span>                :            :  * In fail-open mode, the switch detects when the controller cannot be
+<span class="lineNum">      44 </span>                :            :  * contacted or when the controller is dropping switch connections because the
+<span class="lineNum">      45 </span>                :            :  * switch does not pass its admission control policy.  In those situations the
+<span class="lineNum">      46 </span>                :            :  * switch sets up flows itself using the &quot;normal&quot; action.
+<span class="lineNum">      47 </span>                :            :  *
+<span class="lineNum">      48 </span>                :            :  * There is a little subtlety to implementation, to properly handle the case
+<span class="lineNum">      49 </span>                :            :  * where the controller allows switch connections but drops them a few seconds
+<span class="lineNum">      50 </span>                :            :  * later for admission control reasons.  Because of this case, we don't want to
+<span class="lineNum">      51 </span>                :            :  * just stop setting up flows when we connect to the controller: if we did,
+<span class="lineNum">      52 </span>                :            :  * then new flow setup and existing flows would stop during the duration of
+<span class="lineNum">      53 </span>                :            :  * connection to the controller, and thus the whole network would go down for
+<span class="lineNum">      54 </span>                :            :  * that period of time.
+<span class="lineNum">      55 </span>                :            :  *
+<span class="lineNum">      56 </span>                :            :  * So, instead, we add some special cases when we are connected to a
+<span class="lineNum">      57 </span>                :            :  * controller, but not yet sure that it has admitted us:
+<span class="lineNum">      58 </span>                :            :  *
+<span class="lineNum">      59 </span>                :            :  *     - We set up flows immediately ourselves, but simultaneously send out an
+<span class="lineNum">      60 </span>                :            :  *       OFPT_PACKET_IN to the controller.  We put a special bogus buffer-id in
+<span class="lineNum">      61 </span>                :            :  *       these OFPT_PACKET_IN messages so that duplicate packets don't get sent
+<span class="lineNum">      62 </span>                :            :  *       out to the network when the controller replies.
+<span class="lineNum">      63 </span>                :            :  *
+<span class="lineNum">      64 </span>                :            :  *     - We also send out OFPT_PACKET_IN messages for totally bogus packets
+<span class="lineNum">      65 </span>                :            :  *       every so often, in case no real new flows are arriving in the network.
+<span class="lineNum">      66 </span>                :            :  *
+<span class="lineNum">      67 </span>                :            :  *     - We don't flush the flow table at the time we connect, because this
+<span class="lineNum">      68 </span>                :            :  *       could cause network stuttering in a switch with lots of flows or very
+<span class="lineNum">      69 </span>                :            :  *       high-bandwidth flows by suddenly throwing lots of packets down to
+<span class="lineNum">      70 </span>                :            :  *       userspace.
+<span class="lineNum">      71 </span>                :            :  */
+<span class="lineNum">      72 </span>                :            : 
+<span class="lineNum">      73 </span>                :            : struct fail_open {
+<span class="lineNum">      74 </span>                :            :     struct ofproto *ofproto;
+<span class="lineNum">      75 </span>                :            :     struct connmgr *connmgr;
+<span class="lineNum">      76 </span>                :            :     int last_disconn_secs;
+<span class="lineNum">      77 </span>                :            :     long long int next_bogus_packet_in;
+<span class="lineNum">      78 </span>                :            :     struct rconn_packet_counter *bogus_packet_counter;
+<span class="lineNum">      79 </span>                :            : };
+<span class="lineNum">      80 </span>                :            : 
+<span class="lineNum">      81 </span>                :            : static void fail_open_recover(struct fail_open *);
+<span class="lineNum">      82 </span>                :            : 
+<span class="lineNum">      83 </span>                :            : /* Returns the number of seconds of disconnection after which fail-open mode
+<a name="84"><span class="lineNum">      84 </span>                :            :  * should activate. */</a>
+<span class="lineNum">      85 </span>                :            : static int
+<span class="lineNum">      86 </span>                :<span class="lineNoCov">          0 : trigger_duration(const struct fail_open *fo)</span>
+<span class="lineNum">      87 </span>                :            : {
+<span class="lineNum">      88 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!connmgr_has_controllers(fo-&gt;connmgr)) {</span>
+<span class="lineNum">      89 </span>                :            :         /* Shouldn't ever arrive here, but if we do, never fail open. */
+<span class="lineNum">      90 </span>                :<span class="lineNoCov">          0 :         return INT_MAX;</span>
+<span class="lineNum">      91 </span>                :            :     } else {
+<span class="lineNum">      92 </span>                :            :         /* Otherwise, every controller must have a chance to send an
+<span class="lineNum">      93 </span>                :            :          * inactivity probe and reconnect before we fail open, so take the
+<span class="lineNum">      94 </span>                :            :          * maximum probe interval and multiply by 3:
+<span class="lineNum">      95 </span>                :            :          *
+<span class="lineNum">      96 </span>                :            :          *  - The first interval is the idle time before sending an inactivity
+<span class="lineNum">      97 </span>                :            :          *    probe.
+<span class="lineNum">      98 </span>                :            :          *
+<span class="lineNum">      99 </span>                :            :          *  - The second interval is the time allowed for a response to the
+<span class="lineNum">     100 </span>                :            :          *    inactivity probe.
+<span class="lineNum">     101 </span>                :            :          *
+<span class="lineNum">     102 </span>                :            :          *  - The third interval is the time allowed to reconnect after no
+<span class="lineNum">     103 </span>                :            :          *    response is received.
+<span class="lineNum">     104 </span>                :            :          */
+<span class="lineNum">     105 </span>                :<span class="lineNoCov">          0 :         return connmgr_get_max_probe_interval(fo-&gt;connmgr) * 3;</span>
+<span class="lineNum">     106 </span>                :            :     }
+<span class="lineNum">     107 </span>                :            : }
+<span class="lineNum">     108 </span>                :            : 
+<a name="109"><span class="lineNum">     109 </span>                :            : /* Returns true if 'fo' is currently in fail-open mode, otherwise false. */</a>
+<span class="lineNum">     110 </span>                :            : bool
+<span class="lineNum">     111 </span>                :<span class="lineNoCov">          0 : fail_open_is_active(const struct fail_open *fo)</span>
+<span class="lineNum">     112 </span>                :            : {
+<span class="lineNum">     113 </span>                :<span class="lineNoCov">          0 :     return fo-&gt;last_disconn_secs != 0;</span>
+<span class="lineNum">     114 </span>                :            : }
+<a name="115"><span class="lineNum">     115 </span>                :            : </a>
+<span class="lineNum">     116 </span>                :            : static void
+<span class="lineNum">     117 </span>                :<span class="lineNoCov">          0 : send_bogus_packet_ins(struct fail_open *fo)</span>
+<span class="lineNum">     118 </span>                :            : {
+<span class="lineNum">     119 </span>                :            :     struct ofproto_packet_in pin;
+<span class="lineNum">     120 </span>                :            :     uint8_t mac[ETH_ADDR_LEN];
+<span class="lineNum">     121 </span>                :            :     struct ofpbuf b;
+<span class="lineNum">     122 </span>                :            : 
+<span class="lineNum">     123 </span>                :<span class="lineNoCov">          0 :     ofpbuf_init(&amp;b, 128);</span>
+<span class="lineNum">     124 </span>                :<span class="lineNoCov">          0 :     eth_addr_nicira_random(mac);</span>
+<span class="lineNum">     125 </span>                :<span class="lineNoCov">          0 :     compose_rarp(&amp;b, mac);</span>
+<span class="lineNum">     126 </span>                :            : 
+<span class="lineNum">     127 </span>                :<span class="lineNoCov">          0 :     memset(&amp;pin, 0, sizeof pin);</span>
+<span class="lineNum">     128 </span>                :<span class="lineNoCov">          0 :     pin.up.packet = ofpbuf_data(&amp;b);</span>
+<span class="lineNum">     129 </span>                :<span class="lineNoCov">          0 :     pin.up.packet_len = ofpbuf_size(&amp;b);</span>
+<span class="lineNum">     130 </span>                :<span class="lineNoCov">          0 :     pin.up.reason = OFPR_NO_MATCH;</span>
+<span class="lineNum">     131 </span>                :<span class="lineNoCov">          0 :     pin.up.fmd.in_port = OFPP_LOCAL;</span>
+<span class="lineNum">     132 </span>                :<span class="lineNoCov">          0 :     pin.send_len = ofpbuf_size(&amp;b);</span>
+<span class="lineNum">     133 </span>                :<span class="lineNoCov">          0 :     pin.miss_type = OFPROTO_PACKET_IN_NO_MISS;</span>
+<span class="lineNum">     134 </span>                :<span class="lineNoCov">          0 :     connmgr_send_packet_in(fo-&gt;connmgr, &amp;pin);</span>
+<span class="lineNum">     135 </span>                :            : 
+<span class="lineNum">     136 </span>                :<span class="lineNoCov">          0 :     ofpbuf_uninit(&amp;b);</span>
+<span class="lineNum">     137 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     138 </span>                :            : 
+<a name="139"><span class="lineNum">     139 </span>                :            : /* Enter fail-open mode if we should be in it. */</a>
+<span class="lineNum">     140 </span>                :            : void
+<span class="lineNum">     141 </span>                :<span class="lineNoCov">          0 : fail_open_run(struct fail_open *fo)</span>
+<span class="lineNum">     142 </span>                :            : {
+<span class="lineNum">     143 </span>                :<span class="lineNoCov">          0 :     int disconn_secs = connmgr_failure_duration(fo-&gt;connmgr);</span>
+<span class="lineNum">     144 </span>                :            : 
+<span class="lineNum">     145 </span>                :            :     /* Enter fail-open mode if 'fo' is not in it but should be.  */
+<span class="lineNum">     146 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (disconn_secs &gt;= trigger_duration(fo)) {</span>
+<span class="lineNum">     147 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!fail_open_is_active(fo)) {</span>
+<span class="lineNum">     148 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN(&quot;Could not connect to controller (or switch failed &quot;</span>
+<span class="lineNum">     149 </span>                :            :                       &quot;controller's post-connection admission control &quot;
+<span class="lineNum">     150 </span>                :            :                       &quot;policy) for %d seconds, failing open&quot;, disconn_secs);
+<span class="lineNum">     151 </span>                :<span class="lineNoCov">          0 :             fo-&gt;last_disconn_secs = disconn_secs;</span>
+<span class="lineNum">     152 </span>                :            : 
+<span class="lineNum">     153 </span>                :            :             /* Flush all OpenFlow and datapath flows.  We will set up our
+<span class="lineNum">     154 </span>                :            :              * fail-open rule from fail_open_flushed() when
+<span class="lineNum">     155 </span>                :            :              * ofproto_flush_flows() calls back to us. */
+<span class="lineNum">     156 </span>                :<span class="lineNoCov">          0 :             ofproto_flush_flows(fo-&gt;ofproto);</span>
+<span class="lineNum">     157 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         } else if (disconn_secs &gt; fo-&gt;last_disconn_secs + 60) {</span>
+<span class="lineNum">     158 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_INFO(&quot;Still in fail-open mode after %d seconds disconnected &quot;</span>
+<span class="lineNum">     159 </span>                :            :                       &quot;from controller&quot;, disconn_secs);
+<span class="lineNum">     160 </span>                :<span class="lineNoCov">          0 :             fo-&gt;last_disconn_secs = disconn_secs;</span>
+<span class="lineNum">     161 </span>                :            :         }
+<span class="lineNum">     162 </span>                :            :     }
+<span class="lineNum">     163 </span>                :            : 
+<span class="lineNum">     164 </span>                :            :     /* Schedule a bogus packet-in if we're connected and in fail-open. */
+<span class="lineNum">     165 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (fail_open_is_active(fo)) {</span>
+<span class="lineNum">     166 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (connmgr_is_any_controller_connected(fo-&gt;connmgr)) {</span>
+<span class="lineNum">     167 </span>                :<span class="lineNoCov">          0 :             bool expired = time_msec() &gt;= fo-&gt;next_bogus_packet_in;</span>
+<span class="lineNum">     168 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (expired) {</span>
+<span class="lineNum">     169 </span>                :<span class="lineNoCov">          0 :                 send_bogus_packet_ins(fo);</span>
+<span class="lineNum">     170 </span>                :            :             }
+<span class="lineNum">     171 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (expired || fo-&gt;next_bogus_packet_in == LLONG_MAX) {</span>
+<span class="lineNum">     172 </span>                :<span class="lineNoCov">          0 :                 fo-&gt;next_bogus_packet_in = time_msec() + 2000;</span>
+<span class="lineNum">     173 </span>                :            :             }
+<span class="lineNum">     174 </span>                :            :         } else {
+<span class="lineNum">     175 </span>                :<span class="lineNoCov">          0 :             fo-&gt;next_bogus_packet_in = LLONG_MAX;</span>
+<span class="lineNum">     176 </span>                :            :         }
+<span class="lineNum">     177 </span>                :            :     }
+<span class="lineNum">     178 </span>                :            : 
+<span class="lineNum">     179 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     180 </span>                :            : 
+<span class="lineNum">     181 </span>                :            : /* If 'fo' is currently in fail-open mode and its rconn has connected to the
+<a name="182"><span class="lineNum">     182 </span>                :            :  * controller, exits fail open mode. */</a>
+<span class="lineNum">     183 </span>                :            : void
+<span class="lineNum">     184 </span>                :<span class="lineNoCov">          0 : fail_open_maybe_recover(struct fail_open *fo)</span>
+<span class="lineNum">     185 </span>                :            :     OVS_EXCLUDED(ofproto_mutex)
+<span class="lineNum">     186 </span>                :            : {
+<span class="lineNum">     187 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (fail_open_is_active(fo)</span>
+<span class="lineNum">     188 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         &amp;&amp; connmgr_is_any_controller_admitted(fo-&gt;connmgr)) {</span>
+<span class="lineNum">     189 </span>                :<span class="lineNoCov">          0 :         fail_open_recover(fo);</span>
+<span class="lineNum">     190 </span>                :            :     }
+<span class="lineNum">     191 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="192"><span class="lineNum">     192 </span>                :            : </a>
+<span class="lineNum">     193 </span>                :            : static void
+<span class="lineNum">     194 </span>                :<span class="lineNoCov">          0 : fail_open_recover(struct fail_open *fo)</span>
+<span class="lineNum">     195 </span>                :            :     OVS_EXCLUDED(ofproto_mutex)
+<span class="lineNum">     196 </span>                :            : {
+<span class="lineNum">     197 </span>                :            :     struct match match;
+<span class="lineNum">     198 </span>                :            : 
+<span class="lineNum">     199 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     VLOG_WARN(&quot;No longer in fail-open mode&quot;);</span>
+<span class="lineNum">     200 </span>                :<span class="lineNoCov">          0 :     fo-&gt;last_disconn_secs = 0;</span>
+<span class="lineNum">     201 </span>                :<span class="lineNoCov">          0 :     fo-&gt;next_bogus_packet_in = LLONG_MAX;</span>
+<span class="lineNum">     202 </span>                :            : 
+<span class="lineNum">     203 </span>                :<span class="lineNoCov">          0 :     match_init_catchall(&amp;match);</span>
+<span class="lineNum">     204 </span>                :<span class="lineNoCov">          0 :     ofproto_delete_flow(fo-&gt;ofproto, &amp;match, FAIL_OPEN_PRIORITY);</span>
+<span class="lineNum">     205 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="206"><span class="lineNum">     206 </span>                :            : </a>
+<span class="lineNum">     207 </span>                :            : void
+<span class="lineNum">     208 </span>                :<span class="lineNoCov">          0 : fail_open_wait(struct fail_open *fo)</span>
+<span class="lineNum">     209 </span>                :            : {
+<span class="lineNum">     210 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (fo-&gt;next_bogus_packet_in != LLONG_MAX) {</span>
+<span class="lineNum">     211 </span>                :<span class="lineNoCov">          0 :         poll_timer_wait_until(fo-&gt;next_bogus_packet_in);</span>
+<span class="lineNum">     212 </span>                :            :     }
+<span class="lineNum">     213 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="214"><span class="lineNum">     214 </span>                :            : </a>
+<span class="lineNum">     215 </span>                :            : void
+<span class="lineNum">     216 </span>                :<span class="lineNoCov">          0 : fail_open_flushed(struct fail_open *fo)</span>
+<span class="lineNum">     217 </span>                :            :     OVS_EXCLUDED(ofproto_mutex)
+<span class="lineNum">     218 </span>                :            : {
+<span class="lineNum">     219 </span>                :<span class="lineNoCov">          0 :     int disconn_secs = connmgr_failure_duration(fo-&gt;connmgr);</span>
+<span class="lineNum">     220 </span>                :<span class="lineNoCov">          0 :     bool open = disconn_secs &gt;= trigger_duration(fo);</span>
+<span class="lineNum">     221 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (open) {</span>
+<span class="lineNum">     222 </span>                :            :         struct ofpbuf ofpacts;
+<span class="lineNum">     223 </span>                :            :         struct match match;
+<span class="lineNum">     224 </span>                :            : 
+<span class="lineNum">     225 </span>                :            :         /* Set up a flow that matches every packet and directs them to
+<span class="lineNum">     226 </span>                :            :          * OFPP_NORMAL. */
+<span class="lineNum">     227 </span>                :<span class="lineNoCov">          0 :         ofpbuf_init(&amp;ofpacts, OFPACT_OUTPUT_SIZE);</span>
+<span class="lineNum">     228 </span>                :<span class="lineNoCov">          0 :         ofpact_put_OUTPUT(&amp;ofpacts)-&gt;port = OFPP_NORMAL;</span>
+<span class="lineNum">     229 </span>                :<span class="lineNoCov">          0 :         ofpact_pad(&amp;ofpacts);</span>
+<span class="lineNum">     230 </span>                :            : 
+<span class="lineNum">     231 </span>                :<span class="lineNoCov">          0 :         match_init_catchall(&amp;match);</span>
+<span class="lineNum">     232 </span>                :<span class="lineNoCov">          0 :         ofproto_add_flow(fo-&gt;ofproto, &amp;match, FAIL_OPEN_PRIORITY,</span>
+<span class="lineNum">     233 </span>                :<span class="lineNoCov">          0 :                          ofpbuf_data(&amp;ofpacts), ofpbuf_size(&amp;ofpacts));</span>
+<span class="lineNum">     234 </span>                :            : 
+<span class="lineNum">     235 </span>                :<span class="lineNoCov">          0 :         ofpbuf_uninit(&amp;ofpacts);</span>
+<span class="lineNum">     236 </span>                :            :     }
+<span class="lineNum">     237 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     238 </span>                :            : 
+<a name="239"><span class="lineNum">     239 </span>                :            : /* Creates and returns a new struct fail_open for 'ofproto' and 'mgr'. */</a>
+<span class="lineNum">     240 </span>                :            : struct fail_open *
+<span class="lineNum">     241 </span>                :<span class="lineNoCov">          0 : fail_open_create(struct ofproto *ofproto, struct connmgr *mgr)</span>
+<span class="lineNum">     242 </span>                :            : {
+<span class="lineNum">     243 </span>                :<span class="lineNoCov">          0 :     struct fail_open *fo = xmalloc(sizeof *fo);</span>
+<span class="lineNum">     244 </span>                :<span class="lineNoCov">          0 :     fo-&gt;ofproto = ofproto;</span>
+<span class="lineNum">     245 </span>                :<span class="lineNoCov">          0 :     fo-&gt;connmgr = mgr;</span>
+<span class="lineNum">     246 </span>                :<span class="lineNoCov">          0 :     fo-&gt;last_disconn_secs = 0;</span>
+<span class="lineNum">     247 </span>                :<span class="lineNoCov">          0 :     fo-&gt;next_bogus_packet_in = LLONG_MAX;</span>
+<span class="lineNum">     248 </span>                :<span class="lineNoCov">          0 :     fo-&gt;bogus_packet_counter = rconn_packet_counter_create();</span>
+<span class="lineNum">     249 </span>                :<span class="lineNoCov">          0 :     return fo;</span>
+<span class="lineNum">     250 </span>                :            : }
+<span class="lineNum">     251 </span>                :            : 
+<a name="252"><span class="lineNum">     252 </span>                :            : /* Destroys 'fo'. */</a>
+<span class="lineNum">     253 </span>                :            : void
+<span class="lineNum">     254 </span>                :<span class="lineCov">        858 : fail_open_destroy(struct fail_open *fo)</span>
+<span class="lineNum">     255 </span>                :            :     OVS_EXCLUDED(ofproto_mutex)
+<span class="lineNum">     256 </span>                :            : {
+<span class="lineNum">     257 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 858 times"> + </span>]:<span class="lineCov">        858 :     if (fo) {</span>
+<span class="lineNum">     258 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (fail_open_is_active(fo)) {</span>
+<span class="lineNum">     259 </span>                :<span class="lineNoCov">          0 :             fail_open_recover(fo);</span>
+<span class="lineNum">     260 </span>                :            :         }
+<span class="lineNum">     261 </span>                :            :         /* We don't own fo-&gt;connmgr. */
+<span class="lineNum">     262 </span>                :<span class="lineNoCov">          0 :         rconn_packet_counter_destroy(fo-&gt;bogus_packet_counter);</span>
+<span class="lineNum">     263 </span>                :<span class="lineNoCov">          0 :         free(fo);</span>
+<span class="lineNum">     264 </span>                :            :     }
+<span class="lineNum">     265 </span>                :<span class="lineCov">        858 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

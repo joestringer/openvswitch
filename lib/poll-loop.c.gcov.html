@@ -1,0 +1,458 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/poll-loop.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - poll-loop.c<span style="font-size: 80%;"> (source / <a href="poll-loop.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">117</td>
+            <td class="headerCovTableEntry">122</td>
+            <td class="headerCovTableEntryHi">95.9 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">21</td>
+            <td class="headerCovTableEntry">21</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">54</td>
+            <td class="headerCovTableEntry">64</td>
+            <td class="headerCovTableEntryMed">84.4 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2008, 2009, 2010, 2011, 2012, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &lt;inttypes.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;poll.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &quot;coverage.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;dynamic-string.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;fatal-signal.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;list.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;ovs-thread.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;seq.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;socket-util.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;vlog.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;hmap.h&quot;
+<a name="34"><span class="lineNum">      34 </span>                :            : #include &quot;hash.h&quot;</a>
+<span class="lineNum">      35 </span>                :            : 
+<a name="36"><span class="lineNum">      36 </span>                :<span class="lineCov">      15103 : VLOG_DEFINE_THIS_MODULE(poll_loop);</span></a>
+<a name="37"><span class="lineNum">      37 </span>                :            : </a>
+<span class="lineNum">      38 </span>                :<span class="lineCov">    2340940 : COVERAGE_DEFINE(poll_fd_wait);</span>
+<span class="lineNum">      39 </span>                :<span class="lineCov">      92320 : COVERAGE_DEFINE(poll_zero_timeout);</span>
+<span class="lineNum">      40 </span>                :            : 
+<span class="lineNum">      41 </span>                :            : struct poll_node {
+<span class="lineNum">      42 </span>                :            :     struct hmap_node hmap_node;
+<span class="lineNum">      43 </span>                :            :     struct pollfd pollfd;       /* Events to pass to time_poll(). */
+<span class="lineNum">      44 </span>                :            :     HANDLE wevent;              /* Events for WaitForMultipleObjects(). */
+<span class="lineNum">      45 </span>                :            :     const char *where;          /* Where poll_node was created. */
+<span class="lineNum">      46 </span>                :            : };
+<span class="lineNum">      47 </span>                :            : 
+<span class="lineNum">      48 </span>                :            : struct poll_loop {
+<span class="lineNum">      49 </span>                :            :     /* All active poll waiters. */
+<span class="lineNum">      50 </span>                :            :     struct hmap poll_nodes;
+<span class="lineNum">      51 </span>                :            : 
+<span class="lineNum">      52 </span>                :            :     /* Time at which to wake up the next call to poll_block(), LLONG_MIN to
+<span class="lineNum">      53 </span>                :            :      * wake up immediately, or LLONG_MAX to wait forever. */
+<span class="lineNum">      54 </span>                :            :     long long int timeout_when; /* In msecs as returned by time_msec(). */
+<span class="lineNum">      55 </span>                :            :     const char *timeout_where;  /* Where 'timeout_when' was set. */
+<span class="lineNum">      56 </span>                :            : };
+<span class="lineNum">      57 </span>                :            : 
+<span class="lineNum">      58 </span>                :            : static struct poll_loop *poll_loop(void);
+<span class="lineNum">      59 </span>                :            : 
+<a name="60"><span class="lineNum">      60 </span>                :            : /* Look up the node with same fd and wevent. */</a>
+<span class="lineNum">      61 </span>                :            : static struct poll_node *
+<span class="lineNum">      62 </span>                :<span class="lineCov">     768946 : find_poll_node(struct poll_loop *loop, int fd, uint32_t wevent)</span>
+<span class="lineNum">      63 </span>                :            : {
+<span class="lineNum">      64 </span>                :            :     struct poll_node *node;
+<span class="lineNum">      65 </span>                :            : 
+<span class="lineNum">      66 </span>        [<span class="branchCov" title="Branch 3 was taken 200892 times"> + </span><span class="branchCov" title="Branch 4 was taken 568078 times"> + </span>]:<span class="lineCov">     768946 :     HMAP_FOR_EACH_WITH_HASH (node, hmap_node, hash_2words(fd, wevent),</span>
+<span class="lineNum">      67 </span>                :            :                              &amp;loop-&gt;poll_nodes) {
+<span class="lineNum">      68 </span>[<span class="branchCov" title="Branch 0 was taken 200892 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 200892 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">     200892 :         if (node-&gt;pollfd.fd == fd &amp;&amp; node-&gt;wevent == wevent) {</span>
+<span class="lineNum">      69 </span>                :<span class="lineCov">     200892 :             return node;</span>
+<span class="lineNum">      70 </span>                :            :         }
+<span class="lineNum">      71 </span>                :            :     }
+<span class="lineNum">      72 </span>                :<span class="lineCov">     768970 :     return NULL;</span>
+<span class="lineNum">      73 </span>                :            : }
+<span class="lineNum">      74 </span>                :            : 
+<span class="lineNum">      75 </span>                :            : /* On Unix based systems:
+<span class="lineNum">      76 </span>                :            :  *
+<span class="lineNum">      77 </span>                :            :  *     Registers 'fd' as waiting for the specified 'events' (which should be
+<span class="lineNum">      78 </span>                :            :  *     POLLIN or POLLOUT or POLLIN | POLLOUT).  The following call to
+<span class="lineNum">      79 </span>                :            :  *     poll_block() will wake up when 'fd' becomes ready for one or more of the
+<span class="lineNum">      80 </span>                :            :  *     requested events.  the 'fd's are given to poll() function later.
+<span class="lineNum">      81 </span>                :            :  *
+<span class="lineNum">      82 </span>                :            :  * On Windows system:
+<span class="lineNum">      83 </span>                :            :  *
+<span class="lineNum">      84 </span>                :            :  *     If both 'wevent' handle and 'fd' is specified, associate the 'fd' with
+<span class="lineNum">      85 </span>                :            :  *     with that 'wevent' for 'events' (implemented in poll_block()).
+<span class="lineNum">      86 </span>                :            :  *     In case of no 'fd' specified, wake up on any event on that 'wevent'.
+<span class="lineNum">      87 </span>                :            :  *     These wevents are given to the WaitForMultipleObjects() to be polled.
+<span class="lineNum">      88 </span>                :            :  *     The event registration is one-shot: only the following call to
+<span class="lineNum">      89 </span>                :            :  *     poll_block() is affected.  The event will need to be re-registered after
+<span class="lineNum">      90 </span>                :            :  *     poll_block() is called if it is to persist.
+<span class="lineNum">      91 </span>                :            :  *
+<span class="lineNum">      92 </span>                :            :  * ('where' is used in debug logging.  Commonly one would use poll_fd_wait() to
+<span class="lineNum">      93 </span>                :            :  * automatically provide the caller's source file and line number for
+<a name="94"><span class="lineNum">      94 </span>                :            :  * 'where'.) */</a>
+<span class="lineNum">      95 </span>                :            : void
+<span class="lineNum">      96 </span>                :<span class="lineCov">     768950 : poll_fd_wait_at(int fd, HANDLE wevent, short int events, const char *where)</span>
+<span class="lineNum">      97 </span>                :            : {
+<span class="lineNum">      98 </span>                :<span class="lineCov">     768950 :     struct poll_loop *loop = poll_loop();</span>
+<span class="lineNum">      99 </span>                :            :     struct poll_node *node;
+<span class="lineNum">     100 </span>                :            : 
+<span class="lineNum">     101 </span>                :<span class="lineCov">     768944 :     COVERAGE_INC(poll_fd_wait);</span>
+<span class="lineNum">     102 </span>                :            : 
+<span class="lineNum">     103 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     104 </span>                :            :     /* Null event cannot be polled. */
+<span class="lineNum">     105 </span>                :            :     if (wevent == 0) {
+<span class="lineNum">     106 </span>                :            :         VLOG_ERR(&quot;No event to wait fd %d&quot;, fd);
+<span class="lineNum">     107 </span>                :            :         return;
+<span class="lineNum">     108 </span>                :            :     }
+<span class="lineNum">     109 </span>                :            : #else
+<span class="lineNum">     110 </span>                :<span class="lineCov">     768946 :     wevent = 0;</span>
+<span class="lineNum">     111 </span>                :            : #endif
+<span class="lineNum">     112 </span>                :            : 
+<span class="lineNum">     113 </span>                :            :     /* Check for duplicate.  If found, &quot;or&quot; the event. */
+<span class="lineNum">     114 </span>                :<span class="lineCov">     768946 :     node = find_poll_node(loop, fd, wevent);</span>
+<span class="lineNum">     115 </span>        [<span class="branchCov" title="Branch 0 was taken 200892 times"> + </span><span class="branchCov" title="Branch 1 was taken 568076 times"> + </span>]:<span class="lineCov">     768968 :     if (node) {</span>
+<span class="lineNum">     116 </span>                :<span class="lineCov">     200892 :         node-&gt;pollfd.events |= events;</span>
+<span class="lineNum">     117 </span>                :            :     } else {
+<span class="lineNum">     118 </span>                :<span class="lineCov">     568076 :         node = xzalloc(sizeof *node);</span>
+<span class="lineNum">     119 </span>                :<span class="lineCov">     568087 :         hmap_insert(&amp;loop-&gt;poll_nodes, &amp;node-&gt;hmap_node,</span>
+<span class="lineNum">     120 </span>                :            :                     hash_2words(fd, wevent));
+<span class="lineNum">     121 </span>                :<span class="lineCov">     568089 :         node-&gt;pollfd.fd = fd;</span>
+<span class="lineNum">     122 </span>                :<span class="lineCov">     568089 :         node-&gt;pollfd.events = events;</span>
+<span class="lineNum">     123 </span>                :<span class="lineCov">     568089 :         node-&gt;wevent = wevent;</span>
+<span class="lineNum">     124 </span>                :<span class="lineCov">     568089 :         node-&gt;where = where;</span>
+<span class="lineNum">     125 </span>                :            :     }
+<span class="lineNum">     126 </span>                :<span class="lineCov">     768981 : }</span>
+<span class="lineNum">     127 </span>                :            : 
+<span class="lineNum">     128 </span>                :            : /* Causes the following call to poll_block() to block for no more than 'msec'
+<span class="lineNum">     129 </span>                :            :  * milliseconds.  If 'msec' is nonpositive, the following call to poll_block()
+<span class="lineNum">     130 </span>                :            :  * will not block at all.
+<span class="lineNum">     131 </span>                :            :  *
+<span class="lineNum">     132 </span>                :            :  * The timer registration is one-shot: only the following call to poll_block()
+<span class="lineNum">     133 </span>                :            :  * is affected.  The timer will need to be re-registered after poll_block() is
+<span class="lineNum">     134 </span>                :            :  * called if it is to persist.
+<span class="lineNum">     135 </span>                :            :  *
+<span class="lineNum">     136 </span>                :            :  * ('where' is used in debug logging.  Commonly one would use poll_timer_wait()
+<span class="lineNum">     137 </span>                :            :  * to automatically provide the caller's source file and line number for
+<a name="138"><span class="lineNum">     138 </span>                :            :  * 'where'.) */</a>
+<span class="lineNum">     139 </span>                :            : void
+<span class="lineNum">     140 </span>                :<span class="lineCov">      31005 : poll_timer_wait_at(long long int msec, const char *where)</span>
+<span class="lineNum">     141 </span>                :            : {
+<span class="lineNum">     142 </span>                :<span class="lineCov">      31005 :     long long int now = time_msec();</span>
+<span class="lineNum">     143 </span>                :            :     long long int when;
+<span class="lineNum">     144 </span>                :            : 
+<span class="lineNum">     145 </span>        [<span class="branchCov" title="Branch 0 was taken 23415 times"> + </span><span class="branchCov" title="Branch 1 was taken 7590 times"> + </span>]:<span class="lineCov">      31005 :     if (msec &lt;= 0) {</span>
+<span class="lineNum">     146 </span>                :            :         /* Wake up immediately. */
+<span class="lineNum">     147 </span>                :<span class="lineCov">      23415 :         when = LLONG_MIN;</span>
+<span class="lineNum">     148 </span>        [<span class="branchCov" title="Branch 0 was taken 7590 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       7590 :     } else if ((unsigned long long int) now + msec &lt;= LLONG_MAX) {</span>
+<span class="lineNum">     149 </span>                :            :         /* Normal case. */
+<span class="lineNum">     150 </span>                :<span class="lineCov">       7590 :         when = now + msec;</span>
+<span class="lineNum">     151 </span>                :            :     } else {
+<span class="lineNum">     152 </span>                :            :         /* now + msec would overflow. */
+<span class="lineNum">     153 </span>                :<span class="lineNoCov">          0 :         when = LLONG_MAX;</span>
+<span class="lineNum">     154 </span>                :            :     }
+<span class="lineNum">     155 </span>                :            : 
+<span class="lineNum">     156 </span>                :<span class="lineCov">      31005 :     poll_timer_wait_until_at(when, where);</span>
+<span class="lineNum">     157 </span>                :<span class="lineCov">      31005 : }</span>
+<span class="lineNum">     158 </span>                :            : 
+<span class="lineNum">     159 </span>                :            : /* Causes the following call to poll_block() to wake up when the current time,
+<span class="lineNum">     160 </span>                :            :  * as returned by time_msec(), reaches 'when' or later.  If 'when' is earlier
+<span class="lineNum">     161 </span>                :            :  * than the current time, the following call to poll_block() will not block at
+<span class="lineNum">     162 </span>                :            :  * all.
+<span class="lineNum">     163 </span>                :            :  *
+<span class="lineNum">     164 </span>                :            :  * The timer registration is one-shot: only the following call to poll_block()
+<span class="lineNum">     165 </span>                :            :  * is affected.  The timer will need to be re-registered after poll_block() is
+<span class="lineNum">     166 </span>                :            :  * called if it is to persist.
+<span class="lineNum">     167 </span>                :            :  *
+<span class="lineNum">     168 </span>                :            :  * ('where' is used in debug logging.  Commonly one would use
+<span class="lineNum">     169 </span>                :            :  * poll_timer_wait_until() to automatically provide the caller's source file
+<a name="170"><span class="lineNum">     170 </span>                :            :  * and line number for 'where'.) */</a>
+<span class="lineNum">     171 </span>                :            : void
+<span class="lineNum">     172 </span>                :<span class="lineCov">     137841 : poll_timer_wait_until_at(long long int when, const char *where)</span>
+<span class="lineNum">     173 </span>                :            : {
+<span class="lineNum">     174 </span>                :<span class="lineCov">     137841 :     struct poll_loop *loop = poll_loop();</span>
+<span class="lineNum">     175 </span>        [<span class="branchCov" title="Branch 0 was taken 88186 times"> + </span><span class="branchCov" title="Branch 1 was taken 49654 times"> + </span>]:<span class="lineCov">     137840 :     if (when &lt; loop-&gt;timeout_when) {</span>
+<span class="lineNum">     176 </span>                :<span class="lineCov">      88186 :         loop-&gt;timeout_when = when;</span>
+<span class="lineNum">     177 </span>                :<span class="lineCov">      88186 :         loop-&gt;timeout_where = where;</span>
+<span class="lineNum">     178 </span>                :            :     }
+<span class="lineNum">     179 </span>                :<span class="lineCov">     137840 : }</span>
+<span class="lineNum">     180 </span>                :            : 
+<span class="lineNum">     181 </span>                :            : /* Causes the following call to poll_block() to wake up immediately, without
+<span class="lineNum">     182 </span>                :            :  * blocking.
+<span class="lineNum">     183 </span>                :            :  *
+<span class="lineNum">     184 </span>                :            :  * ('where' is used in debug logging.  Commonly one would use
+<span class="lineNum">     185 </span>                :            :  * poll_immediate_wake() to automatically provide the caller's source file and
+<a name="186"><span class="lineNum">     186 </span>                :            :  * line number for 'where'.) */</a>
+<span class="lineNum">     187 </span>                :            : void
+<span class="lineNum">     188 </span>                :<span class="lineCov">      23415 : poll_immediate_wake_at(const char *where)</span>
+<span class="lineNum">     189 </span>                :            : {
+<span class="lineNum">     190 </span>                :<span class="lineCov">      23415 :     poll_timer_wait_at(0, where);</span>
+<span class="lineNum">     191 </span>                :<span class="lineCov">      23415 : }</span>
+<span class="lineNum">     192 </span>                :            : 
+<span class="lineNum">     193 </span>                :            : /* Logs, if appropriate, that the poll loop was awakened by an event
+<span class="lineNum">     194 </span>                :            :  * registered at 'where' (typically a source file and line number).  The other
+<span class="lineNum">     195 </span>                :            :  * arguments have two possible interpretations:
+<span class="lineNum">     196 </span>                :            :  *
+<span class="lineNum">     197 </span>                :            :  *   - If 'pollfd' is nonnull then it should be the &quot;struct pollfd&quot; that caused
+<span class="lineNum">     198 </span>                :            :  *     the wakeup.  'timeout' is ignored.
+<span class="lineNum">     199 </span>                :            :  *
+<span class="lineNum">     200 </span>                :            :  *   - If 'pollfd' is NULL then 'timeout' is the number of milliseconds after
+<span class="lineNum">     201 </span>                :            :  *     which the poll loop woke up.
+<a name="202"><span class="lineNum">     202 </span>                :            :  */</a>
+<span class="lineNum">     203 </span>                :            : static void
+<span class="lineNum">     204 </span>                :<span class="lineCov">      26720 : log_wakeup(const char *where, const struct pollfd *pollfd, int timeout)</span>
+<span class="lineNum">     205 </span>                :            : {
+<span class="lineNum">     206 </span>                :            :     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(10, 10);
+<span class="lineNum">     207 </span>                :            :     enum vlog_level level;
+<span class="lineNum">     208 </span>                :            :     int cpu_usage;
+<span class="lineNum">     209 </span>                :            :     struct ds s;
+<span class="lineNum">     210 </span>                :            : 
+<span class="lineNum">     211 </span>                :<span class="lineCov">      26720 :     cpu_usage = get_cpu_usage();</span>
+<span class="lineNum">     212 </span>        [<span class="branchCov" title="Branch 1 was taken 76 times"> + </span><span class="branchCov" title="Branch 2 was taken 26644 times"> + </span>]:<span class="lineCov">      26720 :     if (VLOG_IS_DBG_ENABLED()) {</span>
+<span class="lineNum">     213 </span>                :<span class="lineCov">         76 :         level = VLL_DBG;</span>
+<span class="lineNum">     214 </span>[<span class="branchCov" title="Branch 0 was taken 1462 times"> + </span><span class="branchCov" title="Branch 1 was taken 25182 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 41 times"> + </span><span class="branchCov" title="Branch 4 was taken 1421 times"> + </span>]:<span class="lineCov">      26644 :     } else if (cpu_usage &gt; 50 &amp;&amp; !VLOG_DROP_INFO(&amp;rl)) {</span>
+<span class="lineNum">     215 </span>                :<span class="lineCov">         41 :         level = VLL_INFO;</span>
+<span class="lineNum">     216 </span>                :            :     } else {
+<span class="lineNum">     217 </span>                :<span class="lineCov">      26720 :         return;</span>
+<span class="lineNum">     218 </span>                :            :     }
+<span class="lineNum">     219 </span>                :            : 
+<span class="lineNum">     220 </span>                :<span class="lineCov">        117 :     ds_init(&amp;s);</span>
+<span class="lineNum">     221 </span>                :<span class="lineCov">        117 :     ds_put_cstr(&amp;s, &quot;wakeup due to &quot;);</span>
+<span class="lineNum">     222 </span>        [<span class="branchCov" title="Branch 0 was taken 77 times"> + </span><span class="branchCov" title="Branch 1 was taken 40 times"> + </span>]:<span class="lineCov">        117 :     if (pollfd) {</span>
+<span class="lineNum">     223 </span>                :<span class="lineCov">         77 :         char *description = describe_fd(pollfd-&gt;fd);</span>
+<span class="lineNum">     224 </span>        [<span class="branchCov" title="Branch 0 was taken 58 times"> + </span><span class="branchCov" title="Branch 1 was taken 19 times"> + </span>]:<span class="lineCov">         77 :         if (pollfd-&gt;revents &amp; POLLIN) {</span>
+<span class="lineNum">     225 </span>                :<span class="lineCov">         58 :             ds_put_cstr(&amp;s, &quot;[POLLIN]&quot;);</span>
+<span class="lineNum">     226 </span>                :            :         }
+<span class="lineNum">     227 </span>        [<span class="branchCov" title="Branch 0 was taken 19 times"> + </span><span class="branchCov" title="Branch 1 was taken 58 times"> + </span>]:<span class="lineCov">         77 :         if (pollfd-&gt;revents &amp; POLLOUT) {</span>
+<span class="lineNum">     228 </span>                :<span class="lineCov">         19 :             ds_put_cstr(&amp;s, &quot;[POLLOUT]&quot;);</span>
+<span class="lineNum">     229 </span>                :            :         }
+<span class="lineNum">     230 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 77 times"> + </span>]:<span class="lineCov">         77 :         if (pollfd-&gt;revents &amp; POLLERR) {</span>
+<span class="lineNum">     231 </span>                :<span class="lineNoCov">          0 :             ds_put_cstr(&amp;s, &quot;[POLLERR]&quot;);</span>
+<span class="lineNum">     232 </span>                :            :         }
+<span class="lineNum">     233 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 77 times"> + </span>]:<span class="lineCov">         77 :         if (pollfd-&gt;revents &amp; POLLHUP) {</span>
+<span class="lineNum">     234 </span>                :<span class="lineNoCov">          0 :             ds_put_cstr(&amp;s, &quot;[POLLHUP]&quot;);</span>
+<span class="lineNum">     235 </span>                :            :         }
+<span class="lineNum">     236 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 77 times"> + </span>]:<span class="lineCov">         77 :         if (pollfd-&gt;revents &amp; POLLNVAL) {</span>
+<span class="lineNum">     237 </span>                :<span class="lineNoCov">          0 :             ds_put_cstr(&amp;s, &quot;[POLLNVAL]&quot;);</span>
+<span class="lineNum">     238 </span>                :            :         }
+<span class="lineNum">     239 </span>                :<span class="lineCov">         77 :         ds_put_format(&amp;s, &quot; on fd %d (%s)&quot;, pollfd-&gt;fd, description);</span>
+<span class="lineNum">     240 </span>                :<span class="lineCov">         77 :         free(description);</span>
+<span class="lineNum">     241 </span>                :            :     } else {
+<span class="lineNum">     242 </span>                :<span class="lineCov">         40 :         ds_put_format(&amp;s, &quot;%d-ms timeout&quot;, timeout);</span>
+<span class="lineNum">     243 </span>                :            :     }
+<span class="lineNum">     244 </span>        [<span class="branchCov" title="Branch 0 was taken 86 times"> + </span><span class="branchCov" title="Branch 1 was taken 31 times"> + </span>]:<span class="lineCov">        117 :     if (where) {</span>
+<span class="lineNum">     245 </span>                :<span class="lineCov">         86 :         ds_put_format(&amp;s, &quot; at %s&quot;, where);</span>
+<span class="lineNum">     246 </span>                :            :     }
+<span class="lineNum">     247 </span>        [<span class="branchCov" title="Branch 0 was taken 41 times"> + </span><span class="branchCov" title="Branch 1 was taken 76 times"> + </span>]:<span class="lineCov">        117 :     if (cpu_usage &gt;= 0) {</span>
+<span class="lineNum">     248 </span>                :<span class="lineCov">         41 :         ds_put_format(&amp;s, &quot; (%d%% CPU usage)&quot;, cpu_usage);</span>
+<span class="lineNum">     249 </span>                :            :     }
+<span class="lineNum">     250 </span>        [<span class="branchCov" title="Branch 0 was taken 117 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        117 :     VLOG(level, &quot;%s&quot;, ds_cstr(&amp;s));</span>
+<span class="lineNum">     251 </span>                :<span class="lineCov">      26720 :     ds_destroy(&amp;s);</span>
+<span class="lineNum">     252 </span>                :            : }
+<a name="253"><span class="lineNum">     253 </span>                :            : </a>
+<span class="lineNum">     254 </span>                :            : static void
+<span class="lineNum">     255 </span>                :<span class="lineCov">     155037 : free_poll_nodes(struct poll_loop *loop)</span>
+<span class="lineNum">     256 </span>                :            : {
+<span class="lineNum">     257 </span>                :            :     struct poll_node *node, *next;
+<span class="lineNum">     258 </span>                :            : 
+<span class="lineNum">     259 </span>[<span class="branchCov" title="Branch 1 was taken 567502 times"> + </span><span class="branchCov" title="Branch 2 was taken 155055 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 567501 times"> + </span><span class="branchCov" title="Branch 5 was taken 155054 times"> + </span>]:<span class="lineCov">     722580 :     HMAP_FOR_EACH_SAFE (node, next, hmap_node, &amp;loop-&gt;poll_nodes) {</span>
+<span class="lineNum">     260 </span>                :<span class="lineCov">     567501 :         hmap_remove(&amp;loop-&gt;poll_nodes, &amp;node-&gt;hmap_node);</span>
+<span class="lineNum">     261 </span>                :<span class="lineCov">     567543 :         free(node);</span>
+<span class="lineNum">     262 </span>                :            :     }
+<span class="lineNum">     263 </span>                :<span class="lineCov">     155054 : }</span>
+<span class="lineNum">     264 </span>                :            : 
+<span class="lineNum">     265 </span>                :            : /* Blocks until one or more of the events registered with poll_fd_wait()
+<span class="lineNum">     266 </span>                :            :  * occurs, or until the minimum duration registered with poll_timer_wait()
+<a name="267"><span class="lineNum">     267 </span>                :            :  * elapses, or not at all if poll_immediate_wake() has been called. */</a>
+<span class="lineNum">     268 </span>                :            : void
+<span class="lineNum">     269 </span>                :<span class="lineCov">     152852 : poll_block(void)</span>
+<span class="lineNum">     270 </span>                :            : {
+<span class="lineNum">     271 </span>                :<span class="lineCov">     152852 :     struct poll_loop *loop = poll_loop();</span>
+<span class="lineNum">     272 </span>                :            :     struct poll_node *node;
+<span class="lineNum">     273 </span>                :            :     struct pollfd *pollfds;
+<span class="lineNum">     274 </span>                :<span class="lineCov">     152853 :     HANDLE *wevents = NULL;</span>
+<span class="lineNum">     275 </span>                :            :     int elapsed;
+<span class="lineNum">     276 </span>                :            :     int retval;
+<span class="lineNum">     277 </span>                :            :     int i;
+<span class="lineNum">     278 </span>                :            : 
+<span class="lineNum">     279 </span>                :            :     /* Register fatal signal events before actually doing any real work for
+<span class="lineNum">     280 </span>                :            :      * poll_block. */
+<span class="lineNum">     281 </span>                :<span class="lineCov">     152853 :     fatal_signal_wait();</span>
+<span class="lineNum">     282 </span>                :            : 
+<span class="lineNum">     283 </span>        [<span class="branchCov" title="Branch 0 was taken 19404 times"> + </span><span class="branchCov" title="Branch 1 was taken 133452 times"> + </span>]:<span class="lineCov">     152856 :     if (loop-&gt;timeout_when == LLONG_MIN) {</span>
+<span class="lineNum">     284 </span>                :<span class="lineCov">      19404 :         COVERAGE_INC(poll_zero_timeout);</span>
+<span class="lineNum">     285 </span>                :            :     }
+<span class="lineNum">     286 </span>                :            : 
+<span class="lineNum">     287 </span>                :<span class="lineCov">     152856 :     timewarp_run();</span>
+<span class="lineNum">     288 </span>                :<span class="lineCov">     152854 :     pollfds = xmalloc(hmap_count(&amp;loop-&gt;poll_nodes) * sizeof *pollfds);</span>
+<span class="lineNum">     289 </span>                :            : 
+<span class="lineNum">     290 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     291 </span>                :            :     wevents = xmalloc(hmap_count(&amp;loop-&gt;poll_nodes) * sizeof *wevents);
+<span class="lineNum">     292 </span>                :            : #endif
+<span class="lineNum">     293 </span>                :            : 
+<span class="lineNum">     294 </span>                :            :     /* Populate with all the fds and events. */
+<span class="lineNum">     295 </span>                :<span class="lineCov">     152856 :     i = 0;</span>
+<span class="lineNum">     296 </span>        [<span class="branchCov" title="Branch 2 was taken 568091 times"> + </span><span class="branchCov" title="Branch 3 was taken 152855 times"> + </span>]:<span class="lineCov">     720946 :     HMAP_FOR_EACH (node, hmap_node, &amp;loop-&gt;poll_nodes) {</span>
+<span class="lineNum">     297 </span>                :<span class="lineCov">     568091 :         pollfds[i] = node-&gt;pollfd;</span>
+<span class="lineNum">     298 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     299 </span>                :            :         wevents[i] = node-&gt;wevent;
+<span class="lineNum">     300 </span>                :            :         if (node-&gt;pollfd.fd &amp;&amp; node-&gt;wevent) {
+<span class="lineNum">     301 </span>                :            :             short int wsa_events = 0;
+<span class="lineNum">     302 </span>                :            :             if (node-&gt;pollfd.events &amp; POLLIN) {
+<span class="lineNum">     303 </span>                :            :                 wsa_events |= FD_READ | FD_ACCEPT | FD_CLOSE;
+<span class="lineNum">     304 </span>                :            :             }
+<span class="lineNum">     305 </span>                :            :             if (node-&gt;pollfd.events &amp; POLLOUT) {
+<span class="lineNum">     306 </span>                :            :                 wsa_events |= FD_WRITE | FD_CONNECT | FD_CLOSE;
+<span class="lineNum">     307 </span>                :            :             }
+<span class="lineNum">     308 </span>                :            :             WSAEventSelect(node-&gt;pollfd.fd, node-&gt;wevent, wsa_events);
+<span class="lineNum">     309 </span>                :            :         }
+<span class="lineNum">     310 </span>                :            : #endif
+<span class="lineNum">     311 </span>                :<span class="lineCov">     568091 :         i++;</span>
+<span class="lineNum">     312 </span>                :            :     }
+<span class="lineNum">     313 </span>                :            : 
+<span class="lineNum">     314 </span>                :<span class="lineCov">     152855 :     retval = time_poll(pollfds, hmap_count(&amp;loop-&gt;poll_nodes), wevents,</span>
+<span class="lineNum">     315 </span>                :            :                        loop-&gt;timeout_when, &amp;elapsed);
+<span class="lineNum">     316 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 152581 times"> + </span>]:<span class="lineCov">     152581 :     if (retval &lt; 0) {</span>
+<span class="lineNum">     317 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     318 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;poll: %s&quot;, ovs_strerror(-retval));</span>
+<span class="lineNum">     319 </span>        [<span class="branchCov" title="Branch 0 was taken 25406 times"> + </span><span class="branchCov" title="Branch 1 was taken 127175 times"> + </span>]:<span class="lineCov">     152581 :     } else if (!retval) {</span>
+<span class="lineNum">     320 </span>                :<span class="lineCov">      25406 :         log_wakeup(loop-&gt;timeout_where, NULL, elapsed);</span>
+<span class="lineNum">     321 </span>[<span class="branchCov" title="Branch 1 was taken 125921 times"> + </span><span class="branchCov" title="Branch 2 was taken 1264 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 40 times"> + </span><span class="branchCov" title="Branch 5 was taken 125865 times"> + </span>]:<span class="lineCov">     127175 :     } else if (get_cpu_usage() &gt; 50 || VLOG_IS_DBG_ENABLED()) {</span>
+<span class="lineNum">     322 </span>                :<span class="lineCov">       1304 :         i = 0;</span>
+<span class="lineNum">     323 </span>        [<span class="branchCov" title="Branch 2 was taken 9069 times"> + </span><span class="branchCov" title="Branch 3 was taken 1304 times"> + </span>]:<span class="lineCov">      10373 :         HMAP_FOR_EACH (node, hmap_node, &amp;loop-&gt;poll_nodes) {</span>
+<span class="lineNum">     324 </span>        [<span class="branchCov" title="Branch 0 was taken 1314 times"> + </span><span class="branchCov" title="Branch 1 was taken 7755 times"> + </span>]:<span class="lineCov">       9069 :             if (pollfds[i].revents) {</span>
+<span class="lineNum">     325 </span>                :<span class="lineCov">       1314 :                 log_wakeup(node-&gt;where, &amp;pollfds[i], 0);</span>
+<span class="lineNum">     326 </span>                :            :             }
+<span class="lineNum">     327 </span>                :<span class="lineCov">       9069 :             i++;</span>
+<span class="lineNum">     328 </span>                :            :         }
+<span class="lineNum">     329 </span>                :            :     }
+<span class="lineNum">     330 </span>                :            : 
+<span class="lineNum">     331 </span>                :<span class="lineCov">     152575 :     free_poll_nodes(loop);</span>
+<span class="lineNum">     332 </span>                :<span class="lineCov">     152595 :     loop-&gt;timeout_when = LLONG_MAX;</span>
+<span class="lineNum">     333 </span>                :<span class="lineCov">     152595 :     loop-&gt;timeout_where = NULL;</span>
+<span class="lineNum">     334 </span>                :<span class="lineCov">     152595 :     free(pollfds);</span>
+<span class="lineNum">     335 </span>                :<span class="lineCov">     152595 :     free(wevents);</span>
+<span class="lineNum">     336 </span>                :            : 
+<span class="lineNum">     337 </span>                :            :     /* Handle any pending signals before doing anything else. */
+<span class="lineNum">     338 </span>                :<span class="lineCov">     152595 :     fatal_signal_run();</span>
+<span class="lineNum">     339 </span>                :            : 
+<span class="lineNum">     340 </span>                :<span class="lineCov">     152587 :     seq_woke();</span>
+<span class="lineNum">     341 </span>                :<span class="lineCov">     152597 : }</span>
+<a name="342"><span class="lineNum">     342 </span>                :            : </a>
+<span class="lineNum">     343 </span>                :            : static void
+<span class="lineNum">     344 </span>                :<span class="lineCov">       2463 : free_poll_loop(void *loop_)</span>
+<span class="lineNum">     345 </span>                :            : {
+<span class="lineNum">     346 </span>                :<span class="lineCov">       2463 :     struct poll_loop *loop = loop_;</span>
+<span class="lineNum">     347 </span>                :            : 
+<span class="lineNum">     348 </span>                :<span class="lineCov">       2463 :     free_poll_nodes(loop);</span>
+<span class="lineNum">     349 </span>                :<span class="lineCov">       2463 :     hmap_destroy(&amp;loop-&gt;poll_nodes);</span>
+<span class="lineNum">     350 </span>                :<span class="lineCov">       2463 :     free(loop);</span>
+<span class="lineNum">     351 </span>                :<span class="lineCov">       2463 : }</span>
+<a name="352"><span class="lineNum">     352 </span>                :            : </a>
+<span class="lineNum">     353 </span>                :            : static struct poll_loop *
+<span class="lineNum">     354 </span>                :<span class="lineCov">    1059588 : poll_loop(void)</span>
+<span class="lineNum">     355 </span>                :            : {
+<span class="lineNum">     356 </span>                :            :     static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
+<span class="lineNum">     357 </span>                :            :     static pthread_key_t key;
+<span class="lineNum">     358 </span>                :            :     struct poll_loop *loop;
+<span class="lineNum">     359 </span>                :            : 
+<span class="lineNum">     360 </span>        [<span class="branchCov" title="Branch 1 was taken 11261 times"> + </span><span class="branchCov" title="Branch 2 was taken 1048331 times"> + </span>]:<span class="lineCov">    1059588 :     if (ovsthread_once_start(&amp;once)) {</span>
+<span class="lineNum">     361 </span>                :<span class="lineCov">      11261 :         xpthread_key_create(&amp;key, free_poll_loop);</span>
+<span class="lineNum">     362 </span>                :<span class="lineCov">      11261 :         ovsthread_once_done(&amp;once);</span>
+<span class="lineNum">     363 </span>                :            :     }
+<span class="lineNum">     364 </span>                :            : 
+<span class="lineNum">     365 </span>                :<span class="lineCov">    1059592 :     loop = pthread_getspecific(key);</span>
+<span class="lineNum">     366 </span>        [<span class="branchCov" title="Branch 0 was taken 13981 times"> + </span><span class="branchCov" title="Branch 1 was taken 1045605 times"> + </span>]:<span class="lineCov">    1059586 :     if (!loop) {</span>
+<span class="lineNum">     367 </span>                :<span class="lineCov">      13981 :         loop = xzalloc(sizeof *loop);</span>
+<span class="lineNum">     368 </span>                :<span class="lineCov">      13981 :         hmap_init(&amp;loop-&gt;poll_nodes);</span>
+<span class="lineNum">     369 </span>                :<span class="lineCov">      13981 :         xpthread_setspecific(key, loop);</span>
+<span class="lineNum">     370 </span>                :            :     }
+<span class="lineNum">     371 </span>                :<span class="lineCov">    1059582 :     return loop;</span>
+<span class="lineNum">     372 </span>                :            : }
+<span class="lineNum">     373 </span>                :            : 
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,1508 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ovsdb/ovsdb-server.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">ovsdb</a> - ovsdb-server.c<span style="font-size: 80%;"> (source / <a href="ovsdb-server.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">309</td>
+            <td class="headerCovTableEntry">595</td>
+            <td class="headerCovTableEntryLo">51.9 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">22</td>
+            <td class="headerCovTableEntry">41</td>
+            <td class="headerCovTableEntryLo">53.7 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">135</td>
+            <td class="headerCovTableEntry">344</td>
+            <td class="headerCovTableEntryLo">39.2 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (c) 2009, 2010, 2011, 2012, 2013, 2014 Nicira, Inc.</a>
+<span class="lineNum">       2 </span>                :            :  *
+<span class="lineNum">       3 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       4 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       5 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       6 </span>                :            :  *
+<span class="lineNum">       7 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       8 </span>                :            :  *
+<span class="lineNum">       9 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      10 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      11 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      12 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      13 </span>                :            :  * limitations under the License.
+<span class="lineNum">      14 </span>                :            :  */
+<span class="lineNum">      15 </span>                :            : 
+<span class="lineNum">      16 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      17 </span>                :            : 
+<span class="lineNum">      18 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      19 </span>                :            : #include &lt;getopt.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &lt;inttypes.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;signal.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;sys/stat.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;unistd.h&gt;
+<span class="lineNum">      24 </span>                :            : 
+<span class="lineNum">      25 </span>                :            : #include &quot;column.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;command-line.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;daemon.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;dirs.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;dummy.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;dynamic-string.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;fatal-signal.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;file.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;json.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;jsonrpc.h&quot;
+<span class="lineNum">      36 </span>                :            : #include &quot;jsonrpc-server.h&quot;
+<span class="lineNum">      37 </span>                :            : #include &quot;list.h&quot;
+<span class="lineNum">      38 </span>                :            : #include &quot;memory.h&quot;
+<span class="lineNum">      39 </span>                :            : #include &quot;ovsdb.h&quot;
+<span class="lineNum">      40 </span>                :            : #include &quot;ovsdb-data.h&quot;
+<span class="lineNum">      41 </span>                :            : #include &quot;ovsdb-types.h&quot;
+<span class="lineNum">      42 </span>                :            : #include &quot;ovsdb-error.h&quot;
+<span class="lineNum">      43 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      44 </span>                :            : #include &quot;process.h&quot;
+<span class="lineNum">      45 </span>                :            : #include &quot;row.h&quot;
+<span class="lineNum">      46 </span>                :            : #include &quot;simap.h&quot;
+<span class="lineNum">      47 </span>                :            : #include &quot;shash.h&quot;
+<span class="lineNum">      48 </span>                :            : #include &quot;stream-ssl.h&quot;
+<span class="lineNum">      49 </span>                :            : #include &quot;stream.h&quot;
+<span class="lineNum">      50 </span>                :            : #include &quot;sset.h&quot;
+<span class="lineNum">      51 </span>                :            : #include &quot;table.h&quot;
+<span class="lineNum">      52 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      53 </span>                :            : #include &quot;transaction.h&quot;
+<span class="lineNum">      54 </span>                :            : #include &quot;trigger.h&quot;
+<span class="lineNum">      55 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      56 </span>                :            : #include &quot;unixctl.h&quot;
+<a name="57"><span class="lineNum">      57 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      58 </span>                :            : 
+<span class="lineNum">      59 </span>                :<span class="lineCov">       1094 : VLOG_DEFINE_THIS_MODULE(ovsdb_server);</span>
+<span class="lineNum">      60 </span>                :            : 
+<span class="lineNum">      61 </span>                :            : struct db {
+<span class="lineNum">      62 </span>                :            :     /* Initialized in main(). */
+<span class="lineNum">      63 </span>                :            :     char *filename;
+<span class="lineNum">      64 </span>                :            :     struct ovsdb_file *file;
+<span class="lineNum">      65 </span>                :            :     struct ovsdb *db;
+<span class="lineNum">      66 </span>                :            : 
+<span class="lineNum">      67 </span>                :            :     /* Only used by update_remote_status(). */
+<span class="lineNum">      68 </span>                :            :     struct ovsdb_txn *txn;
+<span class="lineNum">      69 </span>                :            : };
+<span class="lineNum">      70 </span>                :            : 
+<span class="lineNum">      71 </span>                :            : /* SSL configuration. */
+<span class="lineNum">      72 </span>                :            : static char *private_key_file;
+<span class="lineNum">      73 </span>                :            : static char *certificate_file;
+<span class="lineNum">      74 </span>                :            : static char *ca_cert_file;
+<span class="lineNum">      75 </span>                :            : static bool bootstrap_ca_cert;
+<span class="lineNum">      76 </span>                :            : 
+<span class="lineNum">      77 </span>                :            : static unixctl_cb_func ovsdb_server_exit;
+<span class="lineNum">      78 </span>                :            : static unixctl_cb_func ovsdb_server_compact;
+<span class="lineNum">      79 </span>                :            : static unixctl_cb_func ovsdb_server_reconnect;
+<span class="lineNum">      80 </span>                :            : 
+<span class="lineNum">      81 </span>                :            : struct server_config {
+<span class="lineNum">      82 </span>                :            :     struct sset *remotes;
+<span class="lineNum">      83 </span>                :            :     struct shash *all_dbs;
+<span class="lineNum">      84 </span>                :            :     FILE *config_tmpfile;
+<span class="lineNum">      85 </span>                :            :     struct ovsdb_jsonrpc_server *jsonrpc;
+<span class="lineNum">      86 </span>                :            : };
+<span class="lineNum">      87 </span>                :            : static unixctl_cb_func ovsdb_server_add_remote;
+<span class="lineNum">      88 </span>                :            : static unixctl_cb_func ovsdb_server_remove_remote;
+<span class="lineNum">      89 </span>                :            : static unixctl_cb_func ovsdb_server_list_remotes;
+<span class="lineNum">      90 </span>                :            : 
+<span class="lineNum">      91 </span>                :            : static unixctl_cb_func ovsdb_server_add_database;
+<span class="lineNum">      92 </span>                :            : static unixctl_cb_func ovsdb_server_remove_database;
+<span class="lineNum">      93 </span>                :            : static unixctl_cb_func ovsdb_server_list_databases;
+<span class="lineNum">      94 </span>                :            : 
+<span class="lineNum">      95 </span>                :            : static char *open_db(struct server_config *config, const char *filename);
+<span class="lineNum">      96 </span>                :            : 
+<span class="lineNum">      97 </span>                :            : static void parse_options(int *argc, char **argvp[],
+<span class="lineNum">      98 </span>                :            :                           struct sset *remotes, char **unixctl_pathp,
+<span class="lineNum">      99 </span>                :            :                           char **run_command);
+<span class="lineNum">     100 </span>                :            : static void usage(void) NO_RETURN;
+<span class="lineNum">     101 </span>                :            : 
+<span class="lineNum">     102 </span>                :            : static char *reconfigure_remotes(struct ovsdb_jsonrpc_server *,
+<span class="lineNum">     103 </span>                :            :                                  const struct shash *all_dbs,
+<span class="lineNum">     104 </span>                :            :                                  struct sset *remotes);
+<span class="lineNum">     105 </span>                :            : static char *reconfigure_ssl(const struct shash *all_dbs);
+<span class="lineNum">     106 </span>                :            : static void report_error_if_changed(char *error, char **last_errorp);
+<span class="lineNum">     107 </span>                :            : 
+<span class="lineNum">     108 </span>                :            : static void update_remote_status(const struct ovsdb_jsonrpc_server *jsonrpc,
+<span class="lineNum">     109 </span>                :            :                                  const struct sset *remotes,
+<span class="lineNum">     110 </span>                :            :                                  struct shash *all_dbs);
+<span class="lineNum">     111 </span>                :            : 
+<span class="lineNum">     112 </span>                :            : static void save_config__(FILE *config_file, const struct sset *remotes,
+<span class="lineNum">     113 </span>                :            :                           const struct sset *db_filenames);
+<span class="lineNum">     114 </span>                :            : static void save_config(struct server_config *);
+<span class="lineNum">     115 </span>                :            : static void load_config(FILE *config_file, struct sset *remotes,
+<span class="lineNum">     116 </span>                :            :                         struct sset *db_filenames);
+<a name="117"><span class="lineNum">     117 </span>                :            : </a>
+<span class="lineNum">     118 </span>                :            : int
+<span class="lineNum">     119 </span>                :<span class="lineCov">       1094 : main(int argc, char *argv[])</span>
+<span class="lineNum">     120 </span>                :            : {
+<span class="lineNum">     121 </span>                :<span class="lineCov">       1094 :     char *unixctl_path = NULL;</span>
+<span class="lineNum">     122 </span>                :<span class="lineCov">       1094 :     char *run_command = NULL;</span>
+<span class="lineNum">     123 </span>                :            :     struct unixctl_server *unixctl;
+<span class="lineNum">     124 </span>                :            :     struct ovsdb_jsonrpc_server *jsonrpc;
+<span class="lineNum">     125 </span>                :            :     struct sset remotes, db_filenames;
+<span class="lineNum">     126 </span>                :            :     const char *db_filename;
+<span class="lineNum">     127 </span>                :            :     struct process *run_process;
+<span class="lineNum">     128 </span>                :            :     bool exiting;
+<span class="lineNum">     129 </span>                :            :     int retval;
+<span class="lineNum">     130 </span>                :<span class="lineCov">       1094 :     long long int status_timer = LLONG_MIN;</span>
+<span class="lineNum">     131 </span>                :            :     FILE *config_tmpfile;
+<span class="lineNum">     132 </span>                :            :     struct server_config server_config;
+<span class="lineNum">     133 </span>                :            :     struct shash all_dbs;
+<span class="lineNum">     134 </span>                :            :     struct shash_node *node;
+<span class="lineNum">     135 </span>                :            :     char *remotes_error, *ssl_error;
+<span class="lineNum">     136 </span>                :            :     char *error;
+<span class="lineNum">     137 </span>                :            :     int i;
+<span class="lineNum">     138 </span>                :            : 
+<span class="lineNum">     139 </span>                :<span class="lineCov">       1094 :     proctitle_init(argc, argv);</span>
+<span class="lineNum">     140 </span>                :<span class="lineCov">       1094 :     set_program_name(argv[0]);</span>
+<span class="lineNum">     141 </span>                :<span class="lineCov">       1094 :     service_start(&amp;argc, &amp;argv);</span>
+<span class="lineNum">     142 </span>                :<span class="lineCov">       1094 :     fatal_ignore_sigpipe();</span>
+<span class="lineNum">     143 </span>                :<span class="lineCov">       1094 :     process_init();</span>
+<span class="lineNum">     144 </span>                :            : 
+<span class="lineNum">     145 </span>                :<span class="lineCov">       1094 :     parse_options(&amp;argc, &amp;argv, &amp;remotes, &amp;unixctl_path, &amp;run_command);</span>
+<span class="lineNum">     146 </span>                :            : 
+<span class="lineNum">     147 </span>                :            :     /* Create and initialize 'config_tmpfile' as a temporary file to hold
+<span class="lineNum">     148 </span>                :            :      * ovsdb-server's most basic configuration, and then save our initial
+<span class="lineNum">     149 </span>                :            :      * configuration to it.  When --monitor is used, this preserves the effects
+<span class="lineNum">     150 </span>                :            :      * of ovs-appctl commands such as ovsdb-server/add-remote (which saves the
+<span class="lineNum">     151 </span>                :            :      * new configuration) across crashes. */
+<span class="lineNum">     152 </span>                :<span class="lineCov">       1094 :     config_tmpfile = tmpfile();</span>
+<span class="lineNum">     153 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1094 times"> + </span>]:<span class="lineCov">       1094 :     if (!config_tmpfile) {</span>
+<span class="lineNum">     154 </span>                :<span class="lineNoCov">          0 :         ovs_fatal(errno, &quot;failed to create temporary file&quot;);</span>
+<span class="lineNum">     155 </span>                :            :     }
+<span class="lineNum">     156 </span>                :            : 
+<span class="lineNum">     157 </span>                :<span class="lineCov">       1094 :     sset_init(&amp;db_filenames);</span>
+<span class="lineNum">     158 </span>        [<span class="branchCov" title="Branch 0 was taken 567 times"> + </span><span class="branchCov" title="Branch 1 was taken 527 times"> + </span>]:<span class="lineCov">       1094 :     if (argc &gt; 0) {</span>
+<span class="lineNum">     159 </span>        [<span class="branchCov" title="Branch 0 was taken 571 times"> + </span><span class="branchCov" title="Branch 1 was taken 567 times"> + </span>]:<span class="lineCov">       1138 :         for (i = 0; i &lt; argc; i++) {</span>
+<span class="lineNum">     160 </span>                :<span class="lineCov">        571 :             sset_add(&amp;db_filenames, argv[i]);</span>
+<span class="lineNum">     161 </span>                :            :          }
+<span class="lineNum">     162 </span>                :            :     } else {
+<span class="lineNum">     163 </span>                :<span class="lineCov">        527 :         char *default_db = xasprintf(&quot;%s/conf.db&quot;, ovs_dbdir());</span>
+<span class="lineNum">     164 </span>                :<span class="lineCov">        527 :         sset_add(&amp;db_filenames, default_db);</span>
+<span class="lineNum">     165 </span>                :<span class="lineCov">        527 :         free(default_db);</span>
+<span class="lineNum">     166 </span>                :            :     }
+<span class="lineNum">     167 </span>                :            : 
+<span class="lineNum">     168 </span>                :<span class="lineCov">       1094 :     server_config.remotes = &amp;remotes;</span>
+<span class="lineNum">     169 </span>                :<span class="lineCov">       1094 :     server_config.config_tmpfile = config_tmpfile;</span>
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>                :<span class="lineCov">       1094 :     save_config__(config_tmpfile, &amp;remotes, &amp;db_filenames);</span>
+<span class="lineNum">     172 </span>                :            : 
+<span class="lineNum">     173 </span>                :<span class="lineCov">       1094 :     daemonize_start();</span>
+<span class="lineNum">     174 </span>                :            : 
+<span class="lineNum">     175 </span>                :            :     /* Load the saved config. */
+<span class="lineNum">     176 </span>                :<span class="lineCov">        591 :     load_config(config_tmpfile, &amp;remotes, &amp;db_filenames);</span>
+<span class="lineNum">     177 </span>                :<span class="lineCov">        591 :     jsonrpc = ovsdb_jsonrpc_server_create();</span>
+<span class="lineNum">     178 </span>                :            : 
+<span class="lineNum">     179 </span>                :<span class="lineCov">        591 :     shash_init(&amp;all_dbs);</span>
+<span class="lineNum">     180 </span>                :<span class="lineCov">        591 :     server_config.all_dbs = &amp;all_dbs;</span>
+<span class="lineNum">     181 </span>                :<span class="lineCov">        591 :     server_config.jsonrpc = jsonrpc;</span>
+<span class="lineNum">     182 </span>[<span class="branchCov" title="Branch 1 was taken 591 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>][<span class="branchCov" title="Branch 5 was taken 1 time"> + </span><span class="branchCov" title="Branch 6 was taken 591 times"> + </span>]:<span class="lineCov">       1183 :     SSET_FOR_EACH (db_filename, &amp;db_filenames) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 8 was taken 592 times"> + </span><span class="branchCov" title="Branch 9 was taken 591 times"> + </span>]
+<span class="lineNum">     183 </span>                :<span class="lineCov">        592 :         error = open_db(&amp;server_config, db_filename);</span>
+<span class="lineNum">     184 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 592 times"> + </span>]:<span class="lineCov">        592 :         if (error) {</span>
+<span class="lineNum">     185 </span>                :<span class="lineNoCov">          0 :             ovs_fatal(0, &quot;%s&quot;, error);</span>
+<span class="lineNum">     186 </span>                :            :         }
+<span class="lineNum">     187 </span>                :            :     }
+<span class="lineNum">     188 </span>                :            : 
+<span class="lineNum">     189 </span>                :<span class="lineCov">        591 :     error = reconfigure_remotes(jsonrpc, &amp;all_dbs, &amp;remotes);</span>
+<span class="lineNum">     190 </span>        [<span class="branchCov" title="Branch 0 was taken 591 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        591 :     if (!error) {</span>
+<span class="lineNum">     191 </span>                :<span class="lineCov">        591 :         error = reconfigure_ssl(&amp;all_dbs);</span>
+<span class="lineNum">     192 </span>                :            :     }
+<span class="lineNum">     193 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 591 times"> + </span>]:<span class="lineCov">        591 :     if (error) {</span>
+<span class="lineNum">     194 </span>                :<span class="lineNoCov">          0 :         ovs_fatal(0, &quot;%s&quot;, error);</span>
+<span class="lineNum">     195 </span>                :            :     }
+<span class="lineNum">     196 </span>                :            : 
+<span class="lineNum">     197 </span>                :<span class="lineCov">        591 :     retval = unixctl_server_create(unixctl_path, &amp;unixctl);</span>
+<span class="lineNum">     198 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 589 times"> + </span>]:<span class="lineCov">        591 :     if (retval) {</span>
+<span class="lineNum">     199 </span>                :<span class="lineCov">          2 :         exit(EXIT_FAILURE);</span>
+<span class="lineNum">     200 </span>                :            :     }
+<span class="lineNum">     201 </span>                :            : 
+<span class="lineNum">     202 </span>        [<span class="branchCov" title="Branch 0 was taken 112 times"> + </span><span class="branchCov" title="Branch 1 was taken 477 times"> + </span>]:<span class="lineCov">        589 :     if (run_command) {</span>
+<span class="lineNum">     203 </span>                :            :         char *run_argv[4];
+<span class="lineNum">     204 </span>                :            : 
+<span class="lineNum">     205 </span>                :<span class="lineCov">        112 :         run_argv[0] = &quot;/bin/sh&quot;;</span>
+<span class="lineNum">     206 </span>                :<span class="lineCov">        112 :         run_argv[1] = &quot;-c&quot;;</span>
+<span class="lineNum">     207 </span>                :<span class="lineCov">        112 :         run_argv[2] = run_command;</span>
+<span class="lineNum">     208 </span>                :<span class="lineCov">        112 :         run_argv[3] = NULL;</span>
+<span class="lineNum">     209 </span>                :            : 
+<span class="lineNum">     210 </span>                :<span class="lineCov">        112 :         retval = process_start(run_argv, &amp;run_process);</span>
+<span class="lineNum">     211 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 112 times"> + </span>]:<span class="lineCov">        112 :         if (retval) {</span>
+<span class="lineNum">     212 </span>                :<span class="lineCov">        112 :             ovs_fatal(retval, &quot;%s: process failed to start&quot;, run_command);</span>
+<span class="lineNum">     213 </span>                :            :         }
+<span class="lineNum">     214 </span>                :            :     } else {
+<span class="lineNum">     215 </span>                :<span class="lineCov">        477 :         run_process = NULL;</span>
+<span class="lineNum">     216 </span>                :            :     }
+<span class="lineNum">     217 </span>                :            : 
+<span class="lineNum">     218 </span>                :<span class="lineCov">        589 :     daemonize_complete();</span>
+<span class="lineNum">     219 </span>                :            : 
+<span class="lineNum">     220 </span>        [<span class="branchCov" title="Branch 0 was taken 477 times"> + </span><span class="branchCov" title="Branch 1 was taken 112 times"> + </span>]:<span class="lineCov">        589 :     if (!run_command) {</span>
+<span class="lineNum">     221 </span>                :            :         /* ovsdb-server is usually a long-running process, in which case it
+<span class="lineNum">     222 </span>                :            :          * makes plenty of sense to log the version, but --run makes
+<span class="lineNum">     223 </span>                :            :          * ovsdb-server more like a command-line tool, so skip it.  */
+<span class="lineNum">     224 </span>        [<span class="branchCov" title="Branch 0 was taken 477 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        477 :         VLOG_INFO(&quot;%s (Open vSwitch) %s&quot;, program_name, VERSION);</span>
+<span class="lineNum">     225 </span>                :            :     }
+<span class="lineNum">     226 </span>                :            : 
+<span class="lineNum">     227 </span>                :<span class="lineCov">        589 :     unixctl_command_register(&quot;exit&quot;, &quot;&quot;, 0, 0, ovsdb_server_exit, &amp;exiting);</span>
+<span class="lineNum">     228 </span>                :<span class="lineCov">        589 :     unixctl_command_register(&quot;ovsdb-server/compact&quot;, &quot;&quot;, 0, 1,</span>
+<span class="lineNum">     229 </span>                :            :                              ovsdb_server_compact, &amp;all_dbs);
+<span class="lineNum">     230 </span>                :<span class="lineCov">        589 :     unixctl_command_register(&quot;ovsdb-server/reconnect&quot;, &quot;&quot;, 0, 0,</span>
+<span class="lineNum">     231 </span>                :            :                              ovsdb_server_reconnect, jsonrpc);
+<span class="lineNum">     232 </span>                :            : 
+<span class="lineNum">     233 </span>                :<span class="lineCov">        589 :     unixctl_command_register(&quot;ovsdb-server/add-remote&quot;, &quot;REMOTE&quot;, 1, 1,</span>
+<span class="lineNum">     234 </span>                :            :                              ovsdb_server_add_remote, &amp;server_config);
+<span class="lineNum">     235 </span>                :<span class="lineCov">        589 :     unixctl_command_register(&quot;ovsdb-server/remove-remote&quot;, &quot;REMOTE&quot;, 1, 1,</span>
+<span class="lineNum">     236 </span>                :            :                              ovsdb_server_remove_remote, &amp;server_config);
+<span class="lineNum">     237 </span>                :<span class="lineCov">        589 :     unixctl_command_register(&quot;ovsdb-server/list-remotes&quot;, &quot;&quot;, 0, 0,</span>
+<span class="lineNum">     238 </span>                :            :                              ovsdb_server_list_remotes, &amp;remotes);
+<span class="lineNum">     239 </span>                :            : 
+<span class="lineNum">     240 </span>                :<span class="lineCov">        589 :     unixctl_command_register(&quot;ovsdb-server/add-db&quot;, &quot;DB&quot;, 1, 1,</span>
+<span class="lineNum">     241 </span>                :            :                              ovsdb_server_add_database, &amp;server_config);
+<span class="lineNum">     242 </span>                :<span class="lineCov">        589 :     unixctl_command_register(&quot;ovsdb-server/remove-db&quot;, &quot;DB&quot;, 1, 1,</span>
+<span class="lineNum">     243 </span>                :            :                              ovsdb_server_remove_database, &amp;server_config);
+<span class="lineNum">     244 </span>                :<span class="lineCov">        589 :     unixctl_command_register(&quot;ovsdb-server/list-dbs&quot;, &quot;&quot;, 0, 0,</span>
+<span class="lineNum">     245 </span>                :            :                              ovsdb_server_list_databases, &amp;all_dbs);
+<span class="lineNum">     246 </span>                :            : 
+<span class="lineNum">     247 </span>                :<span class="lineCov">        589 :     exiting = false;</span>
+<span class="lineNum">     248 </span>                :<span class="lineCov">        589 :     ssl_error = NULL;</span>
+<span class="lineNum">     249 </span>                :<span class="lineCov">        589 :     remotes_error = NULL;</span>
+<span class="lineNum">     250 </span>        [<span class="branchCov" title="Branch 0 was taken 19056 times"> + </span><span class="branchCov" title="Branch 1 was taken 589 times"> + </span>]:<span class="lineCov">      19645 :     while (!exiting) {</span>
+<span class="lineNum">     251 </span>                :<span class="lineCov">      19056 :         memory_run();</span>
+<span class="lineNum">     252 </span>        [<span class="branchCov" title="Branch 1 was taken 7 times"> + </span><span class="branchCov" title="Branch 2 was taken 19049 times"> + </span>]:<span class="lineCov">      19056 :         if (memory_should_report()) {</span>
+<span class="lineNum">     253 </span>                :            :             struct simap usage;
+<span class="lineNum">     254 </span>                :            : 
+<span class="lineNum">     255 </span>                :<span class="lineCov">          7 :             simap_init(&amp;usage);</span>
+<span class="lineNum">     256 </span>                :<span class="lineCov">          7 :             ovsdb_jsonrpc_server_get_memory_usage(jsonrpc, &amp;usage);</span>
+<span class="lineNum">     257 </span>        [<span class="branchCov" title="Branch 2 was taken 7 times"> + </span><span class="branchCov" title="Branch 3 was taken 7 times"> + </span>]:<span class="lineCov">         14 :             SHASH_FOR_EACH(node, &amp;all_dbs) {</span>
+<span class="lineNum">     258 </span>                :<span class="lineCov">          7 :                 struct db *db = node-&gt;data;</span>
+<span class="lineNum">     259 </span>                :<span class="lineCov">          7 :                 ovsdb_get_memory_usage(db-&gt;db, &amp;usage);</span>
+<span class="lineNum">     260 </span>                :            :             }
+<span class="lineNum">     261 </span>                :<span class="lineCov">          7 :             memory_report(&amp;usage);</span>
+<span class="lineNum">     262 </span>                :<span class="lineCov">          7 :             simap_destroy(&amp;usage);</span>
+<span class="lineNum">     263 </span>                :            :         }
+<span class="lineNum">     264 </span>                :            : 
+<span class="lineNum">     265 </span>                :            :         /* Run unixctl_server_run() before reconfigure_remotes() because
+<span class="lineNum">     266 </span>                :            :          * ovsdb-server/add-remote and ovsdb-server/remove-remote can change
+<span class="lineNum">     267 </span>                :            :          * the set of remotes that reconfigure_remotes() uses. */
+<span class="lineNum">     268 </span>                :<span class="lineCov">      19056 :         unixctl_server_run(unixctl);</span>
+<span class="lineNum">     269 </span>                :            : 
+<span class="lineNum">     270 </span>                :<span class="lineCov">      19056 :         report_error_if_changed(</span>
+<span class="lineNum">     271 </span>                :            :             reconfigure_remotes(jsonrpc, &amp;all_dbs, &amp;remotes),
+<span class="lineNum">     272 </span>                :            :             &amp;remotes_error);
+<span class="lineNum">     273 </span>                :<span class="lineCov">      19056 :         report_error_if_changed(reconfigure_ssl(&amp;all_dbs), &amp;ssl_error);</span>
+<span class="lineNum">     274 </span>                :<span class="lineCov">      19056 :         ovsdb_jsonrpc_server_run(jsonrpc);</span>
+<span class="lineNum">     275 </span>                :            : 
+<span class="lineNum">     276 </span>        [<span class="branchCov" title="Branch 2 was taken 19065 times"> + </span><span class="branchCov" title="Branch 3 was taken 19056 times"> + </span>]:<span class="lineCov">      38121 :         SHASH_FOR_EACH(node, &amp;all_dbs) {</span>
+<span class="lineNum">     277 </span>                :<span class="lineCov">      19065 :             struct db *db = node-&gt;data;</span>
+<span class="lineNum">     278 </span>                :<span class="lineCov">      19065 :             ovsdb_trigger_run(db-&gt;db, time_msec());</span>
+<span class="lineNum">     279 </span>                :            :         }
+<span class="lineNum">     280 </span>        [<span class="branchCov" title="Branch 0 was taken 682 times"> + </span><span class="branchCov" title="Branch 1 was taken 18374 times"> + </span>]:<span class="lineCov">      19056 :         if (run_process) {</span>
+<span class="lineNum">     281 </span>                :<span class="lineCov">        682 :             process_run();</span>
+<span class="lineNum">     282 </span>        [<span class="branchCov" title="Branch 1 was taken 112 times"> + </span><span class="branchCov" title="Branch 2 was taken 570 times"> + </span>]:<span class="lineCov">        682 :             if (process_exited(run_process)) {</span>
+<span class="lineNum">     283 </span>                :<span class="lineCov">        112 :                 exiting = true;</span>
+<span class="lineNum">     284 </span>                :            :             }
+<span class="lineNum">     285 </span>                :            :         }
+<span class="lineNum">     286 </span>                :            : 
+<span class="lineNum">     287 </span>                :            :         /* update Manager status(es) every 5 seconds */
+<span class="lineNum">     288 </span>        [<span class="branchCov" title="Branch 1 was taken 617 times"> + </span><span class="branchCov" title="Branch 2 was taken 18439 times"> + </span>]:<span class="lineCov">      19056 :         if (time_msec() &gt;= status_timer) {</span>
+<span class="lineNum">     289 </span>                :<span class="lineCov">        617 :             status_timer = time_msec() + 5000;</span>
+<span class="lineNum">     290 </span>                :<span class="lineCov">        617 :             update_remote_status(jsonrpc, &amp;remotes, &amp;all_dbs);</span>
+<span class="lineNum">     291 </span>                :            :         }
+<span class="lineNum">     292 </span>                :            : 
+<span class="lineNum">     293 </span>                :<span class="lineCov">      19056 :         memory_wait();</span>
+<span class="lineNum">     294 </span>                :<span class="lineCov">      19056 :         ovsdb_jsonrpc_server_wait(jsonrpc);</span>
+<span class="lineNum">     295 </span>                :<span class="lineCov">      19056 :         unixctl_server_wait(unixctl);</span>
+<span class="lineNum">     296 </span>        [<span class="branchCov" title="Branch 2 was taken 19065 times"> + </span><span class="branchCov" title="Branch 3 was taken 19056 times"> + </span>]:<span class="lineCov">      38121 :         SHASH_FOR_EACH(node, &amp;all_dbs) {</span>
+<span class="lineNum">     297 </span>                :<span class="lineCov">      19065 :             struct db *db = node-&gt;data;</span>
+<span class="lineNum">     298 </span>                :<span class="lineCov">      19065 :             ovsdb_trigger_wait(db-&gt;db, time_msec());</span>
+<span class="lineNum">     299 </span>                :            :         }
+<span class="lineNum">     300 </span>        [<span class="branchCov" title="Branch 0 was taken 682 times"> + </span><span class="branchCov" title="Branch 1 was taken 18374 times"> + </span>]:<span class="lineCov">      19056 :         if (run_process) {</span>
+<span class="lineNum">     301 </span>                :<span class="lineCov">        682 :             process_wait(run_process);</span>
+<span class="lineNum">     302 </span>                :            :         }
+<span class="lineNum">     303 </span>        [<span class="branchCov" title="Branch 0 was taken 589 times"> + </span><span class="branchCov" title="Branch 1 was taken 18467 times"> + </span>]:<span class="lineCov">      19056 :         if (exiting) {</span>
+<span class="lineNum">     304 </span>                :<span class="lineCov">        589 :             poll_immediate_wake();</span>
+<span class="lineNum">     305 </span>                :            :         }
+<span class="lineNum">     306 </span>                :<span class="lineCov">      19056 :         poll_timer_wait_until(status_timer);</span>
+<span class="lineNum">     307 </span>                :<span class="lineCov">      19056 :         poll_block();</span>
+<span class="lineNum">     308 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 19056 times"> + </span>]:<span class="lineCov">      19056 :         if (should_service_stop()) {</span>
+<span class="lineNum">     309 </span>                :<span class="lineNoCov">          0 :             exiting = true;</span>
+<span class="lineNum">     310 </span>                :            :         }
+<span class="lineNum">     311 </span>                :            :     }
+<span class="lineNum">     312 </span>                :<span class="lineCov">        589 :     ovsdb_jsonrpc_server_destroy(jsonrpc);</span>
+<span class="lineNum">     313 </span>        [<span class="branchCov" title="Branch 2 was taken 590 times"> + </span><span class="branchCov" title="Branch 3 was taken 589 times"> + </span>]:<span class="lineCov">       1179 :     SHASH_FOR_EACH(node, &amp;all_dbs) {</span>
+<span class="lineNum">     314 </span>                :<span class="lineCov">        590 :         struct db *db = node-&gt;data;</span>
+<span class="lineNum">     315 </span>                :<span class="lineCov">        590 :         ovsdb_destroy(db-&gt;db);</span>
+<span class="lineNum">     316 </span>                :            :     }
+<span class="lineNum">     317 </span>                :<span class="lineCov">        589 :     sset_destroy(&amp;remotes);</span>
+<span class="lineNum">     318 </span>                :<span class="lineCov">        589 :     unixctl_server_destroy(unixctl);</span>
+<span class="lineNum">     319 </span>                :            : 
+<span class="lineNum">     320 </span>[<span class="branchCov" title="Branch 0 was taken 112 times"> + </span><span class="branchCov" title="Branch 1 was taken 477 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 112 times"> + </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span>]:<span class="lineCov">        589 :     if (run_process &amp;&amp; process_exited(run_process)) {</span>
+<span class="lineNum">     321 </span>                :<span class="lineCov">        112 :         int status = process_status(run_process);</span>
+<span class="lineNum">     322 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 112 times"> + </span>]:<span class="lineCov">        112 :         if (status) {</span>
+<span class="lineNum">     323 </span>                :<span class="lineNoCov">          0 :             ovs_fatal(0, &quot;%s: child exited, %s&quot;,</span>
+<span class="lineNum">     324 </span>                :            :                       run_command, process_status_msg(status));
+<span class="lineNum">     325 </span>                :            :         }
+<span class="lineNum">     326 </span>                :            :     }
+<span class="lineNum">     327 </span>                :            : 
+<span class="lineNum">     328 </span>                :<span class="lineCov">        589 :     service_stop();</span>
+<span class="lineNum">     329 </span>                :<span class="lineCov">        589 :     return 0;</span>
+<span class="lineNum">     330 </span>                :            : }
+<span class="lineNum">     331 </span>                :            : 
+<span class="lineNum">     332 </span>                :            : /* Returns true if 'filename' is known to be already open as a database,
+<span class="lineNum">     333 </span>                :            :  * false if not.
+<span class="lineNum">     334 </span>                :            :  *
+<a name="335"><span class="lineNum">     335 </span>                :            :  * &quot;False negatives&quot; are possible. */</a>
+<span class="lineNum">     336 </span>                :            : static bool
+<span class="lineNum">     337 </span>                :<span class="lineCov">        592 : is_already_open(struct server_config *config OVS_UNUSED,</span>
+<span class="lineNum">     338 </span>                :            :                 const char *filename OVS_UNUSED)
+<span class="lineNum">     339 </span>                :            : {
+<span class="lineNum">     340 </span>                :            : #ifndef _WIN32
+<span class="lineNum">     341 </span>                :            :     struct stat s;
+<span class="lineNum">     342 </span>                :            : 
+<span class="lineNum">     343 </span>        [<span class="branchCov" title="Branch 1 was taken 592 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        592 :     if (!stat(filename, &amp;s)) {</span>
+<span class="lineNum">     344 </span>                :            :         struct shash_node *node;
+<span class="lineNum">     345 </span>                :            : 
+<span class="lineNum">     346 </span>        [<span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchCov" title="Branch 3 was taken 592 times"> + </span>]:<span class="lineCov">        593 :         SHASH_FOR_EACH (node, config-&gt;all_dbs) {</span>
+<span class="lineNum">     347 </span>                :<span class="lineCov">          1 :             struct db *db = node-&gt;data;</span>
+<span class="lineNum">     348 </span>                :            :             struct stat s2;
+<span class="lineNum">     349 </span>                :            : 
+<span class="lineNum">     350 </span>        [<span class="branchCov" title="Branch 1 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">          1 :             if (!stat(db-&gt;filename, &amp;s2)</span>
+<span class="lineNum">     351 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          1 :                 &amp;&amp; s.st_dev == s2.st_dev</span>
+<span class="lineNum">     352 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :                 &amp;&amp; s.st_ino == s2.st_ino) {</span>
+<span class="lineNum">     353 </span>                :<span class="lineNoCov">          0 :                 return true;</span>
+<span class="lineNum">     354 </span>                :            :             }
+<span class="lineNum">     355 </span>                :            :         }
+<span class="lineNum">     356 </span>                :            :     }
+<span class="lineNum">     357 </span>                :            : #endif  /* !_WIN32 */
+<span class="lineNum">     358 </span>                :            : 
+<span class="lineNum">     359 </span>                :<span class="lineCov">        592 :     return false;</span>
+<span class="lineNum">     360 </span>                :            : }
+<a name="361"><span class="lineNum">     361 </span>                :            : </a>
+<span class="lineNum">     362 </span>                :            : static char *
+<span class="lineNum">     363 </span>                :<span class="lineCov">        592 : open_db(struct server_config *config, const char *filename)</span>
+<span class="lineNum">     364 </span>                :            : {
+<span class="lineNum">     365 </span>                :            :     struct ovsdb_error *db_error;
+<span class="lineNum">     366 </span>                :            :     struct db *db;
+<span class="lineNum">     367 </span>                :            :     char *error;
+<span class="lineNum">     368 </span>                :            : 
+<span class="lineNum">     369 </span>                :            :     /* If we know that the file is already open, return a good error message.
+<span class="lineNum">     370 </span>                :            :      * Otherwise, if the file is open, we'll fail later on with a harder to
+<span class="lineNum">     371 </span>                :            :      * interpret file locking error. */
+<span class="lineNum">     372 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 592 times"> + </span>]:<span class="lineCov">        592 :     if (is_already_open(config, filename)) {</span>
+<span class="lineNum">     373 </span>                :<span class="lineNoCov">          0 :         return xasprintf(&quot;%s: already open&quot;, filename);</span>
+<span class="lineNum">     374 </span>                :            :     }
+<span class="lineNum">     375 </span>                :            : 
+<span class="lineNum">     376 </span>                :<span class="lineCov">        592 :     db = xzalloc(sizeof *db);</span>
+<span class="lineNum">     377 </span>                :<span class="lineCov">        592 :     db-&gt;filename = xstrdup(filename);</span>
+<span class="lineNum">     378 </span>                :            : 
+<span class="lineNum">     379 </span>                :<span class="lineCov">        592 :     db_error = ovsdb_file_open(db-&gt;filename, false, &amp;db-&gt;db, &amp;db-&gt;file);</span>
+<span class="lineNum">     380 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 592 times"> + </span>]:<span class="lineCov">        592 :     if (db_error) {</span>
+<span class="lineNum">     381 </span>                :<span class="lineNoCov">          0 :         error = ovsdb_error_to_string(db_error);</span>
+<span class="lineNum">     382 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 592 times"> + </span>]:<span class="lineCov">        592 :     } else if (!ovsdb_jsonrpc_server_add_db(config-&gt;jsonrpc, db-&gt;db)) {</span>
+<span class="lineNum">     383 </span>                :<span class="lineNoCov">          0 :         error = xasprintf(&quot;%s: duplicate database name&quot;, db-&gt;db-&gt;schema-&gt;name);</span>
+<span class="lineNum">     384 </span>                :            :     } else {
+<span class="lineNum">     385 </span>                :<span class="lineCov">        592 :         shash_add_assert(config-&gt;all_dbs, db-&gt;db-&gt;schema-&gt;name, db);</span>
+<span class="lineNum">     386 </span>                :<span class="lineCov">        592 :         return NULL;</span>
+<span class="lineNum">     387 </span>                :            :     }
+<span class="lineNum">     388 </span>                :            : 
+<span class="lineNum">     389 </span>                :<span class="lineNoCov">          0 :     ovsdb_error_destroy(db_error);</span>
+<span class="lineNum">     390 </span>                :<span class="lineNoCov">          0 :     ovsdb_destroy(db-&gt;db);</span>
+<span class="lineNum">     391 </span>                :<span class="lineNoCov">          0 :     free(db-&gt;filename);</span>
+<span class="lineNum">     392 </span>                :<span class="lineNoCov">          0 :     free(db);</span>
+<span class="lineNum">     393 </span>                :<span class="lineCov">        592 :     return error;</span>
+<span class="lineNum">     394 </span>                :            : }
+<a name="395"><span class="lineNum">     395 </span>                :            : </a>
+<span class="lineNum">     396 </span>                :            : static const struct db *
+<span class="lineNum">     397 </span>                :<span class="lineCov">         27 : find_db(const struct shash *all_dbs, const char *db_name)</span>
+<span class="lineNum">     398 </span>                :            : {
+<span class="lineNum">     399 </span>                :            :     struct shash_node *node;
+<span class="lineNum">     400 </span>                :            : 
+<span class="lineNum">     401 </span>        [<span class="branchCov" title="Branch 2 was taken 27 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         27 :     SHASH_FOR_EACH(node, all_dbs) {</span>
+<span class="lineNum">     402 </span>                :<span class="lineCov">         27 :         struct db *db = node-&gt;data;</span>
+<span class="lineNum">     403 </span>        [<span class="branchCov" title="Branch 0 was taken 27 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         27 :         if (!strcmp(db-&gt;db-&gt;schema-&gt;name, db_name)) {</span>
+<span class="lineNum">     404 </span>                :<span class="lineCov">         27 :             return db;</span>
+<span class="lineNum">     405 </span>                :            :         }
+<span class="lineNum">     406 </span>                :            :     }
+<span class="lineNum">     407 </span>                :            : 
+<span class="lineNum">     408 </span>                :<span class="lineCov">         27 :     return NULL;</span>
+<span class="lineNum">     409 </span>                :            : }
+<a name="410"><span class="lineNum">     410 </span>                :            : </a>
+<span class="lineNum">     411 </span>                :            : static char * WARN_UNUSED_RESULT
+<span class="lineNum">     412 </span>                :<span class="lineCov">         27 : parse_db_column__(const struct shash *all_dbs,</span>
+<span class="lineNum">     413 </span>                :            :                   const char *name_, char *name,
+<span class="lineNum">     414 </span>                :            :                   const struct db **dbp,
+<span class="lineNum">     415 </span>                :            :                   const struct ovsdb_table **tablep,
+<span class="lineNum">     416 </span>                :            :                   const struct ovsdb_column **columnp)
+<span class="lineNum">     417 </span>                :            : {
+<span class="lineNum">     418 </span>                :            :     const char *db_name, *table_name, *column_name;
+<span class="lineNum">     419 </span>                :            :     const struct ovsdb_column *column;
+<span class="lineNum">     420 </span>                :            :     const struct ovsdb_table *table;
+<span class="lineNum">     421 </span>                :            :     const char *tokens[3];
+<span class="lineNum">     422 </span>                :<span class="lineCov">         27 :     char *save_ptr = NULL;</span>
+<span class="lineNum">     423 </span>                :            :     const struct db *db;
+<span class="lineNum">     424 </span>                :            : 
+<span class="lineNum">     425 </span>                :<span class="lineCov">         27 :     *dbp = NULL;</span>
+<span class="lineNum">     426 </span>                :<span class="lineCov">         27 :     *tablep = NULL;</span>
+<span class="lineNum">     427 </span>                :<span class="lineCov">         27 :     *columnp = NULL;</span>
+<span class="lineNum">     428 </span>                :            : 
+<span class="lineNum">     429 </span>                :<span class="lineCov">         27 :     strtok_r(name, &quot;:&quot;, &amp;save_ptr); /* &quot;db:&quot; */</span>
+<span class="lineNum">     430 </span>                :<span class="lineCov">         27 :     tokens[0] = strtok_r(NULL, &quot;,&quot;, &amp;save_ptr);</span>
+<span class="lineNum">     431 </span>                :<span class="lineCov">         27 :     tokens[1] = strtok_r(NULL, &quot;,&quot;, &amp;save_ptr);</span>
+<span class="lineNum">     432 </span>                :<span class="lineCov">         27 :     tokens[2] = strtok_r(NULL, &quot;,&quot;, &amp;save_ptr);</span>
+<span class="lineNum">     433 </span>[<span class="branchCov" title="Branch 0 was taken 27 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 27 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         27 :     if (!tokens[0] || !tokens[1] || !tokens[2]) {</span>
+<span class="lineNum">         </span>        [<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 27 times"> + </span>]
+<span class="lineNum">     434 </span>                :<span class="lineNoCov">          0 :         return xasprintf(&quot;\&quot;%s\&quot;: invalid syntax&quot;, name_);</span>
+<span class="lineNum">     435 </span>                :            :     }
+<span class="lineNum">     436 </span>                :            : 
+<span class="lineNum">     437 </span>                :<span class="lineCov">         27 :     db_name = tokens[0];</span>
+<span class="lineNum">     438 </span>                :<span class="lineCov">         27 :     table_name = tokens[1];</span>
+<span class="lineNum">     439 </span>                :<span class="lineCov">         27 :     column_name = tokens[2];</span>
+<span class="lineNum">     440 </span>                :            : 
+<span class="lineNum">     441 </span>                :<span class="lineCov">         27 :     db = find_db(all_dbs, tokens[0]);</span>
+<span class="lineNum">     442 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 27 times"> + </span>]:<span class="lineCov">         27 :     if (!db) {</span>
+<span class="lineNum">     443 </span>                :<span class="lineNoCov">          0 :         return xasprintf(&quot;\&quot;%s\&quot;: no database named %s&quot;, name_, db_name);</span>
+<span class="lineNum">     444 </span>                :            :     }
+<span class="lineNum">     445 </span>                :            : 
+<span class="lineNum">     446 </span>                :<span class="lineCov">         27 :     table = ovsdb_get_table(db-&gt;db, table_name);</span>
+<span class="lineNum">     447 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 27 times"> + </span>]:<span class="lineCov">         27 :     if (!table) {</span>
+<span class="lineNum">     448 </span>                :<span class="lineNoCov">          0 :         return xasprintf(&quot;\&quot;%s\&quot;: no table named %s&quot;, name_, table_name);</span>
+<span class="lineNum">     449 </span>                :            :     }
+<span class="lineNum">     450 </span>                :            : 
+<span class="lineNum">     451 </span>                :<span class="lineCov">         27 :     column = ovsdb_table_schema_get_column(table-&gt;schema, column_name);</span>
+<span class="lineNum">     452 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 27 times"> + </span>]:<span class="lineCov">         27 :     if (!column) {</span>
+<span class="lineNum">     453 </span>                :<span class="lineNoCov">          0 :         return xasprintf(&quot;\&quot;%s\&quot;: table \&quot;%s\&quot; has no column \&quot;%s\&quot;&quot;,</span>
+<span class="lineNum">     454 </span>                :            :                          name_, table_name, column_name);
+<span class="lineNum">     455 </span>                :            :     }
+<span class="lineNum">     456 </span>                :            : 
+<span class="lineNum">     457 </span>                :<span class="lineCov">         27 :     *dbp = db;</span>
+<span class="lineNum">     458 </span>                :<span class="lineCov">         27 :     *columnp = column;</span>
+<span class="lineNum">     459 </span>                :<span class="lineCov">         27 :     *tablep = table;</span>
+<span class="lineNum">     460 </span>                :<span class="lineCov">         27 :     return NULL;</span>
+<span class="lineNum">     461 </span>                :            : }
+<span class="lineNum">     462 </span>                :            : 
+<span class="lineNum">     463 </span>                :            : /* Returns NULL if successful, otherwise a malloc()'d string describing the
+<a name="464"><span class="lineNum">     464 </span>                :            :  * error. */</a>
+<span class="lineNum">     465 </span>                :            : static char * WARN_UNUSED_RESULT
+<span class="lineNum">     466 </span>                :<span class="lineCov">         27 : parse_db_column(const struct shash *all_dbs,</span>
+<span class="lineNum">     467 </span>                :            :                 const char *name_,
+<span class="lineNum">     468 </span>                :            :                 const struct db **dbp,
+<span class="lineNum">     469 </span>                :            :                 const struct ovsdb_table **tablep,
+<span class="lineNum">     470 </span>                :            :                 const struct ovsdb_column **columnp)
+<span class="lineNum">     471 </span>                :            : {
+<span class="lineNum">     472 </span>                :<span class="lineCov">         27 :     char *name = xstrdup(name_);</span>
+<span class="lineNum">     473 </span>                :<span class="lineCov">         27 :     char *retval = parse_db_column__(all_dbs, name_, name,</span>
+<span class="lineNum">     474 </span>                :            :                                      dbp, tablep, columnp);
+<span class="lineNum">     475 </span>                :<span class="lineCov">         27 :     free(name);</span>
+<span class="lineNum">     476 </span>                :<span class="lineCov">         27 :     return retval;</span>
+<span class="lineNum">     477 </span>                :            : }
+<span class="lineNum">     478 </span>                :            : 
+<span class="lineNum">     479 </span>                :            : /* Returns NULL if successful, otherwise a malloc()'d string describing the
+<a name="480"><span class="lineNum">     480 </span>                :            :  * error. */</a>
+<span class="lineNum">     481 </span>                :            : static char * WARN_UNUSED_RESULT
+<span class="lineNum">     482 </span>                :<span class="lineCov">         27 : parse_db_string_column(const struct shash *all_dbs,</span>
+<span class="lineNum">     483 </span>                :            :                        const char *name,
+<span class="lineNum">     484 </span>                :            :                        const struct db **dbp,
+<span class="lineNum">     485 </span>                :            :                        const struct ovsdb_table **tablep,
+<span class="lineNum">     486 </span>                :            :                        const struct ovsdb_column **columnp)
+<span class="lineNum">     487 </span>                :            : {
+<span class="lineNum">     488 </span>                :            :     char *retval;
+<span class="lineNum">     489 </span>                :            : 
+<span class="lineNum">     490 </span>                :<span class="lineCov">         27 :     retval = parse_db_column(all_dbs, name, dbp, tablep, columnp);</span>
+<span class="lineNum">     491 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 27 times"> + </span>]:<span class="lineCov">         27 :     if (retval) {</span>
+<span class="lineNum">     492 </span>                :<span class="lineNoCov">          0 :         return retval;</span>
+<span class="lineNum">     493 </span>                :            :     }
+<span class="lineNum">     494 </span>                :            : 
+<span class="lineNum">     495 </span>        [<span class="branchCov" title="Branch 0 was taken 27 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         27 :     if ((*columnp)-&gt;type.key.type != OVSDB_TYPE_STRING</span>
+<span class="lineNum">     496 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 27 times"> + </span>]:<span class="lineCov">         27 :         || (*columnp)-&gt;type.value.type != OVSDB_TYPE_VOID) {</span>
+<span class="lineNum">     497 </span>                :<span class="lineNoCov">          0 :         return xasprintf(&quot;\&quot;%s\&quot;: table \&quot;%s\&quot; column \&quot;%s\&quot; is &quot;</span>
+<span class="lineNum">     498 </span>                :            :                          &quot;not string or set of strings&quot;,
+<span class="lineNum">     499 </span>                :<span class="lineNoCov">          0 :                          name, (*tablep)-&gt;schema-&gt;name, (*columnp)-&gt;name);</span>
+<span class="lineNum">     500 </span>                :            :     }
+<span class="lineNum">     501 </span>                :            : 
+<span class="lineNum">     502 </span>                :<span class="lineCov">         27 :     return NULL;</span>
+<span class="lineNum">     503 </span>                :            : }
+<a name="504"><span class="lineNum">     504 </span>                :            : </a>
+<span class="lineNum">     505 </span>                :            : static const char *
+<span class="lineNum">     506 </span>                :<span class="lineCov">      58941 : query_db_string(const struct shash *all_dbs, const char *name,</span>
+<span class="lineNum">     507 </span>                :            :                 struct ds *errors)
+<span class="lineNum">     508 </span>                :            : {
+<span class="lineNum">     509 </span>[<span class="branchCov" title="Branch 0 was taken 2238 times"> + </span><span class="branchCov" title="Branch 1 was taken 56703 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 2211 times"> + </span><span class="branchCov" title="Branch 3 was taken 27 times"> + </span>]:<span class="lineCov">      58941 :     if (!name || strncmp(name, &quot;db:&quot;, 3)) {</span>
+<span class="lineNum">     510 </span>                :<span class="lineCov">      58914 :         return name;</span>
+<span class="lineNum">     511 </span>                :            :     } else {
+<span class="lineNum">     512 </span>                :            :         const struct ovsdb_column *column;
+<span class="lineNum">     513 </span>                :            :         const struct ovsdb_table *table;
+<span class="lineNum">     514 </span>                :            :         const struct ovsdb_row *row;
+<span class="lineNum">     515 </span>                :            :         const struct db *db;
+<span class="lineNum">     516 </span>                :            :         char *retval;
+<span class="lineNum">     517 </span>                :            : 
+<span class="lineNum">     518 </span>                :<span class="lineCov">         27 :         retval = parse_db_string_column(all_dbs, name,</span>
+<span class="lineNum">     519 </span>                :            :                                         &amp;db, &amp;table, &amp;column);
+<span class="lineNum">     520 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 27 times"> + </span>]:<span class="lineCov">         27 :         if (retval) {</span>
+<span class="lineNum">     521 </span>                :<span class="lineNoCov">          0 :             ds_put_format(errors, &quot;%s\n&quot;, retval);</span>
+<span class="lineNum">     522 </span>                :<span class="lineNoCov">          0 :             return NULL;</span>
+<span class="lineNum">     523 </span>                :            :         }
+<span class="lineNum">     524 </span>                :            : 
+<span class="lineNum">     525 </span>        [<span class="branchCov" title="Branch 2 was taken 27 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         27 :         HMAP_FOR_EACH (row, hmap_node, &amp;table-&gt;rows) {</span>
+<span class="lineNum">     526 </span>                :            :             const struct ovsdb_datum *datum;
+<span class="lineNum">     527 </span>                :            :             size_t i;
+<span class="lineNum">     528 </span>                :            : 
+<span class="lineNum">     529 </span>                :<span class="lineCov">         27 :             datum = &amp;row-&gt;fields[column-&gt;index];</span>
+<span class="lineNum">     530 </span>        [<span class="branchCov" title="Branch 0 was taken 27 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         27 :             for (i = 0; i &lt; datum-&gt;n; i++) {</span>
+<span class="lineNum">     531 </span>        [<span class="branchCov" title="Branch 0 was taken 27 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         27 :                 if (datum-&gt;keys[i].string[0]) {</span>
+<span class="lineNum">     532 </span>                :<span class="lineCov">         27 :                     return datum-&gt;keys[i].string;</span>
+<span class="lineNum">     533 </span>                :            :                 }
+<span class="lineNum">     534 </span>                :            :             }
+<span class="lineNum">     535 </span>                :            :         }
+<span class="lineNum">     536 </span>                :<span class="lineCov">      58941 :         return NULL;</span>
+<span class="lineNum">     537 </span>                :            :     }
+<span class="lineNum">     538 </span>                :            : }
+<a name="539"><span class="lineNum">     539 </span>                :            : </a>
+<span class="lineNum">     540 </span>                :            : static struct ovsdb_jsonrpc_options *
+<span class="lineNum">     541 </span>                :<span class="lineCov">      19827 : add_remote(struct shash *remotes, const char *target)</span>
+<span class="lineNum">     542 </span>                :            : {
+<span class="lineNum">     543 </span>                :            :     struct ovsdb_jsonrpc_options *options;
+<span class="lineNum">     544 </span>                :            : 
+<span class="lineNum">     545 </span>                :<span class="lineCov">      19827 :     options = shash_find_data(remotes, target);</span>
+<span class="lineNum">     546 </span>        [<span class="branchCov" title="Branch 0 was taken 19827 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      19827 :     if (!options) {</span>
+<span class="lineNum">     547 </span>                :<span class="lineCov">      19827 :         options = ovsdb_jsonrpc_default_options(target);</span>
+<span class="lineNum">     548 </span>                :<span class="lineCov">      19827 :         shash_add(remotes, target, options);</span>
+<span class="lineNum">     549 </span>                :            :     }
+<span class="lineNum">     550 </span>                :            : 
+<span class="lineNum">     551 </span>                :<span class="lineCov">      19827 :     return options;</span>
+<span class="lineNum">     552 </span>                :            : }
+<a name="553"><span class="lineNum">     553 </span>                :            : </a>
+<span class="lineNum">     554 </span>                :            : static struct ovsdb_datum *
+<span class="lineNum">     555 </span>                :<span class="lineNoCov">          0 : get_datum(struct ovsdb_row *row, const char *column_name,</span>
+<span class="lineNum">     556 </span>                :            :           const enum ovsdb_atomic_type key_type,
+<span class="lineNum">     557 </span>                :            :           const enum ovsdb_atomic_type value_type,
+<span class="lineNum">     558 </span>                :            :           const size_t n_max)
+<span class="lineNum">     559 </span>                :            : {
+<span class="lineNum">     560 </span>                :            :     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 1);
+<span class="lineNum">     561 </span>                :<span class="lineNoCov">          0 :     const struct ovsdb_table_schema *schema = row-&gt;table-&gt;schema;</span>
+<span class="lineNum">     562 </span>                :            :     const struct ovsdb_column *column;
+<span class="lineNum">     563 </span>                :            : 
+<span class="lineNum">     564 </span>                :<span class="lineNoCov">          0 :     column = ovsdb_table_schema_get_column(schema, column_name);</span>
+<span class="lineNum">     565 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!column) {</span>
+<span class="lineNum">     566 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_DBG_RL(&amp;rl, &quot;Table `%s' has no `%s' column&quot;,</span>
+<span class="lineNum">     567 </span>                :            :                     schema-&gt;name, column_name);
+<span class="lineNum">     568 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     569 </span>                :            :     }
+<span class="lineNum">     570 </span>                :            : 
+<span class="lineNum">     571 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (column-&gt;type.key.type != key_type</span>
+<span class="lineNum">     572 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         || column-&gt;type.value.type != value_type</span>
+<span class="lineNum">     573 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         || column-&gt;type.n_max != n_max) {</span>
+<span class="lineNum">     574 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!VLOG_DROP_DBG(&amp;rl)) {</span>
+<span class="lineNum">     575 </span>                :<span class="lineNoCov">          0 :             char *type_name = ovsdb_type_to_english(&amp;column-&gt;type);</span>
+<span class="lineNum">     576 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_DBG(&quot;Table `%s' column `%s' has type %s, not expected &quot;</span>
+<span class="lineNum">     577 </span>                :            :                      &quot;key type %s, value type %s, max elements %&quot;PRIuSIZE&quot;.&quot;,
+<span class="lineNum">     578 </span>                :            :                      schema-&gt;name, column_name, type_name,
+<span class="lineNum">     579 </span>                :            :                      ovsdb_atomic_type_to_string(key_type),
+<span class="lineNum">     580 </span>                :            :                      ovsdb_atomic_type_to_string(value_type),
+<span class="lineNum">     581 </span>                :            :                      n_max);
+<span class="lineNum">     582 </span>                :<span class="lineNoCov">          0 :             free(type_name);</span>
+<span class="lineNum">     583 </span>                :            :         }
+<span class="lineNum">     584 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     585 </span>                :            :     }
+<span class="lineNum">     586 </span>                :            : 
+<span class="lineNum">     587 </span>                :<span class="lineNoCov">          0 :     return &amp;row-&gt;fields[column-&gt;index];</span>
+<span class="lineNum">     588 </span>                :            : }
+<span class="lineNum">     589 </span>                :            : 
+<span class="lineNum">     590 </span>                :            : /* Read string-string key-values from a map.  Returns the value associated with
+<a name="591"><span class="lineNum">     591 </span>                :            :  * 'key', if found, or NULL */</a>
+<span class="lineNum">     592 </span>                :            : static const char *
+<span class="lineNum">     593 </span>                :<span class="lineNoCov">          0 : read_map_string_column(const struct ovsdb_row *row, const char *column_name,</span>
+<span class="lineNum">     594 </span>                :            :                        const char *key)
+<span class="lineNum">     595 </span>                :            : {
+<span class="lineNum">     596 </span>                :            :     const struct ovsdb_datum *datum;
+<span class="lineNum">     597 </span>                :<span class="lineNoCov">          0 :     union ovsdb_atom *atom_key = NULL, *atom_value = NULL;</span>
+<span class="lineNum">     598 </span>                :            :     size_t i;
+<span class="lineNum">     599 </span>                :            : 
+<span class="lineNum">     600 </span>                :<span class="lineNoCov">          0 :     datum = get_datum(CONST_CAST(struct ovsdb_row *, row), column_name,</span>
+<span class="lineNum">     601 </span>                :            :                       OVSDB_TYPE_STRING, OVSDB_TYPE_STRING, UINT_MAX);
+<span class="lineNum">     602 </span>                :            : 
+<span class="lineNum">     603 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!datum) {</span>
+<span class="lineNum">     604 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     605 </span>                :            :     }
+<span class="lineNum">     606 </span>                :            : 
+<span class="lineNum">     607 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (i = 0; i &lt; datum-&gt;n; i++) {</span>
+<span class="lineNum">     608 </span>                :<span class="lineNoCov">          0 :         atom_key = &amp;datum-&gt;keys[i];</span>
+<span class="lineNum">     609 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!strcmp(atom_key-&gt;string, key)){</span>
+<span class="lineNum">     610 </span>                :<span class="lineNoCov">          0 :             atom_value = &amp;datum-&gt;values[i];</span>
+<span class="lineNum">     611 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     612 </span>                :            :         }
+<span class="lineNum">     613 </span>                :            :     }
+<span class="lineNum">     614 </span>                :            : 
+<span class="lineNum">     615 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     return atom_value ? atom_value-&gt;string : NULL;</span>
+<span class="lineNum">     616 </span>                :            : }
+<a name="617"><span class="lineNum">     617 </span>                :            : </a>
+<span class="lineNum">     618 </span>                :            : static const union ovsdb_atom *
+<span class="lineNum">     619 </span>                :<span class="lineNoCov">          0 : read_column(const struct ovsdb_row *row, const char *column_name,</span>
+<span class="lineNum">     620 </span>                :            :             enum ovsdb_atomic_type type)
+<span class="lineNum">     621 </span>                :            : {
+<span class="lineNum">     622 </span>                :            :     const struct ovsdb_datum *datum;
+<span class="lineNum">     623 </span>                :            : 
+<span class="lineNum">     624 </span>                :<span class="lineNoCov">          0 :     datum = get_datum(CONST_CAST(struct ovsdb_row *, row), column_name, type,</span>
+<span class="lineNum">     625 </span>                :            :                       OVSDB_TYPE_VOID, 1);
+<span class="lineNum">     626 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     return datum &amp;&amp; datum-&gt;n ? datum-&gt;keys : NULL;</span>
+<span class="lineNum">     627 </span>                :            : }
+<a name="628"><span class="lineNum">     628 </span>                :            : </a>
+<span class="lineNum">     629 </span>                :            : static bool
+<span class="lineNum">     630 </span>                :<span class="lineNoCov">          0 : read_integer_column(const struct ovsdb_row *row, const char *column_name,</span>
+<span class="lineNum">     631 </span>                :            :                     long long int *integerp)
+<span class="lineNum">     632 </span>                :            : {
+<span class="lineNum">     633 </span>                :            :     const union ovsdb_atom *atom;
+<span class="lineNum">     634 </span>                :            : 
+<span class="lineNum">     635 </span>                :<span class="lineNoCov">          0 :     atom = read_column(row, column_name, OVSDB_TYPE_INTEGER);</span>
+<span class="lineNum">     636 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     *integerp = atom ? atom-&gt;integer : 0;</span>
+<span class="lineNum">     637 </span>                :<span class="lineNoCov">          0 :     return atom != NULL;</span>
+<span class="lineNum">     638 </span>                :            : }
+<a name="639"><span class="lineNum">     639 </span>                :            : </a>
+<span class="lineNum">     640 </span>                :            : static bool
+<span class="lineNum">     641 </span>                :<span class="lineNoCov">          0 : read_string_column(const struct ovsdb_row *row, const char *column_name,</span>
+<span class="lineNum">     642 </span>                :            :                    const char **stringp)
+<span class="lineNum">     643 </span>                :            : {
+<span class="lineNum">     644 </span>                :            :     const union ovsdb_atom *atom;
+<span class="lineNum">     645 </span>                :            : 
+<span class="lineNum">     646 </span>                :<span class="lineNoCov">          0 :     atom = read_column(row, column_name, OVSDB_TYPE_STRING);</span>
+<span class="lineNum">     647 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     *stringp = atom ? atom-&gt;string : NULL;</span>
+<span class="lineNum">     648 </span>                :<span class="lineNoCov">          0 :     return atom != NULL;</span>
+<span class="lineNum">     649 </span>                :            : }
+<a name="650"><span class="lineNum">     650 </span>                :            : </a>
+<span class="lineNum">     651 </span>                :            : static void
+<span class="lineNum">     652 </span>                :<span class="lineNoCov">          0 : write_bool_column(struct ovsdb_row *row, const char *column_name, bool value)</span>
+<span class="lineNum">     653 </span>                :            : {
+<span class="lineNum">     654 </span>                :            :     const struct ovsdb_column *column;
+<span class="lineNum">     655 </span>                :            :     struct ovsdb_datum *datum;
+<span class="lineNum">     656 </span>                :            : 
+<span class="lineNum">     657 </span>                :<span class="lineNoCov">          0 :     column = ovsdb_table_schema_get_column(row-&gt;table-&gt;schema, column_name);</span>
+<span class="lineNum">     658 </span>                :<span class="lineNoCov">          0 :     datum = get_datum(row, column_name, OVSDB_TYPE_BOOLEAN,</span>
+<span class="lineNum">     659 </span>                :            :                       OVSDB_TYPE_VOID, 1);
+<span class="lineNum">     660 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!datum) {</span>
+<span class="lineNum">     661 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     662 </span>                :            :     }
+<span class="lineNum">     663 </span>                :            : 
+<span class="lineNum">     664 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (datum-&gt;n != 1) {</span>
+<span class="lineNum">     665 </span>                :<span class="lineNoCov">          0 :         ovsdb_datum_destroy(datum, &amp;column-&gt;type);</span>
+<span class="lineNum">     666 </span>                :            : 
+<span class="lineNum">     667 </span>                :<span class="lineNoCov">          0 :         datum-&gt;n = 1;</span>
+<span class="lineNum">     668 </span>                :<span class="lineNoCov">          0 :         datum-&gt;keys = xmalloc(sizeof *datum-&gt;keys);</span>
+<span class="lineNum">     669 </span>                :<span class="lineNoCov">          0 :         datum-&gt;values = NULL;</span>
+<span class="lineNum">     670 </span>                :            :     }
+<span class="lineNum">     671 </span>                :            : 
+<span class="lineNum">     672 </span>                :<span class="lineNoCov">          0 :     datum-&gt;keys[0].boolean = value;</span>
+<span class="lineNum">     673 </span>                :            : }
+<a name="674"><span class="lineNum">     674 </span>                :            : </a>
+<span class="lineNum">     675 </span>                :            : static void
+<span class="lineNum">     676 </span>                :<span class="lineNoCov">          0 : write_string_string_column(struct ovsdb_row *row, const char *column_name,</span>
+<span class="lineNum">     677 </span>                :            :                            char **keys, char **values, size_t n)
+<span class="lineNum">     678 </span>                :            : {
+<span class="lineNum">     679 </span>                :            :     const struct ovsdb_column *column;
+<span class="lineNum">     680 </span>                :            :     struct ovsdb_datum *datum;
+<span class="lineNum">     681 </span>                :            :     size_t i;
+<span class="lineNum">     682 </span>                :            : 
+<span class="lineNum">     683 </span>                :<span class="lineNoCov">          0 :     column = ovsdb_table_schema_get_column(row-&gt;table-&gt;schema, column_name);</span>
+<span class="lineNum">     684 </span>                :<span class="lineNoCov">          0 :     datum = get_datum(row, column_name, OVSDB_TYPE_STRING, OVSDB_TYPE_STRING,</span>
+<span class="lineNum">     685 </span>                :            :                       UINT_MAX);
+<span class="lineNum">     686 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!datum) {</span>
+<span class="lineNum">     687 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         for (i = 0; i &lt; n; i++) {</span>
+<span class="lineNum">     688 </span>                :<span class="lineNoCov">          0 :             free(keys[i]);</span>
+<span class="lineNum">     689 </span>                :<span class="lineNoCov">          0 :             free(values[i]);</span>
+<span class="lineNum">     690 </span>                :            :         }
+<span class="lineNum">     691 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     692 </span>                :            :     }
+<span class="lineNum">     693 </span>                :            : 
+<span class="lineNum">     694 </span>                :            :     /* Free existing data. */
+<span class="lineNum">     695 </span>                :<span class="lineNoCov">          0 :     ovsdb_datum_destroy(datum, &amp;column-&gt;type);</span>
+<span class="lineNum">     696 </span>                :            : 
+<span class="lineNum">     697 </span>                :            :     /* Allocate space for new values. */
+<span class="lineNum">     698 </span>                :<span class="lineNoCov">          0 :     datum-&gt;n = n;</span>
+<span class="lineNum">     699 </span>                :<span class="lineNoCov">          0 :     datum-&gt;keys = xmalloc(n * sizeof *datum-&gt;keys);</span>
+<span class="lineNum">     700 </span>                :<span class="lineNoCov">          0 :     datum-&gt;values = xmalloc(n * sizeof *datum-&gt;values);</span>
+<span class="lineNum">     701 </span>                :            : 
+<span class="lineNum">     702 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (i = 0; i &lt; n; ++i) {</span>
+<span class="lineNum">     703 </span>                :<span class="lineNoCov">          0 :         datum-&gt;keys[i].string = keys[i];</span>
+<span class="lineNum">     704 </span>                :<span class="lineNoCov">          0 :         datum-&gt;values[i].string = values[i];</span>
+<span class="lineNum">     705 </span>                :            :     }
+<span class="lineNum">     706 </span>                :            : 
+<span class="lineNum">     707 </span>                :            :     /* Sort and check constraints. */
+<span class="lineNum">     708 </span>                :<span class="lineNoCov">          0 :     ovsdb_datum_sort_assert(datum, column-&gt;type.key.type);</span>
+<span class="lineNum">     709 </span>                :            : }
+<span class="lineNum">     710 </span>                :            : 
+<span class="lineNum">     711 </span>                :            : /* Adds a remote and options to 'remotes', based on the Manager table row in
+<a name="712"><span class="lineNum">     712 </span>                :            :  * 'row'. */</a>
+<span class="lineNum">     713 </span>                :            : static void
+<span class="lineNum">     714 </span>                :<span class="lineNoCov">          0 : add_manager_options(struct shash *remotes, const struct ovsdb_row *row)</span>
+<span class="lineNum">     715 </span>                :            : {
+<span class="lineNum">     716 </span>                :            :     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 1);
+<span class="lineNum">     717 </span>                :            :     struct ovsdb_jsonrpc_options *options;
+<span class="lineNum">     718 </span>                :            :     long long int max_backoff, probe_interval;
+<span class="lineNum">     719 </span>                :            :     const char *target, *dscp_string;
+<span class="lineNum">     720 </span>                :            : 
+<span class="lineNum">     721 </span>[<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!read_string_column(row, &quot;target&quot;, &amp;target) || !target) {</span>
+<span class="lineNum">     722 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_INFO_RL(&amp;rl, &quot;Table `%s' has missing or invalid `target' column&quot;,</span>
+<span class="lineNum">     723 </span>                :            :                      row-&gt;table-&gt;schema-&gt;name);
+<span class="lineNum">     724 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     725 </span>                :            :     }
+<span class="lineNum">     726 </span>                :            : 
+<span class="lineNum">     727 </span>                :<span class="lineNoCov">          0 :     options = add_remote(remotes, target);</span>
+<span class="lineNum">     728 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (read_integer_column(row, &quot;max_backoff&quot;, &amp;max_backoff)) {</span>
+<span class="lineNum">     729 </span>                :<span class="lineNoCov">          0 :         options-&gt;max_backoff = max_backoff;</span>
+<span class="lineNum">     730 </span>                :            :     }
+<span class="lineNum">     731 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (read_integer_column(row, &quot;inactivity_probe&quot;, &amp;probe_interval)) {</span>
+<span class="lineNum">     732 </span>                :<span class="lineNoCov">          0 :         options-&gt;probe_interval = probe_interval;</span>
+<span class="lineNum">     733 </span>                :            :     }
+<span class="lineNum">     734 </span>                :            : 
+<span class="lineNum">     735 </span>                :<span class="lineNoCov">          0 :     options-&gt;dscp = DSCP_DEFAULT;</span>
+<span class="lineNum">     736 </span>                :<span class="lineNoCov">          0 :     dscp_string = read_map_string_column(row, &quot;other_config&quot;, &quot;dscp&quot;);</span>
+<span class="lineNum">     737 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (dscp_string) {</span>
+<span class="lineNum">     738 </span>                :<span class="lineNoCov">          0 :         int dscp = atoi(dscp_string);</span>
+<span class="lineNum">     739 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (dscp &gt;= 0 &amp;&amp; dscp &lt;= 63) {</span>
+<span class="lineNum">     740 </span>                :<span class="lineNoCov">          0 :             options-&gt;dscp = dscp;</span>
+<span class="lineNum">     741 </span>                :            :         }
+<span class="lineNum">     742 </span>                :            :     }
+<span class="lineNum">     743 </span>                :            : }
+<a name="744"><span class="lineNum">     744 </span>                :            : </a>
+<span class="lineNum">     745 </span>                :            : static void
+<span class="lineNum">     746 </span>                :<span class="lineNoCov">          0 : query_db_remotes(const char *name, const struct shash *all_dbs,</span>
+<span class="lineNum">     747 </span>                :            :                  struct shash *remotes, struct ds *errors)
+<span class="lineNum">     748 </span>                :            : {
+<span class="lineNum">     749 </span>                :            :     const struct ovsdb_column *column;
+<span class="lineNum">     750 </span>                :            :     const struct ovsdb_table *table;
+<span class="lineNum">     751 </span>                :            :     const struct ovsdb_row *row;
+<span class="lineNum">     752 </span>                :            :     const struct db *db;
+<span class="lineNum">     753 </span>                :            :     char *retval;
+<span class="lineNum">     754 </span>                :            : 
+<span class="lineNum">     755 </span>                :<span class="lineNoCov">          0 :     retval = parse_db_column(all_dbs, name, &amp;db, &amp;table, &amp;column);</span>
+<span class="lineNum">     756 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (retval) {</span>
+<span class="lineNum">     757 </span>                :<span class="lineNoCov">          0 :         ds_put_format(errors, &quot;%s\n&quot;, retval);</span>
+<span class="lineNum">     758 </span>                :<span class="lineNoCov">          0 :         free(retval);</span>
+<span class="lineNum">     759 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     760 </span>                :            :     }
+<span class="lineNum">     761 </span>                :            : 
+<span class="lineNum">     762 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (column-&gt;type.key.type == OVSDB_TYPE_STRING</span>
+<span class="lineNum">     763 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         &amp;&amp; column-&gt;type.value.type == OVSDB_TYPE_VOID) {</span>
+<span class="lineNum">     764 </span>        [<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         HMAP_FOR_EACH (row, hmap_node, &amp;table-&gt;rows) {</span>
+<span class="lineNum">     765 </span>                :            :             const struct ovsdb_datum *datum;
+<span class="lineNum">     766 </span>                :            :             size_t i;
+<span class="lineNum">     767 </span>                :            : 
+<span class="lineNum">     768 </span>                :<span class="lineNoCov">          0 :             datum = &amp;row-&gt;fields[column-&gt;index];</span>
+<span class="lineNum">     769 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             for (i = 0; i &lt; datum-&gt;n; i++) {</span>
+<span class="lineNum">     770 </span>                :<span class="lineNoCov">          0 :                 add_remote(remotes, datum-&gt;keys[i].string);</span>
+<span class="lineNum">     771 </span>                :            :             }
+<span class="lineNum">     772 </span>                :            :         }
+<span class="lineNum">     773 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     } else if (column-&gt;type.key.type == OVSDB_TYPE_UUID</span>
+<span class="lineNum">     774 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                &amp;&amp; column-&gt;type.key.u.uuid.refTable</span>
+<span class="lineNum">     775 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                &amp;&amp; column-&gt;type.value.type == OVSDB_TYPE_VOID) {</span>
+<span class="lineNum">     776 </span>                :<span class="lineNoCov">          0 :         const struct ovsdb_table *ref_table = column-&gt;type.key.u.uuid.refTable;</span>
+<span class="lineNum">     777 </span>        [<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         HMAP_FOR_EACH (row, hmap_node, &amp;table-&gt;rows) {</span>
+<span class="lineNum">     778 </span>                :            :             const struct ovsdb_datum *datum;
+<span class="lineNum">     779 </span>                :            :             size_t i;
+<span class="lineNum">     780 </span>                :            : 
+<span class="lineNum">     781 </span>                :<span class="lineNoCov">          0 :             datum = &amp;row-&gt;fields[column-&gt;index];</span>
+<span class="lineNum">     782 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             for (i = 0; i &lt; datum-&gt;n; i++) {</span>
+<span class="lineNum">     783 </span>                :            :                 const struct ovsdb_row *ref_row;
+<span class="lineNum">     784 </span>                :            : 
+<span class="lineNum">     785 </span>                :<span class="lineNoCov">          0 :                 ref_row = ovsdb_table_get_row(ref_table, &amp;datum-&gt;keys[i].uuid);</span>
+<span class="lineNum">     786 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 if (ref_row) {</span>
+<span class="lineNum">     787 </span>                :<span class="lineNoCov">          0 :                     add_manager_options(remotes, ref_row);</span>
+<span class="lineNum">     788 </span>                :            :                 }
+<span class="lineNum">     789 </span>                :            :             }
+<span class="lineNum">     790 </span>                :            :         }
+<span class="lineNum">     791 </span>                :            :     }
+<span class="lineNum">     792 </span>                :            : }
+<a name="793"><span class="lineNum">     793 </span>                :            : </a>
+<span class="lineNum">     794 </span>                :            : static void
+<span class="lineNum">     795 </span>                :<span class="lineNoCov">          0 : update_remote_row(const struct ovsdb_row *row, struct ovsdb_txn *txn,</span>
+<span class="lineNum">     796 </span>                :            :                   const struct ovsdb_jsonrpc_server *jsonrpc)
+<span class="lineNum">     797 </span>                :            : {
+<span class="lineNum">     798 </span>                :            :     struct ovsdb_jsonrpc_remote_status status;
+<span class="lineNum">     799 </span>                :            :     struct ovsdb_row *rw_row;
+<span class="lineNum">     800 </span>                :            :     const char *target;
+<span class="lineNum">     801 </span>                :            :     char *keys[9], *values[9];
+<span class="lineNum">     802 </span>                :<span class="lineNoCov">          0 :     size_t n = 0;</span>
+<span class="lineNum">     803 </span>                :            : 
+<span class="lineNum">     804 </span>                :            :     /* Get the &quot;target&quot; (protocol/host/port) spec. */
+<span class="lineNum">     805 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!read_string_column(row, &quot;target&quot;, &amp;target)) {</span>
+<span class="lineNum">     806 </span>                :            :         /* Bad remote spec or incorrect schema. */
+<span class="lineNum">     807 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     808 </span>                :            :     }
+<span class="lineNum">     809 </span>                :<span class="lineNoCov">          0 :     rw_row = ovsdb_txn_row_modify(txn, row);</span>
+<span class="lineNum">     810 </span>                :<span class="lineNoCov">          0 :     ovsdb_jsonrpc_server_get_remote_status(jsonrpc, target, &amp;status);</span>
+<span class="lineNum">     811 </span>                :            : 
+<span class="lineNum">     812 </span>                :            :     /* Update status information columns. */
+<span class="lineNum">     813 </span>                :<span class="lineNoCov">          0 :     write_bool_column(rw_row, &quot;is_connected&quot;, status.is_connected);</span>
+<span class="lineNum">     814 </span>                :            : 
+<span class="lineNum">     815 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (status.state) {</span>
+<span class="lineNum">     816 </span>                :<span class="lineNoCov">          0 :         keys[n] = xstrdup(&quot;state&quot;);</span>
+<span class="lineNum">     817 </span>                :<span class="lineNoCov">          0 :         values[n++] = xstrdup(status.state);</span>
+<span class="lineNum">     818 </span>                :            :     }
+<span class="lineNum">     819 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (status.sec_since_connect != UINT_MAX) {</span>
+<span class="lineNum">     820 </span>                :<span class="lineNoCov">          0 :         keys[n] = xstrdup(&quot;sec_since_connect&quot;);</span>
+<span class="lineNum">     821 </span>                :<span class="lineNoCov">          0 :         values[n++] = xasprintf(&quot;%u&quot;, status.sec_since_connect);</span>
+<span class="lineNum">     822 </span>                :            :     }
+<span class="lineNum">     823 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (status.sec_since_disconnect != UINT_MAX) {</span>
+<span class="lineNum">     824 </span>                :<span class="lineNoCov">          0 :         keys[n] = xstrdup(&quot;sec_since_disconnect&quot;);</span>
+<span class="lineNum">     825 </span>                :<span class="lineNoCov">          0 :         values[n++] = xasprintf(&quot;%u&quot;, status.sec_since_disconnect);</span>
+<span class="lineNum">     826 </span>                :            :     }
+<span class="lineNum">     827 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (status.last_error) {</span>
+<span class="lineNum">     828 </span>                :<span class="lineNoCov">          0 :         keys[n] = xstrdup(&quot;last_error&quot;);</span>
+<span class="lineNum">     829 </span>                :<span class="lineNoCov">          0 :         values[n++] =</span>
+<span class="lineNum">     830 </span>                :<span class="lineNoCov">          0 :             xstrdup(ovs_retval_to_string(status.last_error));</span>
+<span class="lineNum">     831 </span>                :            :     }
+<span class="lineNum">     832 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (status.locks_held &amp;&amp; status.locks_held[0]) {</span>
+<span class="lineNum">     833 </span>                :<span class="lineNoCov">          0 :         keys[n] = xstrdup(&quot;locks_held&quot;);</span>
+<span class="lineNum">     834 </span>                :<span class="lineNoCov">          0 :         values[n++] = xstrdup(status.locks_held);</span>
+<span class="lineNum">     835 </span>                :            :     }
+<span class="lineNum">     836 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (status.locks_waiting &amp;&amp; status.locks_waiting[0]) {</span>
+<span class="lineNum">     837 </span>                :<span class="lineNoCov">          0 :         keys[n] = xstrdup(&quot;locks_waiting&quot;);</span>
+<span class="lineNum">     838 </span>                :<span class="lineNoCov">          0 :         values[n++] = xstrdup(status.locks_waiting);</span>
+<span class="lineNum">     839 </span>                :            :     }
+<span class="lineNum">     840 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (status.locks_lost &amp;&amp; status.locks_lost[0]) {</span>
+<span class="lineNum">     841 </span>                :<span class="lineNoCov">          0 :         keys[n] = xstrdup(&quot;locks_lost&quot;);</span>
+<span class="lineNum">     842 </span>                :<span class="lineNoCov">          0 :         values[n++] = xstrdup(status.locks_lost);</span>
+<span class="lineNum">     843 </span>                :            :     }
+<span class="lineNum">     844 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (status.n_connections &gt; 1) {</span>
+<span class="lineNum">     845 </span>                :<span class="lineNoCov">          0 :         keys[n] = xstrdup(&quot;n_connections&quot;);</span>
+<span class="lineNum">     846 </span>                :<span class="lineNoCov">          0 :         values[n++] = xasprintf(&quot;%d&quot;, status.n_connections);</span>
+<span class="lineNum">     847 </span>                :            :     }
+<span class="lineNum">     848 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (status.bound_port != htons(0)) {</span>
+<span class="lineNum">     849 </span>                :<span class="lineNoCov">          0 :         keys[n] = xstrdup(&quot;bound_port&quot;);</span>
+<span class="lineNum">     850 </span>                :<span class="lineNoCov">          0 :         values[n++] = xasprintf(&quot;%&quot;PRIu16, ntohs(status.bound_port));</span>
+<span class="lineNum">     851 </span>                :            :     }
+<span class="lineNum">     852 </span>                :<span class="lineNoCov">          0 :     write_string_string_column(rw_row, &quot;status&quot;, keys, values, n);</span>
+<span class="lineNum">     853 </span>                :            : 
+<span class="lineNum">     854 </span>                :<span class="lineNoCov">          0 :     ovsdb_jsonrpc_server_free_remote_status(&amp;status);</span>
+<span class="lineNum">     855 </span>                :            : }
+<a name="856"><span class="lineNum">     856 </span>                :            : </a>
+<span class="lineNum">     857 </span>                :            : static void
+<span class="lineNum">     858 </span>                :<span class="lineCov">        629 : update_remote_rows(const struct shash *all_dbs,</span>
+<span class="lineNum">     859 </span>                :            :                    const char *remote_name,
+<span class="lineNum">     860 </span>                :            :                    const struct ovsdb_jsonrpc_server *jsonrpc)
+<span class="lineNum">     861 </span>                :            : {
+<span class="lineNum">     862 </span>                :            :     const struct ovsdb_table *table, *ref_table;
+<span class="lineNum">     863 </span>                :            :     const struct ovsdb_column *column;
+<span class="lineNum">     864 </span>                :            :     const struct ovsdb_row *row;
+<span class="lineNum">     865 </span>                :            :     const struct db *db;
+<span class="lineNum">     866 </span>                :            :     char *retval;
+<span class="lineNum">     867 </span>                :            : 
+<span class="lineNum">     868 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 629 times"> + </span>]:<span class="lineCov">        629 :     if (strncmp(&quot;db:&quot;, remote_name, 3)) {</span>
+<span class="lineNum">     869 </span>                :            :         return;
+<span class="lineNum">     870 </span>                :            :     }
+<span class="lineNum">     871 </span>                :            : 
+<span class="lineNum">     872 </span>                :<span class="lineNoCov">          0 :     retval = parse_db_column(all_dbs, remote_name, &amp;db, &amp;table, &amp;column);</span>
+<span class="lineNum">     873 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (retval) {</span>
+<span class="lineNum">     874 </span>                :<span class="lineNoCov">          0 :         free(retval);</span>
+<span class="lineNum">     875 </span>                :            :         return;
+<span class="lineNum">     876 </span>                :            :     }
+<span class="lineNum">     877 </span>                :            : 
+<span class="lineNum">     878 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (column-&gt;type.key.type != OVSDB_TYPE_UUID</span>
+<span class="lineNum">     879 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         || !column-&gt;type.key.u.uuid.refTable</span>
+<span class="lineNum">     880 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         || column-&gt;type.value.type != OVSDB_TYPE_VOID) {</span>
+<span class="lineNum">     881 </span>                :            :         return;
+<span class="lineNum">     882 </span>                :            :     }
+<span class="lineNum">     883 </span>                :            : 
+<span class="lineNum">     884 </span>                :<span class="lineNoCov">          0 :     ref_table = column-&gt;type.key.u.uuid.refTable;</span>
+<span class="lineNum">     885 </span>                :            : 
+<span class="lineNum">     886 </span>        [<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">        629 :     HMAP_FOR_EACH (row, hmap_node, &amp;table-&gt;rows) {</span>
+<span class="lineNum">     887 </span>                :            :         const struct ovsdb_datum *datum;
+<span class="lineNum">     888 </span>                :            :         size_t i;
+<span class="lineNum">     889 </span>                :            : 
+<span class="lineNum">     890 </span>                :<span class="lineNoCov">          0 :         datum = &amp;row-&gt;fields[column-&gt;index];</span>
+<span class="lineNum">     891 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         for (i = 0; i &lt; datum-&gt;n; i++) {</span>
+<span class="lineNum">     892 </span>                :            :             const struct ovsdb_row *ref_row;
+<span class="lineNum">     893 </span>                :            : 
+<span class="lineNum">     894 </span>                :<span class="lineNoCov">          0 :             ref_row = ovsdb_table_get_row(ref_table, &amp;datum-&gt;keys[i].uuid);</span>
+<span class="lineNum">     895 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (ref_row) {</span>
+<span class="lineNum">     896 </span>                :<span class="lineNoCov">          0 :                 update_remote_row(ref_row, db-&gt;txn, jsonrpc);</span>
+<span class="lineNum">     897 </span>                :            :             }
+<span class="lineNum">     898 </span>                :            :         }
+<span class="lineNum">     899 </span>                :            :     }
+<span class="lineNum">     900 </span>                :            : }
+<a name="901"><span class="lineNum">     901 </span>                :            : </a>
+<span class="lineNum">     902 </span>                :            : static void
+<span class="lineNum">     903 </span>                :<span class="lineCov">        617 : update_remote_status(const struct ovsdb_jsonrpc_server *jsonrpc,</span>
+<span class="lineNum">     904 </span>                :            :                      const struct sset *remotes,
+<span class="lineNum">     905 </span>                :            :                      struct shash *all_dbs)
+<span class="lineNum">     906 </span>                :            : {
+<span class="lineNum">     907 </span>                :            :     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 1);
+<span class="lineNum">     908 </span>                :            :     const char *remote;
+<span class="lineNum">     909 </span>                :            :     struct db *db;
+<span class="lineNum">     910 </span>                :            :     struct shash_node *node;
+<span class="lineNum">     911 </span>                :            : 
+<span class="lineNum">     912 </span>        [<span class="branchCov" title="Branch 2 was taken 618 times"> + </span><span class="branchCov" title="Branch 3 was taken 617 times"> + </span>]:<span class="lineCov">       1235 :     SHASH_FOR_EACH(node, all_dbs) {</span>
+<span class="lineNum">     913 </span>                :<span class="lineCov">        618 :         db = node-&gt;data;</span>
+<span class="lineNum">     914 </span>                :<span class="lineCov">        618 :         db-&gt;txn = ovsdb_txn_create(db-&gt;db);</span>
+<span class="lineNum">     915 </span>                :            :     }
+<span class="lineNum">     916 </span>                :            : 
+<span class="lineNum">     917 </span>                :            :     /* Iterate over --remote arguments given on command line. */
+<span class="lineNum">     918 </span>[<span class="branchCov" title="Branch 1 was taken 617 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>][<span class="branchCov" title="Branch 5 was taken 12 times"> + </span><span class="branchCov" title="Branch 6 was taken 617 times"> + </span>]:<span class="lineCov">       1246 :     SSET_FOR_EACH (remote, remotes) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 8 was taken 629 times"> + </span><span class="branchCov" title="Branch 9 was taken 617 times"> + </span>]
+<span class="lineNum">     919 </span>                :<span class="lineCov">        629 :         update_remote_rows(all_dbs, remote, jsonrpc);</span>
+<span class="lineNum">     920 </span>                :            :     }
+<span class="lineNum">     921 </span>                :            : 
+<span class="lineNum">     922 </span>        [<span class="branchCov" title="Branch 2 was taken 618 times"> + </span><span class="branchCov" title="Branch 3 was taken 617 times"> + </span>]:<span class="lineCov">       1235 :     SHASH_FOR_EACH(node, all_dbs) {</span>
+<span class="lineNum">     923 </span>                :            :         struct ovsdb_error *error;
+<span class="lineNum">     924 </span>                :<span class="lineCov">        618 :         db = node-&gt;data;</span>
+<span class="lineNum">     925 </span>                :<span class="lineCov">        618 :         error = ovsdb_txn_commit(db-&gt;txn, false);</span>
+<span class="lineNum">     926 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 618 times"> + </span>]:<span class="lineCov">        618 :         if (error) {</span>
+<span class="lineNum">     927 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_ERR_RL(&amp;rl, &quot;Failed to update remote status: %s&quot;,</span>
+<span class="lineNum">     928 </span>                :            :                         ovsdb_error_to_string(error));
+<span class="lineNum">     929 </span>                :<span class="lineNoCov">          0 :             ovsdb_error_destroy(error);</span>
+<span class="lineNum">     930 </span>                :            :         }
+<span class="lineNum">     931 </span>                :            :     }
+<span class="lineNum">     932 </span>                :<span class="lineCov">        617 : }</span>
+<span class="lineNum">     933 </span>                :            : 
+<a name="934"><span class="lineNum">     934 </span>                :            : /* Reconfigures ovsdb-server's remotes based on information in the database. */</a>
+<span class="lineNum">     935 </span>                :            : static char *
+<span class="lineNum">     936 </span>                :<span class="lineCov">      19647 : reconfigure_remotes(struct ovsdb_jsonrpc_server *jsonrpc,</span>
+<span class="lineNum">     937 </span>                :            :                     const struct shash *all_dbs, struct sset *remotes)
+<span class="lineNum">     938 </span>                :            : {
+<span class="lineNum">     939 </span>                :<span class="lineCov">      19647 :     struct ds errors = DS_EMPTY_INITIALIZER;</span>
+<span class="lineNum">     940 </span>                :            :     struct shash resolved_remotes;
+<span class="lineNum">     941 </span>                :            :     const char *name;
+<span class="lineNum">     942 </span>                :            : 
+<span class="lineNum">     943 </span>                :            :     /* Configure remotes. */
+<span class="lineNum">     944 </span>                :<span class="lineCov">      19647 :     shash_init(&amp;resolved_remotes);</span>
+<span class="lineNum">     945 </span>[<span class="branchCov" title="Branch 1 was taken 19645 times"> + </span><span class="branchCov" title="Branch 2 was taken 2 times"> + </span>][<span class="branchCov" title="Branch 5 was taken 182 times"> + </span><span class="branchCov" title="Branch 6 was taken 19645 times"> + </span>]:<span class="lineCov">      39474 :     SSET_FOR_EACH (name, remotes) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 8 was taken 19827 times"> + </span><span class="branchCov" title="Branch 9 was taken 19647 times"> + </span>]
+<span class="lineNum">     946 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 19827 times"> + </span>]:<span class="lineCov">      19827 :         if (!strncmp(name, &quot;db:&quot;, 3)) {</span>
+<span class="lineNum">     947 </span>                :<span class="lineNoCov">          0 :             query_db_remotes(name, all_dbs, &amp;resolved_remotes, &amp;errors);</span>
+<span class="lineNum">     948 </span>                :            :         } else {
+<span class="lineNum">     949 </span>                :<span class="lineCov">      19827 :             add_remote(&amp;resolved_remotes, name);</span>
+<span class="lineNum">     950 </span>                :            :         }
+<span class="lineNum">     951 </span>                :            :     }
+<span class="lineNum">     952 </span>                :<span class="lineCov">      19647 :     ovsdb_jsonrpc_server_set_remotes(jsonrpc, &amp;resolved_remotes);</span>
+<span class="lineNum">     953 </span>                :<span class="lineCov">      19647 :     shash_destroy_free_data(&amp;resolved_remotes);</span>
+<span class="lineNum">     954 </span>                :            : 
+<span class="lineNum">     955 </span>                :<span class="lineCov">      19647 :     return errors.string;</span>
+<span class="lineNum">     956 </span>                :            : }
+<a name="957"><span class="lineNum">     957 </span>                :            : </a>
+<span class="lineNum">     958 </span>                :            : static char *
+<span class="lineNum">     959 </span>                :<span class="lineCov">      19647 : reconfigure_ssl(const struct shash *all_dbs)</span>
+<span class="lineNum">     960 </span>                :            : {
+<span class="lineNum">     961 </span>                :<span class="lineCov">      19647 :     struct ds errors = DS_EMPTY_INITIALIZER;</span>
+<span class="lineNum">     962 </span>                :            :     const char *resolved_private_key;
+<span class="lineNum">     963 </span>                :            :     const char *resolved_certificate;
+<span class="lineNum">     964 </span>                :            :     const char *resolved_ca_cert;
+<span class="lineNum">     965 </span>                :            : 
+<span class="lineNum">     966 </span>                :<span class="lineCov">      19647 :     resolved_private_key = query_db_string(all_dbs, private_key_file, &amp;errors);</span>
+<span class="lineNum">     967 </span>                :<span class="lineCov">      19647 :     resolved_certificate = query_db_string(all_dbs, certificate_file, &amp;errors);</span>
+<span class="lineNum">     968 </span>                :<span class="lineCov">      19647 :     resolved_ca_cert = query_db_string(all_dbs, ca_cert_file, &amp;errors);</span>
+<span class="lineNum">     969 </span>                :            : 
+<span class="lineNum">     970 </span>                :<span class="lineCov">      19647 :     stream_ssl_set_key_and_cert(resolved_private_key, resolved_certificate);</span>
+<span class="lineNum">     971 </span>                :<span class="lineCov">      19647 :     stream_ssl_set_ca_cert_file(resolved_ca_cert, bootstrap_ca_cert);</span>
+<span class="lineNum">     972 </span>                :            : 
+<span class="lineNum">     973 </span>                :<span class="lineCov">      19647 :     return errors.string;</span>
+<span class="lineNum">     974 </span>                :            : }
+<a name="975"><span class="lineNum">     975 </span>                :            : </a>
+<span class="lineNum">     976 </span>                :            : static void
+<span class="lineNum">     977 </span>                :<span class="lineCov">      38112 : report_error_if_changed(char *error, char **last_errorp)</span>
+<span class="lineNum">     978 </span>                :            : {
+<span class="lineNum">     979 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 38112 times"> + </span>]:<span class="lineCov">      38112 :     if (error) {</span>
+<span class="lineNum">     980 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!*last_errorp || strcmp(error, *last_errorp)) {</span>
+<span class="lineNum">     981 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN(&quot;%s&quot;, error);</span>
+<span class="lineNum">     982 </span>                :<span class="lineNoCov">          0 :             free(*last_errorp);</span>
+<span class="lineNum">     983 </span>                :<span class="lineNoCov">          0 :             *last_errorp = error;</span>
+<span class="lineNum">     984 </span>                :<span class="lineCov">      38112 :             return;</span>
+<span class="lineNum">     985 </span>                :            :         }
+<span class="lineNum">     986 </span>                :<span class="lineNoCov">          0 :         free(error);</span>
+<span class="lineNum">     987 </span>                :            :     } else {
+<span class="lineNum">     988 </span>                :<span class="lineCov">      38112 :         free(*last_errorp);</span>
+<span class="lineNum">     989 </span>                :<span class="lineCov">      38112 :         *last_errorp = NULL;</span>
+<span class="lineNum">     990 </span>                :            :     }
+<span class="lineNum">     991 </span>                :            : }
+<a name="992"><span class="lineNum">     992 </span>                :            : </a>
+<span class="lineNum">     993 </span>                :            : static void
+<span class="lineNum">     994 </span>                :<span class="lineCov">        477 : ovsdb_server_exit(struct unixctl_conn *conn, int argc OVS_UNUSED,</span>
+<span class="lineNum">     995 </span>                :            :                   const char *argv[] OVS_UNUSED,
+<span class="lineNum">     996 </span>                :            :                   void *exiting_)
+<span class="lineNum">     997 </span>                :            : {
+<span class="lineNum">     998 </span>                :<span class="lineCov">        477 :     bool *exiting = exiting_;</span>
+<span class="lineNum">     999 </span>                :<span class="lineCov">        477 :     *exiting = true;</span>
+<span class="lineNum">    1000 </span>                :<span class="lineCov">        477 :     unixctl_command_reply(conn, NULL);</span>
+<span class="lineNum">    1001 </span>                :<span class="lineCov">        477 : }</span>
+<a name="1002"><span class="lineNum">    1002 </span>                :            : </a>
+<span class="lineNum">    1003 </span>                :            : static void
+<span class="lineNum">    1004 </span>                :<span class="lineCov">          1 : ovsdb_server_compact(struct unixctl_conn *conn, int argc,</span>
+<span class="lineNum">    1005 </span>                :            :                      const char *argv[], void *dbs_)
+<span class="lineNum">    1006 </span>                :            : {
+<span class="lineNum">    1007 </span>                :<span class="lineCov">          1 :     struct shash *all_dbs = dbs_;</span>
+<span class="lineNum">    1008 </span>                :            :     struct ds reply;
+<span class="lineNum">    1009 </span>                :            :     struct db *db;
+<span class="lineNum">    1010 </span>                :            :     struct shash_node *node;
+<span class="lineNum">    1011 </span>                :<span class="lineCov">          1 :     int n = 0;</span>
+<span class="lineNum">    1012 </span>                :            : 
+<span class="lineNum">    1013 </span>                :<span class="lineCov">          1 :     ds_init(&amp;reply);</span>
+<span class="lineNum">    1014 </span>        [<span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchCov" title="Branch 3 was taken 1 time"> + </span>]:<span class="lineCov">          2 :     SHASH_FOR_EACH(node, all_dbs) {</span>
+<span class="lineNum">    1015 </span>                :            :         const char *name;
+<span class="lineNum">    1016 </span>                :            : 
+<span class="lineNum">    1017 </span>                :<span class="lineCov">          1 :         db = node-&gt;data;</span>
+<span class="lineNum">    1018 </span>                :<span class="lineCov">          1 :         name = db-&gt;db-&gt;schema-&gt;name;</span>
+<span class="lineNum">    1019 </span>                :            : 
+<span class="lineNum">    1020 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">          1 :         if (argc &lt; 2 || !strcmp(argv[1], name)) {</span>
+<span class="lineNum">    1021 </span>                :            :             struct ovsdb_error *error;
+<span class="lineNum">    1022 </span>                :            : 
+<span class="lineNum">    1023 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          1 :             VLOG_INFO(&quot;compacting %s database by user request&quot;, name);</span>
+<span class="lineNum">    1024 </span>                :            : 
+<span class="lineNum">    1025 </span>                :<span class="lineCov">          1 :             error = ovsdb_file_compact(db-&gt;file);</span>
+<span class="lineNum">    1026 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :             if (error) {</span>
+<span class="lineNum">    1027 </span>                :<span class="lineNoCov">          0 :                 char *s = ovsdb_error_to_string(error);</span>
+<span class="lineNum">    1028 </span>                :<span class="lineNoCov">          0 :                 ds_put_format(&amp;reply, &quot;%s\n&quot;, s);</span>
+<span class="lineNum">    1029 </span>                :<span class="lineNoCov">          0 :                 free(s);</span>
+<span class="lineNum">    1030 </span>                :<span class="lineNoCov">          0 :                 ovsdb_error_destroy(error);</span>
+<span class="lineNum">    1031 </span>                :            :             }
+<span class="lineNum">    1032 </span>                :            : 
+<span class="lineNum">    1033 </span>                :<span class="lineCov">          1 :             n++;</span>
+<span class="lineNum">    1034 </span>                :            :         }
+<span class="lineNum">    1035 </span>                :            :     }
+<span class="lineNum">    1036 </span>                :            : 
+<span class="lineNum">    1037 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     if (!n) {</span>
+<span class="lineNum">    1038 </span>                :<span class="lineNoCov">          0 :         unixctl_command_reply_error(conn, &quot;no database by that name&quot;);</span>
+<span class="lineNum">    1039 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     } else if (reply.length) {</span>
+<span class="lineNum">    1040 </span>                :<span class="lineNoCov">          0 :         unixctl_command_reply_error(conn, ds_cstr(&amp;reply));</span>
+<span class="lineNum">    1041 </span>                :            :     } else {
+<span class="lineNum">    1042 </span>                :<span class="lineCov">          1 :         unixctl_command_reply(conn, NULL);</span>
+<span class="lineNum">    1043 </span>                :            :     }
+<span class="lineNum">    1044 </span>                :<span class="lineCov">          1 :     ds_destroy(&amp;reply);</span>
+<span class="lineNum">    1045 </span>                :<span class="lineCov">          1 : }</span>
+<span class="lineNum">    1046 </span>                :            : 
+<span class="lineNum">    1047 </span>                :            : /* &quot;ovsdb-server/reconnect&quot;: makes ovsdb-server drop all of its JSON-RPC
+<a name="1048"><span class="lineNum">    1048 </span>                :            :  * connections and reconnect. */</a>
+<span class="lineNum">    1049 </span>                :            : static void
+<span class="lineNum">    1050 </span>                :<span class="lineNoCov">          0 : ovsdb_server_reconnect(struct unixctl_conn *conn, int argc OVS_UNUSED,</span>
+<span class="lineNum">    1051 </span>                :            :                        const char *argv[] OVS_UNUSED, void *jsonrpc_)
+<span class="lineNum">    1052 </span>                :            : {
+<span class="lineNum">    1053 </span>                :<span class="lineNoCov">          0 :     struct ovsdb_jsonrpc_server *jsonrpc = jsonrpc_;</span>
+<span class="lineNum">    1054 </span>                :            : 
+<span class="lineNum">    1055 </span>                :<span class="lineNoCov">          0 :     ovsdb_jsonrpc_server_reconnect(jsonrpc);</span>
+<span class="lineNum">    1056 </span>                :<span class="lineNoCov">          0 :     unixctl_command_reply(conn, NULL);</span>
+<span class="lineNum">    1057 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1058 </span>                :            : 
+<span class="lineNum">    1059 </span>                :            : /* &quot;ovsdb-server/add-remote REMOTE&quot;: adds REMOTE to the set of remotes that
+<a name="1060"><span class="lineNum">    1060 </span>                :            :  * ovsdb-server services. */</a>
+<span class="lineNum">    1061 </span>                :            : static void
+<span class="lineNum">    1062 </span>                :<span class="lineNoCov">          0 : ovsdb_server_add_remote(struct unixctl_conn *conn, int argc OVS_UNUSED,</span>
+<span class="lineNum">    1063 </span>                :            :                         const char *argv[], void *config_)
+<span class="lineNum">    1064 </span>                :            : {
+<span class="lineNum">    1065 </span>                :<span class="lineNoCov">          0 :     struct server_config *config = config_;</span>
+<span class="lineNum">    1066 </span>                :<span class="lineNoCov">          0 :     const char *remote = argv[1];</span>
+<span class="lineNum">    1067 </span>                :            : 
+<span class="lineNum">    1068 </span>                :            :     const struct ovsdb_column *column;
+<span class="lineNum">    1069 </span>                :            :     const struct ovsdb_table *table;
+<span class="lineNum">    1070 </span>                :            :     const struct db *db;
+<span class="lineNum">    1071 </span>                :            :     char *retval;
+<span class="lineNum">    1072 </span>                :            : 
+<span class="lineNum">    1073 </span>                :<span class="lineNoCov">          0 :     retval = (strncmp(&quot;db:&quot;, remote, 3)</span>
+<span class="lineNum">    1074 </span>                :            :               ? NULL
+<span class="lineNum">    1075 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :               : parse_db_column(config-&gt;all_dbs, remote,</span>
+<span class="lineNum">    1076 </span>                :            :                                 &amp;db, &amp;table, &amp;column));
+<span class="lineNum">    1077 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!retval) {</span>
+<span class="lineNum">    1078 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (sset_add(config-&gt;remotes, remote)) {</span>
+<span class="lineNum">    1079 </span>                :<span class="lineNoCov">          0 :             save_config(config);</span>
+<span class="lineNum">    1080 </span>                :            :         }
+<span class="lineNum">    1081 </span>                :<span class="lineNoCov">          0 :         unixctl_command_reply(conn, NULL);</span>
+<span class="lineNum">    1082 </span>                :            :     } else {
+<span class="lineNum">    1083 </span>                :<span class="lineNoCov">          0 :         unixctl_command_reply_error(conn, retval);</span>
+<span class="lineNum">    1084 </span>                :<span class="lineNoCov">          0 :         free(retval);</span>
+<span class="lineNum">    1085 </span>                :            :     }
+<span class="lineNum">    1086 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1087 </span>                :            : 
+<span class="lineNum">    1088 </span>                :            : /* &quot;ovsdb-server/remove-remote REMOTE&quot;: removes REMOTE frmo the set of remotes
+<a name="1089"><span class="lineNum">    1089 </span>                :            :  * that ovsdb-server services. */</a>
+<span class="lineNum">    1090 </span>                :            : static void
+<span class="lineNum">    1091 </span>                :<span class="lineNoCov">          0 : ovsdb_server_remove_remote(struct unixctl_conn *conn, int argc OVS_UNUSED,</span>
+<span class="lineNum">    1092 </span>                :            :                            const char *argv[], void *config_)
+<span class="lineNum">    1093 </span>                :            : {
+<span class="lineNum">    1094 </span>                :<span class="lineNoCov">          0 :     struct server_config *config = config_;</span>
+<span class="lineNum">    1095 </span>                :            :     struct sset_node *node;
+<span class="lineNum">    1096 </span>                :            : 
+<span class="lineNum">    1097 </span>                :<span class="lineNoCov">          0 :     node = sset_find(config-&gt;remotes, argv[1]);</span>
+<span class="lineNum">    1098 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (node) {</span>
+<span class="lineNum">    1099 </span>                :<span class="lineNoCov">          0 :         sset_delete(config-&gt;remotes, node);</span>
+<span class="lineNum">    1100 </span>                :<span class="lineNoCov">          0 :         save_config(config);</span>
+<span class="lineNum">    1101 </span>                :<span class="lineNoCov">          0 :         unixctl_command_reply(conn, NULL);</span>
+<span class="lineNum">    1102 </span>                :            :     } else {
+<span class="lineNum">    1103 </span>                :<span class="lineNoCov">          0 :         unixctl_command_reply_error(conn, &quot;no such remote&quot;);</span>
+<span class="lineNum">    1104 </span>                :            :     }
+<span class="lineNum">    1105 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1106 </span>                :            : 
+<a name="1107"><span class="lineNum">    1107 </span>                :            : /* &quot;ovsdb-server/list-remotes&quot;: outputs a list of configured rmeotes. */</a>
+<span class="lineNum">    1108 </span>                :            : static void
+<span class="lineNum">    1109 </span>                :<span class="lineNoCov">          0 : ovsdb_server_list_remotes(struct unixctl_conn *conn, int argc OVS_UNUSED,</span>
+<span class="lineNum">    1110 </span>                :            :                           const char *argv[] OVS_UNUSED, void *remotes_)
+<span class="lineNum">    1111 </span>                :            : {
+<span class="lineNum">    1112 </span>                :<span class="lineNoCov">          0 :     struct sset *remotes = remotes_;</span>
+<span class="lineNum">    1113 </span>                :            :     const char **list, **p;
+<span class="lineNum">    1114 </span>                :            :     struct ds s;
+<span class="lineNum">    1115 </span>                :            : 
+<span class="lineNum">    1116 </span>                :<span class="lineNoCov">          0 :     ds_init(&amp;s);</span>
+<span class="lineNum">    1117 </span>                :            : 
+<span class="lineNum">    1118 </span>                :<span class="lineNoCov">          0 :     list = sset_sort(remotes);</span>
+<span class="lineNum">    1119 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (p = list; *p; p++) {</span>
+<span class="lineNum">    1120 </span>                :<span class="lineNoCov">          0 :         ds_put_format(&amp;s, &quot;%s\n&quot;, *p);</span>
+<span class="lineNum">    1121 </span>                :            :     }
+<span class="lineNum">    1122 </span>                :<span class="lineNoCov">          0 :     free(list);</span>
+<span class="lineNum">    1123 </span>                :            : 
+<span class="lineNum">    1124 </span>                :<span class="lineNoCov">          0 :     unixctl_command_reply(conn, ds_cstr(&amp;s));</span>
+<span class="lineNum">    1125 </span>                :<span class="lineNoCov">          0 :     ds_destroy(&amp;s);</span>
+<span class="lineNum">    1126 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1127 </span>                :            : 
+<span class="lineNum">    1128 </span>                :            : 
+<a name="1129"><span class="lineNum">    1129 </span>                :            : /* &quot;ovsdb-server/add-db DB&quot;: adds the DB to ovsdb-server. */</a>
+<span class="lineNum">    1130 </span>                :            : static void
+<span class="lineNum">    1131 </span>                :<span class="lineNoCov">          0 : ovsdb_server_add_database(struct unixctl_conn *conn, int argc OVS_UNUSED,</span>
+<span class="lineNum">    1132 </span>                :            :                           const char *argv[], void *config_)
+<span class="lineNum">    1133 </span>                :            : {
+<span class="lineNum">    1134 </span>                :<span class="lineNoCov">          0 :     struct server_config *config = config_;</span>
+<span class="lineNum">    1135 </span>                :<span class="lineNoCov">          0 :     const char *filename = argv[1];</span>
+<span class="lineNum">    1136 </span>                :            :     char *error;
+<span class="lineNum">    1137 </span>                :            : 
+<span class="lineNum">    1138 </span>                :<span class="lineNoCov">          0 :     error = open_db(config, filename);</span>
+<span class="lineNum">    1139 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!error) {</span>
+<span class="lineNum">    1140 </span>                :<span class="lineNoCov">          0 :         save_config(config);</span>
+<span class="lineNum">    1141 </span>                :<span class="lineNoCov">          0 :         unixctl_command_reply(conn, NULL);</span>
+<span class="lineNum">    1142 </span>                :            :     } else {
+<span class="lineNum">    1143 </span>                :<span class="lineNoCov">          0 :         unixctl_command_reply_error(conn, error);</span>
+<span class="lineNum">    1144 </span>                :<span class="lineNoCov">          0 :         free(error);</span>
+<span class="lineNum">    1145 </span>                :            :     }
+<span class="lineNum">    1146 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="1147"><span class="lineNum">    1147 </span>                :            : </a>
+<span class="lineNum">    1148 </span>                :            : static void
+<span class="lineNum">    1149 </span>                :<span class="lineNoCov">          0 : ovsdb_server_remove_database(struct unixctl_conn *conn, int argc OVS_UNUSED,</span>
+<span class="lineNum">    1150 </span>                :            :                              const char *argv[], void *config_)
+<span class="lineNum">    1151 </span>                :            : {
+<span class="lineNum">    1152 </span>                :<span class="lineNoCov">          0 :     struct server_config *config = config_;</span>
+<span class="lineNum">    1153 </span>                :            :     struct shash_node *node;
+<span class="lineNum">    1154 </span>                :            :     struct db *db;
+<span class="lineNum">    1155 </span>                :            :     bool ok;
+<span class="lineNum">    1156 </span>                :            : 
+<span class="lineNum">    1157 </span>                :<span class="lineNoCov">          0 :     node = shash_find(config-&gt;all_dbs, argv[1]);</span>
+<span class="lineNum">    1158 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!node)  {</span>
+<span class="lineNum">    1159 </span>                :<span class="lineNoCov">          0 :         unixctl_command_reply_error(conn, &quot;Failed to find the database.&quot;);</span>
+<span class="lineNum">    1160 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">    1161 </span>                :            :     }
+<span class="lineNum">    1162 </span>                :<span class="lineNoCov">          0 :     db = node-&gt;data;</span>
+<span class="lineNum">    1163 </span>                :            : 
+<span class="lineNum">    1164 </span>                :<span class="lineNoCov">          0 :     ok = ovsdb_jsonrpc_server_remove_db(config-&gt;jsonrpc, db-&gt;db);</span>
+<span class="lineNum">    1165 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     ovs_assert(ok);</span>
+<span class="lineNum">    1166 </span>                :            : 
+<span class="lineNum">    1167 </span>                :<span class="lineNoCov">          0 :     ovsdb_destroy(db-&gt;db);</span>
+<span class="lineNum">    1168 </span>                :<span class="lineNoCov">          0 :     shash_delete(config-&gt;all_dbs, node);</span>
+<span class="lineNum">    1169 </span>                :<span class="lineNoCov">          0 :     free(db-&gt;filename);</span>
+<span class="lineNum">    1170 </span>                :<span class="lineNoCov">          0 :     free(db);</span>
+<span class="lineNum">    1171 </span>                :            : 
+<span class="lineNum">    1172 </span>                :<span class="lineNoCov">          0 :     save_config(config);</span>
+<span class="lineNum">    1173 </span>                :<span class="lineNoCov">          0 :     unixctl_command_reply(conn, NULL);</span>
+<span class="lineNum">    1174 </span>                :            : }
+<a name="1175"><span class="lineNum">    1175 </span>                :            : </a>
+<span class="lineNum">    1176 </span>                :            : static void
+<span class="lineNum">    1177 </span>                :<span class="lineNoCov">          0 : ovsdb_server_list_databases(struct unixctl_conn *conn, int argc OVS_UNUSED,</span>
+<span class="lineNum">    1178 </span>                :            :                             const char *argv[] OVS_UNUSED, void *all_dbs_)
+<span class="lineNum">    1179 </span>                :            : {
+<span class="lineNum">    1180 </span>                :<span class="lineNoCov">          0 :     struct shash *all_dbs = all_dbs_;</span>
+<span class="lineNum">    1181 </span>                :            :     const struct shash_node **nodes;
+<span class="lineNum">    1182 </span>                :            :     struct ds s;
+<span class="lineNum">    1183 </span>                :            :     size_t i;
+<span class="lineNum">    1184 </span>                :            : 
+<span class="lineNum">    1185 </span>                :<span class="lineNoCov">          0 :     ds_init(&amp;s);</span>
+<span class="lineNum">    1186 </span>                :            : 
+<span class="lineNum">    1187 </span>                :<span class="lineNoCov">          0 :     nodes = shash_sort(all_dbs);</span>
+<span class="lineNum">    1188 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (i = 0; i &lt; shash_count(all_dbs); i++) {</span>
+<span class="lineNum">    1189 </span>                :<span class="lineNoCov">          0 :         struct db *db = nodes[i]-&gt;data;</span>
+<span class="lineNum">    1190 </span>                :<span class="lineNoCov">          0 :         ds_put_format(&amp;s, &quot;%s\n&quot;, db-&gt;db-&gt;schema-&gt;name);</span>
+<span class="lineNum">    1191 </span>                :            :     }
+<span class="lineNum">    1192 </span>                :<span class="lineNoCov">          0 :     free(nodes);</span>
+<span class="lineNum">    1193 </span>                :            : 
+<span class="lineNum">    1194 </span>                :<span class="lineNoCov">          0 :     unixctl_command_reply(conn, ds_cstr(&amp;s));</span>
+<span class="lineNum">    1195 </span>                :<span class="lineNoCov">          0 :     ds_destroy(&amp;s);</span>
+<span class="lineNum">    1196 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="1197"><span class="lineNum">    1197 </span>                :            : </a>
+<span class="lineNum">    1198 </span>                :            : static void
+<span class="lineNum">    1199 </span>                :<span class="lineCov">       1094 : parse_options(int *argcp, char **argvp[],</span>
+<span class="lineNum">    1200 </span>                :            :               struct sset *remotes, char **unixctl_pathp, char **run_command)
+<span class="lineNum">    1201 </span>                :            : {
+<span class="lineNum">    1202 </span>                :            :     enum {
+<span class="lineNum">    1203 </span>                :            :         OPT_REMOTE = UCHAR_MAX + 1,
+<span class="lineNum">    1204 </span>                :            :         OPT_UNIXCTL,
+<span class="lineNum">    1205 </span>                :            :         OPT_RUN,
+<span class="lineNum">    1206 </span>                :            :         OPT_BOOTSTRAP_CA_CERT,
+<span class="lineNum">    1207 </span>                :            :         OPT_ENABLE_DUMMY,
+<span class="lineNum">    1208 </span>                :            :         VLOG_OPTION_ENUMS,
+<span class="lineNum">    1209 </span>                :            :         DAEMON_OPTION_ENUMS
+<span class="lineNum">    1210 </span>                :            :     };
+<span class="lineNum">    1211 </span>                :            :     static const struct option long_options[] = {
+<span class="lineNum">    1212 </span>                :            :         {&quot;remote&quot;,      required_argument, NULL, OPT_REMOTE},
+<span class="lineNum">    1213 </span>                :            :         {&quot;unixctl&quot;,     required_argument, NULL, OPT_UNIXCTL},
+<span class="lineNum">    1214 </span>                :            : #ifndef _WIN32
+<span class="lineNum">    1215 </span>                :            :         {&quot;run&quot;,         required_argument, NULL, OPT_RUN},
+<span class="lineNum">    1216 </span>                :            : #endif
+<span class="lineNum">    1217 </span>                :            :         {&quot;help&quot;,        no_argument, NULL, 'h'},
+<span class="lineNum">    1218 </span>                :            :         {&quot;version&quot;,     no_argument, NULL, 'V'},
+<span class="lineNum">    1219 </span>                :            :         DAEMON_LONG_OPTIONS,
+<span class="lineNum">    1220 </span>                :            :         VLOG_LONG_OPTIONS,
+<span class="lineNum">    1221 </span>                :            :         {&quot;bootstrap-ca-cert&quot;, required_argument, NULL, OPT_BOOTSTRAP_CA_CERT},
+<span class="lineNum">    1222 </span>                :            :         {&quot;private-key&quot;, required_argument, NULL, 'p'},
+<span class="lineNum">    1223 </span>                :            :         {&quot;certificate&quot;, required_argument, NULL, 'c'},
+<span class="lineNum">    1224 </span>                :            :         {&quot;ca-cert&quot;,     required_argument, NULL, 'C'},
+<span class="lineNum">    1225 </span>                :            :         {&quot;enable-dummy&quot;, optional_argument, NULL, OPT_ENABLE_DUMMY},
+<span class="lineNum">    1226 </span>                :            :         {NULL, 0, NULL, 0},
+<span class="lineNum">    1227 </span>                :            :     };
+<span class="lineNum">    1228 </span>                :<span class="lineCov">       1094 :     char *short_options = long_options_to_short_options(long_options);</span>
+<span class="lineNum">    1229 </span>                :<span class="lineCov">       1094 :     int argc = *argcp;</span>
+<span class="lineNum">    1230 </span>                :<span class="lineCov">       1094 :     char **argv = *argvp;</span>
+<span class="lineNum">    1231 </span>                :            : 
+<span class="lineNum">    1232 </span>                :<span class="lineCov">       1094 :     sset_init(remotes);</span>
+<span class="lineNum">    1233 </span>                :            :     for (;;) {
+<span class="lineNum">    1234 </span>                :            :         int c;
+<span class="lineNum">    1235 </span>                :            : 
+<span class="lineNum">    1236 </span>                :<span class="lineCov">       6826 :         c = getopt_long(argc, argv, short_options, long_options, NULL);</span>
+<span class="lineNum">    1237 </span>        [<span class="branchCov" title="Branch 0 was taken 1094 times"> + </span><span class="branchCov" title="Branch 1 was taken 5732 times"> + </span>]:<span class="lineCov">       6826 :         if (c == -1) {</span>
+<span class="lineNum">    1238 </span>                :<span class="lineCov">       1094 :             break;</span>
+<span class="lineNum">    1239 </span>                :            :         }
+<span class="lineNum">    1240 </span>                :            : 
+<span class="lineNum">    1241 </span>  [<span class="branchCov" title="Branch 0 was taken 1105 times"> + </span><span class="branchCov" title="Branch 1 was taken 555 times"> + </span><span class="branchCov" title="Branch 2 was taken 112 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span> :<span class="lineCov">       5732 :         switch (c) {</span>
+<span class="lineNum">         </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 116 times"> + </span><span class="branchCov" title="Branch 6 was taken 723 times"> + </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span><span class="branchCov" title="Branch 8 was taken 981 times"> + </span> 
+<span class="lineNum">         </span><span class="branchCov" title="Branch 9 was taken 981 times"> + </span><span class="branchCov" title="Branch 10 was taken 982 times"> + </span><span class="branchNoCov" title="Branch 11 was not taken"> - </span><span class="branchCov" title="Branch 12 was taken 14 times"> + </span><span class="branchCov" title="Branch 13 was taken 54 times"> + </span> 
+<span class="lineNum">         </span><span class="branchCov" title="Branch 14 was taken 54 times"> + </span><span class="branchCov" title="Branch 15 was taken 54 times"> + </span><span class="branchNoCov" title="Branch 16 was not taken"> - </span><span class="branchCov" title="Branch 17 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 18 was not taken"> - </span> 
+<span class="lineNum">         </span>            <span class="branchNoCov" title="Branch 19 was not taken"> - </span>]
+<span class="lineNum">    1242 </span>                :            :         case OPT_REMOTE:
+<span class="lineNum">    1243 </span>                :<span class="lineCov">       1105 :             sset_add(remotes, optarg);</span>
+<span class="lineNum">    1244 </span>                :<span class="lineCov">       1105 :             break;</span>
+<span class="lineNum">    1245 </span>                :            : 
+<span class="lineNum">    1246 </span>                :            :         case OPT_UNIXCTL:
+<span class="lineNum">    1247 </span>                :<span class="lineCov">        555 :             *unixctl_pathp = optarg;</span>
+<span class="lineNum">    1248 </span>                :<span class="lineCov">        555 :             break;</span>
+<span class="lineNum">    1249 </span>                :            : 
+<span class="lineNum">    1250 </span>                :            :         case OPT_RUN:
+<span class="lineNum">    1251 </span>                :<span class="lineCov">        112 :             *run_command = optarg;</span>
+<span class="lineNum">    1252 </span>                :<span class="lineCov">        112 :             break;</span>
+<span class="lineNum">    1253 </span>                :            : 
+<span class="lineNum">    1254 </span>                :            :         case 'h':
+<span class="lineNum">    1255 </span>                :<span class="lineNoCov">          0 :             usage();</span>
+<span class="lineNum">    1256 </span>                :            : 
+<span class="lineNum">    1257 </span>                :            :         case 'V':
+<span class="lineNum">    1258 </span>                :<span class="lineNoCov">          0 :             ovs_print_version(0, 0);</span>
+<span class="lineNum">    1259 </span>                :<span class="lineNoCov">          0 :             exit(EXIT_SUCCESS);</span>
+<span class="lineNum">    1260 </span>                :            : 
+<span class="lineNum">    1261 </span>                :<span class="lineCov">        839 :         VLOG_OPTION_HANDLERS</span>
+<span class="lineNum">    1262 </span>                :<span class="lineCov">       2958 :         DAEMON_OPTION_HANDLERS</span>
+<span class="lineNum">    1263 </span>                :            : 
+<span class="lineNum">    1264 </span>                :            :         case 'p':
+<span class="lineNum">    1265 </span>                :<span class="lineCov">         54 :             private_key_file = optarg;</span>
+<span class="lineNum">    1266 </span>                :<span class="lineCov">         54 :             break;</span>
+<span class="lineNum">    1267 </span>                :            : 
+<span class="lineNum">    1268 </span>                :            :         case 'c':
+<span class="lineNum">    1269 </span>                :<span class="lineCov">         54 :             certificate_file = optarg;</span>
+<span class="lineNum">    1270 </span>                :<span class="lineCov">         54 :             break;</span>
+<span class="lineNum">    1271 </span>                :            : 
+<span class="lineNum">    1272 </span>                :            :         case 'C':
+<span class="lineNum">    1273 </span>                :<span class="lineCov">         54 :             ca_cert_file = optarg;</span>
+<span class="lineNum">    1274 </span>                :<span class="lineCov">         54 :             bootstrap_ca_cert = false;</span>
+<span class="lineNum">    1275 </span>                :<span class="lineCov">         54 :             break;</span>
+<span class="lineNum">    1276 </span>                :            : 
+<span class="lineNum">    1277 </span>                :            :         case OPT_BOOTSTRAP_CA_CERT:
+<span class="lineNum">    1278 </span>                :<span class="lineNoCov">          0 :             ca_cert_file = optarg;</span>
+<span class="lineNum">    1279 </span>                :<span class="lineNoCov">          0 :             bootstrap_ca_cert = true;</span>
+<span class="lineNum">    1280 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">    1281 </span>                :            : 
+<span class="lineNum">    1282 </span>                :            :         case OPT_ENABLE_DUMMY:
+<span class="lineNum">    1283 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">          1 :             dummy_enable(optarg &amp;&amp; !strcmp(optarg, &quot;override&quot;));</span>
+<span class="lineNum">    1284 </span>                :<span class="lineCov">          1 :             break;</span>
+<span class="lineNum">    1285 </span>                :            : 
+<span class="lineNum">    1286 </span>                :            :         case '?':
+<span class="lineNum">    1287 </span>                :<span class="lineNoCov">          0 :             exit(EXIT_FAILURE);</span>
+<span class="lineNum">    1288 </span>                :            : 
+<span class="lineNum">    1289 </span>                :            :         default:
+<span class="lineNum">    1290 </span>                :<span class="lineNoCov">          0 :             abort();</span>
+<span class="lineNum">    1291 </span>                :            :         }
+<span class="lineNum">    1292 </span>                :<span class="lineCov">       5732 :     }</span>
+<span class="lineNum">    1293 </span>                :<span class="lineCov">       1094 :     free(short_options);</span>
+<span class="lineNum">    1294 </span>                :            : 
+<span class="lineNum">    1295 </span>                :<span class="lineCov">       1094 :     *argcp -= optind;</span>
+<span class="lineNum">    1296 </span>                :<span class="lineCov">       1094 :     *argvp += optind;</span>
+<span class="lineNum">    1297 </span>                :<span class="lineCov">       1094 : }</span>
+<a name="1298"><span class="lineNum">    1298 </span>                :            : </a>
+<span class="lineNum">    1299 </span>                :            : static void
+<span class="lineNum">    1300 </span>                :<span class="lineNoCov">          0 : usage(void)</span>
+<span class="lineNum">    1301 </span>                :            : {
+<span class="lineNum">    1302 </span>                :<span class="lineNoCov">          0 :     printf(&quot;%s: Open vSwitch database server\n&quot;</span>
+<span class="lineNum">    1303 </span>                :            :            &quot;usage: %s [OPTIONS] [DATABASE...]\n&quot;
+<span class="lineNum">    1304 </span>                :            :            &quot;where each DATABASE is a database file in ovsdb format.\n&quot;
+<span class="lineNum">    1305 </span>                :            :            &quot;The default DATABASE, if none is given, is\n%s/conf.db.\n&quot;,
+<span class="lineNum">    1306 </span>                :            :            program_name, program_name, ovs_dbdir());
+<span class="lineNum">    1307 </span>                :<span class="lineNoCov">          0 :     printf(&quot;\nJSON-RPC options (may be specified any number of times):\n&quot;</span>
+<span class="lineNum">    1308 </span>                :            :            &quot;  --remote=REMOTE         connect or listen to REMOTE\n&quot;);
+<span class="lineNum">    1309 </span>                :<span class="lineNoCov">          0 :     stream_usage(&quot;JSON-RPC&quot;, true, true, true);</span>
+<span class="lineNum">    1310 </span>                :<span class="lineNoCov">          0 :     daemon_usage();</span>
+<span class="lineNum">    1311 </span>                :<span class="lineNoCov">          0 :     vlog_usage();</span>
+<span class="lineNum">    1312 </span>                :<span class="lineNoCov">          0 :     printf(&quot;\nOther options:\n&quot;</span>
+<span class="lineNum">    1313 </span>                :            :            &quot;  --run COMMAND           run COMMAND as subprocess then exit\n&quot;
+<span class="lineNum">    1314 </span>                :            :            &quot;  --unixctl=SOCKET        override default control socket name\n&quot;
+<span class="lineNum">    1315 </span>                :            :            &quot;  -h, --help              display this help message\n&quot;
+<span class="lineNum">    1316 </span>                :            :            &quot;  -V, --version           display version information\n&quot;);
+<span class="lineNum">    1317 </span>                :<span class="lineNoCov">          0 :     exit(EXIT_SUCCESS);</span>
+<span class="lineNum">    1318 </span>                :            : }
+<a name="1319"><span class="lineNum">    1319 </span>                :            : </a>
+<span class="lineNum">    1320 </span>                :            : static struct json *
+<span class="lineNum">    1321 </span>                :<span class="lineCov">       2188 : sset_to_json(const struct sset *sset)</span>
+<span class="lineNum">    1322 </span>                :            : {
+<span class="lineNum">    1323 </span>                :            :     struct json *array;
+<span class="lineNum">    1324 </span>                :            :     const char *s;
+<span class="lineNum">    1325 </span>                :            : 
+<span class="lineNum">    1326 </span>                :<span class="lineCov">       2188 :     array = json_array_create_empty();</span>
+<span class="lineNum">    1327 </span>[<span class="branchCov" title="Branch 1 was taken 2174 times"> + </span><span class="branchCov" title="Branch 2 was taken 14 times"> + </span>][<span class="branchCov" title="Branch 5 was taken 29 times"> + </span><span class="branchCov" title="Branch 6 was taken 2174 times"> + </span>]:<span class="lineCov">       4391 :     SSET_FOR_EACH (s, sset) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 8 was taken 2203 times"> + </span><span class="branchCov" title="Branch 9 was taken 2188 times"> + </span>]
+<span class="lineNum">    1328 </span>                :<span class="lineCov">       2203 :         json_array_add(array, json_string_create(s));</span>
+<span class="lineNum">    1329 </span>                :            :     }
+<span class="lineNum">    1330 </span>                :<span class="lineCov">       2188 :     return array;</span>
+<span class="lineNum">    1331 </span>                :            : }
+<span class="lineNum">    1332 </span>                :            : 
+<span class="lineNum">    1333 </span>                :            : /* Truncates and replaces the contents of 'config_file' by a representation of
+<a name="1334"><span class="lineNum">    1334 </span>                :            :  * 'remotes' and 'db_filenames'. */</a>
+<span class="lineNum">    1335 </span>                :            : static void
+<span class="lineNum">    1336 </span>                :<span class="lineCov">       1094 : save_config__(FILE *config_file, const struct sset *remotes,</span>
+<span class="lineNum">    1337 </span>                :            :               const struct sset *db_filenames)
+<span class="lineNum">    1338 </span>                :            : {
+<span class="lineNum">    1339 </span>                :            :     struct json *obj;
+<span class="lineNum">    1340 </span>                :            :     char *s;
+<span class="lineNum">    1341 </span>                :            : 
+<span class="lineNum">    1342 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 1094 times"> + </span>]:<span class="lineCov">       1094 :     if (ftruncate(fileno(config_file), 0) == -1) {</span>
+<span class="lineNum">    1343 </span>                :<span class="lineNoCov">          0 :         VLOG_FATAL(&quot;failed to truncate temporary file (%s)&quot;,</span>
+<span class="lineNum">    1344 </span>                :            :                    ovs_strerror(errno));
+<span class="lineNum">    1345 </span>                :            :     }
+<span class="lineNum">    1346 </span>                :            : 
+<span class="lineNum">    1347 </span>                :<span class="lineCov">       1094 :     obj = json_object_create();</span>
+<span class="lineNum">    1348 </span>                :<span class="lineCov">       1094 :     json_object_put(obj, &quot;remotes&quot;, sset_to_json(remotes));</span>
+<span class="lineNum">    1349 </span>                :<span class="lineCov">       1094 :     json_object_put(obj, &quot;db_filenames&quot;, sset_to_json(db_filenames));</span>
+<span class="lineNum">    1350 </span>                :<span class="lineCov">       1094 :     s = json_to_string(obj, 0);</span>
+<span class="lineNum">    1351 </span>                :<span class="lineCov">       1094 :     json_destroy(obj);</span>
+<span class="lineNum">    1352 </span>                :            : 
+<span class="lineNum">    1353 </span>        [<span class="branchCov" title="Branch 1 was taken 1094 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">       1094 :     if (fseek(config_file, 0, SEEK_SET) != 0</span>
+<span class="lineNum">    1354 </span>        [<span class="branchCov" title="Branch 1 was taken 1094 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">       1094 :         || fputs(s, config_file) == EOF</span>
+<span class="lineNum">    1355 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1094 times"> + </span>]:<span class="lineCov">       1094 :         || fflush(config_file) == EOF) {</span>
+<span class="lineNum">    1356 </span>                :<span class="lineNoCov">          0 :         VLOG_FATAL(&quot;failed to write temporary file (%s)&quot;, ovs_strerror(errno));</span>
+<span class="lineNum">    1357 </span>                :            :     }
+<span class="lineNum">    1358 </span>                :<span class="lineCov">       1094 :     free(s);</span>
+<span class="lineNum">    1359 </span>                :<span class="lineCov">       1094 : }</span>
+<span class="lineNum">    1360 </span>                :            : 
+<span class="lineNum">    1361 </span>                :            : /* Truncates and replaces the contents of 'config_file' by a representation of
+<a name="1362"><span class="lineNum">    1362 </span>                :            :  * 'config'. */</a>
+<span class="lineNum">    1363 </span>                :            : static void
+<span class="lineNum">    1364 </span>                :<span class="lineNoCov">          0 : save_config(struct server_config *config)</span>
+<span class="lineNum">    1365 </span>                :            : {
+<span class="lineNum">    1366 </span>                :            :     struct sset db_filenames;
+<span class="lineNum">    1367 </span>                :            :     struct shash_node *node;
+<span class="lineNum">    1368 </span>                :            : 
+<span class="lineNum">    1369 </span>                :<span class="lineNoCov">          0 :     sset_init(&amp;db_filenames);</span>
+<span class="lineNum">    1370 </span>        [<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     SHASH_FOR_EACH (node, config-&gt;all_dbs) {</span>
+<span class="lineNum">    1371 </span>                :<span class="lineNoCov">          0 :         struct db *db = node-&gt;data;</span>
+<span class="lineNum">    1372 </span>                :<span class="lineNoCov">          0 :         sset_add(&amp;db_filenames, db-&gt;filename);</span>
+<span class="lineNum">    1373 </span>                :            :     }
+<span class="lineNum">    1374 </span>                :            : 
+<span class="lineNum">    1375 </span>                :<span class="lineNoCov">          0 :     save_config__(config-&gt;config_tmpfile, config-&gt;remotes, &amp;db_filenames);</span>
+<span class="lineNum">    1376 </span>                :            : 
+<span class="lineNum">    1377 </span>                :<span class="lineNoCov">          0 :     sset_destroy(&amp;db_filenames);</span>
+<span class="lineNum">    1378 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="1379"><span class="lineNum">    1379 </span>                :            : </a>
+<span class="lineNum">    1380 </span>                :            : static void
+<span class="lineNum">    1381 </span>                :<span class="lineCov">       1182 : sset_from_json(struct sset *sset, const struct json *array)</span>
+<span class="lineNum">    1382 </span>                :            : {
+<span class="lineNum">    1383 </span>                :            :     size_t i;
+<span class="lineNum">    1384 </span>                :            : 
+<span class="lineNum">    1385 </span>                :<span class="lineCov">       1182 :     sset_clear(sset);</span>
+<span class="lineNum">    1386 </span>                :            : 
+<span class="lineNum">    1387 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1182 times"> + </span>]:<span class="lineCov">       1182 :     ovs_assert(array-&gt;type == JSON_ARRAY);</span>
+<span class="lineNum">    1388 </span>        [<span class="branchCov" title="Branch 0 was taken 1193 times"> + </span><span class="branchCov" title="Branch 1 was taken 1182 times"> + </span>]:<span class="lineCov">       2375 :     for (i = 0; i &lt; array-&gt;u.array.n; i++) {</span>
+<span class="lineNum">    1389 </span>                :<span class="lineCov">       1193 :         const struct json *elem = array-&gt;u.array.elems[i];</span>
+<span class="lineNum">    1390 </span>                :<span class="lineCov">       1193 :         sset_add(sset, json_string(elem));</span>
+<span class="lineNum">    1391 </span>                :            :     }
+<span class="lineNum">    1392 </span>                :<span class="lineCov">       1182 : }</span>
+<span class="lineNum">    1393 </span>                :            : 
+<span class="lineNum">    1394 </span>                :            : /* Clears and replaces 'remotes' and 'dbnames' by a configuration read from
+<a name="1395"><span class="lineNum">    1395 </span>                :            :  * 'config_file', which must have been previously written by save_config(). */</a>
+<span class="lineNum">    1396 </span>                :            : static void
+<span class="lineNum">    1397 </span>                :<span class="lineCov">        591 : load_config(FILE *config_file, struct sset *remotes, struct sset *db_filenames)</span>
+<span class="lineNum">    1398 </span>                :            : {
+<span class="lineNum">    1399 </span>                :            :     struct json *json;
+<span class="lineNum">    1400 </span>                :            : 
+<span class="lineNum">    1401 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 591 times"> + </span>]:<span class="lineCov">        591 :     if (fseek(config_file, 0, SEEK_SET) != 0) {</span>
+<span class="lineNum">    1402 </span>                :<span class="lineNoCov">          0 :         VLOG_FATAL(&quot;seek failed in temporary file (%s)&quot;, ovs_strerror(errno));</span>
+<span class="lineNum">    1403 </span>                :            :     }
+<span class="lineNum">    1404 </span>                :<span class="lineCov">        591 :     json = json_from_stream(config_file);</span>
+<span class="lineNum">    1405 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 591 times"> + </span>]:<span class="lineCov">        591 :     if (json-&gt;type == JSON_STRING) {</span>
+<span class="lineNum">    1406 </span>                :<span class="lineNoCov">          0 :         VLOG_FATAL(&quot;reading json failed (%s)&quot;, json_string(json));</span>
+<span class="lineNum">    1407 </span>                :            :     }
+<span class="lineNum">    1408 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 591 times"> + </span>]:<span class="lineCov">        591 :     ovs_assert(json-&gt;type == JSON_OBJECT);</span>
+<span class="lineNum">    1409 </span>                :            : 
+<span class="lineNum">    1410 </span>                :<span class="lineCov">        591 :     sset_from_json(remotes, shash_find_data(json_object(json), &quot;remotes&quot;));</span>
+<span class="lineNum">    1411 </span>                :<span class="lineCov">        591 :     sset_from_json(db_filenames,</span>
+<span class="lineNum">    1412 </span>                :<span class="lineCov">        591 :                    shash_find_data(json_object(json), &quot;db_filenames&quot;));</span>
+<span class="lineNum">    1413 </span>                :<span class="lineCov">        591 :     json_destroy(json);</span>
+<span class="lineNum">    1414 </span>                :<span class="lineCov">        591 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,496 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/vlandev.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - vlandev.c<span style="font-size: 80%;"> (source / <a href="vlandev.c.func.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">49</td>
+            <td class="headerCovTableEntry">125</td>
+            <td class="headerCovTableEntryLo">39.2 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2014-07-01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">10</td>
+            <td class="headerCovTableEntry">20</td>
+            <td class="headerCovTableEntryLo">50.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">16</td>
+            <td class="headerCovTableEntry">62</td>
+            <td class="headerCovTableEntryLo">25.8 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2011, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &quot;vlandev.h&quot;
+<span class="lineNum">      20 </span>                :            : 
+<span class="lineNum">      21 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;net/if.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;sys/ioctl.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &lt;sys/stat.h&gt;
+<span class="lineNum">      25 </span>                :            : 
+<span class="lineNum">      26 </span>                :            : #include &quot;dummy.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;shash.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;socket-util.h&quot;
+<a name="30"><span class="lineNum">      30 </span>                :            : #include &quot;vlog.h&quot;</a>
+<span class="lineNum">      31 </span>                :            : 
+<span class="lineNum">      32 </span>                :<span class="lineCov">       1619 : VLOG_DEFINE_THIS_MODULE(vlandev);</span>
+<span class="lineNum">      33 </span>                :            : 
+<span class="lineNum">      34 </span>                :            : /* A vlandev implementation. */
+<span class="lineNum">      35 </span>                :            : struct vlandev_class {
+<span class="lineNum">      36 </span>                :            :     int (*vd_refresh)(void);
+<span class="lineNum">      37 </span>                :            :     int (*vd_add)(const char *real_dev, int vid);
+<span class="lineNum">      38 </span>                :            :     int (*vd_del)(const char *vlan_dev);
+<span class="lineNum">      39 </span>                :            : };
+<span class="lineNum">      40 </span>                :            : 
+<span class="lineNum">      41 </span>                :            : #ifdef __linux__
+<span class="lineNum">      42 </span>                :            : static const struct vlandev_class vlandev_linux_class;
+<span class="lineNum">      43 </span>                :            : #endif
+<span class="lineNum">      44 </span>                :            : static const struct vlandev_class vlandev_stub_class;
+<span class="lineNum">      45 </span>                :            : static const struct vlandev_class vlandev_dummy_class;
+<span class="lineNum">      46 </span>                :            : 
+<span class="lineNum">      47 </span>                :            : /* The in-use vlandev implementation. */
+<span class="lineNum">      48 </span>                :            : static const struct vlandev_class *vd_class;
+<span class="lineNum">      49 </span>                :            : 
+<span class="lineNum">      50 </span>                :            : /* Maps from a VLAN device name (e.g. &quot;eth0.10&quot;) to struct vlan_dev. */
+<span class="lineNum">      51 </span>                :            : static struct shash vlan_devs = SHASH_INITIALIZER(&amp;vlan_devs);
+<span class="lineNum">      52 </span>                :            : 
+<span class="lineNum">      53 </span>                :            : /* Maps from a VLAN real device name (e.g. &quot;eth0&quot;) to struct vlan_real_dev. */
+<span class="lineNum">      54 </span>                :            : static struct shash vlan_real_devs = SHASH_INITIALIZER(&amp;vlan_real_devs);
+<span class="lineNum">      55 </span>                :            : 
+<span class="lineNum">      56 </span>                :            : static int vlandev_add__(const char *vlan_dev, const char *real_dev, int vid);
+<span class="lineNum">      57 </span>                :            : static int vlandev_del__(const char *vlan_dev);
+<span class="lineNum">      58 </span>                :            : static void vlandev_clear__(void);
+<a name="59"><span class="lineNum">      59 </span>                :            : </a>
+<span class="lineNum">      60 </span>                :            : static const struct vlandev_class *
+<span class="lineNum">      61 </span>                :<span class="lineCov">          5 : vlandev_get_class(void)</span>
+<span class="lineNum">      62 </span>                :            : {
+<span class="lineNum">      63 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 5 times"> + </span>]:<span class="lineCov">          5 :     if (!vd_class) {</span>
+<span class="lineNum">      64 </span>                :            : #if __linux__
+<span class="lineNum">      65 </span>                :<span class="lineNoCov">          0 :         vd_class = &amp;vlandev_linux_class;</span>
+<span class="lineNum">      66 </span>                :            : #else
+<span class="lineNum">      67 </span>                :            :         vd_class = &amp;vlandev_stub_class;
+<span class="lineNum">      68 </span>                :            : #endif
+<span class="lineNum">      69 </span>                :            :     }
+<span class="lineNum">      70 </span>                :<span class="lineCov">          5 :     return vd_class;</span>
+<span class="lineNum">      71 </span>                :            : }
+<span class="lineNum">      72 </span>                :            : 
+<span class="lineNum">      73 </span>                :            : /* On Linux, the default implementation of VLAN devices creates and destroys
+<span class="lineNum">      74 </span>                :            :  * Linux VLAN devices.  On other OSess, the default implementation is a
+<span class="lineNum">      75 </span>                :            :  * nonfunctional stub.  In either case, this function replaces this default
+<span class="lineNum">      76 </span>                :            :  * implementation by a &quot;dummy&quot; implementation that simply reports back whatever
+<span class="lineNum">      77 </span>                :            :  * the client sets up with vlandev_add() and vlandev_del().
+<span class="lineNum">      78 </span>                :            :  *
+<a name="79"><span class="lineNum">      79 </span>                :            :  * Don't call this function directly; use dummy_enable() from dummy.h. */</a>
+<span class="lineNum">      80 </span>                :            : void
+<span class="lineNum">      81 </span>                :<span class="lineCov">        525 : vlandev_dummy_enable(void)</span>
+<span class="lineNum">      82 </span>                :            : {
+<span class="lineNum">      83 </span>        [<span class="branchCov" title="Branch 0 was taken 525 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        525 :     if (vd_class != &amp;vlandev_dummy_class) {</span>
+<span class="lineNum">      84 </span>                :<span class="lineCov">        525 :         vd_class = &amp;vlandev_dummy_class;</span>
+<span class="lineNum">      85 </span>                :<span class="lineCov">        525 :         vlandev_clear__();</span>
+<span class="lineNum">      86 </span>                :            :     }
+<span class="lineNum">      87 </span>                :<span class="lineCov">        525 : }</span>
+<span class="lineNum">      88 </span>                :            : 
+<span class="lineNum">      89 </span>                :            : /* Creates a new VLAN device for VLAN 'vid' on top of real Ethernet device
+<span class="lineNum">      90 </span>                :            :  * 'real_dev'.  Returns 0 if successful, otherwise a positive errno value.  On
+<span class="lineNum">      91 </span>                :            :  * OSes other than Linux, in the absence of dummies (see
+<span class="lineNum">      92 </span>                :            :  * vlandev_dummy_enable()), this always fails.
+<span class="lineNum">      93 </span>                :            :  *
+<span class="lineNum">      94 </span>                :            :  * The name of the new VLAN device is not easily predictable, because Linux
+<span class="lineNum">      95 </span>                :            :  * provides multiple naming schemes, does not allow the client to specify a
+<span class="lineNum">      96 </span>                :            :  * name, and does not directly report the new VLAN device's name.  Use
+<span class="lineNum">      97 </span>                :            :  * vlandev_refresh() then vlandev_get_name() to find out the new VLAN device's
+<a name="98"><span class="lineNum">      98 </span>                :            :  * name,. */</a>
+<span class="lineNum">      99 </span>                :            : int
+<span class="lineNum">     100 </span>                :<span class="lineCov">          3 : vlandev_add(const char *real_dev, int vid)</span>
+<span class="lineNum">     101 </span>                :            : {
+<span class="lineNum">     102 </span>                :<span class="lineCov">          3 :     return vlandev_get_class()-&gt;vd_add(real_dev, vid);</span>
+<span class="lineNum">     103 </span>                :            : }
+<span class="lineNum">     104 </span>                :            : 
+<span class="lineNum">     105 </span>                :            : /* Deletes the VLAN device named 'vlan_dev'.  Returns 0 if successful,
+<span class="lineNum">     106 </span>                :            :  * otherwise a positive errno value.  On OSes other than Linux, in the absence
+<a name="107"><span class="lineNum">     107 </span>                :            :  * of dummies (see vlandev_dummy_enable()), this always fails. */</a>
+<span class="lineNum">     108 </span>                :            : int
+<span class="lineNum">     109 </span>                :<span class="lineNoCov">          0 : vlandev_del(const char *vlan_dev)</span>
+<span class="lineNum">     110 </span>                :            : {
+<span class="lineNum">     111 </span>                :<span class="lineNoCov">          0 :     return vlandev_get_class()-&gt;vd_del(vlan_dev);</span>
+<span class="lineNum">     112 </span>                :            : }
+<span class="lineNum">     113 </span>                :            : 
+<span class="lineNum">     114 </span>                :            : /* Refreshes the cache of real device to VLAN device mappings reported by
+<span class="lineNum">     115 </span>                :            :  * vlandev_get_real_devs() and vlandev_get_name().  Without calling this
+<span class="lineNum">     116 </span>                :            :  * function, changes made by vlandev_add() and vlandev_del() may not be
+<a name="117"><span class="lineNum">     117 </span>                :            :  * reflected by vlandev_get_real_devs() and vlandev_get_name() output. */</a>
+<span class="lineNum">     118 </span>                :            : int
+<span class="lineNum">     119 </span>                :<span class="lineCov">          2 : vlandev_refresh(void)</span>
+<span class="lineNum">     120 </span>                :            : {
+<span class="lineNum">     121 </span>                :<span class="lineCov">          2 :     const struct vlandev_class *class = vlandev_get_class();</span>
+<span class="lineNum">     122 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :     return class-&gt;vd_refresh ? class-&gt;vd_refresh() : 0;</span>
+<span class="lineNum">     123 </span>                :            : }
+<span class="lineNum">     124 </span>                :            : 
+<span class="lineNum">     125 </span>                :            : /* Returns a shash mapping from the name of real Ethernet devices used as the
+<span class="lineNum">     126 </span>                :            :  * basis of VLAN devices to struct vlan_real_devs.  The caller must not modify
+<span class="lineNum">     127 </span>                :            :  * or free anything in the returned shash.
+<span class="lineNum">     128 </span>                :            :  *
+<span class="lineNum">     129 </span>                :            :  * Changes made by vlandev_add() and vlandev_del() may not be reflected in this
+<a name="130"><span class="lineNum">     130 </span>                :            :  * function's output without an intervening call to vlandev_refresh(). */</a>
+<span class="lineNum">     131 </span>                :            : struct shash *
+<span class="lineNum">     132 </span>                :<span class="lineCov">          1 : vlandev_get_real_devs(void)</span>
+<span class="lineNum">     133 </span>                :            : {
+<span class="lineNum">     134 </span>                :<span class="lineCov">          1 :     return &amp;vlan_real_devs;</span>
+<span class="lineNum">     135 </span>                :            : }
+<span class="lineNum">     136 </span>                :            : 
+<span class="lineNum">     137 </span>                :            : /* Returns the name of the VLAN device for VLAN 'vid' on top of
+<span class="lineNum">     138 </span>                :            :  * 'real_dev_name', or NULL if there is no such VLAN device.
+<span class="lineNum">     139 </span>                :            :  *
+<span class="lineNum">     140 </span>                :            :  * Changes made by vlandev_add() and vlandev_del() may not be reflected in this
+<a name="141"><span class="lineNum">     141 </span>                :            :  * function's output without an intervening call to vlandev_refresh(). */</a>
+<span class="lineNum">     142 </span>                :            : const char *
+<span class="lineNum">     143 </span>                :<span class="lineCov">          6 : vlandev_get_name(const char *real_dev_name, int vid)</span>
+<span class="lineNum">     144 </span>                :            : {
+<span class="lineNum">     145 </span>                :            :     const struct vlan_real_dev *real_dev;
+<span class="lineNum">     146 </span>                :            : 
+<span class="lineNum">     147 </span>                :<span class="lineCov">          6 :     real_dev = shash_find_data(&amp;vlan_real_devs, real_dev_name);</span>
+<span class="lineNum">     148 </span>        [<span class="branchCov" title="Branch 0 was taken 5 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          6 :     if (real_dev) {</span>
+<span class="lineNum">     149 </span>                :            :         const struct vlan_dev *vlan_dev;
+<span class="lineNum">     150 </span>                :            : 
+<span class="lineNum">     151 </span>        [<span class="branchCov" title="Branch 3 was taken 3 times"> + </span><span class="branchCov" title="Branch 4 was taken 2 times"> + </span>]:<span class="lineCov">          5 :         HMAP_FOR_EACH_WITH_HASH (vlan_dev, hmap_node, hash_int(vid, 0),</span>
+<span class="lineNum">     152 </span>                :            :                                  &amp;real_dev-&gt;vlan_devs) {
+<span class="lineNum">     153 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          3 :             if (vlan_dev-&gt;vid == vid) {</span>
+<span class="lineNum">     154 </span>                :<span class="lineCov">          3 :                 return vlan_dev-&gt;name;</span>
+<span class="lineNum">     155 </span>                :            :             }
+<span class="lineNum">     156 </span>                :            :         }
+<span class="lineNum">     157 </span>                :            :     }
+<span class="lineNum">     158 </span>                :            : 
+<span class="lineNum">     159 </span>                :<span class="lineCov">          6 :     return NULL;</span>
+<span class="lineNum">     160 </span>                :            : }
+<span class="lineNum">     161 </span>                :            : 
+<span class="lineNum">     162 </span>                :            : /* The Linux vlandev implementation. */
+<span class="lineNum">     163 </span>                :            : 
+<span class="lineNum">     164 </span>                :            : #ifdef __linux__
+<span class="lineNum">     165 </span>                :            : #include &quot;rtnetlink-link.h&quot;
+<span class="lineNum">     166 </span>                :            : #include &lt;linux/if_vlan.h&gt;
+<span class="lineNum">     167 </span>                :            : #include &lt;linux/sockios.h&gt;
+<span class="lineNum">     168 </span>                :            : #include &quot;netdev-linux.h&quot;
+<span class="lineNum">     169 </span>                :            : 
+<span class="lineNum">     170 </span>                :            : static struct nln_notifier *vlan_cache_notifier;
+<span class="lineNum">     171 </span>                :            : static bool cache_valid;
+<a name="172"><span class="lineNum">     172 </span>                :            : </a>
+<span class="lineNum">     173 </span>                :            : static void
+<span class="lineNum">     174 </span>                :<span class="lineNoCov">          0 : vlan_cache_cb(const struct rtnetlink_link_change *change OVS_UNUSED,</span>
+<span class="lineNum">     175 </span>                :            :               void *aux OVS_UNUSED)
+<span class="lineNum">     176 </span>                :            : {
+<span class="lineNum">     177 </span>                :<span class="lineNoCov">          0 :     cache_valid = false;</span>
+<span class="lineNum">     178 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="179"><span class="lineNum">     179 </span>                :            : </a>
+<span class="lineNum">     180 </span>                :            : static int
+<span class="lineNum">     181 </span>                :<span class="lineNoCov">          0 : vlandev_linux_refresh(void)</span>
+<span class="lineNum">     182 </span>                :            : {
+<span class="lineNum">     183 </span>                :<span class="lineNoCov">          0 :     const char *fn = &quot;/proc/net/vlan/config&quot;;</span>
+<span class="lineNum">     184 </span>                :            :     char line[128];
+<span class="lineNum">     185 </span>                :            :     FILE *stream;
+<span class="lineNum">     186 </span>                :            : 
+<span class="lineNum">     187 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!vlan_cache_notifier) {</span>
+<span class="lineNum">     188 </span>                :<span class="lineNoCov">          0 :         vlan_cache_notifier = rtnetlink_link_notifier_create(vlan_cache_cb,</span>
+<span class="lineNum">     189 </span>                :            :                                                              NULL);
+<span class="lineNum">     190 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!vlan_cache_notifier) {</span>
+<span class="lineNum">     191 </span>                :<span class="lineNoCov">          0 :             return EINVAL;</span>
+<span class="lineNum">     192 </span>                :            :         }
+<span class="lineNum">     193 </span>                :            :     }
+<span class="lineNum">     194 </span>                :            : 
+<span class="lineNum">     195 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (cache_valid) {</span>
+<span class="lineNum">     196 </span>                :<span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     197 </span>                :            :     }
+<span class="lineNum">     198 </span>                :            : 
+<span class="lineNum">     199 </span>                :<span class="lineNoCov">          0 :     vlandev_clear__();</span>
+<span class="lineNum">     200 </span>                :            : 
+<span class="lineNum">     201 </span>                :            :     /* Repopulate cache. */
+<span class="lineNum">     202 </span>                :<span class="lineNoCov">          0 :     stream = fopen(fn, &quot;r&quot;);</span>
+<span class="lineNum">     203 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!stream) {</span>
+<span class="lineNum">     204 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 1);
+<span class="lineNum">     205 </span>                :<span class="lineNoCov">          0 :         int error = errno;</span>
+<span class="lineNum">     206 </span>                :            :         struct stat s;
+<span class="lineNum">     207 </span>                :            : 
+<span class="lineNum">     208 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (error == ENOENT &amp;&amp; !stat(&quot;/proc&quot;, &amp;s)) {</span>
+<span class="lineNum">     209 </span>                :            :             /* Probably the vlan module just isn't loaded, and probably that's
+<span class="lineNum">     210 </span>                :            :              * because no VLAN devices have been created.
+<span class="lineNum">     211 </span>                :            :              *
+<span class="lineNum">     212 </span>                :            :              * Not really an error. */
+<span class="lineNum">     213 </span>                :<span class="lineNoCov">          0 :             return 0;</span>
+<span class="lineNum">     214 </span>                :            :         }
+<span class="lineNum">     215 </span>                :            : 
+<span class="lineNum">     216 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;%s: open failed (%s)&quot;, fn, ovs_strerror(error));</span>
+<span class="lineNum">     217 </span>                :<span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     218 </span>                :            :     }
+<span class="lineNum">     219 </span>                :            : 
+<span class="lineNum">     220 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     while (fgets(line, sizeof line, stream)) {</span>
+<span class="lineNum">     221 </span>                :            :         char vlan_dev[16], real_dev[16];
+<span class="lineNum">     222 </span>                :            :         int vid;
+<span class="lineNum">     223 </span>                :            : 
+<span class="lineNum">     224 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (ovs_scan(line, &quot;%15[^ |] | %d | %15s&quot;, vlan_dev, &amp;vid, real_dev)) {</span>
+<span class="lineNum">     225 </span>                :<span class="lineNoCov">          0 :             vlandev_add__(vlan_dev, real_dev, vid);</span>
+<span class="lineNum">     226 </span>                :            :         }
+<span class="lineNum">     227 </span>                :            :     }
+<span class="lineNum">     228 </span>                :<span class="lineNoCov">          0 :     fclose(stream);</span>
+<span class="lineNum">     229 </span>                :            : 
+<span class="lineNum">     230 </span>                :<span class="lineNoCov">          0 :     cache_valid = true;</span>
+<span class="lineNum">     231 </span>                :<span class="lineNoCov">          0 :     return 0;</span>
+<span class="lineNum">     232 </span>                :            : }
+<a name="233"><span class="lineNum">     233 </span>                :            : </a>
+<span class="lineNum">     234 </span>                :            : static int
+<span class="lineNum">     235 </span>                :<span class="lineNoCov">          0 : do_vlan_ioctl(const char *netdev_name, struct vlan_ioctl_args *via,</span>
+<span class="lineNum">     236 </span>                :            :               int cmd, const char *cmd_name)
+<span class="lineNum">     237 </span>                :            : {
+<span class="lineNum">     238 </span>                :            :     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 1);
+<span class="lineNum">     239 </span>                :            :     int error;
+<span class="lineNum">     240 </span>                :            : 
+<span class="lineNum">     241 </span>                :<span class="lineNoCov">          0 :     via-&gt;cmd = cmd;</span>
+<span class="lineNum">     242 </span>                :<span class="lineNoCov">          0 :     ovs_strlcpy(via-&gt;device1, netdev_name, sizeof via-&gt;device1);</span>
+<span class="lineNum">     243 </span>                :            : 
+<span class="lineNum">     244 </span>                :<span class="lineNoCov">          0 :     error = af_inet_ioctl(SIOCSIFVLAN, via);</span>
+<span class="lineNum">     245 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (error) {</span>
+<span class="lineNum">     246 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;%s: VLAN ioctl %s failed (%s)&quot;,</span>
+<span class="lineNum">     247 </span>                :            :                      netdev_name, cmd_name, ovs_strerror(error));
+<span class="lineNum">     248 </span>                :            :     }
+<span class="lineNum">     249 </span>                :<span class="lineNoCov">          0 :     return error;</span>
+<span class="lineNum">     250 </span>                :            : }
+<a name="251"><span class="lineNum">     251 </span>                :            : </a>
+<span class="lineNum">     252 </span>                :            : static int
+<span class="lineNum">     253 </span>                :<span class="lineNoCov">          0 : vlandev_linux_add(const char *real_dev, int vid)</span>
+<span class="lineNum">     254 </span>                :            : {
+<span class="lineNum">     255 </span>                :            :     struct vlan_ioctl_args via;
+<span class="lineNum">     256 </span>                :            :     int error;
+<span class="lineNum">     257 </span>                :            : 
+<span class="lineNum">     258 </span>                :<span class="lineNoCov">          0 :     memset(&amp;via, 0, sizeof via);</span>
+<span class="lineNum">     259 </span>                :<span class="lineNoCov">          0 :     via.u.VID = vid;</span>
+<span class="lineNum">     260 </span>                :            : 
+<span class="lineNum">     261 </span>                :<span class="lineNoCov">          0 :     error = do_vlan_ioctl(real_dev, &amp;via, ADD_VLAN_CMD, &quot;ADD_VLAN_CMD&quot;);</span>
+<span class="lineNum">     262 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!error) {</span>
+<span class="lineNum">     263 </span>                :<span class="lineNoCov">          0 :         cache_valid = false;</span>
+<span class="lineNum">     264 </span>                :            :     }
+<span class="lineNum">     265 </span>                :<span class="lineNoCov">          0 :     return error;</span>
+<span class="lineNum">     266 </span>                :            : }
+<a name="267"><span class="lineNum">     267 </span>                :            : </a>
+<span class="lineNum">     268 </span>                :            : static int
+<span class="lineNum">     269 </span>                :<span class="lineNoCov">          0 : vlandev_linux_del(const char *vlan_dev)</span>
+<span class="lineNum">     270 </span>                :            : {
+<span class="lineNum">     271 </span>                :            :     struct vlan_ioctl_args via;
+<span class="lineNum">     272 </span>                :            :     int error;
+<span class="lineNum">     273 </span>                :            : 
+<span class="lineNum">     274 </span>                :<span class="lineNoCov">          0 :     memset(&amp;via, 0, sizeof via);</span>
+<span class="lineNum">     275 </span>                :<span class="lineNoCov">          0 :     error = do_vlan_ioctl(vlan_dev, &amp;via, DEL_VLAN_CMD, &quot;DEL_VLAN_CMD&quot;);</span>
+<span class="lineNum">     276 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!error) {</span>
+<span class="lineNum">     277 </span>                :<span class="lineNoCov">          0 :         cache_valid = false;</span>
+<span class="lineNum">     278 </span>                :            :     }
+<span class="lineNum">     279 </span>                :<span class="lineNoCov">          0 :     return error;</span>
+<span class="lineNum">     280 </span>                :            : }
+<span class="lineNum">     281 </span>                :            : 
+<span class="lineNum">     282 </span>                :            : static const struct vlandev_class vlandev_linux_class = {
+<span class="lineNum">     283 </span>                :            :     vlandev_linux_refresh,
+<span class="lineNum">     284 </span>                :            :     vlandev_linux_add,
+<span class="lineNum">     285 </span>                :            :     vlandev_linux_del
+<span class="lineNum">     286 </span>                :            : };
+<span class="lineNum">     287 </span>                :            : #endif
+<span class="lineNum">     288 </span>                :            : 
+<span class="lineNum">     289 </span>                :            : /* Stub implementation. */
+<a name="290"><span class="lineNum">     290 </span>                :            : </a>
+<span class="lineNum">     291 </span>                :            : static int
+<span class="lineNum">     292 </span>                :<span class="lineNoCov">          0 : vlandev_stub_add(const char *real_dev OVS_UNUSED, int vid OVS_UNUSED)</span>
+<span class="lineNum">     293 </span>                :            : {
+<span class="lineNum">     294 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     VLOG_ERR(&quot;not supported on non-Linux platform&quot;);</span>
+<span class="lineNum">     295 </span>                :<span class="lineNoCov">          0 :     return EOPNOTSUPP;</span>
+<span class="lineNum">     296 </span>                :            : }
+<a name="297"><span class="lineNum">     297 </span>                :            : </a>
+<span class="lineNum">     298 </span>                :            : static int
+<span class="lineNum">     299 </span>                :<span class="lineNoCov">          0 : vlandev_stub_del(const char *vlan_dev OVS_UNUSED)</span>
+<span class="lineNum">     300 </span>                :            : {
+<span class="lineNum">     301 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     VLOG_ERR(&quot;not supported on non-Linux platform&quot;);</span>
+<span class="lineNum">     302 </span>                :<span class="lineNoCov">          0 :     return EOPNOTSUPP;</span>
+<span class="lineNum">     303 </span>                :            : }
+<span class="lineNum">     304 </span>                :            : 
+<span class="lineNum">     305 </span>                :            : static const struct vlandev_class OVS_UNUSED vlandev_stub_class = {
+<span class="lineNum">     306 </span>                :            :     NULL,                       /* vd_refresh */
+<span class="lineNum">     307 </span>                :            :     vlandev_stub_add,
+<span class="lineNum">     308 </span>                :            :     vlandev_stub_del
+<span class="lineNum">     309 </span>                :            : };
+<span class="lineNum">     310 </span>                :            : 
+<span class="lineNum">     311 </span>                :            : /* Dummy implementation. */
+<a name="312"><span class="lineNum">     312 </span>                :            : </a>
+<span class="lineNum">     313 </span>                :            : static int
+<span class="lineNum">     314 </span>                :<span class="lineCov">          3 : vlandev_dummy_add(const char *real_dev, int vid)</span>
+<span class="lineNum">     315 </span>                :            : {
+<span class="lineNum">     316 </span>                :            :     char name[IFNAMSIZ];
+<span class="lineNum">     317 </span>                :            : 
+<span class="lineNum">     318 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">          3 :     if (snprintf(name, sizeof name, &quot;%s.%d&quot;, real_dev, vid) &gt;= sizeof name) {</span>
+<span class="lineNum">     319 </span>                :<span class="lineNoCov">          0 :         return ENAMETOOLONG;</span>
+<span class="lineNum">     320 </span>                :            :     }
+<span class="lineNum">     321 </span>                :<span class="lineCov">          3 :     return vlandev_add__(name, real_dev, vid);</span>
+<span class="lineNum">     322 </span>                :            : }
+<a name="323"><span class="lineNum">     323 </span>                :            : </a>
+<span class="lineNum">     324 </span>                :            : static int
+<span class="lineNum">     325 </span>                :<span class="lineNoCov">          0 : vlandev_dummy_del(const char *vlan_dev)</span>
+<span class="lineNum">     326 </span>                :            : {
+<span class="lineNum">     327 </span>                :<span class="lineNoCov">          0 :     return vlandev_del__(vlan_dev);</span>
+<span class="lineNum">     328 </span>                :            : }
+<span class="lineNum">     329 </span>                :            : 
+<span class="lineNum">     330 </span>                :            : static const struct vlandev_class vlandev_dummy_class = {
+<span class="lineNum">     331 </span>                :            :     NULL,                       /* vd_refresh */
+<span class="lineNum">     332 </span>                :            :     vlandev_dummy_add,
+<span class="lineNum">     333 </span>                :            :     vlandev_dummy_del
+<span class="lineNum">     334 </span>                :            : };
+<a name="335"><span class="lineNum">     335 </span>                :            : </a>
+<span class="lineNum">     336 </span>                :            : static int
+<span class="lineNum">     337 </span>                :<span class="lineCov">          3 : vlandev_add__(const char *vlan_dev, const char *real_dev, int vid)</span>
+<span class="lineNum">     338 </span>                :            : {
+<span class="lineNum">     339 </span>                :<span class="lineCov">          3 :     uint32_t vid_hash = hash_int(vid, 0);</span>
+<span class="lineNum">     340 </span>                :            :     struct vlan_real_dev *vrd;
+<span class="lineNum">     341 </span>                :            :     struct vlan_dev *vd;
+<span class="lineNum">     342 </span>                :            : 
+<span class="lineNum">     343 </span>[<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 3 times"> + </span>]:<span class="lineCov">          3 :     if (vid &lt; 0 || vid &gt; 4095) {</span>
+<span class="lineNum">     344 </span>                :<span class="lineNoCov">          0 :         return EINVAL;</span>
+<span class="lineNum">     345 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 3 times"> + </span>]:<span class="lineCov">          3 :     } else if (shash_find(&amp;vlan_devs, vlan_dev)) {</span>
+<span class="lineNum">     346 </span>                :<span class="lineNoCov">          0 :         return EEXIST;</span>
+<span class="lineNum">     347 </span>                :            :     }
+<span class="lineNum">     348 </span>                :            : 
+<span class="lineNum">     349 </span>                :<span class="lineCov">          3 :     vrd = shash_find_data(&amp;vlan_real_devs, real_dev);</span>
+<span class="lineNum">     350 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          3 :     if (!vrd) {</span>
+<span class="lineNum">     351 </span>                :<span class="lineCov">          1 :         vrd = xmalloc(sizeof *vrd);</span>
+<span class="lineNum">     352 </span>                :<span class="lineCov">          1 :         vrd-&gt;name = xstrdup(real_dev);</span>
+<span class="lineNum">     353 </span>                :<span class="lineCov">          1 :         hmap_init(&amp;vrd-&gt;vlan_devs);</span>
+<span class="lineNum">     354 </span>                :<span class="lineCov">          1 :         shash_add_nocopy(&amp;vlan_real_devs, vrd-&gt;name, vrd);</span>
+<span class="lineNum">     355 </span>                :            :     } else {
+<span class="lineNum">     356 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 2 times"> + </span>]:<span class="lineCov">          2 :         HMAP_FOR_EACH_WITH_HASH (vd, hmap_node, vid_hash, &amp;vrd-&gt;vlan_devs) {</span>
+<span class="lineNum">     357 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (vd-&gt;vid == vid) {</span>
+<span class="lineNum">     358 </span>                :<span class="lineNoCov">          0 :                 return EEXIST;</span>
+<span class="lineNum">     359 </span>                :            :             }
+<span class="lineNum">     360 </span>                :            :         }
+<span class="lineNum">     361 </span>                :            :     }
+<span class="lineNum">     362 </span>                :            : 
+<span class="lineNum">     363 </span>                :<span class="lineCov">          3 :     vd = xmalloc(sizeof *vd);</span>
+<span class="lineNum">     364 </span>                :<span class="lineCov">          3 :     hmap_insert(&amp;vrd-&gt;vlan_devs, &amp;vd-&gt;hmap_node, vid_hash);</span>
+<span class="lineNum">     365 </span>                :<span class="lineCov">          3 :     vd-&gt;name = xstrdup(vlan_dev);</span>
+<span class="lineNum">     366 </span>                :<span class="lineCov">          3 :     vd-&gt;vid = vid;</span>
+<span class="lineNum">     367 </span>                :<span class="lineCov">          3 :     vd-&gt;real_dev = vrd;</span>
+<span class="lineNum">     368 </span>                :<span class="lineCov">          3 :     shash_add_nocopy(&amp;vlan_devs, vd-&gt;name, vd);</span>
+<span class="lineNum">     369 </span>                :            : 
+<span class="lineNum">     370 </span>                :<span class="lineCov">          3 :     return 0;</span>
+<span class="lineNum">     371 </span>                :            : }
+<a name="372"><span class="lineNum">     372 </span>                :            : </a>
+<span class="lineNum">     373 </span>                :            : static int
+<span class="lineNum">     374 </span>                :<span class="lineNoCov">          0 : vlandev_del__(const char *vlan_dev)</span>
+<span class="lineNum">     375 </span>                :            : {
+<span class="lineNum">     376 </span>                :<span class="lineNoCov">          0 :     struct shash_node *vd_node = shash_find(&amp;vlan_devs, vlan_dev);</span>
+<span class="lineNum">     377 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (vd_node) {</span>
+<span class="lineNum">     378 </span>                :<span class="lineNoCov">          0 :         struct vlan_dev *vd = vd_node-&gt;data;</span>
+<span class="lineNum">     379 </span>                :<span class="lineNoCov">          0 :         struct vlan_real_dev *vrd = vd-&gt;real_dev;</span>
+<span class="lineNum">     380 </span>                :            : 
+<span class="lineNum">     381 </span>                :<span class="lineNoCov">          0 :         hmap_remove(&amp;vrd-&gt;vlan_devs, &amp;vd-&gt;hmap_node);</span>
+<span class="lineNum">     382 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (hmap_is_empty(&amp;vrd-&gt;vlan_devs)) {</span>
+<span class="lineNum">     383 </span>                :<span class="lineNoCov">          0 :             shash_find_and_delete_assert(&amp;vlan_real_devs, vrd-&gt;name);</span>
+<span class="lineNum">     384 </span>                :<span class="lineNoCov">          0 :             free(vrd);</span>
+<span class="lineNum">     385 </span>                :            :         }
+<span class="lineNum">     386 </span>                :            : 
+<span class="lineNum">     387 </span>                :<span class="lineNoCov">          0 :         shash_delete(&amp;vlan_devs, vd_node);</span>
+<span class="lineNum">     388 </span>                :<span class="lineNoCov">          0 :         free(vd);</span>
+<span class="lineNum">     389 </span>                :            : 
+<span class="lineNum">     390 </span>                :<span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     391 </span>                :            :     } else {
+<span class="lineNum">     392 </span>                :<span class="lineNoCov">          0 :         return ENOENT;</span>
+<span class="lineNum">     393 </span>                :            :     }
+<span class="lineNum">     394 </span>                :            : }
+<span class="lineNum">     395 </span>                :            : 
+<a name="396"><span class="lineNum">     396 </span>                :            : /* Clear 'vlan_devs' and 'vlan_real_devs' in preparation for repopulating. */</a>
+<span class="lineNum">     397 </span>                :            : static void
+<span class="lineNum">     398 </span>                :<span class="lineCov">        525 : vlandev_clear__(void)</span>
+<span class="lineNum">     399 </span>                :            : {
+<span class="lineNum">     400 </span>                :            :     /* We do not free the 'name' members of struct vlan_dev and struct
+<span class="lineNum">     401 </span>                :            :      * vlan_real_dev, because the &quot;shash&quot;es own them.. */
+<span class="lineNum">     402 </span>                :            :     struct shash_node *node;
+<span class="lineNum">     403 </span>                :            : 
+<span class="lineNum">     404 </span>                :<span class="lineCov">        525 :     shash_clear_free_data(&amp;vlan_devs);</span>
+<span class="lineNum">     405 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 525 times"> + </span>]:<span class="lineCov">        525 :     SHASH_FOR_EACH (node, &amp;vlan_real_devs) {</span>
+<span class="lineNum">     406 </span>                :<span class="lineNoCov">          0 :         struct vlan_real_dev *vrd = node-&gt;data;</span>
+<span class="lineNum">     407 </span>                :            : 
+<span class="lineNum">     408 </span>                :<span class="lineNoCov">          0 :         hmap_destroy(&amp;vrd-&gt;vlan_devs);</span>
+<span class="lineNum">     409 </span>                :            :     }
+<span class="lineNum">     410 </span>                :<span class="lineCov">        525 :     shash_clear_free_data(&amp;vlan_real_devs);</span>
+<span class="lineNum">     411 </span>                :<span class="lineCov">        525 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>
