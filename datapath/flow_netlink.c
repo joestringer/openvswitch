@@ -1071,6 +1071,85 @@ free_newmask:
 	return err;
 }
 
+size_t ovs_uid_attr_size(void)
+{
+	/* Whenever adding new OVS_UID_ATTR_ FIELDS, we should consider
+	 * updating this function.  */
+	return    nla_total_size(4)    /* OVS_UID_ATTR_FLAGS */
+		+ nla_total_size(256 / 8);  /* OVS_UID_ATTR_ID */
+}
+
+/* Support UIDs up to 128 bits. Matches OVS_UID_ATTR_ID size above. */
+#define MAX_UID_BUFSIZE		(256 / 8)
+
+static struct sw_flow_id *ovs_nla_alloc_uid(size_t size)
+{
+	struct sw_flow_id *sfid;
+
+	if (size > MAX_UID_BUFSIZE) {
+		OVS_NLERR("Flow uid size (%zu bytes) exceeds maximum "
+			  "(%u bytes)\n", size, MAX_UID_BUFSIZE);
+		return ERR_PTR(-EINVAL);
+	}
+
+	sfid = kmalloc(sizeof(*sfid) + size, GFP_KERNEL);
+	if (!sfid)
+		return ERR_PTR(-ENOMEM);
+
+	memset(sfid, 0, sizeof(*sfid) + size);
+
+	return sfid;
+}
+
+int ovs_nla_get_uid(const struct nlattr *attr, struct sw_flow_id **sfid,
+		    u32 *flags)
+{
+	static const struct nla_policy ovs_uid_policy[OVS_UID_ATTR_MAX + 1] = {
+		[OVS_UID_ATTR_FLAGS] = { .type = NLA_U32 },
+		[OVS_UID_ATTR_ID] = { .len = sizeof(u32) },
+	};
+	const struct nlattr *a[OVS_UID_ATTR_MAX + 1];
+	int err;
+
+	if (sfid)
+		*sfid = NULL;
+	if (flags)
+		*flags = 0;
+
+	if (!attr)
+		return 0;
+
+	err = nla_parse_nested((struct nlattr **)a, OVS_UID_ATTR_MAX, attr,
+			       ovs_uid_policy);
+	if (err)
+		return err;
+
+	if (sfid) {
+		if (a[OVS_UID_ATTR_ID]) {
+			struct sw_flow_id *uid;
+			size_t len;
+
+			len = nla_len(a[OVS_UID_ATTR_ID]);
+			uid = ovs_nla_alloc_uid(len);
+			if (IS_ERR(uid)) {
+				err = PTR_ERR(uid);
+				return err;
+			}
+
+			memcpy(uid->uid, nla_data(a[OVS_UID_ATTR_ID]), len);
+			uid->uid_len = len;
+			*sfid = uid;
+		} else {
+			return -EINVAL;
+		}
+	}
+
+	if (flags && a[OVS_UID_ATTR_FLAGS])
+		*flags = nla_get_u32(a[OVS_UID_ATTR_FLAGS]);
+
+	return 0;
+}
+
 /**
  * ovs_nla_get_flow_metadata - parses Netlink attributes into a flow key.
  * @key: Receives extracted in_port, priority, tun_key and skb_mark.

@@ -199,6 +199,11 @@ struct sw_flow_match {
 	struct sw_flow_mask *mask;
 };
 
+struct sw_flow_id {
+	u32 uid_len;
+	u32 uid[];
+};
+
 struct sw_flow_actions {
 	struct rcu_head rcu;
 	u32 actions_len;
@@ -215,11 +220,14 @@ struct flow_stats {
 
 struct sw_flow {
 	struct rcu_head rcu;
-	struct hlist_node hash_node[2];
-	u32 hash;
+	struct {
+		struct hlist_node node[2];
+		u32 hash;
+	} flow_hash, uid_hash;
 	int stats_last_writer;		/* NUMA-node id of the last writer on
 					 * 'stats[0]'.
 					 */
+	struct sw_flow_id *uid;
 	struct sw_flow_key key;
 	struct sw_flow_key unmasked_key;
 	struct sw_flow_mask *mask;

@@ -39,6 +39,7 @@
 
 size_t ovs_tun_key_attr_size(void);
 size_t ovs_key_attr_size(void);
+size_t ovs_uid_attr_size(void);
 
 void ovs_match_init(struct sw_flow_match *match,
 		    struct sw_flow_key *key, struct sw_flow_mask *mask);
@@ -52,6 +53,7 @@ int ovs_nla_get_match(struct sw_flow_match *match,
 		      const struct nlattr *);
 int ovs_nla_put_egress_tunnel_key(struct sk_buff *,
 				  const struct ovs_tunnel_info *);
+int ovs_nla_get_uid(const struct nlattr *, struct sw_flow_id **, u32 *flags);
 
 int ovs_nla_copy_actions(const struct nlattr *attr,
 			 const struct sw_flow_key *key,

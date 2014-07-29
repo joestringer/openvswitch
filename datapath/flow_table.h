@@ -60,6 +60,7 @@ struct flow_table {
 	struct table_instance __rcu *ti;
 	struct mask_cache_entry __percpu *mask_cache;
 	struct mask_array __rcu *mask_array;
+	struct table_instance __rcu *uid_ti;
 	unsigned long last_rehash;
 	unsigned int count;
 };
@@ -72,7 +73,7 @@ void ovs_flow_exit(void);
 struct sw_flow *ovs_flow_alloc(void);
 void ovs_flow_free(struct sw_flow *, bool deferred);
 
-int ovs_flow_tbl_init(struct flow_table *);
+int ovs_flow_tbl_init(struct flow_table *, bool support_uid);
 int ovs_flow_tbl_count(struct flow_table *table);
 void ovs_flow_tbl_destroy(struct flow_table *table);
 int ovs_flow_tbl_flush(struct flow_table *flow_table);
@@ -90,6 +91,7 @@ struct sw_flow *ovs_flow_tbl_lookup_stats(struct flow_table *,
 struct sw_flow *ovs_flow_tbl_lookup(struct flow_table *,
 				    const struct sw_flow_key *);
 struct sw_flow *ovs_flow_tbl_lookup_exact(struct flow_table *,
+					  struct sw_flow_id *sfid,
 					  struct sw_flow_match *match);
 
 bool ovs_flow_cmp_unmasked_key(const struct sw_flow *flow,

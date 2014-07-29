@@ -252,6 +252,7 @@ dpif_linux_open(const struct dpif_class *class OVS_UNUSED, const char *name,
     dp_request.name = name;
     dp_request.user_features |= OVS_DP_F_UNALIGNED;
     dp_request.user_features |= OVS_DP_F_VPORT_PIDS;
+    dp_request.user_features |= OVS_DP_F_INDEX_BY_UID;
     error = dpif_linux_dp_transact(&dp_request, &dp, &buf);
     if (error) {
         return error;

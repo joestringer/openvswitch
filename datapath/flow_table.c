@@ -90,6 +90,7 @@ struct sw_flow *ovs_flow_alloc(void)
 	if (!flow)
 		return ERR_PTR(-ENOMEM);
 
+	flow->uid = NULL;
 	flow->sf_acts = NULL;
 	flow->mask = NULL;
 	flow->stats_last_writer = NUMA_NO_NODE;
@@ -147,6 +148,7 @@ static void flow_free(struct sw_flow *flow)
 	int node;
 
 	kfree((struct sw_flow_actions __force *)flow->sf_acts);
+	kfree((struct sw_flow_id __force *)flow->uid);
 	for_each_node(node)
 		if (flow->stats[node])
 			kmem_cache_free(flow_stats_cache,
@@ -263,7 +265,7 @@ static int tbl_mask_array_realloc(struct flow_table *tbl, int size)
 	return 0;
 }
 
-int ovs_flow_tbl_init(struct flow_table *table)
+int ovs_flow_tbl_init(struct flow_table *table, bool support_uid)
 {
 	struct table_instance *ti;
 	struct mask_array *ma;
@@ -281,12 +283,24 @@ int ovs_flow_tbl_init(struct flow_table *table)
 	if (!ti)
 		goto free_mask_array;
 
+	if (support_uid) {
+		struct table_instance *uid_ti;
+
+		uid_ti = table_instance_alloc(TBL_MIN_BUCKETS);
+		if (!uid_ti)
+			goto free_ti;
+		rcu_assign_pointer(table->uid_ti, uid_ti);
+	} else
+		rcu_assign_pointer(table->uid_ti, NULL);
+
 	rcu_assign_pointer(table->ti, ti);
 	rcu_assign_pointer(table->mask_array, ma);
 	table->last_rehash = jiffies;
 	table->count = 0;
 	return 0;
 
+free_ti:
+	__table_instance_destroy(ti);
 free_mask_array:
 	kfree(ma);
 free_mask_cache:
@@ -301,7 +315,8 @@ static void flow_tbl_destroy_rcu_cb(struct rcu_head *rcu)
 	__table_instance_destroy(ti);
 }
 
-static void table_instance_destroy(struct table_instance *ti, bool deferred)
+static void table_instance_destroy(struct table_instance *ti, bool deferred,
+				   bool uid)
 {
 	int i;
 
@@ -317,9 +332,14 @@ static void table_instance_destroy(struct table_instance *ti, bool deferred)
 		struct hlist_node *n;
 		int ver = ti->node_ver;
 
-		hlist_for_each_entry_safe(flow, n, head, hash_node[ver]) {
-			hlist_del_rcu(&flow->hash_node[ver]);
-			ovs_flow_free(flow, deferred);
+		if (uid) {
+			hlist_for_each_entry_safe(flow, n, head, uid_hash.node[ver])
+				hlist_del_rcu(&flow->uid_hash.node[ver]);
+		} else {
+			hlist_for_each_entry_safe(flow, n, head, flow_hash.node[ver]) {
+				hlist_del_rcu(&flow->flow_hash.node[ver]);
+				ovs_flow_free(flow, deferred);
+			}
 		}
 	}
 
@@ -335,10 +355,12 @@ skip_flows:
 void ovs_flow_tbl_destroy(struct flow_table *table)
 {
 	struct table_instance *ti = (struct table_instance __force *)table->ti;
+	struct table_instance *uid_ti = (struct table_instance __force *)table->uid_ti;
 
 	free_percpu(table->mask_cache);
 	kfree((struct mask_array __force *)table->mask_array);
-	table_instance_destroy(ti, false);
+	table_instance_destroy(ti, false, false);
+	table_instance_destroy(uid_ti, false, true);
 }
 
 struct sw_flow *ovs_flow_tbl_dump_next(struct table_instance *ti,
@@ -353,7 +375,7 @@ struct sw_flow *ovs_flow_tbl_dump_next(struct table_instance *ti,
 	while (*bucket < ti->n_buckets) {
 		i = 0;
 		head = flex_array_get(ti->buckets, *bucket);
-		hlist_for_each_entry_rcu(flow, head, hash_node[ver]) {
+		hlist_for_each_entry_rcu(flow, head, flow_hash.node[ver]) {
 			if (i < *last) {
 				i++;
 				continue;
@@ -379,12 +401,20 @@ static void table_instance_insert(struct table_instance *ti, struct sw_flow *flo
 {
 	struct hlist_head *head;
 
-	head = find_bucket(ti, flow->hash);
-	hlist_add_head_rcu(&flow->hash_node[ti->node_ver], head);
+	head = find_bucket(ti, flow->flow_hash.hash);
+	hlist_add_head_rcu(&flow->flow_hash.node[ti->node_ver], head);
+}
+
+static void uid_table_instance_insert(struct table_instance *ti, struct sw_flow *flow)
+{
+	struct hlist_head *head;
+
+	head = find_bucket(ti, flow->uid_hash.hash);
+	hlist_add_head_rcu(&flow->uid_hash.node[ti->node_ver], head);
 }
 
 static void flow_table_copy_flows(struct table_instance *old,
-				  struct table_instance *new)
+				  struct table_instance *new, bool uid)
 {
 	int old_ver;
 	int i;
@@ -399,42 +429,81 @@ static void flow_table_copy_flows(struct table_instance *old,
 
 		head = flex_array_get(old->buckets, i);
 
-		hlist_for_each_entry(flow, head, hash_node[old_ver])
-			table_instance_insert(new, flow);
+		if (uid)
+			hlist_for_each_entry(flow, head, uid_hash.node[old_ver])
+				uid_table_instance_insert(new, flow);
+		else
+			hlist_for_each_entry(flow, head, flow_hash.node[old_ver])
+				table_instance_insert(new, flow);
 	}
 
 	old->keep_flows = true;
 }
 
-static struct table_instance *table_instance_rehash(struct table_instance *ti,
-					    int n_buckets)
+static int flow_table_instance_alloc(struct table_instance **ti,
+				     struct table_instance **uid_ti,
+				     int n_buckets)
 {
-	struct table_instance *new_ti;
+	struct table_instance *new_ti, *new_uid_ti;
 
 	new_ti = table_instance_alloc(n_buckets);
 	if (!new_ti)
-		return NULL;
+		return -ENOMEM;
 
-	flow_table_copy_flows(ti, new_ti);
+	if (uid_ti) {
+		new_uid_ti = table_instance_alloc(n_buckets);
+		if (!new_uid_ti) {
+			__table_instance_destroy(new_ti);
+			return -ENOMEM;
+		}
+		*uid_ti = new_uid_ti;
+	}
 
-	return new_ti;
+	*ti = new_ti;
+	return 0;
+}
+
+static int flow_table_rehash(struct table_instance *old_ti,
+			     struct table_instance *old_uid_ti, int n_buckets,
+			     struct table_instance **new_ti,
+			     struct table_instance **new_uid_ti)
+{
+	int err;
+
+	err = flow_table_instance_alloc(new_ti, old_uid_ti ? new_uid_ti : NULL,
+					n_buckets);
+	if (err)
+		return err;
+
+	flow_table_copy_flows(old_ti, *new_ti, false);
+	if (old_uid_ti)
+		flow_table_copy_flows(old_uid_ti, *new_uid_ti, true);
+
+	return 0;
 }
 
 int ovs_flow_tbl_flush(struct flow_table *flow_table)
 {
-	struct table_instance *old_ti;
-	struct table_instance *new_ti;
+	struct table_instance *old_ti, *new_ti, *old_uid_ti;
+	struct table_instance *new_uid_ti = NULL;
+	int err;
 
 	old_ti = ovsl_dereference(flow_table->ti);
-	new_ti = table_instance_alloc(TBL_MIN_BUCKETS);
-	if (!new_ti)
-		return -ENOMEM;
+	old_uid_ti = ovsl_dereference(flow_table->uid_ti);
+	if (old_uid_ti)
+		err = flow_table_instance_alloc(&new_ti, &new_uid_ti, TBL_MIN_BUCKETS);
+	else
+		err = flow_table_instance_alloc(&new_ti, NULL, TBL_MIN_BUCKETS);
+	if (err)
+		return err;
 
 	rcu_assign_pointer(flow_table->ti, new_ti);
+	rcu_assign_pointer(flow_table->uid_ti, new_uid_ti);
 	flow_table->last_rehash = jiffies;
 	flow_table->count = 0;
 
-	table_instance_destroy(old_ti, true);
+	table_instance_destroy(old_ti, true, false);
+	table_instance_destroy(old_uid_ti, true, true);
 	return 0;
 }
 
@@ -507,8 +576,8 @@ static struct sw_flow *masked_flow_lookup(struct table_instance *ti,
 	hash = flow_hash(&masked_key, key_start, key_end);
 	head = find_bucket(ti, hash);
 	(*n_mask_hit)++;
-	hlist_for_each_entry_rcu(flow, head, hash_node[ti->node_ver]) {
-		if (flow->mask == mask && flow->hash == hash &&
+	hlist_for_each_entry_rcu(flow, head, flow_hash.node[ti->node_ver]) {
+		if (flow->mask == mask && flow->flow_hash.hash == hash &&
 		    flow_cmp_masked_key(flow, &masked_key,
 					  key_start, key_end))
 			return flow;
@@ -626,8 +695,8 @@ struct sw_flow *ovs_flow_tbl_lookup(struct flow_table *tbl,
 	return flow_lookup(tbl, ti, ma, key, &n_mask_hit, &index);
 }
 
-struct sw_flow *ovs_flow_tbl_lookup_exact(struct flow_table *tbl,
-					  struct sw_flow_match *match)
+static struct sw_flow *lookup_exact(struct flow_table *tbl,
+				    struct sw_flow_match *match)
 {
 	struct mask_array *ma = ovsl_dereference(tbl->mask_array);
 	int i;
@@ -649,6 +718,58 @@ struct sw_flow *ovs_flow_tbl_lookup_exact(struct flow_table *tbl,
 	return NULL;
 }
 
+static u32 uid_hash(const struct sw_flow_id *sfid)
+{
+	return arch_fast_hash2(sfid->uid, sfid->uid_len >> 2, 0);
+}
+
+static bool flow_cmp_uid(const struct sw_flow *flow,
+			 const struct sw_flow_id *sfid)
+{
+	if (flow->uid->uid_len != sfid->uid_len)
+		return false;
+
+	return !memcmp(&flow->uid->uid, &sfid->uid, flow->uid->uid_len);
+}
+
+static struct sw_flow *lookup_uid(struct flow_table *tbl,
+				  const struct sw_flow_id *uid)
+{
+	struct table_instance *ti = rcu_dereference_ovsl(tbl->uid_ti);
+	struct sw_flow *flow;
+	struct hlist_head *head;
+	u32 hash;
+
+	BUG_ON(!ti);
+	hash = uid_hash(uid);
+	head = find_bucket(ti, hash);
+	hlist_for_each_entry_rcu(flow, head, uid_hash.node[ti->node_ver]) {
+		if (flow->uid_hash.hash == hash && flow_cmp_uid(flow, uid))
+			return flow;
+	}
+	return NULL;
+}
+
+struct sw_flow *ovs_flow_tbl_lookup_exact(struct flow_table *tbl,
+					  struct sw_flow_id *uid,
+					  struct sw_flow_match *match)
+{
+	struct sw_flow *flow;
+
+	if (rcu_access_pointer(tbl->uid_ti) && uid) {
+		flow = lookup_uid(tbl, uid);
+	} else if (match) {
+		flow = lookup_exact(tbl, match);
+	} else {
+		OVS_NLERR("Flow key attribute not present in flow lookup.\n");
+		return ERR_PTR(-EINVAL);
+	}
+
+	if (!flow)
+		return ERR_PTR(-ENOENT);
+	return flow;
+}
+
 int ovs_flow_tbl_num_masks(const struct flow_table *table)
 {
 	struct mask_array *ma;
@@ -657,9 +778,13 @@ int ovs_flow_tbl_num_masks(const struct flow_table *table)
 	return ma->count;
 }
 
-static struct table_instance *table_instance_expand(struct table_instance *ti)
+static int flow_table_expand(struct table_instance *old_ti,
+			     struct table_instance *old_uid_ti,
+			     struct table_instance **new_ti,
+			     struct table_instance **new_uid_ti)
 {
-	return table_instance_rehash(ti, ti->n_buckets * 2);
+	return flow_table_rehash(old_ti, old_uid_ti, old_ti->n_buckets * 2,
+				 new_ti, new_uid_ti);
 }
 
 static void tbl_mask_array_delete_mask(struct mask_array *ma,
@@ -709,9 +834,12 @@ static void flow_mask_remove(struct flow_table *tbl, struct sw_flow_mask *mask)
 void ovs_flow_tbl_remove(struct flow_table *table, struct sw_flow *flow)
 {
 	struct table_instance *ti = ovsl_dereference(table->ti);
+	struct table_instance *uid_ti = ovsl_dereference(table->uid_ti);
 
 	BUG_ON(table->count == 0);
-	hlist_del_rcu(&flow->hash_node[ti->node_ver]);
+	hlist_del_rcu(&flow->flow_hash.node[ti->node_ver]);
+	if (uid_ti)
+		hlist_del_rcu(&flow->uid_hash.node[uid_ti->node_ver]);
 	table->count--;
 
 	/* RCU delete the mask. 'flow->mask' is not NULLed, as it should be
@@ -816,29 +944,39 @@ static int flow_mask_insert(struct flow_table *tbl, struct sw_flow *flow,
 int ovs_flow_tbl_insert(struct flow_table *table, struct sw_flow *flow,
 			struct sw_flow_mask *mask)
 {
-	struct table_instance *new_ti = NULL;
-	struct table_instance *ti;
+	struct table_instance *new_ti = NULL, *new_uid_ti = NULL;
+	struct table_instance *ti, *uid_ti;
 	int err;
 
 	err = flow_mask_insert(table, flow, mask);
 	if (err)
 		return err;
 
-	flow->hash = flow_hash(&flow->key, flow->mask->range.start,
-			flow->mask->range.end);
+	flow->flow_hash.hash = flow_hash(&flow->key, flow->mask->range.start,
+					 flow->mask->range.end);
 	ti = ovsl_dereference(table->ti);
 	table_instance_insert(ti, flow);
 	table->count++;
 
+	uid_ti = ovsl_dereference(table->uid_ti);
+	if (uid_ti) {
+		BUG_ON(!flow->uid);
+		flow->uid_hash.hash = uid_hash(flow->uid);
+		uid_table_instance_insert(uid_ti, flow);
+	}
+
 	/* Expand table, if necessary, to make room. */
 	if (table->count > ti->n_buckets)
-		new_ti = table_instance_expand(ti);
+		flow_table_expand(ti, uid_ti, &new_ti, &new_uid_ti);
 	else if (time_after(jiffies, table->last_rehash + REHASH_INTERVAL))
-		new_ti = table_instance_rehash(ti, ti->n_buckets);
+		flow_table_rehash(ti, uid_ti, ti->n_buckets,
+				  &new_ti, &new_uid_ti);
 
 	if (new_ti) {
 		rcu_assign_pointer(table->ti, new_ti);
-		table_instance_destroy(ti, true);
+		rcu_assign_pointer(table->uid_ti, new_uid_ti);
+		table_instance_destroy(ti, true, false);
+		table_instance_destroy(uid_ti, true, true);
 		table->last_rehash = jiffies;
 	}
 	return 0;
