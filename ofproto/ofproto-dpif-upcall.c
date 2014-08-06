@@ -201,6 +201,9 @@ struct udpif_key {
      * protected by a mutex. */
     const struct nlattr *key;      /* Datapath flow key. */
     size_t key_len;                /* Length of 'key'. */
+    const struct nlattr *mask;     /* Datapath flow mask. */
+    size_t mask_len;               /* Length of 'mask'. */
+    struct ofpbuf *actions;        /* Datapath flow actions as nlattrs. */
     uint32_t hash;                 /* Pre-computed hash for 'key'. */
 
     struct ovs_mutex mutex;                   /* Guards the following. */
@@ -216,9 +219,9 @@ struct udpif_key {
                                                * Used for stats and learning.*/
 
     union {
-        struct odputil_keybuf key_buf;        /* Memory for 'key'. */
-        struct nlattr key_buf_nla;
-    };
+        struct odputil_keybuf buf;
+        struct nlattr nla;
+    } keybuf, maskbuf;
 };
 
 /* Datapath operation with optional ukey attached. */
@@ -1078,7 +1081,6 @@ static void
 handle_upcalls(struct udpif *udpif, struct upcall *upcalls,
                size_t n_upcalls)
 {
-    struct odputil_keybuf mask_bufs[UPCALL_MAX_BATCH];
     struct dpif_op *opsp[UPCALL_MAX_BATCH * 2];
     struct ukey_op ops[UPCALL_MAX_BATCH * 2];
     unsigned int flow_limit;
@@ -1129,33 +1131,20 @@ handle_upcalls(struct udpif *udpif, struct upcall *upcalls,
          *    - We received this packet via some flow installed in the kernel
          *      already. */
         if (may_put && upcall->type == DPIF_UC_MISS) {
-            struct ofpbuf mask;
+            struct udpif_key *ukey = upcall->ukey;
 
-            ofpbuf_use_stack(&mask, &mask_bufs[i], sizeof mask_bufs[i]);
-
-            if (megaflow) {
-                size_t max_mpls;
-                bool recirc;
-
-                recirc = ofproto_dpif_get_enable_recirc(upcall->ofproto);
-                max_mpls = ofproto_dpif_get_max_mpls_depth(upcall->ofproto);
-                odp_flow_key_from_mask(&mask, &upcall->xout.wc.masks,
-                                       upcall->flow, UINT32_MAX, max_mpls,
-                                       recirc);
-            }
-
-            op = &ops[n_ops++];
-            op->ukey = upcall->ukey;
             upcall->ukey = NULL;
+            op = &ops[n_ops++];
+            op->ukey = ukey;
             op->dop.type = DPIF_OP_FLOW_PUT;
             op->dop.u.flow_put.flags = DPIF_FP_CREATE;
-            op->dop.u.flow_put.key = upcall->key;
-            op->dop.u.flow_put.key_len = upcall->key_len;
-            op->dop.u.flow_put.mask = ofpbuf_data(&mask);
-            op->dop.u.flow_put.mask_len = ofpbuf_size(&mask);
+            op->dop.u.flow_put.key = ukey->key;
+            op->dop.u.flow_put.key_len = ukey->key_len;
+            op->dop.u.flow_put.mask = ukey->mask;
+            op->dop.u.flow_put.mask_len = ukey->mask_len;
             op->dop.u.flow_put.stats = NULL;
-            op->dop.u.flow_put.actions = ofpbuf_data(&upcall->put_actions);
-            op->dop.u.flow_put.actions_len = ofpbuf_size(&upcall->put_actions);
+            op->dop.u.flow_put.actions = ofpbuf_data(ukey->actions);
+            op->dop.u.flow_put.actions_len = ofpbuf_size(ukey->actions);
         }
 
         if (ofpbuf_size(upcall->xout.odp_actions)) {
@@ -1219,11 +1208,11 @@ ukey_new(const struct udpif *udpif, struct upcall *upcall)
     OVS_NO_THREAD_SAFETY_ANALYSIS
 {
     struct udpif_key *ukey = xzalloc(sizeof *ukey);
-    struct ofpbuf key;
-    bool recirc;
+    struct ofpbuf key, mask;
+    bool recirc, megaflow;
 
     recirc = ofproto_dpif_get_enable_recirc(upcall->ofproto);
-    ofpbuf_use_stack(&key, &ukey->key_buf, sizeof ukey->key_buf);
+    ofpbuf_use_stack(&key, &ukey->keybuf, sizeof ukey->keybuf);
     if (upcall->key_len) {
         ofpbuf_put(&key, upcall->key, upcall->key_len);
     } else {
@@ -1231,9 +1220,23 @@ ukey_new(const struct udpif *udpif, struct upcall *upcall)
                                upcall->flow->in_port.odp_port, recirc);
     }
 
+    atomic_read(&enable_megaflows, &megaflow);
+    ofpbuf_use_stack(&mask, &ukey->maskbuf, sizeof ukey->maskbuf);
+    if (megaflow) {
+        size_t max_mpls;
+
+        max_mpls = ofproto_dpif_get_max_mpls_depth(upcall->ofproto);
+        odp_flow_key_from_mask(&mask, &upcall->xout.wc.masks,
+                               upcall->flow, UINT32_MAX, max_mpls,
+                               recirc);
+    }
+
     ukey->key = ofpbuf_data(&key);
     ukey->key_len = ofpbuf_size(&key);
+    ukey->mask = ofpbuf_data(&mask);
+    ukey->mask_len = ofpbuf_size(&mask);
     ukey->hash = hash_bytes(ukey->key, ukey->key_len, udpif->secret);
+    ukey->actions = ofpbuf_clone(&upcall->put_actions);
 
     ovs_mutex_init(&ukey->mutex);
     ukey->dump_seq = upcall->dump_seq;
@@ -1337,6 +1340,7 @@ ukey_delete__(struct udpif_key *ukey)
 {
     if (ukey) {
         xlate_cache_delete(ukey->xcache);
+        ofpbuf_delete(ukey->actions);
         ovs_mutex_destroy(&ukey->mutex);
         free(ukey);
     }
@@ -1385,7 +1389,7 @@ should_revalidate(const struct udpif *udpif, uint64_t packets,
 
 static bool
 revalidate_ukey(struct udpif *udpif, struct udpif_key *ukey,
-                const struct dpif_flow *f, uint64_t reval_seq)
+                const struct dpif_flow_stats *stats, uint64_t reval_seq)
     OVS_REQUIRES(ukey->mutex)
 {
     uint64_t slow_path_buf[128 / 8];
@@ -1395,12 +1399,10 @@ revalidate_ukey(struct udpif *udpif, struct udpif_key *ukey,
     struct dpif_flow_stats push;
     struct ofpbuf xout_actions;
     struct flow flow, dp_mask;
-    uint32_t *dp32, *xout32;
     ofp_port_t ofp_in_port;
     struct xlate_in xin;
     long long int last_used;
     int error;
-    size_t i;
     bool ok;
     bool need_revalidate;
 
@@ -1410,13 +1412,13 @@ revalidate_ukey(struct udpif *udpif, struct udpif_key *ukey,
 
     need_revalidate = (ukey->reval_seq != reval_seq);
     last_used = ukey->stats.used;
-    push.used = f->stats.used;
-    push.tcp_flags = f->stats.tcp_flags;
-    push.n_packets = (f->stats.n_packets > ukey->stats.n_packets
-                      ? f->stats.n_packets - ukey->stats.n_packets
+    push.used = stats->used;
+    push.tcp_flags = stats->tcp_flags;
+    push.n_packets = (stats->n_packets > ukey->stats.n_packets
+                      ? stats->n_packets - ukey->stats.n_packets
                       : 0);
-    push.n_bytes = (f->stats.n_bytes > ukey->stats.n_bytes
-                    ? f->stats.n_bytes - ukey->stats.n_bytes
+    push.n_bytes = (stats->n_bytes > ukey->stats.n_bytes
+                    ? stats->n_bytes - ukey->stats.n_bytes
                     : 0);
 
     if (need_revalidate && last_used
@@ -1426,7 +1428,7 @@ revalidate_ukey(struct udpif *udpif, struct udpif_key *ukey,
     }
 
     /* We will push the stats, so update the ukey stats cache. */
-    ukey->stats = f->stats;
+    ukey->stats = *stats;
     if (!push.n_packets && !need_revalidate) {
         ok = true;
         goto exit;
@@ -1481,28 +1483,15 @@ revalidate_ukey(struct udpif *udpif, struct udpif_key *ukey,
                           &xout_actions);
     }
 
-    if (f->actions_len != ofpbuf_size(&xout_actions)
-        || memcmp(ofpbuf_data(&xout_actions), f->actions, f->actions_len)) {
+    if (!ofpbuf_equal(&xout_actions, ukey->actions)) {
         goto exit;
     }
 
-    if (odp_flow_key_to_mask(f->mask, f->mask_len, &dp_mask, &flow)
+    if (odp_flow_key_to_mask(ukey->mask, ukey->mask_len, &dp_mask, &flow)
         == ODP_FIT_ERROR) {
         goto exit;
     }
 
-    /* Since the kernel is free to ignore wildcarded bits in the mask, we can't
-     * directly check that the masks are the same.  Instead we check that the
-     * mask in the kernel is more specific i.e. less wildcarded, than what
-     * we've calculated here.  This guarantees we don't catch any packets we
-     * shouldn't with the megaflow. */
-    dp32 = (uint32_t *) &dp_mask;
-    xout32 = (uint32_t *) &xout.wc.masks;
-    for (i = 0; i < FLOW_U32S; i++) {
-        if ((dp32[i] | xout32[i]) != dp32[i]) {
-            goto exit;
-        }
-    }
     ok = true;
 
 exit:
@@ -1697,13 +1686,13 @@ revalidate(struct revalidator *revalidator)
             if (kill_them_all || (used && used < now - max_idle)) {
                 keep = false;
             } else {
-                keep = revalidate_ukey(udpif, ukey, f, reval_seq);
+                keep = revalidate_ukey(udpif, ukey, &f->stats, reval_seq);
             }
             ukey->dump_seq = dump_seq;
             ukey->flow_exists = keep;
 
             if (!keep) {
-                delete_op_init(&ops[n_ops++], f->key, f->key_len, ukey);
+                delete_op_init(&ops[n_ops++], ukey->key, ukey->key_len, ukey);
             }
             ovs_mutex_unlock(&ukey->mutex);
         }
@@ -1720,20 +1709,15 @@ static bool
 handle_missed_revalidation(struct udpif *udpif, uint64_t reval_seq,
                            struct udpif_key *ukey)
 {
-    struct dpif_flow flow;
-    struct ofpbuf buf;
-    uint64_t stub[DPIF_FLOW_BUFSIZE / 8];
-    bool keep = false;
+    struct dpif_flow_stats stats;
+    bool keep;
 
     COVERAGE_INC(revalidate_missed_dp_flow);
 
-    ofpbuf_use_stub(&buf, &stub, sizeof stub);
-    if (!dpif_flow_get(udpif->dpif, ukey->key, ukey->key_len, &buf, &flow)) {
-        ovs_mutex_lock(&ukey->mutex);
-        keep = revalidate_ukey(udpif, ukey, &flow, reval_seq);
-        ovs_mutex_unlock(&ukey->mutex);
-    }
-    ofpbuf_uninit(&buf);
+    memset(&stats, 0, sizeof stats);
+    ovs_mutex_lock(&ukey->mutex);
+    keep = revalidate_ukey(udpif, ukey, &stats, reval_seq);
+    ovs_mutex_unlock(&ukey->mutex);
 
     return keep;
 }
