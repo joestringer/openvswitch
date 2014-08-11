@@ -81,6 +81,11 @@ typedef struct {
 #endif
 } ovs_32aligned_u64;
 
+/* XXX: endianness? */
+typedef struct {
+    uint32_t h[4];
+} ovs_u128;
+
 /* A 64-bit value, in network byte order, that is only aligned on a 32-bit
  * boundary. */
 typedef struct {

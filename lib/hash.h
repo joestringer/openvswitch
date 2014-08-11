@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008, 2009, 2010, 2012, 2013 Nicira, Inc.
+ * Copyright (c) 2008, 2009, 2010, 2012, 2013, 2014 Nicira, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -81,6 +81,8 @@ static inline uint32_t mhash_finish(uint32_t hash, uint32_t n_bytes)
     hash ^= hash >> 16;
     return hash;
 }
+
+void hash_words128(const void *p_, size_t n, uint32_t basis, ovs_u128 *out);
 
 #if !(defined(__SSE4_2__) && defined(__x86_64__))
 /* Mhash-based implemantation. */
