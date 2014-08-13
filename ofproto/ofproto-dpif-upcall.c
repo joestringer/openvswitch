@@ -208,14 +208,17 @@ struct udpif_key {
     struct ofpbuf *actions;        /* Datapath flow actions as nlattrs. */
     ovs_u128 uid;                  /* Unique flow identifier. */
     uint32_t hash;                 /* Pre-computed hash for 'key'. */
+    atomic_bool installed;         /* True if the datapath flow has been
+                                      installed and handlers are finished with
+                                      this ukey. Used to reduce contention. */
 
     struct ovs_mutex mutex;                   /* Guards the following. */
     struct dpif_flow_stats stats OVS_GUARDED; /* Last known stats.*/
     long long int created OVS_GUARDED;        /* Estimate of creation time. */
     uint64_t dump_seq OVS_GUARDED;            /* Tracks udpif->dump_seq. */
     uint64_t reval_seq OVS_GUARDED;           /* Tracks udpif->reval_seq. */
-    bool flow_exists OVS_GUARDED;             /* Ensures flows are only deleted
-                                                 once. */
+    bool flow_exists OVS_GUARDED;             /* The flow is currently in the
+                                                 datapath. */
 
     struct xlate_cache *xcache OVS_GUARDED;   /* Cache for xlate entries that
                                                * are affected by this ukey.
@@ -1314,6 +1317,7 @@ ukey_new(struct udpif *udpif, struct upcall *upcall)
     ukey->hash = get_uid_hash(&ukey->uid);
     ukey->actions = ofpbuf_clone(&upcall->put_actions);
 
+    atomic_init(&ukey->installed, false);
     ovs_mutex_init(&ukey->mutex);
     ukey->dump_seq = upcall->dump_seq;
     ukey->reval_seq = upcall->reval_seq;
@@ -1357,6 +1361,7 @@ ukey_install_finish(struct udpif_key *ukey, int error)
 {
     if (!error) {
         ukey->flow_exists = true;
+        atomic_store(&ukey->installed, true);
     }
     ovs_mutex_unlock(&ukey->mutex);
 }
@@ -1370,6 +1375,22 @@ ukey_install(struct udpif *udpif, struct udpif_key *ukey)
 
     ukey_install_finish(ukey, 0);
     return true;
+}
+
+/* Wrapper for ovs_mutex_trylock() which reduces contention between handler
+ * threads and revalidator threads by not bothering to try locking if the
+ * flow is still being processed. */
+static int
+ukey_trylock(struct udpif_key *ukey)
+    OVS_TRY_LOCK(0, ukey->mutex)
+{
+    bool installed;
+
+    atomic_read_relaxed(&ukey->installed, &installed);
+    if (!installed) {
+        return EBUSY;
+    }
+    return ovs_mutex_trylock(&ukey->mutex);
 }
 
 /* Searches for a ukey in 'udpif->ukeys' that matches 'flow' and attempts to
@@ -1393,7 +1414,7 @@ ukey_acquire(struct udpif *udpif, const struct dpif_flow *flow,
     ukey = ukey_lookup(udpif, flow->uid, flow->uid_len,
                        flow->key, flow->key_len);
     if (ukey) {
-        retval = ovs_mutex_trylock(&ukey->mutex);
+        retval = ukey_trylock(ukey);
     } else {
         struct ds ds = DS_EMPTY_INITIALIZER;
         ovs_u128 uid;
@@ -1850,7 +1871,7 @@ revalidator_sweep__(struct revalidator *revalidator, bool purge)
 
             /* Handler threads could be holding a ukey lock while it installs a
              * new flow, so don't hang around waiting for access to it. */
-            if (ovs_mutex_trylock(&ukey->mutex)) {
+            if (ukey_trylock(ukey)) {
                 continue;
             }
             flow_exists = ukey->flow_exists;
