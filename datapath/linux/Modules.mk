@@ -11,6 +11,7 @@ openvswitch_sources += \
 	linux/compat/ip_tunnels_core.c \
 	linux/compat/netdevice.c \
 	linux/compat/net_namespace.c \
+	linux/compat/nlattr.c \
 	linux/compat/reciprocal_div.c \
 	linux/compat/skbuff-openvswitch.c \
 	linux/compat/vxlan.c	\

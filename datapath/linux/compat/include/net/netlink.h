@@ -70,4 +70,25 @@ static inline bool nla_is_last(const struct nlattr *nla, int rem)
 }
 #endif
 
+#ifndef HAVE_NLA_PARSE_STRICT
+
+/*
+ * Flags for nla_parse_strict() to apply additional policy constraints.
+ */
+#define NLA_PARSE_F_NOINIT	(1<<0)	/* Don't initialize the tb to zero. */
+#define NLA_PARSE_F_UNKNOWN	(1<<1)	/* Disallow unknown attributes. */
+#define NLA_PARSE_F_TRAILING	(1<<2)	/* Disallow trailing attributes. */
+#define NLA_PARSE_F_DUPLICATE	(1<<3)	/* Disallow duplicate attributes. */
+#define NLA_PARSE_F_EXACT_LEN	(1<<4)	/* Lengths specified in the policy
+					   restrict both min and max length. */
+#define NLA_PARSE_F_NONZERO	(1<<5)	/* Only store pointers for attributes
+					   with nonzero values. Requires a
+					   policy to be specified. */
+#define NLA_PARSE_F_LOG_ERRORS	(1<<6)	/* Log errors as they are detected. */
+
+int nla_parse_strict(const struct nlattr **tb, int maxtype,
+		     const struct nlattr *head, int len,
+		     const struct nla_policy *policy, u8 flags);
+#endif
+
 #endif /* net/netlink.h */
