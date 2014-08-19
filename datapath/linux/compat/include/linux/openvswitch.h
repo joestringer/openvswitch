@@ -470,6 +470,10 @@ struct ovs_key_nd {
  * a wildcarded match. Omitting attribute is treated as wildcarding all
  * corresponding fields. Optional for all requests. If not present,
  * all flow key bits are exact match bits.
+ * @OVS_FLOW_ATTR_UID: Nested %OVS_UID_ATTR_* attributes specifying unique
+ * identifiers for flows and providing alternative semantics for flow
+ * installation and retrieval. Required for all requests if the datapath is
+ * created with %OVS_DP_F_INDEX_BY_UID.
  *
  * These attributes follow the &struct ovs_header within the Generic Netlink
  * payload for %OVS_FLOW_* commands.
@@ -483,10 +487,32 @@ enum ovs_flow_attr {
 	OVS_FLOW_ATTR_USED,      /* u64 msecs last used in monotonic time. */
 	OVS_FLOW_ATTR_CLEAR,     /* Flag to clear stats, tcp_flags, used. */
 	OVS_FLOW_ATTR_MASK,      /* Sequence of OVS_KEY_ATTR_* attributes. */
+	OVS_FLOW_ATTR_UID,       /* 64-bit Unique flow identifier. */
 	__OVS_FLOW_ATTR_MAX
 };
 
 #define OVS_FLOW_ATTR_MAX (__OVS_FLOW_ATTR_MAX - 1)
+
+/**
+ * enum ovs_uid_attr - Unique identifier types.
+ *
+ * @OVS_UID_ATTR_FLAGS: A 32-bit value specifying changes to the behaviour of
+ * the current %OVS_FLOW_CMD_* request. Optional for all requests.
+ * @OVS_UID_ATTR_ID: A 64-bit value uniquely identifying the flow.
+ */
+enum ovs_uid_attr {
+	OVS_UID_ATTR_UNSPEC,
+	OVS_UID_ATTR_FLAGS,	/* u32 of OVS_UID_F_* */
+	OVS_UID_ATTR_ID,	/* u64 unique flow identifier. */
+	__OVS_UID_ATTR_MAX
+};
+
+#define OVS_UID_ATTR_MAX (__OVS_UID_ATTR_MAX - 1)
+
+/* Skip attributes for notifications. */
+#define OVS_UID_F_SKIP_KEY	(1 << 0)
+#define OVS_UID_F_SKIP_MASK	(1 << 1)
+#define OVS_UID_F_SKIP_ACTIONS	(1 << 2)
 
 /**
  * enum ovs_sample_attr - Attributes for %OVS_ACTION_ATTR_SAMPLE action.

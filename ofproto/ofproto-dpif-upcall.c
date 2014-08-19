@@ -635,7 +635,8 @@ recv_upcalls(struct handler *handler)
                  * while traffic is being received.  Print a rate-limited
                  * message in case it happens frequently. */
                 dpif_flow_put(udpif->dpif, DPIF_FP_CREATE, dupcall->key,
-                              dupcall->key_len, NULL, 0, NULL, 0, NULL);
+                              dupcall->key_len, NULL, 0, NULL, 0, NULL, 0,
+                              NULL);
                 VLOG_INFO_RL(&rl, "received packet on unassociated datapath "
                              "port %"PRIu32, flow.in_port.odp_port);
             }
@@ -713,7 +714,7 @@ udpif_revalidator(void *arg)
 
             start_time = time_msec();
             if (!udpif->reval_exit) {
-                udpif->dump = dpif_flow_dump_create(udpif->dpif);
+                udpif->dump = dpif_flow_dump_create(udpif->dpif, 0);
             }
         }
 
@@ -953,7 +954,7 @@ upcall_uninit(struct upcall *upcall)
 static int
 upcall_cb(const struct ofpbuf *packet, const struct flow *flow,
           enum dpif_upcall_type type, const struct nlattr *userdata,
-          struct ofpbuf *actions, struct flow_wildcards *wc,
+          struct ofpbuf *actions, struct flow_wildcards *wc, ovs_u128 *uid,
           struct ofpbuf *put_actions, void *aux)
 {
     struct udpif *udpif = aux;
@@ -991,6 +992,11 @@ upcall_cb(const struct ofpbuf *packet, const struct flow *flow,
         }
     }
 
+    if (uid) {
+        memset(uid, 0, sizeof *uid);
+    }
+
+    atomic_read_relaxed(&udpif->flow_limit, &flow_limit);
     if (udpif_get_n_flows(udpif) >= flow_limit) {
         error = ENOSPC;
         goto out;
@@ -1220,7 +1226,7 @@ ukey_new(const struct udpif *udpif, struct upcall *upcall)
                                upcall->flow->in_port.odp_port, recirc);
     }
 
-    atomic_read(&enable_megaflows, &megaflow);
+    atomic_read_relaxed(&enable_megaflows, &megaflow);
     ofpbuf_use_stack(&mask, &ukey->maskbuf, sizeof ukey->maskbuf);
     if (megaflow) {
         size_t max_mpls;

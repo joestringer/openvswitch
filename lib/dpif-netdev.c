@@ -1270,6 +1270,9 @@ dp_netdev_flow_to_dpif_flow(const struct dp_netdev_flow *netdev_flow,
     flow->actions = actions->actions;
     flow->actions_len = actions->size;
 
+    flow->uid = NULL;
+    flow->uid_len = 0;
+
     get_dpif_flow_stats(netdev_flow, &flow->stats);
 }
 
@@ -1558,7 +1561,8 @@ dpif_netdev_flow_dump_cast(struct dpif_flow_dump *dump)
 }
 
 static struct dpif_flow_dump *
-dpif_netdev_flow_dump_create(const struct dpif *dpif_)
+dpif_netdev_flow_dump_create(const struct dpif *dpif_,
+                             uint32_t dump_flags OVS_UNUSED)
 {
     struct dpif_netdev_flow_dump *dump;
 
@@ -1675,6 +1679,10 @@ dpif_netdev_flow_dump_next(struct dpif_flow_dump_thread *thread_,
         dp_actions = dp_netdev_flow_get_actions(netdev_flow);
         f->actions = dp_actions->actions;
         f->actions_len = dp_actions->size;
+
+        /* UID. */
+        f->uid = NULL;
+        f->uid_len = 0;
 
         /* Stats. */
         get_dpif_flow_stats(netdev_flow, &f->stats);
@@ -2093,7 +2101,7 @@ dp_netdev_upcall(struct dp_netdev *dp, struct dpif_packet *packet_,
         ds_destroy(&ds);
     }
 
-    return dp->upcall_cb(packet, flow, type, userdata, actions, wc,
+    return dp->upcall_cb(packet, flow, type, userdata, actions, wc, NULL,
                          put_actions, dp->upcall_aux);
 }
 

@@ -965,7 +965,7 @@ check_recirc(struct dpif_backer *backer)
 
     error = dpif_flow_put(backer->dpif, DPIF_FP_CREATE,
                           ofpbuf_data(&key), ofpbuf_size(&key), NULL, 0, NULL,
-                          0, NULL);
+                          0, NULL, 0, NULL);
     if (error && error != EEXIST) {
         if (error != EINVAL) {
             VLOG_WARN("%s: Reciculation flow probe failed (%s)",
@@ -975,7 +975,7 @@ check_recirc(struct dpif_backer *backer)
     }
 
     error = dpif_flow_del(backer->dpif, ofpbuf_data(&key), ofpbuf_size(&key),
-                          NULL);
+                          NULL, 0, NULL);
     if (error) {
         VLOG_WARN("%s: failed to delete recirculation feature probe flow",
                   dpif_name(backer->dpif));
@@ -1092,7 +1092,8 @@ check_max_mpls_depth(struct dpif_backer *backer)
         odp_flow_key_from_flow(&key, &flow, NULL, 0, false);
 
         error = dpif_flow_put(backer->dpif, DPIF_FP_CREATE,
-                              ofpbuf_data(&key), ofpbuf_size(&key), NULL, 0, NULL, 0, NULL);
+                              ofpbuf_data(&key), ofpbuf_size(&key), NULL, 0,
+                              NULL, 0, NULL, 0, NULL);
         if (error && error != EEXIST) {
             if (error != EINVAL) {
                 VLOG_WARN("%s: MPLS stack length feature probe failed (%s)",
@@ -1101,7 +1102,9 @@ check_max_mpls_depth(struct dpif_backer *backer)
             break;
         }
 
-        error = dpif_flow_del(backer->dpif, ofpbuf_data(&key), ofpbuf_size(&key), NULL);
+        error = dpif_flow_del(backer->dpif,
+                              ofpbuf_data(&key), ofpbuf_size(&key),
+                              NULL, 0, NULL);
         if (error) {
             VLOG_WARN("%s: failed to delete MPLS feature probe flow",
                       dpif_name(backer->dpif));
@@ -4632,7 +4635,7 @@ ofproto_unixctl_dpif_dump_flows(struct unixctl_conn *conn,
     }
 
     ds_init(&ds);
-    flow_dump = dpif_flow_dump_create(ofproto->backer->dpif);
+    flow_dump = dpif_flow_dump_create(ofproto->backer->dpif, 0);
     flow_dump_thread = dpif_flow_dump_thread_create(flow_dump);
     while (dpif_flow_dump_next(flow_dump_thread, &f, 1)) {
         struct flow flow;

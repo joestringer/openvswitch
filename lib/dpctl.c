@@ -736,7 +736,7 @@ dpctl_dump_flows(int argc, const char *argv[], struct dpctl_params *dpctl_p)
     }
 
     ds_init(&ds);
-    flow_dump = dpif_flow_dump_create(dpif);
+    flow_dump = dpif_flow_dump_create(dpif, 0);
     flow_dump_thread = dpif_flow_dump_thread_create(flow_dump);
     while (dpif_flow_dump_next(flow_dump_thread, &f, 1)) {
         if (filter) {
@@ -836,12 +836,13 @@ dpctl_put_flow(int argc, const char *argv[], enum dpif_flow_put_flags flags,
         dpctl_error(dpctl_p, error, "parsing actions");
         goto out_freeactions;
     }
+    /* XXX: UID parsing */
     error = dpif_flow_put(dpif, flags,
                           ofpbuf_data(&key), ofpbuf_size(&key),
                           ofpbuf_size(&mask) == 0 ? NULL : ofpbuf_data(&mask),
                           ofpbuf_size(&mask),
                           ofpbuf_data(&actions), ofpbuf_size(&actions),
-                          dpctl_p->print_statistics ? &stats : NULL);
+                          NULL, 0, dpctl_p->print_statistics ? &stats : NULL);
     if (error) {
         dpctl_error(dpctl_p, error, "updating flow table");
         goto out_freeactions;
@@ -928,6 +929,7 @@ dpctl_del_flow(int argc, const char *argv[], struct dpctl_params *dpctl_p)
 
     error = dpif_flow_del(dpif,
                           ofpbuf_data(&key), ofpbuf_size(&key),
+                          NULL, 0, /* XXX */
                           dpctl_p->print_statistics ? &stats : NULL);
     if (error) {
         dpctl_error(dpctl_p, error, "deleting flow");

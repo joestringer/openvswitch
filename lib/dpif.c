@@ -87,6 +87,7 @@ static void log_flow_message(const struct dpif *dpif, int error,
                              const char *operation,
                              const struct nlattr *key, size_t key_len,
                              const struct nlattr *mask, size_t mask_len,
+                             const struct nlattr *uid, size_t uid_len,
                              const struct dpif_flow_stats *stats,
                              const struct nlattr *actions, size_t actions_len);
 static void log_operation(const struct dpif *, const char *operation,
@@ -835,6 +836,7 @@ dpif_flow_flush(struct dpif *dpif)
 int
 dpif_flow_get(struct dpif *dpif,
               const struct nlattr *key, size_t key_len,
+              const struct nlattr *uid, size_t uid_len,
               struct ofpbuf *buf, struct dpif_flow *flow)
 {
     struct dpif_op *opp;
@@ -843,7 +845,11 @@ dpif_flow_get(struct dpif *dpif,
     op.type = DPIF_OP_FLOW_GET;
     op.u.flow_get.key = key;
     op.u.flow_get.key_len = key_len;
+    op.u.flow_get.uid = uid;
+    op.u.flow_get.uid_len = uid_len;
     op.u.flow_get.buffer = buf;
+
+    memset(flow, 0, sizeof *flow);
     op.u.flow_get.flow = flow;
     op.u.flow_get.flow->key = key;
     op.u.flow_get.flow->key_len = key_len;
@@ -860,6 +866,7 @@ dpif_flow_put(struct dpif *dpif, enum dpif_flow_put_flags flags,
               const struct nlattr *key, size_t key_len,
               const struct nlattr *mask, size_t mask_len,
               const struct nlattr *actions, size_t actions_len,
+              const struct nlattr *uid, size_t uid_len,
               struct dpif_flow_stats *stats)
 {
     struct dpif_op *opp;
@@ -873,6 +880,8 @@ dpif_flow_put(struct dpif *dpif, enum dpif_flow_put_flags flags,
     op.u.flow_put.mask_len = mask_len;
     op.u.flow_put.actions = actions;
     op.u.flow_put.actions_len = actions_len;
+    op.u.flow_put.uid = uid;
+    op.u.flow_put.uid_len = uid_len;
     op.u.flow_put.stats = stats;
 
     opp = &op;
@@ -885,6 +894,7 @@ dpif_flow_put(struct dpif *dpif, enum dpif_flow_put_flags flags,
 int
 dpif_flow_del(struct dpif *dpif,
               const struct nlattr *key, size_t key_len,
+              const struct nlattr *uid, size_t uid_len,
               struct dpif_flow_stats *stats)
 {
     struct dpif_op *opp;
@@ -893,6 +903,8 @@ dpif_flow_del(struct dpif *dpif,
     op.type = DPIF_OP_FLOW_DEL;
     op.u.flow_del.key = key;
     op.u.flow_del.key_len = key_len;
+    op.u.flow_del.uid = uid;
+    op.u.flow_del.uid_len = uid_len;
     op.u.flow_del.stats = stats;
 
     opp = &op;
@@ -902,14 +914,15 @@ dpif_flow_del(struct dpif *dpif,
 }
 
 /* Creates and returns a new 'struct dpif_flow_dump' for iterating through the
- * flows in 'dpif'.
+ * flows in 'dpif'.  'dump_flags' is a bitmask of 'OVS_UID_F_*' flags that
+ * describes the behavior of the flow dump operation.
  *
  * This function always successfully returns a dpif_flow_dump.  Error
  * reporting is deferred to dpif_flow_dump_destroy(). */
 struct dpif_flow_dump *
-dpif_flow_dump_create(const struct dpif *dpif)
+dpif_flow_dump_create(const struct dpif *dpif, uint32_t dump_flags)
 {
-    return dpif->dpif_class->flow_dump_create(dpif);
+    return dpif->dpif_class->flow_dump_create(dpif, dump_flags);
 }
 
 /* Destroys 'dump', which must have been created with dpif_flow_dump_create().
@@ -974,7 +987,8 @@ dpif_flow_dump_next(struct dpif_flow_dump_thread *thread,
         for (f = flows; f < &flows[n] && should_log_flow_message(0); f++) {
             log_flow_message(dpif, 0, "flow_dump",
                              f->key, f->key_len, f->mask, f->mask_len,
-                             &f->stats, f->actions, f->actions_len);
+                             f->uid, f->uid_len, &f->stats,
+                             f->actions, f->actions_len);
         }
     } else {
         VLOG_DBG_RL(&dpmsg_rl, "%s: dumped all flows", dpif_name(dpif));
@@ -1454,6 +1468,7 @@ static void
 log_flow_message(const struct dpif *dpif, int error, const char *operation,
                  const struct nlattr *key, size_t key_len,
                  const struct nlattr *mask, size_t mask_len,
+                 const struct nlattr *uid, size_t uid_len,
                  const struct dpif_flow_stats *stats,
                  const struct nlattr *actions, size_t actions_len)
 {
@@ -1465,6 +1480,13 @@ log_flow_message(const struct dpif *dpif, int error, const char *operation,
     ds_put_format(&ds, "%s ", operation);
     if (error) {
         ds_put_format(&ds, "(%s) ", ovs_strerror(error));
+    }
+    if (uid) {
+        ovs_u128 hash;
+
+        odp_uid_from_nlattrs(uid, uid_len, &hash, NULL);
+        odp_format_uid(&hash, &ds);
+        ds_put_cstr(&ds, " ");
     }
     odp_flow_format(key, key_len, mask, mask_len, NULL, &ds, true);
     if (stats) {
@@ -1499,7 +1521,8 @@ log_flow_put_message(struct dpif *dpif, const struct dpif_flow_put *put,
         }
         log_flow_message(dpif, error, ds_cstr(&s),
                          put->key, put->key_len, put->mask, put->mask_len,
-                         put->stats, put->actions, put->actions_len);
+                         put->uid, put->uid_len, put->stats,
+                         put->actions, put->actions_len);
         ds_destroy(&s);
     }
 }
@@ -1510,7 +1533,8 @@ log_flow_del_message(struct dpif *dpif, const struct dpif_flow_del *del,
 {
     if (should_log_flow_message(error)) {
         log_flow_message(dpif, error, "flow_del", del->key, del->key_len,
-                         NULL, 0, !error ? del->stats : NULL, NULL, 0);
+                         NULL, 0, NULL, 0, !error ? del->stats : NULL,
+                         NULL, 0);
     }
 }
 
@@ -1565,7 +1589,7 @@ log_flow_get_message(const struct dpif *dpif, const struct dpif_flow_get *get,
         log_flow_message(dpif, error, "flow_get",
                          get->key, get->key_len,
                          get->flow->mask, get->flow->mask_len,
-                         &get->flow->stats,
+                         get->flow->uid, get->flow->uid_len, &get->flow->stats,
                          get->flow->actions, get->flow->actions_len);
     }
 }

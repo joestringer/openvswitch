@@ -519,12 +519,16 @@ int dpif_flow_put(struct dpif *, enum dpif_flow_put_flags,
                   const struct nlattr *key, size_t key_len,
                   const struct nlattr *mask, size_t mask_len,
                   const struct nlattr *actions, size_t actions_len,
+                  const struct nlattr *uid, size_t uid_len,
                   struct dpif_flow_stats *);
+
 int dpif_flow_del(struct dpif *,
                   const struct nlattr *key, size_t key_len,
+                  const struct nlattr *uid, size_t uid_len,
                   struct dpif_flow_stats *);
 int dpif_flow_get(struct dpif *,
                   const struct nlattr *key, size_t key_len,
+                  const struct nlattr *uid, size_t uid_len,
                   struct ofpbuf *, struct dpif_flow *);
 
 /* Flow dumping interface
@@ -555,7 +559,8 @@ int dpif_flow_get(struct dpif *,
  *
  * All error reporting is deferred to the call to dpif_flow_dump_destroy().
  */
-struct dpif_flow_dump *dpif_flow_dump_create(const struct dpif *);
+struct dpif_flow_dump *dpif_flow_dump_create(const struct dpif *,
+                                             uint32_t dump_flags);
 int dpif_flow_dump_destroy(struct dpif_flow_dump *);
 
 struct dpif_flow_dump_thread *dpif_flow_dump_thread_create(
@@ -570,6 +575,8 @@ struct dpif_flow {
     size_t mask_len;              /* 'mask' length in bytes. */
     const struct nlattr *actions; /* Actions, as OVS_ACTION_ATTR_ */
     size_t actions_len;           /* 'actions' length in bytes. */
+    const struct nlattr *uid;     /* Unique flow identifier. */
+    size_t uid_len;               /* 'uid' length in bytes. */
     struct dpif_flow_stats stats; /* Flow statistics. */
 };
 int dpif_flow_dump_next(struct dpif_flow_dump_thread *,
@@ -621,6 +628,8 @@ struct dpif_flow_put {
     size_t mask_len;                /* Length of 'mask' in bytes. */
     const struct nlattr *actions;   /* Actions to perform on flow. */
     size_t actions_len;             /* Length of 'actions' in bytes. */
+    const struct nlattr *uid;       /* Unique flow identifier. */
+    size_t uid_len;                 /* Length of 'uid' in bytes. */
 
     /* Output. */
     struct dpif_flow_stats *stats;  /* Optional flow statistics. */
@@ -629,8 +638,17 @@ struct dpif_flow_put {
 /* Delete a flow.
  *
  * The flow is specified by the Netlink attributes with types OVS_KEY_ATTR_* in
- * the 'key_len' bytes starting at 'key'.  Succeeds with status 0 if the flow
- * is deleted, or fails with ENOENT if the dpif does not contain such a flow.
+ * the 'key_len' bytes starting at 'key', or the Netlink attributes with
+ * types OVS_UID_ATTR_* in the 'uid_len' bytes starting at 'uid'. At least one
+ * of 'key' or 'uid' must be specified. Succeeds with status 0 if the flow is
+ * deleted, or fails with ENOENT if the dpif does not contain such a flow.
+ *
+ * XXX: Current semantics are that if a datapath is set up with INDEX_BY_UID,
+ * it will only accept operations that have a UID specified (and reject others).
+ * However, UID is generated in the udpif and some users (eg ovs-dpctl) have no
+ * way of determining the UID from a flow. We could accept either, which would
+ * require datapaths to index by flow and by UID, or perhaps shift the UID
+ * down to the dpif layer.
  *
  * If the operation succeeds, then 'stats', if nonnull, will be set to the
  * flow's statistics before its deletion. */
@@ -638,6 +656,8 @@ struct dpif_flow_del {
     /* Input. */
     const struct nlattr *key;       /* Flow to delete. */
     size_t key_len;                 /* Length of 'key' in bytes. */
+    const struct nlattr *uid;       /* UID of flow to delete. */
+    size_t uid_len;                 /* Length of 'uid' in bytes. */
 
     /* Output. */
     struct dpif_flow_stats *stats;  /* Optional flow statistics. */
@@ -674,6 +694,8 @@ struct dpif_execute {
  * the 'key_len' bytes starting at 'key'. 'buffer' must point to an initialized
  * buffer, with a recommended size of DPIF_FLOW_BUFSIZE bytes.
  *
+ * XXX: See dpif_flow_del comment regarding UID.
+ *
  * On success, 'flow' will be populated with the mask, actions and stats for
  * the datapath flow corresponding to 'key'. The mask and actions may point
  * within '*buffer', or may point at RCU-protected data. Therefore, callers
@@ -687,6 +709,8 @@ struct dpif_flow_get {
     /* Input. */
     const struct nlattr *key;       /* Flow to get. */
     size_t key_len;                 /* Length of 'key' in bytes. */
+    const struct nlattr *uid;       /* UID of flow to get. */
+    size_t uid_len;                 /* Length of 'uid' in bytes. */
     struct ofpbuf *buffer;          /* Storage for output parameters. */
 
     /* Output. */
@@ -752,7 +776,8 @@ struct dpif_upcall {
  * wildcard mask suitable for that purpose into 'wc'.  If the actions to store
  * into the flow entry are the same as 'actions', then the callback may leave
  * 'put_actions' empty; otherwise it must store the desired actions into
- * 'put_actions'.
+ * 'put_actions'. The callback must fill in 'uid' with the userspace id
+ * corresponding to 'flow'.
  *
  * Returns 0 if successful, ENOSPC if the flow limit has been reached and no
  * flow should be installed, or some otherwise a positive errno value. */
@@ -762,6 +787,7 @@ typedef int upcall_callback(const struct ofpbuf *packet,
                             const struct nlattr *userdata,
                             struct ofpbuf *actions,
                             struct flow_wildcards *wc,
+                            ovs_u128 *uid,
                             struct ofpbuf *put_actions,
                             void *aux);
 

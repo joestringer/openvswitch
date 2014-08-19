@@ -256,8 +256,12 @@ struct dpif_class {
      *
      * 'flow_dump_create' and 'flow_dump_thread_create' must initialize the
      * structures that they return with dpif_flow_dump_init() and
-     * dpif_flow_dump_thread_init(), respectively. */
-    struct dpif_flow_dump *(*flow_dump_create)(const struct dpif *dpif);
+     * dpif_flow_dump_thread_init(), respectively.
+     *
+     * 'dump_flags' is a bitmask of OVS_UID_F_* values which describe the
+     * behaviour for dumping flows. */
+    struct dpif_flow_dump *(*flow_dump_create)(const struct dpif *dpif,
+                                               uint32_t dump_flags);
     int (*flow_dump_destroy)(struct dpif_flow_dump *dump);
 
     struct dpif_flow_dump_thread *(*flow_dump_thread_create)(

@@ -134,6 +134,27 @@ struct odputil_keybuf {
     uint32_t keybuf[DIV_ROUND_UP(ODPUTIL_FLOW_KEY_BYTES, 4)];
 };
 
+/* The maximum number of bytes that odp_uid_from_uid() appends to a buffer.
+ * This is the upper bound on the length of a nlattr-formatted flow key that
+ * ovs-vswitchd fully understands.
+ *
+ * As with ODPUTIL_FLOW_KEY_BYTES, the datapath may have a different idea of a
+ * flow, so this isn't necessarily an upper bound on the length of a UID that
+ * the datapath can pass to ovs-vswitchd.
+ *
+ *                                     struct  pad  nl hdr  total
+ *                                     ------  ---  ------  -----
+ * OVS_UID_ATTR_FLAGS                     4     -      4      8
+ * OVS_UID_ATTR_UID                      16     -      4     20
+ *  ------------------------------------------------------------
+ *  total                                                    28
+ *
+ */
+#define ODPUTIL_FLOW_UID_BYTES 28
+struct odputil_uidbuf {
+    uint32_t uidbuf[DIV_ROUND_UP(ODPUTIL_FLOW_UID_BYTES, 4)];
+};
+
 enum odp_key_fitness odp_tun_key_from_attr(const struct nlattr *,
                                            struct flow_tnl *);
 
@@ -154,6 +175,8 @@ void odp_flow_key_from_mask(struct ofpbuf *, const struct flow *mask,
                             size_t max_mpls_depth, bool recirc);
 
 uint32_t odp_flow_key_hash(const struct nlattr *, size_t);
+void odp_uid_to_nlattrs(struct ofpbuf *, const ovs_u128 *, uint32_t flags);
+void odp_format_uid(const ovs_u128 *uid, struct ds *);
 
 /* Estimated space needed for metadata. */
 enum { ODP_KEY_METADATA_SIZE = 9 * 8 };
@@ -180,6 +203,8 @@ enum odp_key_fitness odp_flow_key_to_mask(const struct nlattr *key, size_t len,
                                           struct flow *mask,
                                           const struct flow *flow);
 const char *odp_key_fitness_to_string(enum odp_key_fitness);
+int odp_uid_from_nlattrs(const struct nlattr *, size_t,
+                         ovs_u128 *uid, uint32_t *flags);
 
 void commit_odp_tunnel_action(const struct flow *, struct flow *base,
                               struct ofpbuf *odp_actions);

@@ -2898,6 +2898,57 @@ odp_flow_key_hash(const struct nlattr *key, size_t key_len)
                       key_len / sizeof(uint32_t), 0);
 }
 
+int
+odp_uid_from_nlattrs(const struct nlattr *nla, size_t nla_len, ovs_u128 *uid,
+                     uint32_t *flags)
+{
+    static const struct nl_policy ovs_uid_policy[] = {
+        [OVS_UID_ATTR_FLAGS] = { .type = NL_A_U32, .optional = true },
+        [OVS_UID_ATTR_ID] = { .type = NL_A_UNSPEC,
+                              .min_len = sizeof *uid }
+    };
+    struct nlattr *a[ARRAY_SIZE(ovs_uid_policy)];
+    const ovs_u128 *uidp;
+    struct ofpbuf buf;
+
+    if (!nla) {
+        return EINVAL;
+    }
+
+    ofpbuf_use_const(&buf, nla, nla_len);
+    if (!nl_policy_parse(&buf, 0, ovs_uid_policy, a, ARRAY_SIZE(a))) {
+        VLOG_WARN("Failed to parse UID_ATTRs (%p, len=%"PRIuSIZE")",
+                  nla, nla_len);
+        return EINVAL;
+    }
+
+    uidp = nl_attr_get_unspec(a[OVS_UID_ATTR_ID], sizeof *uid);
+    memcpy(uid, uidp, sizeof *uid);
+
+    if (flags && a[OVS_UID_ATTR_FLAGS]) {
+        *flags = nl_attr_get_u32(a[OVS_UID_ATTR_FLAGS]);
+    }
+    return 0;
+}
+
+void
+odp_uid_to_nlattrs(struct ofpbuf *buf, const ovs_u128 *uid, uint32_t flags)
+{
+    if (flags) {
+        nl_msg_put_u32(buf, OVS_UID_ATTR_FLAGS, flags);
+    }
+    if (uid) {
+        nl_msg_put_unspec(buf, OVS_UID_ATTR_ID, uid, sizeof *uid);
+    }
+}
+
+void
+odp_format_uid(const ovs_u128 *uid, struct ds *ds)
+{
+    ds_put_format(ds, "uid:%"PRIx32"%"PRIx32"%"PRIx32"%"PRIx32,
+                  uid->h[0], uid->h[1], uid->h[2], uid->h[3]);
+}
+
 static void
 log_odp_key_attributes(struct vlog_rate_limit *rl, const char *title,
                        uint64_t attrs, int out_of_range_attr,

@@ -1120,7 +1120,8 @@ dpif_linux_flow_dump_cast(struct dpif_flow_dump *dump)
 }
 
 static struct dpif_flow_dump *
-dpif_linux_flow_dump_create(const struct dpif *dpif_)
+dpif_linux_flow_dump_create(const struct dpif *dpif_,
+                            uint32_t dump_flags OVS_UNUSED)
 {
     const struct dpif_linux *dpif = dpif_linux_cast(dpif_);
     struct dpif_linux_flow_dump *dump;
@@ -1207,6 +1208,8 @@ dpif_linux_flow_to_dpif_flow(struct dpif_flow *dpif_flow,
     dpif_flow->mask_len = linux_flow->mask_len;
     dpif_flow->actions = linux_flow->actions;
     dpif_flow->actions_len = linux_flow->actions_len;
+    dpif_flow->uid = NULL;
+    dpif_flow->uid_len = 0;
     dpif_linux_flow_get_stats(linux_flow, &dpif_flow->stats);
 }
 
