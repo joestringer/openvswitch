@@ -110,6 +110,8 @@ struct dpif_linux_flow {
     size_t mask_len;
     const struct nlattr *actions;       /* OVS_FLOW_ATTR_ACTIONS. */
     size_t actions_len;
+    const struct nlattr *uid;           /* OVS_FLOW_ATTR_UID. */
+    size_t uid_len;
     const struct ovs_flow_stats *stats; /* OVS_FLOW_ATTR_STATS. */
     const uint8_t *tcp_flags;           /* OVS_FLOW_ATTR_TCP_FLAGS. */
     const ovs_32aligned_u64 *used;      /* OVS_FLOW_ATTR_USED. */
@@ -1050,25 +1052,16 @@ dpif_linux_port_poll_wait(const struct dpif *dpif_)
 
 static void
 dpif_linux_init_flow_get(const struct dpif_linux *dpif,
-                         const struct nlattr *key, size_t key_len,
+                         const struct dpif_flow_get *get,
                          struct dpif_linux_flow *request)
 {
     dpif_linux_flow_init(request);
     request->cmd = OVS_FLOW_CMD_GET;
     request->dp_ifindex = dpif->dp_ifindex;
-    request->key = key;
-    request->key_len = key_len;
-}
-
-static int
-dpif_linux_flow_get(const struct dpif_linux *dpif,
-                    const struct nlattr *key, size_t key_len,
-                    struct dpif_linux_flow *reply, struct ofpbuf **bufp)
-{
-    struct dpif_linux_flow request;
-
-    dpif_linux_init_flow_get(dpif, key, key_len, &request);
-    return dpif_linux_flow_transact(&request, reply, bufp);
+    request->key = get->key;
+    request->key_len = get->key_len;
+    request->uid = get->uid;
+    request->uid_len = get->uid_len;
 }
 
 static void
@@ -1085,6 +1078,9 @@ dpif_linux_init_flow_put(struct dpif_linux *dpif, const struct dpif_flow_put *pu
     request->key_len = put->key_len;
     request->mask = put->mask;
     request->mask_len = put->mask_len;
+    request->uid = put->uid;
+    request->uid_len = put->uid_len;
+
     /* Ensure that OVS_FLOW_ATTR_ACTIONS will always be included. */
     request->actions = (put->actions
                         ? put->actions
@@ -1105,6 +1101,8 @@ dpif_linux_init_flow_del(struct dpif_linux *dpif, const struct dpif_flow_del *de
     request->dp_ifindex = dpif->dp_ifindex;
     request->key = del->key;
     request->key_len = del->key_len;
+    request->uid = del->uid;
+    request->uid_len = del->uid_len;
 }
 
 struct dpif_linux_flow_dump {
@@ -1120,13 +1118,13 @@ dpif_linux_flow_dump_cast(struct dpif_flow_dump *dump)
 }
 
 static struct dpif_flow_dump *
-dpif_linux_flow_dump_create(const struct dpif *dpif_,
-                            uint32_t dump_flags OVS_UNUSED)
+dpif_linux_flow_dump_create(const struct dpif *dpif_, uint32_t dump_flags)
 {
     const struct dpif_linux *dpif = dpif_linux_cast(dpif_);
     struct dpif_linux_flow_dump *dump;
     struct dpif_linux_flow request;
-    struct ofpbuf *buf;
+    struct ofpbuf *buf, uid;
+    struct odputil_uidbuf uid_buf;
 
     dump = xmalloc(sizeof *dump);
     dpif_flow_dump_init(&dump->up, dpif_);
@@ -1134,6 +1132,11 @@ dpif_linux_flow_dump_create(const struct dpif *dpif_,
     dpif_linux_flow_init(&request);
     request.cmd = OVS_FLOW_CMD_GET;
     request.dp_ifindex = dpif->dp_ifindex;
+
+    ofpbuf_use_stack(&uid, &uid_buf, sizeof uid_buf);
+    odp_uid_to_nlattrs(&uid, NULL, dump_flags);
+    request.uid = ofpbuf_data(&uid);
+    request.uid_len = ofpbuf_size(&uid);
 
     buf = ofpbuf_new(1024);
     dpif_linux_flow_to_ofpbuf(&request, buf);
@@ -1208,8 +1211,8 @@ dpif_linux_flow_to_dpif_flow(struct dpif_flow *dpif_flow,
     dpif_flow->mask_len = linux_flow->mask_len;
     dpif_flow->actions = linux_flow->actions;
     dpif_flow->actions_len = linux_flow->actions_len;
-    dpif_flow->uid = NULL;
-    dpif_flow->uid_len = 0;
+    dpif_flow->uid = linux_flow->uid;
+    dpif_flow->uid_len = linux_flow->uid_len;
     dpif_linux_flow_get_stats(linux_flow, &dpif_flow->stats);
 }
 
@@ -1220,7 +1223,6 @@ dpif_linux_flow_dump_next(struct dpif_flow_dump_thread *thread_,
     struct dpif_linux_flow_dump_thread *thread
         = dpif_linux_flow_dump_thread_cast(thread_);
     struct dpif_linux_flow_dump *dump = thread->dump;
-    struct dpif_linux *dpif = dpif_linux_cast(thread->up.dpif);
     int n_flows;
 
     ofpbuf_delete(thread->nl_actions);
@@ -1245,30 +1247,7 @@ dpif_linux_flow_dump_next(struct dpif_flow_dump_thread *thread_,
             break;
         }
 
-        if (linux_flow.actions) {
-            /* Common case: the flow includes actions. */
-            dpif_linux_flow_to_dpif_flow(&flows[n_flows++], &linux_flow);
-        } else {
-            /* Rare case: the flow does not include actions.  Retrieve this
-             * individual flow again to get the actions. */
-            error = dpif_linux_flow_get(dpif, linux_flow.key,
-                                        linux_flow.key_len, &linux_flow,
-                                        &thread->nl_actions);
-            if (error == ENOENT) {
-                VLOG_DBG("dumped flow disappeared on get");
-                continue;
-            } else if (error) {
-                VLOG_WARN("error fetching dumped flow: %s",
-                          ovs_strerror(error));
-                atomic_store_relaxed(&dump->status, error);
-                break;
-            }
-
-            /* Save this flow.  Then exit, because we only have one buffer to
-             * handle this case. */
-            dpif_linux_flow_to_dpif_flow(&flows[n_flows++], &linux_flow);
-            break;
-        }
+        dpif_linux_flow_to_dpif_flow(&flows[n_flows++], &linux_flow);
     }
     return n_flows;
 }
@@ -1368,7 +1347,7 @@ dpif_linux_operate__(struct dpif_linux *dpif,
 
         case DPIF_OP_FLOW_GET:
             get = &op->u.flow_get;
-            dpif_linux_init_flow_get(dpif, get->key, get->key_len, &flow);
+            dpif_linux_init_flow_get(dpif, get, &flow);
             aux->txn.reply = get->buffer;
             dpif_linux_flow_to_ofpbuf(&flow, &aux->request);
             break;
@@ -2269,14 +2248,15 @@ static int
 dpif_linux_flow_from_ofpbuf(struct dpif_linux_flow *flow,
                             const struct ofpbuf *buf)
 {
-    static const struct nl_policy ovs_flow_policy[] = {
-        [OVS_FLOW_ATTR_KEY] = { .type = NL_A_NESTED },
+    static const struct nl_policy ovs_flow_policy[__OVS_FLOW_ATTR_MAX] = {
+        [OVS_FLOW_ATTR_KEY] = { .type = NL_A_NESTED, .optional = true },
         [OVS_FLOW_ATTR_MASK] = { .type = NL_A_NESTED, .optional = true },
         [OVS_FLOW_ATTR_ACTIONS] = { .type = NL_A_NESTED, .optional = true },
         [OVS_FLOW_ATTR_STATS] = { NL_POLICY_FOR(struct ovs_flow_stats),
                                   .optional = true },
         [OVS_FLOW_ATTR_TCP_FLAGS] = { .type = NL_A_U8, .optional = true },
         [OVS_FLOW_ATTR_USED] = { .type = NL_A_U64, .optional = true },
+        [OVS_FLOW_ATTR_UID] = { .type = NL_A_NESTED, .optional = true },
         /* The kernel never uses OVS_FLOW_ATTR_CLEAR. */
     };
 
@@ -2298,12 +2278,21 @@ dpif_linux_flow_from_ofpbuf(struct dpif_linux_flow *flow,
                             ARRAY_SIZE(ovs_flow_policy))) {
         return EINVAL;
     }
+    if (!a[OVS_FLOW_ATTR_KEY] && !a[OVS_FLOW_ATTR_UID]) {
+        return EINVAL;
+    }
 
     flow->nlmsg_flags = nlmsg->nlmsg_flags;
     flow->dp_ifindex = ovs_header->dp_ifindex;
-    flow->key = nl_attr_get(a[OVS_FLOW_ATTR_KEY]);
-    flow->key_len = nl_attr_get_size(a[OVS_FLOW_ATTR_KEY]);
+    if (a[OVS_FLOW_ATTR_KEY]) {
+        flow->key = nl_attr_get(a[OVS_FLOW_ATTR_KEY]);
+        flow->key_len = nl_attr_get_size(a[OVS_FLOW_ATTR_KEY]);
+    }
 
+    if (a[OVS_FLOW_ATTR_UID]) {
+        flow->uid = nl_attr_get(a[OVS_FLOW_ATTR_UID]);
+        flow->uid_len = nl_attr_get_size(a[OVS_FLOW_ATTR_UID]);
+    }
     if (a[OVS_FLOW_ATTR_MASK]) {
         flow->mask = nl_attr_get(a[OVS_FLOW_ATTR_MASK]);
         flow->mask_len = nl_attr_get_size(a[OVS_FLOW_ATTR_MASK]);
@@ -2345,6 +2334,10 @@ dpif_linux_flow_to_ofpbuf(const struct dpif_linux_flow *flow,
 
     if (flow->mask_len) {
         nl_msg_put_unspec(buf, OVS_FLOW_ATTR_MASK, flow->mask, flow->mask_len);
+    }
+
+    if (flow->uid_len) {
+        nl_msg_put_unspec(buf, OVS_FLOW_ATTR_UID, flow->uid, flow->uid_len);
     }
 
     if (flow->actions || flow->actions_len) {
