@@ -20,6 +20,7 @@
 struct dpif;
 struct dpif_backer;
 struct dpif_upcall;
+struct nlattr;
 struct ofpbuf;
 struct seq;
 struct simap;
@@ -37,6 +38,8 @@ void udpif_destroy(struct udpif *);
 void udpif_revalidate(struct udpif *);
 void udpif_get_memory_usage(struct udpif *, struct simap *usage);
 struct seq *udpif_dump_seq(struct udpif *);
+void udpif_hash_flow(struct udpif *, const struct nlattr *key, size_t key_len,
+                     struct ofpbuf *);
 void udpif_flush(struct udpif *);
 
 #endif /* ofproto-dpif-upcall.h */

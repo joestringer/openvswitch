@@ -87,6 +87,8 @@ enum rule_dpif_lookup_verdict {
 
 size_t ofproto_dpif_get_max_mpls_depth(const struct ofproto_dpif *);
 bool ofproto_dpif_get_enable_recirc(const struct ofproto_dpif *);
+bool ofproto_dpif_get_enable_uid(const struct ofproto_dpif *);
+bool dpif_backer_get_enable_uid(const struct dpif_backer *);
 
 uint8_t rule_dpif_lookup(struct ofproto_dpif *, struct flow *,
                          struct flow_wildcards *, struct rule_dpif **rule,

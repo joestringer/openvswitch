@@ -266,6 +266,9 @@ struct dpif_backer {
     /* Maximum number of MPLS label stack entries that the datapath supports
      * in a match */
     size_t max_mpls_depth;
+
+    /* Support for userspace-generated unique flow ids. */
+    bool enable_uid;
 };
 
 /* All existing ofproto_backer instances, indexed by ofproto->up.type. */
@@ -342,6 +345,18 @@ bool
 ofproto_dpif_get_enable_recirc(const struct ofproto_dpif *ofproto)
 {
     return ofproto->backer->enable_recirc;
+}
+
+bool
+ofproto_dpif_get_enable_uid(const struct ofproto_dpif *ofproto)
+{
+    return ofproto->backer->enable_uid;
+}
+
+bool
+dpif_backer_get_enable_uid(const struct dpif_backer *backer)
+{
+    return backer->enable_uid;
 }
 
 static struct ofport_dpif *get_ofp_port(const struct ofproto_dpif *ofproto,
@@ -827,6 +842,7 @@ struct odp_garbage {
 static bool check_variable_length_userdata(struct dpif_backer *backer);
 static size_t check_max_mpls_depth(struct dpif_backer *backer);
 static bool check_recirc(struct dpif_backer *backer);
+static bool check_uid(struct dpif_backer *backer);
 
 static int
 open_dpif_backer(const char *type, struct dpif_backer **backerp)
@@ -924,6 +940,7 @@ open_dpif_backer(const char *type, struct dpif_backer **backerp)
     backer->variable_length_userdata = check_variable_length_userdata(backer);
     backer->max_mpls_depth = check_max_mpls_depth(backer);
     backer->rid_pool = recirc_id_pool_create();
+    backer->enable_uid = check_uid(backer);
 
     error = dpif_recv_set(backer->dpif, backer->recv_set_enable);
     if (error) {
@@ -952,7 +969,8 @@ check_recirc(struct dpif_backer *backer)
 {
     struct flow flow;
     struct odputil_keybuf keybuf;
-    struct ofpbuf key;
+    struct odputil_uidbuf uidbuf;
+    struct ofpbuf key, uid;
     int error;
     bool enable_recirc = false;
 
@@ -961,11 +979,13 @@ check_recirc(struct dpif_backer *backer)
     flow.dp_hash = 1;
 
     ofpbuf_use_stack(&key, &keybuf, sizeof keybuf);
+    ofpbuf_use_stack(&uid, &uidbuf, sizeof uidbuf);
     odp_flow_key_from_flow(&key, &flow, NULL, 0, true);
 
+    udpif_hash_flow(backer->udpif, ofpbuf_data(&key), ofpbuf_size(&key), &uid);
     error = dpif_flow_put(backer->dpif, DPIF_FP_CREATE,
                           ofpbuf_data(&key), ofpbuf_size(&key), NULL, 0, NULL,
-                          0, NULL, 0, NULL);
+                          0, ofpbuf_data(&uid), ofpbuf_size(&uid), NULL);
     if (error && error != EEXIST) {
         if (error != EINVAL) {
             VLOG_WARN("%s: Reciculation flow probe failed (%s)",
@@ -975,7 +995,7 @@ check_recirc(struct dpif_backer *backer)
     }
 
     error = dpif_flow_del(backer->dpif, ofpbuf_data(&key), ofpbuf_size(&key),
-                          NULL, 0, NULL);
+                          ofpbuf_data(&uid), ofpbuf_size(&uid), NULL);
     if (error) {
         VLOG_WARN("%s: failed to delete recirculation feature probe flow",
                   dpif_name(backer->dpif));
@@ -993,6 +1013,72 @@ done:
     }
 
     return enable_recirc;
+}
+
+/* Tests whether 'backer''s datapath supports userspace flow ids. Only newer
+ * datapaths support OVS_FLOW_ATTR_UID in flow commands. We can skip
+ * serializing some flow attributes for datapaths that support this feature.
+ *
+ * Returns true if 'backer' supports UID for flow operations.
+ * Returns false if 'backer' does not support UID. */
+static bool
+check_uid(struct dpif_backer *backer)
+{
+    struct dpif_flow reply;
+    struct flow flow;
+    struct odputil_keybuf keybuf;
+    struct ofpbuf key, uid, replybuf;
+    struct odputil_uidbuf uidbuf;
+    uint64_t stub[DPIF_FLOW_BUFSIZE / 8];
+    int error;
+    bool enable_uid = false;
+
+    memset(&flow, 0, sizeof flow);
+    flow.dl_type = htons(0x1234);
+
+    ofpbuf_use_stack(&key, &keybuf, sizeof keybuf);
+    ofpbuf_use_stack(&uid, &uidbuf, sizeof uidbuf);
+    odp_flow_key_from_flow(&key, &flow, NULL, 0, true);
+    udpif_hash_flow(backer->udpif, ofpbuf_data(&key), ofpbuf_size(&key), &uid);
+    error = dpif_flow_put(backer->dpif, DPIF_FP_CREATE,
+                          ofpbuf_data(&key), ofpbuf_size(&key), NULL, 0, NULL,
+                          0, ofpbuf_data(&uid), ofpbuf_size(&uid), NULL);
+
+    if (error && error != EEXIST) {
+        VLOG_WARN("%s: UID feature probe failed (%s).",
+                  dpif_name(backer->dpif), ovs_strerror(error));
+        goto done;
+    }
+
+    ofpbuf_use_stub(&replybuf, &stub, sizeof stub);
+    error = dpif_flow_get(backer->dpif, ofpbuf_data(&key), ofpbuf_size(&key),
+                          ofpbuf_data(&uid), ofpbuf_size(&uid),
+                          &replybuf, &reply);
+    if (!error && reply.uid) {
+        ovs_u128 tmp;
+
+        if (!odp_uid_from_nlattrs(reply.uid, reply.uid_len, &tmp, NULL)) {
+            enable_uid = true;
+        }
+    }
+    ofpbuf_uninit(&replybuf);
+
+    error = dpif_flow_del(backer->dpif, ofpbuf_data(&key), ofpbuf_size(&key),
+                          ofpbuf_data(&uid), ofpbuf_size(&uid), NULL);
+    if (error) {
+        VLOG_WARN("%s: failed to delete UID feature probe flow",
+                  dpif_name(backer->dpif));
+    }
+done:
+    if (enable_uid) {
+        VLOG_INFO("%s: Datapath supports userspace flow ids",
+                  dpif_name(backer->dpif));
+    } else {
+        VLOG_INFO("%s: Datapath does not support userspace flow ids",
+                  dpif_name(backer->dpif));
+    }
+
+    return enable_uid;
 }
 
 /* Tests whether 'backer''s datapath supports variable-length
@@ -1081,7 +1167,8 @@ check_max_mpls_depth(struct dpif_backer *backer)
 
     for (n = 0; n < FLOW_MAX_MPLS_LABELS; n++) {
         struct odputil_keybuf keybuf;
-        struct ofpbuf key;
+        struct odputil_uidbuf uidbuf;
+        struct ofpbuf key, uid;
         int error;
 
         memset(&flow, 0, sizeof flow);
@@ -1089,11 +1176,15 @@ check_max_mpls_depth(struct dpif_backer *backer)
         flow_set_mpls_bos(&flow, n, 1);
 
         ofpbuf_use_stack(&key, &keybuf, sizeof keybuf);
+        ofpbuf_use_stack(&uid, &uidbuf, sizeof uidbuf);
         odp_flow_key_from_flow(&key, &flow, NULL, 0, false);
+        udpif_hash_flow(backer->udpif, ofpbuf_data(&key), ofpbuf_size(&key),
+                        &uid);
 
         error = dpif_flow_put(backer->dpif, DPIF_FP_CREATE,
                               ofpbuf_data(&key), ofpbuf_size(&key), NULL, 0,
-                              NULL, 0, NULL, 0, NULL);
+                              NULL, 0, ofpbuf_data(&uid), ofpbuf_size(&uid),
+                              NULL);
         if (error && error != EEXIST) {
             if (error != EINVAL) {
                 VLOG_WARN("%s: MPLS stack length feature probe failed (%s)",
@@ -1104,7 +1195,7 @@ check_max_mpls_depth(struct dpif_backer *backer)
 
         error = dpif_flow_del(backer->dpif,
                               ofpbuf_data(&key), ofpbuf_size(&key),
-                              NULL, 0, NULL);
+                              ofpbuf_data(&uid), ofpbuf_size(&uid), NULL);
         if (error) {
             VLOG_WARN("%s: failed to delete MPLS feature probe flow",
                       dpif_name(backer->dpif));
