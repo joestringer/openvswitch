@@ -4672,7 +4672,7 @@ for dl_src in 00 01; do
 done
 sleep 1  # wait for the datapath flow installed
 for dl_src in 00 01; do
-    AT_CHECK_UNQUOTED([cat ovs-vswitchd.log | FILTER_FLOW_INSTALL | grep "$dl_src," | STRIP_USED], [0], [dnl
+    AT_CHECK_UNQUOTED([cat ovs-vswitchd.log | STRIP_UID | FILTER_FLOW_INSTALL | grep "$dl_src," | STRIP_USED], [0], [dnl
 recirc_id=0,skb_priority=0,mpls,in_port=1,dl_src=60:66:66:66:66:$dl_src,mpls_label=20,mpls_tc=0,mpls_ttl=32,mpls_bos=0,mpls_lse1=82208,mpls_lse2=0, actions:userspace(pid=0,slow_path(controller))
 ])
 done
@@ -4712,7 +4712,7 @@ for dl_src in 00 01; do
 done
 sleep 1  # wait for the datapath flow installed
 for dl_src in 00 01; do
-    AT_CHECK_UNQUOTED([cat ovs-vswitchd.log | FILTER_FLOW_INSTALL | grep "$dl_src," | STRIP_USED], [0], [dnl
+    AT_CHECK_UNQUOTED([cat ovs-vswitchd.log | STRIP_UID | FILTER_FLOW_INSTALL | grep "$dl_src," | STRIP_USED], [0], [dnl
 recirc_id=0,skb_priority=0,mpls,in_port=1,dl_src=60:66:66:66:66:$dl_src,mpls_label=20,mpls_tc=0,mpls_ttl=32,mpls_bos=0,mpls_lse1=82208,mpls_lse2=0, actions:userspace(pid=0,slow_path(controller))
 ])
 done
@@ -4729,6 +4729,9 @@ OVS_VSWITCHD_START([add-br br1 \
 ADD_OF_PORTS([br0], [2])
 ADD_OF_PORTS([br1], [3])
 
+AT_CHECK([ovs-appctl revalidator/wait], [0], [ignore])
+AT_CHECK([ovs-appctl upcall/disable-terse-dump], [0], [Datapath dumping tersely using UID disabled
+], [])
 AT_CHECK([ovs-appctl time/stop])
 AT_CHECK([ovs-appctl vlog/set dpif:dbg dpif_netdev:dbg])
 
@@ -4766,15 +4769,15 @@ dummy@ovs-dummy: hit:13 missed:2
 		pbr1 1/none: (patch: peer=pbr0)
 ])
 
-AT_CHECK([cat ovs-vswitchd.log | FILTER_FLOW_INSTALL | STRIP_USED], [0], [dnl
+AT_CHECK([cat ovs-vswitchd.log | STRIP_UID | FILTER_FLOW_INSTALL | STRIP_USED], [0], [dnl
 recirc_id=0,skb_priority=0,ip,in_port=100,nw_frag=no, actions:101,3,2
 recirc_id=0,skb_priority=0,ip,in_port=101,nw_frag=no, actions:100,2,3
 ])
 
-AT_CHECK([cat ovs-vswitchd.log | grep -e 'in_port(100).*packets:9' | FILTER_FLOW_DUMP], [0], [dnl
+AT_CHECK([cat ovs-vswitchd.log | grep -e 'in_port(100).*packets:9' | STRIP_UID | FILTER_FLOW_DUMP], [0], [dnl
 skb_priority(0),skb_mark(0/0),recirc_id(0),dp_hash(0/0),in_port(100),eth(src=50:54:00:00:00:05/00:00:00:00:00:00,dst=50:54:00:00:00:07/00:00:00:00:00:00),eth_type(0x0800),ipv4(src=192.168.0.1/0.0.0.0,dst=192.168.0.2/0.0.0.0,proto=1/0,tos=0/0,ttl=64/0,frag=no/0xff),icmp(type=8/0,code=0/0), packets:9, bytes:540, used:0.0s, actions:101,3,2
 ])
-AT_CHECK([cat ovs-vswitchd.log | grep -e 'in_port(101).*packets:4' | FILTER_FLOW_DUMP], [0], [dnl
+AT_CHECK([cat ovs-vswitchd.log | grep -e 'in_port(101).*packets:4' | STRIP_UID | FILTER_FLOW_DUMP], [0], [dnl
 skb_priority(0),skb_mark(0/0),recirc_id(0),dp_hash(0/0),in_port(101),eth(src=50:54:00:00:00:07/00:00:00:00:00:00,dst=50:54:00:00:00:05/00:00:00:00:00:00),eth_type(0x0800),ipv4(src=192.168.0.2/0.0.0.0,dst=192.168.0.1/0.0.0.0,proto=1/0,tos=0/0,ttl=64/0,frag=no/0xff),icmp(type=8/0,code=0/0), packets:4, bytes:240, used:0.0s, actions:100,2,3
 ])
 
@@ -5294,7 +5297,7 @@ dnl ofproto-dpif).  The second entry actually updates the destination
 dnl MAC, so both the source and destination MAC addresses are
 dnl un-wildcarded, since the ODP commit functions update both the source
 dnl and destination MAC addresses.
-AT_CHECK([cat ovs-vswitchd.log | FILTER_FLOW_INSTALL | STRIP_USED], [0], [dnl
+AT_CHECK([cat ovs-vswitchd.log | STRIP_UID | FILTER_FLOW_INSTALL | STRIP_USED], [0], [dnl
 recirc_id=0,skb_priority=0,ip,in_port=1,dl_dst=50:54:00:00:00:0a,nw_frag=no, actions:2
 recirc_id=0,skb_priority=0,ip,in_port=1,dl_src=50:54:00:00:00:0b,dl_dst=50:54:00:00:00:0c,nw_frag=no, actions:set(eth(src=50:54:00:00:00:0b,dst=50:54:00:00:00:0a)),2
 ])
@@ -5311,6 +5314,9 @@ table=0 in_port=1,ip,nw_dst=10.0.0.3 actions=drop
 ])
 AT_CHECK([ovs-appctl upcall/disable-megaflows], [0], [megaflows disabled
 ], [])
+AT_CHECK([ovs-appctl revalidator/wait], [0], [ignore])
+AT_CHECK([ovs-appctl upcall/disable-terse-dump], [0], [Datapath dumping tersely using UID disabled
+], [])
 AT_CHECK([ovs-appctl vlog/set dpif_netdev:dbg], [0], [], [])
 AT_CHECK([ovs-ofctl add-flows br0 flows.txt])
 for i in 1 2 3 4; do
@@ -5321,11 +5327,11 @@ for i in 1 2 3 4; do
     fi
 done
 sleep 1
-AT_CHECK([cat ovs-vswitchd.log | FILTER_FLOW_INSTALL | STRIP_USED], [0], [dnl
+AT_CHECK([cat ovs-vswitchd.log | STRIP_UID | FILTER_FLOW_INSTALL | STRIP_USED], [0], [dnl
 pkt_mark=0,recirc_id=0,skb_priority=0,icmp,tun_id=0,tun_src=0.0.0.0,tun_dst=0.0.0.0,tun_tos=0,tun_ttl=0,,in_port=1,vlan_tci=0x0000,dl_src=50:54:00:00:00:09,dl_dst=50:54:00:00:00:0a,nw_src=10.0.0.2,nw_dst=10.0.0.1,nw_tos=0,nw_ecn=0,nw_ttl=64,mpls_label=0,mpls_tc=0,mpls_ttl=0,mpls_bos=0,mpls_lse1=0,mpls_lse2=0,icmp_type=8,icmp_code=0, actions:2
 pkt_mark=0,recirc_id=0,skb_priority=0,icmp,tun_id=0,tun_src=0.0.0.0,tun_dst=0.0.0.0,tun_tos=0,tun_ttl=0,,in_port=1,vlan_tci=0x0000,dl_src=50:54:00:00:00:0b,dl_dst=50:54:00:00:00:0c,nw_src=10.0.0.4,nw_dst=10.0.0.3,nw_tos=0,nw_ecn=0,nw_ttl=64,mpls_label=0,mpls_tc=0,mpls_ttl=0,mpls_bos=0,mpls_lse1=0,mpls_lse2=0,icmp_type=8,icmp_code=0, actions:drop
 ])
-AT_CHECK([cat ovs-vswitchd.log | FILTER_FLOW_DUMP | grep 'packets:3'], [0], [dnl
+AT_CHECK([cat ovs-vswitchd.log | STRIP_UID | FILTER_FLOW_DUMP | grep 'packets:3'], [0], [dnl
 skb_priority(0),skb_mark(0),recirc_id(0),dp_hash(0),in_port(1),eth(src=50:54:00:00:00:09,dst=50:54:00:00:00:0a),eth_type(0x0800),ipv4(src=10.0.0.2,dst=10.0.0.1,proto=1,tos=0,ttl=64,frag=no),icmp(type=8,code=0), packets:3, bytes:180, used:0.0s, actions:2
 skb_priority(0),skb_mark(0),recirc_id(0),dp_hash(0),in_port(1),eth(src=50:54:00:00:00:0b,dst=50:54:00:00:00:0c),eth_type(0x0800),ipv4(src=10.0.0.4,dst=10.0.0.3,proto=1,tos=0,ttl=64,frag=no),icmp(type=8,code=0), packets:3, bytes:180, used:0.0s, actions:drop
 ])

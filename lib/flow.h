@@ -246,6 +246,12 @@ flow_hash(const struct flow *flow, uint32_t basis)
     return hash_words((const uint32_t *) flow, sizeof *flow / 4, basis);
 }
 
+static inline uint32_t
+flow_uid_hash(const ovs_u128 *uid, uint32_t basis)
+{
+    return hash_words((const uint32_t *) uid, sizeof *uid / 4, basis);
+}
+
 static inline uint16_t
 ofp_to_u16(ofp_port_t ofp_port)
 {
