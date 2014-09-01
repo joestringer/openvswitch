@@ -787,7 +787,7 @@ typedef int upcall_callback(const struct ofpbuf *packet,
                             const struct nlattr *userdata,
                             struct ofpbuf *actions,
                             struct flow_wildcards *wc,
-                            ovs_u128 *uid,
+                            uint64_t *uid,
                             struct ofpbuf *put_actions,
                             void *aux);
 

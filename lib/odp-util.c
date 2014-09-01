@@ -2899,7 +2899,7 @@ odp_flow_key_hash(const struct nlattr *key, size_t key_len)
 }
 
 int
-odp_uid_from_nlattrs(const struct nlattr *nla, size_t nla_len, ovs_u128 *uid,
+odp_uid_from_nlattrs(const struct nlattr *nla, size_t nla_len, uint64_t *uid,
                      uint32_t *flags)
 {
     static const struct nl_policy ovs_uid_policy[] = {
@@ -2908,7 +2908,7 @@ odp_uid_from_nlattrs(const struct nlattr *nla, size_t nla_len, ovs_u128 *uid,
                               .min_len = sizeof *uid }
     };
     struct nlattr *a[ARRAY_SIZE(ovs_uid_policy)];
-    const ovs_u128 *uidp;
+    const uint64_t *uidp;
     struct ofpbuf buf;
 
     if (!nla) {
@@ -2932,7 +2932,7 @@ odp_uid_from_nlattrs(const struct nlattr *nla, size_t nla_len, ovs_u128 *uid,
 }
 
 void
-odp_uid_to_nlattrs(struct ofpbuf *buf, const ovs_u128 *uid, uint32_t flags)
+odp_uid_to_nlattrs(struct ofpbuf *buf, const uint64_t *uid, uint32_t flags)
 {
     if (flags) {
         nl_msg_put_u32(buf, OVS_UID_ATTR_FLAGS, flags);
@@ -2943,10 +2943,9 @@ odp_uid_to_nlattrs(struct ofpbuf *buf, const ovs_u128 *uid, uint32_t flags)
 }
 
 void
-odp_format_uid(const ovs_u128 *uid, struct ds *ds)
+odp_format_uid(const uint64_t *uid, struct ds *ds)
 {
-    ds_put_format(ds, "uid:%"PRIx32"%"PRIx32"%"PRIx32"%"PRIx32,
-                  uid->h[0], uid->h[1], uid->h[2], uid->h[3]);
+    ds_put_format(ds, "uid:%"PRIx64, *uid);
 }
 
 static void

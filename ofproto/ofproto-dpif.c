@@ -1055,7 +1055,7 @@ check_uid(struct dpif_backer *backer)
                           ofpbuf_data(&uid), ofpbuf_size(&uid),
                           &replybuf, &reply);
     if (!error && reply.uid) {
-        ovs_u128 tmp;
+        uint64_t tmp;
 
         if (!odp_uid_from_nlattrs(reply.uid, reply.uid_len, &tmp, NULL)) {
             enable_uid = true;

@@ -1482,7 +1482,7 @@ log_flow_message(const struct dpif *dpif, int error, const char *operation,
         ds_put_format(&ds, "(%s) ", ovs_strerror(error));
     }
     if (uid) {
-        ovs_u128 hash;
+        uint64_t hash;
 
         odp_uid_from_nlattrs(uid, uid_len, &hash, NULL);
         odp_format_uid(&hash, &ds);

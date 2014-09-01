@@ -167,7 +167,7 @@ struct upcall {
     bool xout_initialized;         /* True if 'xout' must be uninitialized. */
     struct xlate_out xout;         /* Result of xlate_actions(). */
     struct ofpbuf put_actions;     /* Actions 'put' in the fastapath. */
-    ovs_u128 *uid;                 /* The flow's unique identifier. */
+    uint64_t *uid;                 /* The flow's unique identifier. */
 
     struct dpif_ipfix *ipfix;      /* IPFIX pointer or NULL. */
     struct dpif_sflow *sflow;      /* SFlow pointer or NULL. */
@@ -206,7 +206,7 @@ struct udpif_key {
     const struct nlattr *mask;     /* Datapath flow mask. */
     size_t mask_len;               /* Length of 'mask'. */
     struct ofpbuf *actions;        /* Datapath flow actions as nlattrs. */
-    ovs_u128 uid;                  /* Unique flow identifier. */
+    uint64_t uid;                  /* Unique flow identifier. */
     uint32_t hash;                 /* Pre-computed hash for 'key'. */
     atomic_bool installed;         /* True if the datapath flow has been
                                       installed and handlers are finished with
@@ -269,7 +269,7 @@ static void upcall_unixctl_set_flow_limit(struct unixctl_conn *conn, int argc,
 static void upcall_unixctl_dump_wait(struct unixctl_conn *conn, int argc,
                                      const char *argv[], void *aux);
 
-static uint32_t get_uid_hash(const ovs_u128 *uid);
+static uint32_t get_uid_hash(const uint64_t *uid);
 
 static struct udpif_key *ukey_new(struct udpif *, struct upcall *);
 static bool ukey_install_start(struct udpif *, struct udpif_key *ukey);
@@ -279,7 +279,7 @@ static struct udpif_key *ukey_lookup(struct udpif *udpif,
                                      const struct nlattr *uid, size_t uid_len,
                                      const struct nlattr *key, size_t key_len);
 static struct udpif_key *ukey_lookup_by_uid(struct udpif *udpif,
-                                            const ovs_u128 *uid);
+                                            const uint64_t *uid);
 static void ukey_delete__(struct udpif_key *);
 static void ukey_delete(struct umap *, struct udpif_key *);
 static enum upcall_type classify_upcall(enum dpif_upcall_type type,
@@ -989,7 +989,7 @@ upcall_uninit(struct upcall *upcall)
 static int
 upcall_cb(const struct ofpbuf *packet, const struct flow *flow,
           enum dpif_upcall_type type, const struct nlattr *userdata,
-          struct ofpbuf *actions, struct flow_wildcards *wc, ovs_u128 *uid,
+          struct ofpbuf *actions, struct flow_wildcards *wc, uint64_t *uid,
           struct ofpbuf *put_actions, void *aux)
 {
     struct udpif *udpif = aux;
@@ -1235,13 +1235,13 @@ handle_upcalls(struct udpif *udpif, struct upcall *upcalls,
 }
 
 static uint32_t
-get_uid_hash(const ovs_u128 *uid)
+get_uid_hash(const uint64_t *uid)
 {
-    return uid->h[0];
+    return *uid;
 }
 
 static struct udpif_key *
-ukey_lookup_by_uid(struct udpif *udpif, const ovs_u128 *uid)
+ukey_lookup_by_uid(struct udpif *udpif, const uint64_t *uid)
 {
     struct udpif_key *ukey;
     int idx = get_uid_hash(uid) % N_UMAPS;
@@ -1261,9 +1261,9 @@ void
 udpif_hash_flow(struct udpif *udpif, const struct nlattr *key, size_t key_len,
                 struct ofpbuf *buf)
 {
-    ovs_u128 hash;
+    uint64_t hash;
 
-    hash_words128(key, key_len, udpif->secret, &hash);
+    hash = chash64(key, key_len, udpif->secret);
     odp_uid_to_nlattrs(buf, &hash, 0);
 }
 
@@ -1271,12 +1271,12 @@ static struct udpif_key *
 ukey_lookup(struct udpif *udpif, const struct nlattr *uid, size_t uid_len,
             const struct nlattr *key, size_t key_len)
 {
-    ovs_u128 hash;
+    uint64_t hash;
     int error;
 
     error = odp_uid_from_nlattrs(uid, uid_len, &hash, NULL);
     if (error) {
-        hash_words128(key, key_len, udpif->secret, &hash);
+        hash = chash64(key, key_len, udpif->secret);
     }
 
     return ukey_lookup_by_uid(udpif, &hash);
@@ -1313,7 +1313,7 @@ ukey_new(struct udpif *udpif, struct upcall *upcall)
     }
     ukey->mask = ofpbuf_data(&mask);
     ukey->mask_len = ofpbuf_size(&mask);
-    hash_words128(ukey->key, ukey->key_len, udpif->secret, &ukey->uid);
+    ukey->uid = chash64(ukey->key, ukey->key_len, udpif->secret);
     ukey->hash = get_uid_hash(&ukey->uid);
     ukey->actions = ofpbuf_clone(&upcall->put_actions);
 
@@ -1417,7 +1417,7 @@ ukey_acquire(struct udpif *udpif, const struct dpif_flow *flow,
         retval = ukey_trylock(ukey);
     } else {
         struct ds ds = DS_EMPTY_INITIALIZER;
-        ovs_u128 uid;
+        uint64_t uid;
         bool enable_uid;
 
         memset(&uid, 0, sizeof uid);
@@ -1427,7 +1427,7 @@ ukey_acquire(struct udpif *udpif, const struct dpif_flow *flow,
             VLOG_WARN("Dumped flow from datapath with invalid UID.");
         }
 
-        hash_words128(flow->key, flow->key_len, udpif->secret, &uid);
+        uid = chash64(flow->key, flow->key_len, udpif->secret);
         odp_format_uid(&uid, &ds);
         VLOG_INFO("Dumped flow from datapath with no corresponding ukey (%s)",
                   ds_cstr(&ds));

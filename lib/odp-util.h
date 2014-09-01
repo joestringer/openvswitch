@@ -175,8 +175,8 @@ void odp_flow_key_from_mask(struct ofpbuf *, const struct flow *mask,
                             size_t max_mpls_depth, bool recirc);
 
 uint32_t odp_flow_key_hash(const struct nlattr *, size_t);
-void odp_uid_to_nlattrs(struct ofpbuf *, const ovs_u128 *, uint32_t flags);
-void odp_format_uid(const ovs_u128 *uid, struct ds *);
+void odp_uid_to_nlattrs(struct ofpbuf *, const uint64_t *, uint32_t flags);
+void odp_format_uid(const uint64_t *uid, struct ds *);
 
 /* Estimated space needed for metadata. */
 enum { ODP_KEY_METADATA_SIZE = 9 * 8 };
@@ -204,7 +204,7 @@ enum odp_key_fitness odp_flow_key_to_mask(const struct nlattr *key, size_t len,
                                           const struct flow *flow);
 const char *odp_key_fitness_to_string(enum odp_key_fitness);
 int odp_uid_from_nlattrs(const struct nlattr *, size_t,
-                         ovs_u128 *uid, uint32_t *flags);
+                         uint64_t *uid, uint32_t *flags);
 
 void commit_odp_tunnel_action(const struct flow *, struct flow *base,
                               struct ofpbuf *odp_actions);

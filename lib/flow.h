@@ -247,9 +247,9 @@ flow_hash(const struct flow *flow, uint32_t basis)
 }
 
 static inline uint32_t
-flow_uid_hash(const ovs_u128 *uid, uint32_t basis)
+flow_uid_hash(const uint64_t *uid, uint32_t basis OVS_UNUSED)
 {
-    return hash_words((const uint32_t *) uid, sizeof *uid / 4, basis);
+    return *uid;
 }
 
 static inline uint16_t
