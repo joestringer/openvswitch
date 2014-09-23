@@ -571,8 +571,7 @@ CityHash128(const char *s, size_t len)
                       : CityHash128WithSeed(s, len, seed));
 }
 
-#ifdef __SSE4_2__
-#include <citycrc.h>
+#else /* __SSE4_2__ && __x86_64 */
 #include <nmmintrin.h>
 
 /* Requires len >= 240. */
@@ -693,7 +692,7 @@ CityHashCrc256(const char *s, size_t len, uint64_t * result)
 }
 
 uint128_t
-CityHashCrc128WithSeed(const char *s, size_t len, uint128_t seed)
+CityHash128WithSeed(const char *s, size_t len, uint128_t seed)
 {
     if (len <= 900) {
         return CityHash128WithSeed(s, len, seed);
@@ -713,7 +712,7 @@ CityHashCrc128WithSeed(const char *s, size_t len, uint128_t seed)
 }
 
 uint128_t
-CityHashCrc128(const char *s, size_t len)
+CityHash128(const char *s, size_t len)
 {
     if (len <= 900) {
         return CityHash128(s, len);
