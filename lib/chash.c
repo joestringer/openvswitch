@@ -34,6 +34,7 @@
 
 #include <string.h>
 #include "byte-order.h"
+#include "compiler.h"
 
 static uint64_t
 UNALIGNED_LOAD64(const char *p)
@@ -59,14 +60,6 @@ UNALIGNED_LOAD32(const char *p)
 #else
 #define uint32_in_expected_order(x) (x)
 #define uint64_in_expected_order(x) (x)
-#endif
-
-#if !defined(LIKELY)
-#if HAVE_BUILTIN_EXPECT
-#define LIKELY(x) (__builtin_expect(!!(x), 1))
-#else
-#define LIKELY(x) (x)
-#endif
 #endif
 
 static uint64_t
@@ -524,7 +517,7 @@ CityHash128WithSeed(const char *s, size_t len, uint128_t seed)
         swap_uint64(&z, &x);
         s += 64;
         len -= 128;
-    } while (LIKELY(len >= 128));
+    } while (OVS_LIKELY(len >= 128));
     x += Rotate(v.lo + z, 49) * k0;
     y = y * k0 + Rotate(w.hi, 37);
     z = z * k0 + Rotate(w.lo, 27);
@@ -684,7 +677,7 @@ CityHashCrc256Short(const char *s, size_t len, uint64_t * result)
 void
 CityHashCrc256(const char *s, size_t len, uint64_t * result)
 {
-    if (LIKELY(len >= 240)) {
+    if (OVS_LIKELY(len >= 240)) {
         CityHashCrc256Long(s, len, 0, result);
     } else {
         CityHashCrc256Short(s, len, result);
