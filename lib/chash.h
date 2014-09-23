@@ -64,10 +64,8 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include "openvswitch/types.h"
 
-typedef struct {
-    uint64_t lo, hi;
-} uint128_t;
 
 inline uint64_t
 Uint128Low64(const uint128_t *x)

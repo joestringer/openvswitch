@@ -99,4 +99,12 @@ typedef uint32_t OVS_BITWISE ofp11_port_t;
 #define ODP_PORT_C(X) ((OVS_FORCE odp_port_t) (X))
 #define OFP11_PORT_C(X) ((OVS_FORCE ofp11_port_t) (X))
 
+typedef struct {
+#ifdef WORDS_BIGENDIAN
+    uint64_t lo, hi;
+#else
+    uint64_t hi, lo;
+#endif
+} uint128_t;
+
 #endif /* openvswitch/types.h */
