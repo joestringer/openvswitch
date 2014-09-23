@@ -32,6 +32,8 @@ lib_libopenvswitch_la_SOURCES = \
 	lib/byteq.h \
 	lib/cfm.c \
 	lib/cfm.h \
+	lib/chash.c \
+	lib/chash.h \
 	lib/classifier.c \
 	lib/classifier.h \
 	lib/cmap.c \
