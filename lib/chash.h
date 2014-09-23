@@ -67,18 +67,6 @@
 #include "openvswitch/types.h"
 
 
-inline uint64_t
-Uint128Low64(const uint128_t *x)
-{
-    return x->lo;
-}
-
-inline uint64_t
-Uint128High64(const uint128_t *x)
-{
-    return x->hi;
-}
-
 /* Hash function for a byte array. */
 uint64_t
 CityHash64(const char *buf, size_t len);
@@ -111,18 +99,16 @@ CityHash32(const char *buf, size_t len);
 inline uint64_t
 Hash128to64(const uint128_t *x)
 {
-    // Murmur-inspired hashing.
-    const uint64_t
-        kMul = 0x9ddfea08eb382d69ULL;
-    uint64_t
-        a = (Uint128Low64(x) ^ Uint128High64(x)) * kMul;
+    /* Murmur-inspired hashing. */
+    const uint64_t kMul = 0x9ddfea08eb382d69ULL;
+    uint64_t a, b;
 
+    a = (x->lo ^ x->hi) * kMul;
     a ^= (a >> 47);
-    uint64_t
-        b = (Uint128High64(x) ^ a) * kMul;
-
+    b = (x->hi ^ a) * kMul;
     b ^= (b >> 47);
     b *= kMul;
+
     return b;
 }
 

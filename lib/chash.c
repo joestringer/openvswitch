@@ -441,14 +441,16 @@ CityHash64WithSeeds(const char *s, size_t len, uint64_t seed0, uint64_t seed1)
     return HashLen16(CityHash64(s, len) - seed0, seed1);
 }
 
+#if !(defined(__SSE4_2__) && defined(__x86_64))
+
 /* A subroutine for CityHash128().  Returns a decent 128-bit hash for strings
  * of any length representable in signed long.  Based on City and Murmur. */
 static uint128_t
 CityMurmur(const char *s, size_t len, uint128_t seed)
 {
     uint128_t result;
-    uint64_t a = Uint128Low64(&seed);
-    uint64_t b = Uint128High64(&seed);
+    uint64_t a = seed.lo;
+    uint64_t b = seed.hi;
     uint64_t c = 0;
     uint64_t d = 0;
     signed long l = len - 16;
@@ -492,8 +494,8 @@ CityHash128WithSeed(const char *s, size_t len, uint128_t seed)
     }
     /* We expect len >= 128 to be the common case.  Keep 56 bytes of state:
      * v, w, x, y, and z. */
-    x = Uint128Low64(&seed);
-    y = Uint128High64(&seed);
+    x = seed.lo;
+    y = seed.hi;
     z = len * k1;
 
     v.lo = Rotate(y ^ k1, 49) * k1 + Fetch64(s);
@@ -697,11 +699,12 @@ CityHashCrc128WithSeed(const char *s, size_t len, uint128_t seed)
         return CityHash128WithSeed(s, len, seed);
     } else {
         uint128_t hash;
+        uint64_t u, v;
         uint64_t result[4];
 
         CityHashCrc256(s, len, result);
-        uint64_t u = Uint128High64(&seed) + result[0];
-        uint64_t v = Uint128Low64(&seed) + result[1];
+        u = seed.hi + result[0];
+        v = seed.lo + result[1];
 
         hash.lo = HashLen16(u, v + result[2]);
         hash.hi = HashLen16(Rotate(v, 32), u * k0 + result[3]);
