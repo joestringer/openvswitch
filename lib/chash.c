@@ -36,24 +36,6 @@
 #include "byte-order.h"
 #include "compiler.h"
 
-static uint64_t
-UNALIGNED_LOAD64(const char *p)
-{
-    uint64_t result;
-
-    memcpy(&result, p, sizeof (result));
-    return result;
-}
-
-static uint32_t
-UNALIGNED_LOAD32(const char *p)
-{
-    uint32_t result;
-
-    memcpy(&result, p, sizeof (result));
-    return result;
-}
-
 #ifdef WORDS_BIGENDIAN
 #define uint32_t_in_expected_order(x) (uint32_byteswap(x))
 #define uint64_t_in_expected_order(x) (uint64_byteswap(x))
@@ -65,13 +47,19 @@ UNALIGNED_LOAD32(const char *p)
 static uint64_t
 Fetch64(const char *p)
 {
-    return uint64_in_expected_order(UNALIGNED_LOAD64(p));
+    uint64_t result;
+
+    memcpy(&result, p, sizeof (result));
+    return uint64_in_expected_order(result);
 }
 
 static uint32_t
 Fetch32(const char *p)
 {
-    return uint32_in_expected_order(UNALIGNED_LOAD32(p));
+    uint64_t result;
+
+    memcpy(&result, p, sizeof (result));
+    return uint32_in_expected_order(result);
 }
 
 static void
