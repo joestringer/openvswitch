@@ -50,6 +50,18 @@ uint32_byteswap(uint32_t crc) {
             ((crc & 0xff000000) >> 24));
 }
 
+static inline uint64_t
+uint64_byteswap(uint64_t crc) {
+    return (((crc & 0x00000000000000ffull) << 56) |
+            ((crc & 0x000000000000ff00ull) << 40) |
+            ((crc & 0x0000000000ff0000ull) << 24) |
+            ((crc & 0x00000000ff000000ull) << 8)  |
+            ((crc & 0x000000ff00000000ull) >> 8)  |
+            ((crc & 0x0000ff0000000000ull) >> 24) |
+            ((crc & 0x00ff000000000000ull) >> 40) |
+            ((crc & 0xff00000000000000ull) >> 56));
+}
+
 /* These macros may substitute for htons(), htonl(), and htonll() in contexts
  * where function calls are not allowed, such as case labels.  They should not
  * be used elsewhere because all of them evaluate their argument many times. */

@@ -53,55 +53,9 @@ UNALIGNED_LOAD32(const char *p)
     return result;
 }
 
-#ifdef _MSC_VER
-
-#include <stdlib.h>
-#define bswap_32(x) _byteswap_ulong(x)
-#define bswap_64(x) _byteswap_uint64_t(x)
-
-#elif defined(__APPLE__)
-
-/* Mac OS X / Darwin features */
-#include <libkern/OSByteOrder.h>
-#define bswap_32(x) OSSwapInt32(x)
-#define bswap_64(x) OSSwapInt64(x)
-
-#elif defined(__sun) || defined(sun)
-
-#include <sys/byteorder.h>
-#define bswap_32(x) BSWAP_32(x)
-#define bswap_64(x) BSWAP_64(x)
-
-#elif defined(__FreeBSD__)
-
-#include <sys/endian.h>
-#define bswap_32(x) bswap32(x)
-#define bswap_64(x) bswap64(x)
-
-#elif defined(__OpenBSD__)
-
-#include <sys/types.h>
-#define bswap_32(x) swap32(x)
-#define bswap_64(x) swap64(x)
-
-#elif defined(__NetBSD__)
-
-#include <sys/types.h>
-#include <machine/bswap.h>
-#if defined(__BSWAP_RENAME) && !defined(__bswap_32)
-#define bswap_32(x) bswap32(x)
-#define bswap_64(x) bswap64(x)
-#endif
-
-#else
-
-#include <byteswap.h>
-
-#endif
-
 #ifdef WORDS_BIGENDIAN
-#define uint32_t_in_expected_order(x) (bswap_32(x))
-#define uint64_t_in_expected_order(x) (bswap_64(x))
+#define uint32_t_in_expected_order(x) (uint32_byteswap(x))
+#define uint64_t_in_expected_order(x) (uint64_byteswap(x))
 #else
 #define uint32_in_expected_order(x) (x)
 #define uint64_in_expected_order(x) (x)
@@ -277,9 +231,9 @@ CityHash32(const char *s, size_t len)
         h = Rotate32(h, 19);
         h = h * 5 + 0xe6546b64;
         g ^= a4;
-        g = bswap_32(g) * 5;
+        g = uint32_byteswap(g) * 5;
         h += a4 * 5;
-        h = bswap_32(h);
+        h = uint32_byteswap(h);
         f += a0;
         PERMUTE3(uint32_t, f, h, g);
         s += 20;
@@ -424,12 +378,12 @@ HashLen33to64(const char *s, size_t len)
     uint64_t h = Fetch64(s + len - 16) * mul;
     uint64_t u = Rotate(a + g, 43) + (Rotate(b, 30) + c) * 9;
     uint64_t v = ((a + g) ^ d) + f + 1;
-    uint64_t w = bswap_64((u + v) * mul) + h;
+    uint64_t w = uint64_byteswap((u + v) * mul) + h;
     uint64_t x = Rotate(e + f, 42) + c;
-    uint64_t y = (bswap_64((v + w) * mul) + g) * mul;
+    uint64_t y = (uint64_byteswap((v + w) * mul) + g) * mul;
     uint64_t z = e + f + c;
 
-    a = bswap_64((x + z) * mul + y) + b;
+    a = uint64_byteswap((x + z) * mul + y) + b;
     b = ShiftMix((z + a) * mul + d + h) * mul;
     return b + x;
 }
