@@ -64,27 +64,21 @@
 
 #include <stdlib.h>
 #include <stdint.h>
-#include <utility>
 
-typedef uint8_t_t uint8_t;
-typedef uint32_t_t uint32_t;
-typedef uint64_t_t uint64_t;
-typedef
-    std::pair <
-    uint64_t,
-    uint64_t >
-    uint128_t;
+typedef struct {
+    uint64_t lo, hi;
+} uint128_t;
 
 inline uint64_t
-Uint128Low64(const uint128_t & x)
+Uint128Low64(const uint128_t *x)
 {
-    return x.first;
+    return x->lo;
 }
 
 inline uint64_t
-Uint128High64(const uint128_t & x)
+Uint128High64(const uint128_t *x)
 {
-    return x.second;
+    return x->hi;
 }
 
 /* Hash function for a byte array. */
@@ -117,7 +111,7 @@ CityHash32(const char *buf, size_t len);
 /* Hash 128 input bits down to 64 bits of output.
  * This is intended to be a reasonably good hash function. */
 inline uint64_t
-Hash128to64(const uint128_t & x)
+Hash128to64(const uint128_t *x)
 {
     // Murmur-inspired hashing.
     const uint64_t
