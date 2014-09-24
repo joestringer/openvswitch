@@ -66,15 +66,15 @@
 #include <stdint.h>
 #include "openvswitch/types.h"
 
-uint32_t CityHash32(const char *buf, size_t len);
+uint32_t CityHash32(const void *buf, size_t len);
 
-uint64_t CityHash64(const char *buf, size_t len);
-uint64_t CityHash64WithSeed(const char *buf, size_t len, uint64_t seed);
-uint64_t CityHash64WithSeeds(const char *buf, size_t len, uint64_t seed0,
+uint64_t CityHash64(const void *buf, size_t len);
+uint64_t CityHash64WithSeed(const void *buf, size_t len, uint64_t seed);
+uint64_t CityHash64WithSeeds(const void *buf, size_t len, uint64_t seed0,
                              uint64_t seed1);
 
-uint128_t CityHash128(const char *s, size_t len);
-uint128_t CityHash128WithSeed(const char *s, size_t len, uint128_t seed);
+uint128_t CityHash128(const void *s, size_t len);
+uint128_t CityHash128WithSeed(const void *s, size_t len, uint128_t seed);
 
 /* Hash 128 input bits down to 64 bits of output.
  * This is intended to be a reasonably good hash function. */
@@ -96,7 +96,7 @@ Hash128to64(const uint128_t *x)
 
 #if defined(__SSE_4_2__) && defined(__x86_64__)
 
-void CityHashCrc256(const char *s, size_t len, uint64_t * result);
+void CityHashCrc256(const void *s, size_t len, uint64_t * result);
 
 #endif
 
