@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "chash.h"
 #include "hash.h"
 #include "jhash.h"
 #include "ovstest.h"
@@ -33,6 +34,22 @@ set_bit(uint32_t array[3], int bit)
     memset(array, 0, sizeof(uint32_t) * 3);
     if (bit < 96) {
         array[bit / 32] = UINT32_C(1) << (bit % 32);
+    }
+}
+
+static void
+set_bit128(uint128_t array[16], int bit)
+{
+    assert(bit >= 0 && bit <= 2048);
+    memset(array, 0, sizeof(uint128_t) * 16);
+    if (bit < 2048) {
+        int b = bit % 128;
+
+        if (b < 64) {
+            array[bit / 128].lo = UINT64_C(1) << (b % 64);
+        } else {
+            array[bit / 128].hi = UINT64_C(1) << (b % 64);
+        }
     }
 }
 
@@ -52,6 +69,12 @@ static uint32_t
 hash_int_cb(uint32_t input)
 {
     return hash_int(input, 0);
+}
+
+static uint32_t
+chash128_cb(uint32_t input)
+{
+    return chash128(&input, sizeof input).lo;
 }
 
 static void
@@ -120,6 +143,48 @@ check_3word_hash(uint32_t (*hash)(const uint32_t[], size_t, uint32_t),
 }
 
 static void
+check_256byte_hash(uint128_t (*hash)(const void *, size_t), const char *name)
+{
+    const int n_bits = 256 * 8;
+    const int min_unique = 22;
+    const uint64_t unique_mask = (UINT64_C(1) << min_unique) - 1;
+    int i, j;
+
+    for (i = 0; i < n_bits; i++) {
+        for (j = i + 1; j < n_bits; j++) {
+            OVS_PACKED(struct offset_uint128 {
+                uint32_t a;
+                uint128_t b[16];
+            }) in0_data;
+            uint128_t *in0, in1[16], in2[16];
+            uint128_t out0, out1, out2;
+
+            in0 = in0_data.b;
+            set_bit128(in0, i);
+            set_bit128(in1, i);
+            set_bit128(in2, j);
+            out0 = hash(in0, sizeof(uint128_t) * 16);
+            out1 = hash(in1, sizeof(uint128_t) * 16);
+            out2 = hash(in2, sizeof(uint128_t) * 16);
+            if (memcmp(&out0, &out1, sizeof(uint128_t))) {
+                printf("%s hash not the same for non-64 aligned data "
+                       "%016"PRIx64"%016"PRIx64" != %016"PRIx64"%016"PRIx64"\n",
+                       name, out0.lo, out0.hi, out1.lo, out1.hi);
+            }
+            if ((out1.lo & unique_mask) == (out2.lo & unique_mask)) {
+                printf("%s has a partial collision:\n", name);
+                printf("hash(1 << %4d) == %016"PRIx64"%016"PRIx64"\n", i,
+                       out1.hi, out1.lo);
+                printf("hash(1 << %4d) == %016"PRIx64"%016"PRIx64"\n", j,
+                       out2.hi, out2.lo);
+                printf("The low-order %d bits of output are both "
+                       "0x%"PRIx64"\n", min_unique, out1.lo & unique_mask);
+            }
+        }
+    }
+}
+
+static void
 test_hash_main(int argc OVS_UNUSED, char *argv[] OVS_UNUSED)
 {
     /* Check that all hashes computed with hash_words with one 1-bit (or no
@@ -175,6 +240,22 @@ test_hash_main(int argc OVS_UNUSED, char *argv[] OVS_UNUSED)
      * function.
      */
     check_word_hash(hash_int_cb, "hash_int", 12);
+    check_word_hash(chash128_cb, "chash128", 12);
+
+    /* Check that all hashes computed with CityHash with 1-bit (or no 1-bits)
+     * set within 16 128-bit words have different values in their lowest 21
+     * bits.
+     *
+     * Given a random distribution, the probability of at least one collision
+     * in any set of 21 bits is approximately
+     *
+     *                      1 - ((2**21 - 1)/2**21)**C(2048,2)
+     *                   == 1 - (2,097,151/2,097,152)**2,096,128
+     *                   =~ 0.63
+     *
+     * so we are doing pretty well to not have any collisions in 21 bits.
+     */
+    check_256byte_hash(chash128, "chash128");
 }
 
 OVSTEST_REGISTER("test-hash", test_hash_main);
