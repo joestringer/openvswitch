@@ -66,20 +66,19 @@
 #include <stdint.h>
 #include "openvswitch/types.h"
 
-uint32_t CityHash32(const void *buf, size_t len);
+uint32_t chash32(const void *buf, size_t len);
 
-uint64_t CityHash64(const void *buf, size_t len);
-uint64_t CityHash64WithSeed(const void *buf, size_t len, uint64_t seed);
-uint64_t CityHash64WithSeeds(const void *buf, size_t len, uint64_t seed0,
-                             uint64_t seed1);
+uint64_t chash64(const void *buf, size_t len);
+uint64_t chash64_seed(const void *buf, size_t len, uint64_t seed);
+uint64_t chash64_seeds(const void *buf, size_t len, uint64_t seed0,
+                       uint64_t seed1);
 
-uint128_t CityHash128(const void *s, size_t len);
-uint128_t CityHash128WithSeed(const void *s, size_t len, uint128_t seed);
+uint128_t chash128(const void *s, size_t len);
+uint128_t chash128_seed(const void *s, size_t len, uint128_t seed);
 
 /* Hash 128 input bits down to 64 bits of output.
  * This is intended to be a reasonably good hash function. */
-static inline uint64_t
-Hash128to64(const uint128_t *x)
+static inline uint64_t chash128to64(const uint128_t *x)
 {
     /* Murmur-inspired hashing. */
     const uint64_t kMul = 0x9ddfea08eb382d69ULL;
@@ -96,7 +95,7 @@ Hash128to64(const uint128_t *x)
 
 #if defined(__SSE_4_2__) && defined(__x86_64__)
 
-void CityHashCrc256(const void *s, size_t len, uint64_t * result);
+void chash256(const void *s, size_t len, uint64_t * result);
 
 #endif
 
