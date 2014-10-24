@@ -914,7 +914,7 @@ static int ovs_key_from_nlattrs(struct sw_flow_match *match, u64 attrs,
 	return 0;
 }
 
-static void nlattr_set(struct nlattr *attr, u8 val, bool is_attr_mask_key)
+static void mask_set_nlattr(struct nlattr *attr)
 {
 	struct nlattr *nla;
 	int rem;
@@ -924,16 +924,18 @@ static void nlattr_set(struct nlattr *attr, u8 val, bool is_attr_mask_key)
 		/* We assume that ovs_key_lens[type] == -1 means that type is a
 		 * nested attribute
 		 */
-		if (is_attr_mask_key && ovs_key_lens[nla_type(nla)] == -1)
-			nlattr_set(nla, val, false);
+		if (ovs_key_lens[nla_type(nla)] == -1)
+			nla_for_each_nested(nla, attr, rem)
+				memset(nla_data(nla), 0xff, nla_len(nla));
 		else
-			memset(nla_data(nla), val, nla_len(nla));
-	}
-}
+			memset(nla_data(nla), 0xff, nla_len(nla));
 
-static void mask_set_nlattr(struct nlattr *attr, u8 val)
-{
-	nlattr_set(attr, val, true);
+		if (nla_type(nla) == OVS_KEY_ATTR_IPV6) {
+			struct ovs_key_ipv6 *ipv6_key = nla_data(nla);
+
+			ipv6_key->ipv6_label &= htonl(0x000FFFFF);
+		}
+	}
 }
 
 /**
@@ -1023,7 +1025,7 @@ int ovs_nla_get_match(struct sw_flow_match *match,
 			if (!newmask)
 				return -ENOMEM;
 
-			mask_set_nlattr(newmask, 0xff);
+			mask_set_nlattr(newmask);
 
 			/* The userspace does not send tunnel attributes that
 			 * are 0, but we should not wildcard them nonetheless.
