@@ -1,0 +1,99 @@
+# -*- makefile -*-
+export builddir = @abs_builddir@
+export srcdir = @abs_srcdir@
+export top_srcdir = @abs_top_srcdir@
+export KSRC = @KBUILD@
+export VERSION = @VERSION@
+
+all: default
+distdir: clean
+install:
+install-data:
+install-exec:
+uninstall:
+install-dvi:
+install-html:
+install-info:
+install-ps:
+install-pdf:
+installdirs:
+check: all
+installcheck:
+mostlyclean:
+clean:
+	rm -f *.bpf *.bpfs Module.symvers modules.order
+
+distclean: clean
+
+maintainer-clean: distclean
+dvi:
+pdf:
+ps:
+info:
+html:
+tags:
+TAGS:
+
+ifneq ($(KSRC),)
+
+ifeq (/lib/modules/$(shell uname -r)/source, $(KSRC))
+  KOBJ := /lib/modules/$(shell uname -r)/build
+else
+  KOBJ := $(KSRC)
+endif
+
+VERSION_FILE := $(KOBJ)/include/linux/version.h
+ifeq (,$(wildcard $(VERSION_FILE)))
+  VERSION_FILE := $(KOBJ)/include/generated/uapi/linux/version.h
+  ifeq (,$(wildcard $(VERSION_FILE)))
+    $(error Linux kernel source not configured - missing version.h)
+  endif
+endif
+
+CONFIG_FILE := $(KSRC)/include/generated/autoconf.h
+ifeq (,$(wildcard $(CONFIG_FILE)))
+  CONFIG_FILE := $(KSRC)/include/linux/autoconf.h
+  ifeq (,$(wildcard $(CONFIG_FILE)))
+    $(error Linux kernel source not configured - missing autoconf.h)
+  endif
+endif
+
+KOBJ := $(KSRC)
+LLC=/home/azhou/projs/bpf/bpf/tools/bpf/llvm/bld/Debug+Asserts/bin/llc
+
+BLD=$(PWD)
+EXTRA_CFLAGS=-I.
+
+ifeq ($(NESTED),1)
+# to get NOSTDINC_FLAGS and LINUXINCLUDE from kernel build
+# have to trick top Makefile
+# pretend that we're building a module
+KBUILD_EXTMOD=$(PWD)
+# and include main kernel Makefile
+include Makefile
+
+# cannot have other targets (like all, clean) here
+# since they will conflict
+%.bpf: %.c
+	echo $(LINUXINCLUDE)
+	clang $(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(EXTRA_CFLAGS) \
+	  -D__KERNEL__ -Wno-unused-value -Wno-pointer-sign \
+	  -O2 -emit-llvm -c $< -o -| $(LLC) -filetype=obj -o $@
+
+%.bpfs: %.c
+	clang $(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(EXTRA_CFLAGS) \
+	  -D__KERNEL__ -Wno-unused-value -Wno-pointer-sign \
+	  -O2 -emit-llvm -c $< -o -| $(LLC) -filetype=asm -o $@
+else
+
+SRCS := $(notdir $(wildcard *.c))
+BPFS := $(patsubst %.c,$(BLD)/%.bpf,$(SRCS))
+BPF_ASMS := $(patsubst %.c,$(BLD)/%.bpfs,$(SRCS))
+
+
+default: $(LLC)
+# invoke make recursively with current Makefile, but
+# for specific .bpf targets
+	$(MAKE) -C $(KOBJ) -f $(BLD)/Makefile NESTED=1 $(BPFS) $(BPF_ASMS) 
+endif
+endif

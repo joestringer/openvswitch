@@ -1,6 +1,6 @@
 SUBDIRS =
 if LINUX_ENABLED
-SUBDIRS += linux
+SUBDIRS += linux bpf
 endif
 
 EXTRA_DIST = $(dist_headers) $(dist_sources) $(dist_extras)
