@@ -20,8 +20,6 @@ installdirs:
 check: all
 installcheck:
 mostlyclean:
-clean:
-	rm -f *.bpf *.bpfs Module.symvers modules.order
 
 distclean: clean
 
@@ -58,7 +56,6 @@ ifeq (,$(wildcard $(CONFIG_FILE)))
   endif
 endif
 
-KOBJ := $(KSRC)
 LLC=/home/azhou/projs/bpf/bpf/tools/bpf/llvm/bld/Debug+Asserts/bin/llc
 
 BLD=$(PWD)
@@ -86,14 +83,22 @@ include Makefile
 	  -O2 -emit-llvm -c $< -o -| $(LLC) -filetype=asm -o $@
 else
 
-SRCS := $(notdir $(wildcard *.c))
+SRCS := $(notdir $(wildcard $(srcdir)/*.c))
+HDRS := $(notdir $(wildcard $(srcdir)/*.h))
 BPFS := $(patsubst %.c,$(BLD)/%.bpf,$(SRCS))
 BPF_ASMS := $(patsubst %.c,$(BLD)/%.bpfs,$(SRCS))
+build_links := $(SRCS) $(HDRS)
 
-
-default: $(LLC)
+default: $(build_links) $(LLC)
 # invoke make recursively with current Makefile, but
 # for specific .bpf targets
-	$(MAKE) -C $(KOBJ) -f $(BLD)/Makefile NESTED=1 $(BPFS) $(BPF_ASMS) 
+	$(MAKE) -C $(KOBJ) -f $(BLD)/Makefile NESTED=1 $(BPFS) $(BPF_ASMS)
+
+$(foreach s,$(build_links), \
+	$(eval $(notdir $(s)): ; ln -s $(srcdir)/$(s) $@))
+
+clean:
+	rm -f *.bpf *.bpfs
+
 endif
 endif
