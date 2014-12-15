@@ -1034,6 +1034,8 @@ parse_odp_action(const char *s, const struct simap *port_names,
             nl_msg_put_unspec(actions, OVS_ACTION_ATTR_BPF_PROG,
                               &act_bpf, sizeof(act_bpf));
             return n;
+        } else {
+            VLOG_INFO("Failed to parse bpf() action");
         }
     }
 
