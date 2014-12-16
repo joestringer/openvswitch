@@ -573,6 +573,7 @@ struct ovs_action_push_mpls {
 struct ovs_action_bpf_prog {
 	__be32 prog_id;
 	__be64 arg;
+	__be32 pad;		/* XXX */
 };
 
 /**
