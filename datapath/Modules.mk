@@ -19,8 +19,7 @@ openvswitch_sources = \
 	vport-internal_dev.c \
 	vport-lisp.c \
 	vport-netdev.c \
-	vport-vxlan.c \
-	bpf/simple.c
+	vport-vxlan.c
 
 openvswitch_headers = \
 	compat.h \
@@ -31,14 +30,21 @@ openvswitch_headers = \
 	vlan.h \
 	vport.h \
 	vport-internal_dev.h \
-	vport-netdev.h \
+	vport-netdev.h
+
+openvswitch_bpf_sources = \
+	bpf/simple.c
+
+openvswitch_bpf_headers = \
 	bpf/bpf_helpers.h
 
 openvswitch_extras = \
 	README.md
 
 dist_sources = $(foreach module,$(dist_modules),$($(module)_sources))
+dist_sources += $(openvswitch_bpf_sources)
 dist_headers = $(foreach module,$(dist_modules),$($(module)_headers))
+dist_headers += $(openvswitch_bpf_headers)
 dist_extras = $(foreach module,$(dist_modules),$($(module)_extras))
 build_sources = $(foreach module,$(build_modules),$($(module)_sources))
 build_headers = $(foreach module,$(build_modules),$($(module)_headers))

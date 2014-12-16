@@ -171,6 +171,7 @@ AC_DEFUN([OVS_CHECK_LLC], [
          AC_MSG_ERROR([BPF llc backend is configured but not found ])
       fi
   fi
+  AM_CONDITIONAL(LLC_ENABLED, test -n "$LLC")
 ])
 
 dnl OVS_CHECK_DPDK
