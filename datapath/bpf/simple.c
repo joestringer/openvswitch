@@ -2,7 +2,7 @@
 #include <uapi/linux/bpf.h>
 #include "bpf_helpers.h"
 
-SEC("bpf_simple")
+SEC("ovs/bpf_simple")
 int bpf_simple(struct sk_buff *skb)
 {
 	char fmt[] = "skb %x \n";
