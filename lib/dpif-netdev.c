@@ -210,7 +210,10 @@ struct dp_netdev {
     /* Protects access to ofproto-dpif-upcall interface during revalidator
      * thread synchronization. */
     struct fat_rwlock upcall_rwlock;
-    upcall_callback *upcall_cb;  /* Callback function for executing upcalls. */
+
+    /* Callback functions for executing upcalls */
+    upcall_callback *upcall_cb;
+    upcall_finish_callback *upcall_finish_cb;
     void *upcall_aux;
 
     /* Stores all 'struct dp_netdev_pmd_thread's. */
@@ -618,6 +621,7 @@ create_dp_netdev(const char *name, const struct dpif_class *class,
     dp_netdev_disable_upcall(dp);
     dp->upcall_aux = NULL;
     dp->upcall_cb = NULL;
+    dp->upcall_finish_cb = NULL;
 
     cmap_init(&dp->poll_threads);
     ovs_mutex_init_recursive(&dp->non_pmd_mutex);
@@ -2648,7 +2652,8 @@ static int
 dp_netdev_upcall(struct dp_netdev *dp, struct dpif_packet *packet_,
                  struct flow *flow, struct flow_wildcards *wc, ovs_u128 *ufid,
                  enum dpif_upcall_type type, const struct nlattr *userdata,
-                 struct ofpbuf *actions, struct ofpbuf *put_actions)
+                 struct ofpbuf *actions, struct ofpbuf *put_actions,
+                 void **upcall_state)
 {
     struct ofpbuf *packet = &packet_->ofpbuf;
 
@@ -2656,7 +2661,7 @@ dp_netdev_upcall(struct dp_netdev *dp, struct dpif_packet *packet_,
         dp_netdev_count_packet(dp, DP_STAT_MISS, 1);
     }
 
-    if (OVS_UNLIKELY(!dp->upcall_cb)) {
+    if (OVS_UNLIKELY(!dp->upcall_cb || !dp->upcall_finish_cb)) {
         return ENODEV;
     }
 
@@ -2683,7 +2688,7 @@ dp_netdev_upcall(struct dp_netdev *dp, struct dpif_packet *packet_,
     }
 
     return dp->upcall_cb(packet, flow, ufid, type, userdata, actions, wc,
-                         put_actions, dp->upcall_aux);
+                         put_actions, dp->upcall_aux, upcall_state);
 }
 
 static inline uint32_t
@@ -2877,6 +2882,7 @@ fast_path_processing(struct dp_netdev_pmd_thread *pmd,
             struct ofpbuf *add_actions;
             struct match match;
             int error;
+            void *upcall_state = NULL;
 
             if (OVS_LIKELY(rules[i])) {
                 continue;
@@ -2899,7 +2905,7 @@ fast_path_processing(struct dp_netdev_pmd_thread *pmd,
             dpif_flow_hash(dp->dpif, &match.flow, sizeof match.flow, &ufid);
             error = dp_netdev_upcall(dp, packets[i], &match.flow, &match.wc,
                                      &ufid, DPIF_UC_MISS, NULL, &actions,
-                                     &put_actions);
+                                     &put_actions, &upcall_state);
             if (OVS_UNLIKELY(error && error != ENOSPC)) {
                 continue;
             }
@@ -2930,6 +2936,7 @@ fast_path_processing(struct dp_netdev_pmd_thread *pmd,
                                                      ofpbuf_size(add_actions));
                 }
                 ovs_mutex_unlock(&dp->flow_mutex);
+                dp->upcall_finish_cb(upcall_state);
 
                 emc_insert(flow_cache, &keys[i], netdev_flow);
             }
@@ -3002,6 +3009,14 @@ dpif_netdev_register_upcall_cb(struct dpif *dpif, upcall_callback *cb,
     struct dp_netdev *dp = get_dp_netdev(dpif);
     dp->upcall_aux = aux;
     dp->upcall_cb = cb;
+}
+
+static void
+dpif_netdev_register_upcall_finish_cb(struct dpif *dpif,
+                                      upcall_finish_callback *cb)
+{
+    struct dp_netdev *dp = get_dp_netdev(dpif);
+    dp->upcall_finish_cb = cb;
 }
 
 static void
@@ -3141,7 +3156,7 @@ dp_execute_cb(void *aux_, struct dpif_packet **packets, int cnt,
                 dpif_flow_hash(dp->dpif, &flow, sizeof flow, &ufid);
                 error = dp_netdev_upcall(dp, packets[i], &flow, NULL, &ufid,
                                          DPIF_UC_ACTION, userdata,&actions,
-                                         NULL);
+                                         NULL, NULL);
                 if (!error || error == ENOSPC) {
                     dp_netdev_execute_actions(pmd, &packets[i], 1, may_steal,
                                               ofpbuf_data(&actions),
@@ -3245,6 +3260,7 @@ const struct dpif_class dpif_netdev_class = {
     NULL,                       /* recv_wait */
     NULL,                       /* recv_purge */
     dpif_netdev_register_upcall_cb,
+    dpif_netdev_register_upcall_finish_cb,
     dpif_netdev_enable_upcall,
     dpif_netdev_disable_upcall,
     dpif_netdev_get_datapath_version,

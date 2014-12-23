@@ -792,9 +792,13 @@ typedef int upcall_callback(const struct ofpbuf *packet,
                             struct ofpbuf *actions,
                             struct flow_wildcards *wc,
                             struct ofpbuf *put_actions,
-                            void *aux);
+                            void *aux, void **finish_state);
+
+/* XXX */
+typedef void upcall_finish_callback(void *finish_state);
 
 void dpif_register_upcall_cb(struct dpif *, upcall_callback *, void *aux);
+void dpif_register_upcall_finish_cb(struct dpif *, upcall_finish_callback *);
 
 int dpif_recv_set(struct dpif *, bool enable);
 int dpif_handlers_set(struct dpif *, uint32_t n_handlers);

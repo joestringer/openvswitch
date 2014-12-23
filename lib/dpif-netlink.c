@@ -2273,6 +2273,7 @@ const struct dpif_class dpif_netlink_class = {
     dpif_netlink_recv_wait,
     dpif_netlink_recv_purge,
     NULL,                       /* register_upcall_cb */
+    NULL,                       /* register_upcall_finish_cb */
     NULL,                       /* enable_upcall */
     NULL,                       /* disable_upcall */
     dpif_netlink_get_datapath_version, /* get_datapath_version */

@@ -1349,6 +1349,14 @@ dpif_register_upcall_cb(struct dpif *dpif, upcall_callback *cb, void *aux)
 }
 
 void
+dpif_register_upcall_finish_cb(struct dpif *dpif, upcall_finish_callback *cb)
+{
+    if (dpif->dpif_class->register_upcall_finish_cb) {
+        dpif->dpif_class->register_upcall_finish_cb(dpif, cb);
+    }
+}
+
+void
 dpif_enable_upcall(struct dpif *dpif)
 {
     if (dpif->dpif_class->enable_upcall) {

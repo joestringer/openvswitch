@@ -364,6 +364,9 @@ struct dpif_class {
      * callback on invocation. */
     void (*register_upcall_cb)(struct dpif *, upcall_callback *, void *aux);
 
+    /* XXX */
+    void (*register_upcall_finish_cb)(struct dpif *, upcall_finish_callback *);
+
     /* Enables upcalls if 'dpif' directly executes upcall functions. */
     void (*enable_upcall)(struct dpif *);
 

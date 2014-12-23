@@ -275,7 +275,6 @@ static int ukey_create_from_dpif_flow(const struct udpif *,
                                       struct udpif_key **);
 static bool ukey_install_start(struct udpif *, struct udpif_key *ukey);
 static bool ukey_install_finish(struct udpif_key *ukey, int error);
-static bool ukey_install(struct udpif *udpif, struct udpif_key *ukey);
 static struct udpif_key *ukey_lookup(struct udpif *udpif,
                                      const ovs_u128 *ufid);
 static int ukey_acquire(struct udpif *, const struct dpif_flow *,
@@ -292,6 +291,7 @@ static int upcall_receive(struct upcall *, const struct dpif_backer *,
 static void upcall_uninit(struct upcall *);
 
 static upcall_callback upcall_cb;
+static upcall_finish_callback upcall_finish_cb;
 
 static atomic_bool enable_megaflows = ATOMIC_VAR_INIT(true);
 
@@ -339,6 +339,7 @@ udpif_create(struct dpif_backer *backer, struct dpif *dpif)
     }
 
     dpif_register_upcall_cb(dpif, upcall_cb, udpif);
+    dpif_register_upcall_finish_cb(dpif, upcall_finish_cb);
 
     return udpif;
 }
@@ -998,7 +999,7 @@ static int
 upcall_cb(const struct ofpbuf *packet, const struct flow *flow, ovs_u128 *ufid,
           enum dpif_upcall_type type, const struct nlattr *userdata,
           struct ofpbuf *actions, struct flow_wildcards *wc,
-          struct ofpbuf *put_actions, void *aux)
+          struct ofpbuf *put_actions, void *aux, void **finish_state)
 {
     struct udpif *udpif = aux;
     unsigned int flow_limit;
@@ -1039,8 +1040,11 @@ upcall_cb(const struct ofpbuf *packet, const struct flow *flow, ovs_u128 *ufid,
         goto out;
     }
 
-    if (upcall.ukey && !ukey_install(udpif, upcall.ukey)) {
+    if (upcall.ukey && !ukey_install_start(udpif, upcall.ukey)) {
         error = ENOSPC;
+    }
+    if (finish_state) {
+        *finish_state = upcall.ukey;
     }
 
 out:
@@ -1049,6 +1053,14 @@ out:
     }
     upcall_uninit(&upcall);
     return error;
+}
+
+static void
+upcall_finish_cb(void *finish_state)
+{
+    struct udpif_key *ukey = finish_state;
+
+    ukey_install_finish(ukey, 0);
 }
 
 static int
@@ -1417,22 +1429,6 @@ ukey_install_finish(struct udpif_key *ukey, int error)
     ovs_mutex_unlock(&ukey->mutex);
 
     return !error;
-}
-
-static bool
-ukey_install(struct udpif *udpif, struct udpif_key *ukey)
-{
-    /* The usual way to keep 'ukey->flow_exists' in sync with the datapath is
-     * to call ukey_install_start(), install the corresponding datapath flow,
-     * then call ukey_install_finish(). The netdev interface using upcall_cb()
-     * doesn't provide a function to separately finish the flow installation,
-     * so we perform the operations together here.
-     *
-     * This is fine currently, as revalidator threads will only delete this
-     * ukey during revalidator_sweep() and only if the dump_seq is mismatched.
-     * It is unlikely for a revalidator thread to advance dump_seq and reach
-     * the next GC phase between ukey creation and flow installation. */
-    return ukey_install_start(udpif, ukey) && ukey_install_finish(ukey, 0);
 }
 
 /* Searches for a ukey in 'udpif->ukeys' that matches 'flow' and attempts to
