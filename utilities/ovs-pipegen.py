@@ -40,20 +40,30 @@ def rand_bool():
     return bool(random.randint(0, 1))
 
 
-def l2(stage, action):
+def advance(stage):
+    return flow_str(stage, "", resubmit(stage+1), priority=1)
+
+
+def l2(stage, default=False):
+    if default:
+        return advance(stage)
     mac = ["%x" % random.randint(0, 2 ** 8 - 1) for x in range(6)]
     mac = [x.zfill(2) for x in mac]
     mac = ":".join(mac)
-    return flow_str(stage, "dl_dst=%s" % mac, action)
+    return flow_str(stage, "dl_dst=%s" % mac, resubmit(stage+1))
 
 
-def l3(stage, action):
+def l3(stage, default=False):
+    if default:
+        return advance(stage)
     ip, mask = rand_ip_mask()
-    return flow_str(stage, "ip,ip_dst=%s/%d" % (ip, mask), action,
+    return flow_str(stage, "ip,ip_dst=%s/%d" % (ip, mask), resubmit(stage+1),
                     priority=mask)
 
 
-def l4(stage, action):
+def l4(stage, default=False):
+    if default:
+        return advance(stage)
     match = "tcp"
 
     if rand_bool():
@@ -63,16 +73,16 @@ def l4(stage, action):
         match += ",ip_dst=%s/%d" % rand_ip_mask()
 
     src_dst = "tp_src" if rand_bool() else "tp_dst"
-    match += ",%s=%d" % (src_dst, random.randint(1024, 2**16 - 1))
-    return flow_str(stage, match, action)
+    match += ",%s=%d" % (src_dst, random.randint(1023, 2**16 - 1))
+    return flow_str(stage, match, resubmit(stage+1))
 
 
 PIPELINES = {
-    "simple": [l2, l3, l4, l2]
-}
-
-DESCRIPTIONS = {
-    "simple": "Basic L2 switching + L3 routing + L4 (stateless) firewall"
+    "simple": {
+        "stages": [l2, l3, l4, l2],
+        "description": "Basic L2 switching + L3 routing + L4 (stateless) "
+                       "firewall"
+    },
 }
 
 
@@ -80,10 +90,9 @@ def pipeline(size, mode):
     pipeline = PIPELINES[mode]
 
     flows = []
-    for stage in xrange(len(pipeline)):
-        action = resubmit(stage + 1)
-        flows += [pipeline[stage](stage, action) for _ in xrange(size)]
-        flows.append(flow_str(stage, "", action, priority=1))
+    for stage in xrange(len(pipeline["stages"])):
+        flows += [pipeline["stages"][stage](stage) for _ in xrange(size)]
+        flows.append(pipeline["stages"][stage](stage, default=True))
 
     flows.append(flow_str(len(pipeline), "", "in_port"))
 
@@ -93,8 +102,8 @@ def pipeline(size, mode):
 
 def pipelines_usage():
     print("Available pipeline modes:\n")
-    for mode in DESCRIPTIONS.keys():
-        print(mode.ljust(16) + DESCRIPTIONS[mode])
+    for mode in PIPELINES.keys():
+        print(mode.ljust(16) + PIPELINES[mode]["description"])
     return 0
 
 
