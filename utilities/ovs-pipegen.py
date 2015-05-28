@@ -101,6 +101,11 @@ def ct_lookup(stage, default=False):
     return ct(stage, stage, "-trk", "recirc", False, default)
 
 
+def ct_lookup2(stage, default=False):
+    '''Second lookup will have conntrack state left over from first lookup.'''
+    return ct(stage, stage, "+trk", "recirc", False, default)
+
+
 def ct_commit(stage, default=False):
     '''Must use same zone as prior conntrack lookup.'''
     return ct(stage, stage-1, "+trk", "commit", True, default)
@@ -114,7 +119,11 @@ PIPELINES = {
     },
     "stateful-1": {
         "stages": [l2, ct_lookup, ct_commit, l3, l4, l2],
-        "description": "L2+L3+L4 (stateful), one firewall"
+        "description": "L2+L3+L4 (stateful), one firewall (vif->phy)"
+    },
+    "stateful-2": {
+        "stages": [l2, ct_lookup, ct_commit, l3, l4, ct_lookup2, ct_commit, l2],
+        "description": "L2+L3+L4 (stateful), two firewalls (vif->vif)"
     },
 }
 
