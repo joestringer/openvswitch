@@ -46,7 +46,7 @@ def advance(stage):
 
 def l2(stage, default=False):
     if default:
-        return advance(stage)
+        return None
     mac = ["%x" % random.randint(0, 2 ** 8 - 1) for x in range(6)]
     mac = [x.zfill(2) for x in mac]
     mac = ":".join(mac)
@@ -55,7 +55,7 @@ def l2(stage, default=False):
 
 def l3(stage, default=False):
     if default:
-        return advance(stage)
+        return None
     ip, mask = rand_ip_mask()
     return flow_str(stage, "ip,ip_dst=%s/%d" % (ip, mask), resubmit(stage+1),
                     priority=mask)
@@ -63,8 +63,9 @@ def l3(stage, default=False):
 
 def l4(stage, default=False):
     if default:
-        return advance(stage)
+        return None
     match = "tcp"
+    action = resubmit(stage+1)
 
     if rand_bool():
         match += ",ip_src=%s/%d" % rand_ip_mask()
@@ -74,7 +75,35 @@ def l4(stage, default=False):
 
     src_dst = "tp_src" if rand_bool() else "tp_dst"
     match += ",%s=%d" % (src_dst, random.randint(1023, 2**16 - 1))
-    return flow_str(stage, match, resubmit(stage+1))
+    return flow_str(stage, match, action)
+
+
+def ct(stage, zone, conn_state, flags, advance, default):
+    match = "tcp,conn_state=%s" % (conn_state)
+    action = "ct(%s,zone=%d)" % (flags, zone)
+    if advance:
+        action += ",%s" % resubmit(stage+1)
+    if default:
+        return flow_str(stage, match, action, priority=10)
+
+    if rand_bool():
+        match += ",ip_src=%s/%d" % rand_ip_mask()
+
+    if rand_bool():
+        match += ",ip_dst=%s/%d" % rand_ip_mask()
+
+    src_dst = "tp_src" if rand_bool() else "tp_dst"
+    match += ",%s=%d" % (src_dst, random.randint(1023, 2**16 - 1))
+    return flow_str(stage, match, action)
+
+
+def ct_lookup(stage, default=False):
+    return ct(stage, stage, "-trk", "recirc", False, default)
+
+
+def ct_commit(stage, default=False):
+    '''Must use same zone as prior conntrack lookup.'''
+    return ct(stage, stage-1, "+trk", "commit", True, default)
 
 
 PIPELINES = {
@@ -82,6 +111,10 @@ PIPELINES = {
         "stages": [l2, l3, l4, l2],
         "description": "Basic L2 switching + L3 routing + L4 (stateless) "
                        "firewall"
+    },
+    "stateful-1": {
+        "stages": [l2, ct_lookup, ct_commit, l3, l4, l2],
+        "description": "L2+L3+L4 (stateful), one firewall"
     },
 }
 
@@ -92,7 +125,10 @@ def pipeline(size, mode):
     flows = []
     for stage in xrange(len(pipeline["stages"])):
         flows += [pipeline["stages"][stage](stage) for _ in xrange(size)]
-        flows.append(pipeline["stages"][stage](stage, default=True))
+        f = pipeline["stages"][stage](stage, default=True)
+        if f is not None:
+            flows.append(f)
+        flows.append(flow_str(stage, "", resubmit(stage+1), priority=1))
 
     flows.append(flow_str(len(pipeline), "", "in_port"))
 
