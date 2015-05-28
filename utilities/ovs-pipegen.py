@@ -67,8 +67,17 @@ def l4(stage, action):
     return flow_str(stage, match, action)
 
 
-def pipeline(size):
-    pipeline = [l2, l3, l4, l2]
+PIPELINES = {
+    "simple": [l2, l3, l4, l2]
+}
+
+DESCRIPTIONS = {
+    "simple": "Basic L2 switching + L3 routing + L4 (stateless) firewall"
+}
+
+
+def pipeline(size, mode):
+    pipeline = PIPELINES[mode]
 
     flows = []
     for stage in xrange(len(pipeline)):
@@ -80,6 +89,13 @@ def pipeline(size):
 
     for f in flows:
         print f
+
+
+def pipelines_usage():
+    print("Available pipeline modes:\n")
+    for mode in DESCRIPTIONS.keys():
+        print(mode.ljust(16) + DESCRIPTIONS[mode])
+    return 0
 
 
 def main():
@@ -112,10 +128,20 @@ def main():
                                      formatter_class=\
                                      argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--size", dest="size", default=1000,
-                        help="Size (rules) of each OpenFlow table.")
-    args=parser.parse_args()
+                        help="size (rules) of each OpenFlow table.")
+    parser.add_argument("--list", dest="list", default=False,
+                        action="store_true",
+                        help="list available pipeline modes")
+    parser.add_argument("mode", default="simple", nargs='?',
+                        help="pipeline generation mode (default: simple)")
+    args = parser.parse_args()
 
-    pipeline(int(args.size))
+    if args.mode not in PIPELINES.keys():
+        print("'%s' is not a valid pipeline.\n" % args.mode)
+    if args.list or args.mode not in PIPELINES:
+        return pipelines_usage()
+
+    pipeline(int(args.size), args.mode)
 
 
 if __name__ == "__main__":
