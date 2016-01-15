@@ -2286,6 +2286,30 @@ mf_parse(const struct mf_field *mf, const char *s,
     return error;
 }
 
+static bool
+mf_field_is_flag(const struct mf_field *mf)
+{
+    switch (mf->string) {
+    case MFS_CT_STATE:
+    case MFS_TNL_FLAGS:
+    case MFS_TCP_FLAGS:
+        return true;
+    case MFS_DECIMAL:
+    case MFS_HEXADECIMAL:
+    case MFS_ETHERNET:
+    case MFS_IPV4:
+    case MFS_IPV6:
+    case MFS_OFP_PORT:
+    case MFS_OFP_PORT_OXM:
+    case MFS_FRAG:
+        break;
+    default:
+        OVS_NOT_REACHED();
+    }
+
+    return false;
+}
+
 /* Parses 's', a string value for field 'mf', into 'value'.  Returns NULL if
  * successful, otherwise a malloc()'d string describing the error. */
 char *
@@ -2299,7 +2323,8 @@ mf_parse_value(const struct mf_field *mf, const char *s, union mf_value *value)
         return error;
     }
 
-    if (!is_all_ones((const uint8_t *) &mask, mf->n_bytes)) {
+    if (!mf_field_is_flag(mf)
+        && !is_all_ones((const uint8_t *) &mask, mf->n_bytes)) {
         return xasprintf("%s: wildcards not allowed here", s);
     }
     return NULL;
