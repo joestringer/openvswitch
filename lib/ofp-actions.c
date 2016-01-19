@@ -4962,10 +4962,16 @@ parse_CT(char *arg, struct ofpbuf *ofpacts,
 static void
 format_alg(int port, struct ds *s)
 {
-    if (port == IPPORT_FTP) {
+    switch (port) {
+    case IPPORT_FTP:
         ds_put_format(s, "alg=ftp,");
-    } else if (port) {
+        break;
+    case IPPORT_TFTP:
+        ds_put_format(s, "alg=tftp,");
+        break;
+    default:
         ds_put_format(s, "alg=%d,", port);
+        break;
     }
 }
 
