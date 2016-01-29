@@ -42,9 +42,13 @@ typedef bool nln_parse_func(struct ofpbuf *buf, void *change);
 struct nln *nln_create(int protocol, int multicast_group, nln_parse_func *,
                        void *change);
 void nln_destroy(struct nln *);
-struct nln_notifier *nln_notifier_create(struct nln *, nln_notify_func *,
-                                         void *aux);
+struct nln_notifier *nln_notifier_create_at(struct nln *, nln_notify_func *,
+                                            void *aux, const char *where);
 void nln_notifier_destroy(struct nln_notifier *);
-void nln_run(struct nln *);
+void nln_run_at(struct nln *, const char *where);
 void nln_wait(struct nln *);
+
+#define nln_notifier_create(nln, func, aux) \
+        nln_notifier_create_at(nln, func, aux, OVS_SOURCE_LOCATOR)
+#define nln_run(nln) nln_run_at(nln, OVS_SOURCE_LOCATOR)
 #endif /* netlink-notifier.h */

@@ -101,7 +101,8 @@ nln_destroy(struct nln *nln)
  *
  * Returns an initialized nln_notifier if successful, otherwise NULL. */
 struct nln_notifier *
-nln_notifier_create(struct nln *nln, nln_notify_func *cb, void *aux)
+nln_notifier_create_at(struct nln *nln, nln_notify_func *cb, void *aux,
+                       const char *where)
 {
     struct nln_notifier *notifier;
 
@@ -115,15 +116,15 @@ nln_notifier_create(struct nln *nln, nln_notify_func *cb, void *aux)
         }
         if (error) {
             nl_sock_destroy(sock);
-            VLOG_WARN("could not create netlink socket: %s",
-                      ovs_strerror(error));
+            VLOG_WARN("could not create netlink socket: %s (%s)",
+                      ovs_strerror(error), where);
             return NULL;
         }
         nln->notify_sock = sock;
     } else {
         /* Catch up on notification work so that the new notifier won't
          * receive any stale notifications. */
-        nln_run(nln);
+        nln_run_at(nln, where);
     }
 
     notifier = xmalloc(sizeof *notifier);
@@ -154,7 +155,7 @@ nln_notifier_destroy(struct nln_notifier *notifier)
 /* Calls all of the registered notifiers, passing along any as-yet-unreported
  * change events. */
 void
-nln_run(struct nln *nln)
+nln_run_at(struct nln *nln, const char *where)
 {
     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
 
@@ -174,7 +175,7 @@ nln_run(struct nln *nln)
             if (nln->parse(&buf, nln->change)) {
                 nln_report(nln, nln->change);
             } else {
-                VLOG_WARN_RL(&rl, "received bad netlink message");
+                VLOG_WARN_RL(&rl, "received bad netlink message (%s)", where);
                 nln_report(nln, NULL);
             }
             ofpbuf_uninit(&buf);
@@ -185,10 +186,11 @@ nln_run(struct nln *nln)
                 /* The socket buffer might be full, there could be too many
                  * notifications, so it makes sense to call nln_report() */
                 nln_report(nln, NULL);
-                VLOG_WARN_RL(&rl, "netlink receive buffer overflowed");
+                VLOG_WARN_RL(&rl, "netlink receive buffer overflowed (%s)",
+                             where);
             } else {
-                VLOG_WARN_RL(&rl, "error reading netlink socket: %s",
-                             ovs_strerror(error));
+                VLOG_WARN_RL(&rl, "error reading netlink socket: %s, (%s)",
+                             ovs_strerror(error), where);
             }
             return;
         }
