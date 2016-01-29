@@ -97,7 +97,7 @@ nln_destroy(struct nln *nln)
  * not modify or free.
  *
  * This is probably not the function you want.  You should probably be using
- * message specific notifiers like rtnetlink_link_notifier_register().
+ * message specific notifiers like rtnetlink_notifier_register().
  *
  * Returns an initialized nln_notifier if successful, otherwise NULL. */
 struct nln_notifier *
