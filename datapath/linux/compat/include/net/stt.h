@@ -24,6 +24,8 @@ struct stthdr {
 
 #define STT_BASE_HLEN   (sizeof(struct stthdr) + STT_ETH_PAD)
 #define STT_HEADER_LEN	(sizeof(struct tcphdr) + STT_BASE_HLEN)
+#define STT_MAX_MTU	(IP_MAX_MTU - STT_HEADER_LEN - sizeof(struct iphdr) \
+				    - sizeof(struct ethhdr))
 
 static inline struct stthdr *stt_hdr(const struct sk_buff *skb)
 {

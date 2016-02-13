@@ -1683,6 +1683,15 @@ static int stt_stop(struct net_device *dev)
 	return 0;
 }
 
+static int stt_change_mtu(struct net_device *dev, int new_mtu)
+{
+	if (new_mtu < 68 || new_mtu > STT_MAX_MTU)
+		return -EINVAL;
+
+	dev->mtu = new_mtu;
+	return 0;
+}
+
 static const struct net_device_ops stt_netdev_ops = {
 	.ndo_init               = stt_init,
 	.ndo_uninit             = stt_uninit,
@@ -1690,7 +1699,7 @@ static const struct net_device_ops stt_netdev_ops = {
 	.ndo_stop               = stt_stop,
 	.ndo_start_xmit         = stt_dev_xmit,
 	.ndo_get_stats64        = ip_tunnel_get_stats64,
-	.ndo_change_mtu         = eth_change_mtu,
+	.ndo_change_mtu         = stt_change_mtu,
 	.ndo_validate_addr      = eth_validate_addr,
 	.ndo_set_mac_address    = eth_mac_addr,
 };
@@ -1783,6 +1792,10 @@ static int stt_configure(struct net *net, struct net_device *dev,
 		return -EBUSY;
 
 	err = register_netdevice(dev);
+	if (err)
+		return err;
+
+	err = stt_change_mtu(dev, STT_MAX_MTU);
 	if (err)
 		return err;
 
