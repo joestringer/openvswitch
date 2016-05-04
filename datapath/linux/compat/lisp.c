@@ -222,7 +222,7 @@ static int lisp_rcv(struct sock *sk, struct sk_buff *skb)
 	if (unlikely(!dev))
 		goto error;
 
-	if (iptunnel_pull_header(skb, LISP_HLEN, 0))
+	if (iptunnel_pull_header(skb, LISP_HLEN, 0, false))
 		goto error;
 
 	lisph = lisp_hdr(skb);
