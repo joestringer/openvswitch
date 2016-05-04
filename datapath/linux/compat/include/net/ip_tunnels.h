@@ -13,6 +13,7 @@
 #include <linux/if_tunnel.h>
 #include <linux/types.h>
 #include <net/dsfield.h>
+#include <net/dst_cache.h>
 #include <net/flow.h>
 #include <net/inet_ecn.h>
 #include <net/ip.h>
@@ -137,6 +138,7 @@ struct ip_tunnel_key {
 
 struct ip_tunnel_info {
 	struct ip_tunnel_key	key;
+	struct dst_cache        dst_cache;
 	u8			options_len;
 	u8			mode;
 };
@@ -194,6 +196,23 @@ static inline void ip_tunnel_key_init(struct ip_tunnel_key *key,
 
 #define ip_tunnel_collect_metadata() true
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,7,0)
+#define TUNNEL_NOCACHE 0
+
+static inline bool
+ip_tunnel_dst_cache_usable(const struct sk_buff *skb,
+			   const struct ip_tunnel_info *info)
+{
+	if (skb->mark)
+		return false;
+	if (!info)
+		return true;
+	if (info->key.tun_flags & TUNNEL_NOCACHE)
+		return false;
+
+	return true;
+}
+#endif
 
 #define ip_tunnel rpl_ip_tunnel
 

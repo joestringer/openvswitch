@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2015 Nicira, Inc.
+ * Copyright (c) 2007-2016 Nicira, Inc.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of version 2 of the GNU General Public
@@ -45,8 +45,8 @@
 #include <net/mpls.h>
 #include <net/ndisc.h>
 
-#include "datapath.h"
 #include "conntrack.h"
+#include "datapath.h"
 #include "flow.h"
 #include "flow_netlink.h"
 #include "vport.h"
@@ -101,9 +101,9 @@ void ovs_flow_stats_update(struct sw_flow *flow, __be16 tcp_flags,
 
 				new_stats =
 					kmem_cache_alloc_node(flow_stats_cache,
-                                                              GFP_NOWAIT |
-                                                              __GFP_THISNODE |
-                                                              __GFP_NOWARN |
+							      GFP_NOWAIT |
+							      __GFP_THISNODE |
+							      __GFP_NOWARN |
 							      __GFP_NOMEMALLOC,
 							      node);
 				if (likely(new_stats)) {
@@ -556,8 +556,7 @@ static int key_extract(struct sk_buff *skb, struct sw_flow_key *key)
 				struct icmphdr *icmp = icmp_hdr(skb);
 				/* The ICMP type and code fields use the 16-bit
 				 * transport port fields, so we need to store
-				 * them in 16-bit network byte order.
-				 */
+				 * them in 16-bit network byte order. */
 				key->tp.src = htons(icmp->type);
 				key->tp.dst = htons(icmp->code);
 			} else {
@@ -689,9 +688,7 @@ int ovs_flow_key_extract(const struct ip_tunnel_info *tun_info,
 {
 	/* Extract metadata from packet. */
 	if (tun_info) {
-		if (ip_tunnel_info_af(tun_info) != AF_INET)
-			return -EINVAL;
-
+		key->tun_proto = ip_tunnel_info_af(tun_info);
 		memcpy(&key->tun_key, &tun_info->key, sizeof(key->tun_key));
 		BUILD_BUG_ON(((1 << (sizeof(tun_info->options_len) * 8)) - 1) >
 			     sizeof(key->tun_opts));
@@ -703,7 +700,8 @@ int ovs_flow_key_extract(const struct ip_tunnel_info *tun_info,
 		} else {
 			key->tun_opts_len = 0;
 		}
-	} else {
+	} else  {
+		key->tun_proto = 0;
 		key->tun_opts_len = 0;
 		memset(&key->tun_key, 0, sizeof(key->tun_key));
 	}

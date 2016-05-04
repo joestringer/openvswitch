@@ -12,6 +12,7 @@
 
 #else
 
+#include <net/addrconf.h>
 #include <net/ip_tunnels.h>
 #include <net/udp.h>
 
