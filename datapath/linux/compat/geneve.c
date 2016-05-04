@@ -548,10 +548,8 @@ static int geneve_build_skb(struct rtable *rt, struct sk_buff *skb,
 			+ GENEVE_BASE_HLEN + opt_len + sizeof(struct iphdr)
 			+ (skb_vlan_tag_present(skb) ? VLAN_HLEN : 0);
 	err = skb_cow_head(skb, min_headroom);
-	if (unlikely(err)) {
-		kfree_skb(skb);
+	if (unlikely(err))
 		goto free_rt;
-	}
 
 	skb = vlan_hwaccel_push_inside(skb);
 	if (!skb) {
@@ -559,11 +557,9 @@ static int geneve_build_skb(struct rtable *rt, struct sk_buff *skb,
 		goto free_rt;
 	}
 
-	skb = udp_tunnel_handle_offloads(skb, csum, 0, false);
-	if (IS_ERR(skb)) {
-		err = PTR_ERR(skb);
+	err = udp_tunnel_handle_offloads(skb, csum, false);
+	if (err)
 		goto free_rt;
-	}
 	gnvh = (struct genevehdr *)__skb_push(skb, sizeof(*gnvh) + opt_len);
 	gnvh->ver = GENEVE_VER;
 	gnvh->opt_len = opt_len / 4;
@@ -579,6 +575,7 @@ static int geneve_build_skb(struct rtable *rt, struct sk_buff *skb,
 	return 0;
 
 free_rt:
+	kfree_skb(skb);
 	ip_rt_put(rt);
 	return err;
 }
