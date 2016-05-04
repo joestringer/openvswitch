@@ -60,4 +60,13 @@ void rpl_udp_set_csum(bool nocheck, struct sk_buff *skb,
 		      __be32 saddr, __be32 daddr, int len);
 #endif
 
+#ifndef HAVE_SK_NO_CHECK_TX
+static inline void udp_set_no_check6_tx(struct sock *sk, bool val)
+{
+}
+
+static inline void udp_set_no_check6_rx(struct sock *sk, bool val)
+{
+}
+#endif
 #endif
