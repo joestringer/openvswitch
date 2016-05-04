@@ -81,4 +81,9 @@ static inline __be32 ip6_make_flowinfo(unsigned int tclass, __be32 flowlabel)
 	return htonl(tclass << IPV6_TCLASS_SHIFT) | flowlabel;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,18,0)
+#define ip6_local_out rpl_ip6_local_out
+int rpl_ip6_local_out(struct sk_buff *skb);
+#endif
+
 #endif

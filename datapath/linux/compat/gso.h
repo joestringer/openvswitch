@@ -23,6 +23,7 @@ struct ovs_gso_cb {
 #ifndef HAVE_INNER_NETWORK_HEADER
 	unsigned int	inner_network_header;
 #endif
+	bool ipv6;
 };
 #define OVS_GSO_CB(skb) ((struct ovs_gso_cb *)(skb)->cb)
 
