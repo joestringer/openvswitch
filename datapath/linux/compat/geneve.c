@@ -765,6 +765,29 @@ static int geneve_change_mtu(struct net_device *dev, int new_mtu)
 	return __geneve_change_mtu(dev, new_mtu, true);
 }
 
+int ovs_geneve_fill_metadata_dst(struct net_device *dev, struct sk_buff *skb)
+{
+	struct ip_tunnel_info *info = skb_tunnel_info(skb);
+	struct geneve_dev *geneve = netdev_priv(dev);
+	struct rtable *rt;
+	struct flowi4 fl4;
+
+	if (ip_tunnel_info_af(info) != AF_INET)
+		return -EINVAL;
+
+	rt = geneve_get_rt(skb, dev, &fl4, info);
+	if (IS_ERR(rt))
+		return PTR_ERR(rt);
+
+	ip_rt_put(rt);
+	info->key.u.ipv4.src = fl4.saddr;
+	info->key.tp_src = udp_flow_src_port(geneve->net, skb,
+					     1, USHRT_MAX, true);
+	info->key.tp_dst = geneve->dst_port;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(ovs_geneve_fill_metadata_dst);
+
 static const struct net_device_ops geneve_netdev_ops = {
 	.ndo_init		= geneve_init,
 	.ndo_uninit		= geneve_uninit,
@@ -775,6 +798,9 @@ static const struct net_device_ops geneve_netdev_ops = {
 	.ndo_change_mtu		= geneve_change_mtu,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_set_mac_address	= eth_mac_addr,
+#ifdef HAVE_NDO_FILL_METADATA_DST
+	.ndo_fill_metadata_dst  = geneve_fill_metadata_dst,
+#endif
 };
 
 static void geneve_get_drvinfo(struct net_device *dev,
