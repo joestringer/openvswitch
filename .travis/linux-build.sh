@@ -10,7 +10,7 @@ EXTRA_OPTS=""
 function install_kernel()
 {
     if [[ "$1" =~ el7$ ]]; then
-        REPO="https://mirror.centos.org/centos/7/os/x86_64/Packages"
+        REPO="http://mirror.centos.org/centos/7/os/x86_64/Packages"
         # Centos kernel
         wget ${REPO}/kernel-devel-${1}.x86_64.rpm
         mkdir linux-${1}
