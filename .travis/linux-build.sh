@@ -9,6 +9,7 @@ EXTRA_OPTS=""
 
 function install_kernel()
 {
+    set -x
     if [[ "$1" =~ el7$ ]]; then
         REPO="http://mirror.centos.org/centos/7/os/x86_64/Packages"
 
@@ -37,6 +38,9 @@ function install_kernel()
         cd linux-${1}
     fi
 
+    pwd
+    ls
+    set +x
     make allmodconfig
 
     # Older kernels do not include openvswitch
