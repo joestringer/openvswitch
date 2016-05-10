@@ -11,6 +11,8 @@ function install_kernel()
 {
     if [[ "$1" =~ el7$ ]]; then
         REPO="http://mirror.centos.org/centos/7/os/x86_64/Packages"
+
+        sudo apt-get install rpm2cpio
         # Centos kernel
         wget ${REPO}/kernel-devel-${1}.x86_64.rpm
         mkdir linux-${1}
