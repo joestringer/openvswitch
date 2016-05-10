@@ -16,8 +16,8 @@ function install_kernel()
         # Centos kernel
         wget ${REPO}/kernel-devel-${1}.x86_64.rpm
         mkdir linux-${1}
-        rpm2cpio ../kernel-devel-${1}.x86_64.rpm | cpio -idmV -D linux-${1}
         cd linux-${1}/usr/src/kernels/${1}.x86_64
+        rpm2cpio ../kernel-devel-${1}.x86_64.rpm | cpio -idmV
 
         # GCC on travis ubuntu hosts don't support -fstack-protector-strong.
         sed -i 'c/Handle stack protector/CONFIG_CC_STACKPROTECTOR_REGULAR=1/' Makefile
