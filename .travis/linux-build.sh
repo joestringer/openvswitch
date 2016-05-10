@@ -22,7 +22,7 @@ function install_kernel()
         cd usr/src/kernels/${1}.x86_64
 
         # GCC on travis ubuntu hosts don't support -fstack-protector-strong.
-        sed -i 'c/Handle stack protector/CONFIG_CC_STACKPROTECTOR_REGULAR=1/' Makefile
+        sed -i 's/.*Handle stack protector.*/CONFIG_CC_STACKPROTECTOR_REGULAR=1/' Makefile
     else
         REPO="https://www.kernel.org/pub/linux/kernel"
         if [[ "$1" =~ ^4.* ]]; then
