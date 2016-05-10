@@ -9,17 +9,29 @@ EXTRA_OPTS=""
 
 function install_kernel()
 {
-    if [[ "$1" =~ ^4.* ]]; then
-        PREFIX="v4.x"
-    elif [[ "$1" =~ ^3.* ]]; then
-        PREFIX="v3.x"
+    if [[ "$1" =~ el7$ ]]; then
+        REPO="https://mirror.centos.org/centos/7/os/x86_64/Packages"
+        # Centos kernel
+        wget ${REPO}/kernel-devel-${1}.x86_64.rpm
+        mkdir linux-${1}
+        rpm2cpio ../kernel-devel-${1}.x86_64.rpm | cpio -idmV -D linux-${1}
+        cd linux-${1}/usr/src/kernels/${1}.x86_64
+        sed -i 'c/Handle stack protector/CONFIG_CC_STACKPROTECTOR_REGULAR=1/' Makefile
     else
-        PREFIX="v2.6/longterm/v2.6.32"
+        REPO="https://www.kernel.org/pub/linux/kernel"
+        if [[ "$1" =~ ^4.* ]]; then
+            PREFIX="v4.x"
+        elif [[ "$1" =~ ^3.* ]]; then
+            PREFIX="v3.x"
+        else
+            PREFIX="v2.6/longterm/v2.6.32"
+        fi
+
+        wget ${REPO}/${PREFIX}/linux-${1}.tar.gz
+        tar xzvf linux-${1}.tar.gz > /dev/null
+        cd linux-${1}
     fi
 
-    wget https://www.kernel.org/pub/linux/kernel/${PREFIX}/linux-${1}.tar.gz
-    tar xzvf linux-${1}.tar.gz > /dev/null
-    cd linux-${1}
     make allmodconfig
 
     # Older kernels do not include openvswitch
