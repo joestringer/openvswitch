@@ -306,7 +306,7 @@ struct dp_netdev_flow {
     /* Hash table index by unmasked flow. */
     const struct cmap_node node; /* In owning dp_netdev_pmd_thread's */
                                  /* 'flow_table'. */
-    const ovs_u128 ufid;         /* Unique flow identifier. */
+    const struct ufid ufid;      /* Unique flow identifier. */
     const unsigned pmd_id;       /* The 'core_id' of pmd thread owning this */
                                  /* flow. */
 
@@ -1431,9 +1431,9 @@ static void dp_netdev_flow_unref(struct dp_netdev_flow *flow)
 }
 
 static uint32_t
-dp_netdev_flow_hash(const ovs_u128 *ufid)
+dp_netdev_flow_hash(const struct ufid *ufid)
 {
-    return ufid->u32[0];
+    return ufid->u128.u32[0];
 }
 
 static void
@@ -1802,24 +1802,24 @@ dp_netdev_pmd_lookup_flow(const struct dp_netdev_pmd_thread *pmd,
 
 static struct dp_netdev_flow *
 dp_netdev_pmd_find_flow(const struct dp_netdev_pmd_thread *pmd,
-                        const ovs_u128 *ufidp, const struct nlattr *key,
+                        const struct ufid *ufidp, const struct nlattr *key,
                         size_t key_len)
 {
     struct dp_netdev_flow *netdev_flow;
     struct flow flow;
-    ovs_u128 ufid;
+    struct ufid ufid;
 
     /* If a UFID is not provided, determine one based on the key. */
     if (!ufidp && key && key_len
         && !dpif_netdev_flow_from_nlattrs(key, key_len, &flow)) {
-        dpif_flow_hash(pmd->dp->dpif, &flow, sizeof flow, &ufid);
+        dpif_flow_generate_ufid(&flow, sizeof flow, &ufid);
         ufidp = &ufid;
     }
 
     if (ufidp) {
         CMAP_FOR_EACH_WITH_HASH (netdev_flow, node, dp_netdev_flow_hash(ufidp),
                                  &pmd->flow_table) {
-            if (ovs_u128_equals(netdev_flow->ufid, *ufidp)) {
+            if (ovs_u128_equals(netdev_flow->ufid.u128, ufidp->u128)) {
                 return netdev_flow;
             }
         }
@@ -1894,7 +1894,6 @@ dp_netdev_flow_to_dpif_flow(const struct dp_netdev_flow *netdev_flow,
     }
 
     flow->ufid = netdev_flow->ufid;
-    flow->ufid_present = true;
     flow->pmd_id = netdev_flow->pmd_id;
     get_dpif_flow_stats(netdev_flow, &flow->stats);
 }
@@ -2003,7 +2002,7 @@ dpif_netdev_flow_get(const struct dpif *dpif, const struct dpif_flow_get *get)
 
 static struct dp_netdev_flow *
 dp_netdev_flow_add(struct dp_netdev_pmd_thread *pmd,
-                   struct match *match, const ovs_u128 *ufid,
+                   struct match *match, const struct ufid *ufid,
                    const struct nlattr *actions, size_t actions_len)
     OVS_REQUIRES(pmd->flow_mutex)
 {
@@ -2022,7 +2021,7 @@ dp_netdev_flow_add(struct dp_netdev_pmd_thread *pmd,
     flow->batch = NULL;
     *CONST_CAST(unsigned *, &flow->pmd_id) = pmd->core_id;
     *CONST_CAST(struct flow *, &flow->flow) = match->flow;
-    *CONST_CAST(ovs_u128 *, &flow->ufid) = *ufid;
+    *CONST_CAST(struct ufid *, &flow->ufid) = *ufid;
     ovs_refcount_init(&flow->ref_cnt);
     ovsrcu_set(&flow->actions, dp_netdev_actions_create(actions, actions_len));
 
@@ -2063,7 +2062,7 @@ dpif_netdev_flow_put(struct dpif *dpif, const struct dpif_flow_put *put)
     struct netdev_flow_key key;
     struct dp_netdev_pmd_thread *pmd;
     struct match match;
-    ovs_u128 ufid;
+    struct ufid ufid;
     unsigned pmd_id = put->pmd_id == PMD_ID_NULL
                       ? NON_PMD_CORE_ID : put->pmd_id;
     int error;
@@ -2088,11 +2087,11 @@ dpif_netdev_flow_put(struct dpif *dpif, const struct dpif_flow_put *put)
      * This interface is no longer performance critical, since it is not used
      * for upcall processing any more. */
     netdev_flow_key_from_flow(&key, &match.flow);
-
     if (put->ufid) {
         ufid = *put->ufid;
     } else {
-        dpif_flow_hash(dpif, &match.flow, sizeof match.flow, &ufid);
+        dpif_flow_generate_ufid(&match.flow, sizeof match.flow, &ufid);
+        ufid.propagate = true;
     }
 
     ovs_mutex_lock(&pmd->flow_mutex);
@@ -3209,7 +3208,7 @@ dp_netdev_count_packet(struct dp_netdev_pmd_thread *pmd,
 
 static int
 dp_netdev_upcall(struct dp_netdev_pmd_thread *pmd, struct dp_packet *packet_,
-                 struct flow *flow, struct flow_wildcards *wc, ovs_u128 *ufid,
+                 struct flow *flow, struct flow_wildcards *wc, struct ufid *ufid,
                  enum dpif_upcall_type type, const struct nlattr *userdata,
                  struct ofpbuf *actions, struct ofpbuf *put_actions)
 {
@@ -3482,7 +3481,7 @@ fast_path_processing(struct dp_netdev_pmd_thread *pmd,
     if (OVS_UNLIKELY(any_miss) && !fat_rwlock_tryrdlock(&dp->upcall_rwlock)) {
         uint64_t actions_stub[512 / 8], slow_stub[512 / 8];
         struct ofpbuf actions, put_actions;
-        ovs_u128 ufid;
+        struct ufid ufid;
 
         ofpbuf_use_stub(&actions, actions_stub, sizeof actions_stub);
         ofpbuf_use_stub(&put_actions, slow_stub, sizeof slow_stub);
@@ -3514,7 +3513,7 @@ fast_path_processing(struct dp_netdev_pmd_thread *pmd,
             ofpbuf_clear(&actions);
             ofpbuf_clear(&put_actions);
 
-            dpif_flow_hash(dp->dpif, &match.flow, sizeof match.flow, &ufid);
+            dpif_flow_generate_ufid(&match.flow, sizeof match.flow, &ufid);
             error = dp_netdev_upcall(pmd, packets[i], &match.flow, &match.wc,
                                      &ufid, DPIF_UC_MISS, NULL, &actions,
                                      &put_actions);
@@ -3796,7 +3795,7 @@ dp_execute_cb(void *aux_, struct dp_packet **packets, int cnt,
             const struct nlattr *userdata;
             struct ofpbuf actions;
             struct flow flow;
-            ovs_u128 ufid;
+            struct ufid ufid;
 
             userdata = nl_attr_find_nested(a, OVS_USERSPACE_ATTR_USERDATA);
             ofpbuf_init(&actions, 0);
@@ -3807,7 +3806,7 @@ dp_execute_cb(void *aux_, struct dp_packet **packets, int cnt,
                 ofpbuf_clear(&actions);
 
                 flow_extract(packets[i], &flow);
-                dpif_flow_hash(dp->dpif, &flow, sizeof flow, &ufid);
+                dpif_flow_generate_ufid(&flow, sizeof flow, &ufid);
                 error = dp_netdev_upcall(pmd, packets[i], &flow, NULL, &ufid,
                                          DPIF_UC_ACTION, userdata,&actions,
                                          NULL);

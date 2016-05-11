@@ -93,7 +93,7 @@ static void log_flow_message(const struct dpif *dpif, int error,
                              const char *operation,
                              const struct nlattr *key, size_t key_len,
                              const struct nlattr *mask, size_t mask_len,
-                             const ovs_u128 *ufid,
+                             const struct ufid *ufid,
                              const struct dpif_flow_stats *stats,
                              const struct nlattr *actions, size_t actions_len);
 static void log_operation(const struct dpif *, const char *operation,
@@ -843,8 +843,7 @@ dpif_flow_stats_format(const struct dpif_flow_stats *stats, struct ds *s)
 
 /* Places the hash of the 'key_len' bytes starting at 'key' into '*hash'. */
 void
-dpif_flow_hash(const struct dpif *dpif OVS_UNUSED,
-               const void *key, size_t key_len, ovs_u128 *hash)
+dpif_flow_generate_ufid(const void *key, size_t key_len, struct ufid *ufid)
 {
     static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
     static uint32_t secret;
@@ -853,8 +852,9 @@ dpif_flow_hash(const struct dpif *dpif OVS_UNUSED,
         secret = random_uint32();
         ovsthread_once_done(&once);
     }
-    hash_bytes128(key, key_len, secret, hash);
-    uuid_set_bits_v4((struct uuid *)hash);
+    hash_bytes128(key, key_len, secret, &ufid->u128);
+    uuid_set_bits_v4((struct uuid *)&ufid->u128);
+    ufid->propagate = false;
 }
 
 /* Deletes all flows from 'dpif'.  Returns 0 if successful, otherwise a
@@ -876,7 +876,7 @@ dpif_flow_flush(struct dpif *dpif)
  */
 bool
 dpif_probe_feature(struct dpif *dpif, const char *name,
-                   const struct ofpbuf *key, const ovs_u128 *ufid)
+                   const struct ofpbuf *key, const struct ufid *ufid)
 {
     struct dpif_flow flow;
     struct ofpbuf reply;
@@ -902,8 +902,8 @@ dpif_probe_feature(struct dpif *dpif, const char *name,
     error = dpif_flow_get(dpif, key->data, key->size, ufid,
                           PMD_ID_NULL, &reply, &flow);
     if (!error
-        && (!ufid || (flow.ufid_present
-                      && ovs_u128_equals(*ufid, flow.ufid)))) {
+        && (!ufid || (ufid->propagate
+                      && ovs_u128_equals(ufid->u128, flow.ufid.u128)))) {
         enable_feature = true;
     }
 
@@ -920,8 +920,9 @@ dpif_probe_feature(struct dpif *dpif, const char *name,
 /* A dpif_operate() wrapper for performing a single DPIF_OP_FLOW_GET. */
 int
 dpif_flow_get(struct dpif *dpif,
-              const struct nlattr *key, size_t key_len, const ovs_u128 *ufid,
-              const unsigned pmd_id, struct ofpbuf *buf, struct dpif_flow *flow)
+              const struct nlattr *key, size_t key_len,
+              const struct ufid *ufid, const unsigned pmd_id,
+              struct ofpbuf *buf, struct dpif_flow *flow)
 {
     struct dpif_op *opp;
     struct dpif_op op;
@@ -950,7 +951,7 @@ dpif_flow_put(struct dpif *dpif, enum dpif_flow_put_flags flags,
               const struct nlattr *key, size_t key_len,
               const struct nlattr *mask, size_t mask_len,
               const struct nlattr *actions, size_t actions_len,
-              const ovs_u128 *ufid, const unsigned pmd_id,
+              const struct ufid *ufid, const unsigned pmd_id,
               struct dpif_flow_stats *stats)
 {
     struct dpif_op *opp;
@@ -977,8 +978,9 @@ dpif_flow_put(struct dpif *dpif, enum dpif_flow_put_flags flags,
 /* A dpif_operate() wrapper for performing a single DPIF_OP_FLOW_DEL. */
 int
 dpif_flow_del(struct dpif *dpif,
-              const struct nlattr *key, size_t key_len, const ovs_u128 *ufid,
-              const unsigned pmd_id, struct dpif_flow_stats *stats)
+              const struct nlattr *key, size_t key_len,
+              const struct ufid *ufid, const unsigned pmd_id,
+              struct dpif_flow_stats *stats)
 {
     struct dpif_op *opp;
     struct dpif_op op;
@@ -1591,7 +1593,7 @@ static void
 log_flow_message(const struct dpif *dpif, int error, const char *operation,
                  const struct nlattr *key, size_t key_len,
                  const struct nlattr *mask, size_t mask_len,
-                 const ovs_u128 *ufid, const struct dpif_flow_stats *stats,
+                 const struct ufid *ufid, const struct dpif_flow_stats *stats,
                  const struct nlattr *actions, size_t actions_len)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;

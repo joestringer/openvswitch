@@ -2997,18 +2997,20 @@ scan_u128(const char *s_, ovs_u128 *value, ovs_u128 *mask)
 }
 
 int
-odp_ufid_from_string(const char *s_, ovs_u128 *ufid)
+odp_ufid_from_string(const char *s_, struct ufid *ufid)
 {
     const char *s = s_;
 
+    ufid->propagate = false;
     if (ovs_scan(s, "ufid:")) {
         s += 5;
 
-        if (!uuid_from_string_prefix((struct uuid *)ufid, s)) {
+        if (!uuid_from_string_prefix((struct uuid *)&ufid->u128, s)) {
             return -EINVAL;
         }
         s += UUID_LEN;
 
+        ufid->propagate = true;
         return s - s_;
     }
 
@@ -3016,9 +3018,9 @@ odp_ufid_from_string(const char *s_, ovs_u128 *ufid)
 }
 
 void
-odp_format_ufid(const ovs_u128 *ufid, struct ds *ds)
+odp_format_ufid(const struct ufid *ufid, struct ds *ds)
 {
-    ds_put_format(ds, "ufid:"UUID_FMT, UUID_ARGS((struct uuid *)ufid));
+    ds_put_format(ds, "ufid:"UUID_FMT, UUID_ARGS((struct uuid *)&ufid->u128));
 }
 
 /* Appends to 'ds' a string representation of the 'key_len' bytes of
@@ -3999,7 +4001,7 @@ static int
 parse_odp_key_mask_attr(const char *s, const struct simap *port_names,
                         struct ofpbuf *key, struct ofpbuf *mask)
 {
-    ovs_u128 ufid;
+    struct ufid ufid;
     int len;
 
     /* Skip UFID. */

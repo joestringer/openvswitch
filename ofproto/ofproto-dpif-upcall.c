@@ -201,7 +201,7 @@ struct upcall {
      * dpif-netdev.  If a modification is absolutely necessary, a const cast
      * may be used with other datapaths. */
     const struct flow *flow;       /* Parsed representation of the packet. */
-    const ovs_u128 *ufid;          /* Unique identifier for 'flow'. */
+    struct ufid ufid;              /* Unique identifier for 'flow'. */
     unsigned pmd_id;               /* Datapath poll mode driver id. */
     const struct dp_packet *packet;   /* Packet associated with this upcall. */
     ofp_port_t in_port;            /* OpenFlow in port, or OFPP_NONE. */
@@ -256,8 +256,7 @@ struct udpif_key {
     size_t key_len;                /* Length of 'key'. */
     const struct nlattr *mask;     /* Datapath flow mask. */
     size_t mask_len;               /* Length of 'mask'. */
-    ovs_u128 ufid;                 /* Unique flow identifier. */
-    bool ufid_present;             /* True if 'ufid' is in datapath. */
+    struct ufid ufid;              /* Unique flow identifier. */
     uint32_t hash;                 /* Pre-computed hash for 'key'. */
     unsigned pmd_id;               /* Datapath poll mode driver id. */
 
@@ -338,7 +337,7 @@ static bool ukey_install_start(struct udpif *, struct udpif_key *ukey);
 static bool ukey_install_finish(struct udpif_key *ukey, int error);
 static bool ukey_install(struct udpif *udpif, struct udpif_key *ukey);
 static struct udpif_key *ukey_lookup(struct udpif *udpif,
-                                     const ovs_u128 *ufid,
+                                     const struct ufid *ufid,
                                      const unsigned pmd_id);
 static int ukey_acquire(struct udpif *, const struct dpif_flow *,
                         struct udpif_key **result, int *error);
@@ -351,7 +350,7 @@ static int upcall_receive(struct upcall *, const struct dpif_backer *,
                           const struct dp_packet *packet, enum dpif_upcall_type,
                           const struct nlattr *userdata, const struct flow *,
                           const unsigned int mru,
-                          const ovs_u128 *ufid, const unsigned pmd_id);
+                          const struct ufid *ufid, const unsigned pmd_id);
 static void upcall_uninit(struct upcall *);
 
 static upcall_callback upcall_cb;
@@ -783,7 +782,7 @@ recv_upcalls(struct handler *handler)
 
         upcall->key = dupcall->key;
         upcall->key_len = dupcall->key_len;
-        upcall->ufid = &dupcall->ufid;
+        upcall->ufid = dupcall->ufid;
 
         upcall->out_tun_key = dupcall->out_tun_key;
         upcall->actions = dupcall->actions;
@@ -1007,7 +1006,7 @@ upcall_receive(struct upcall *upcall, const struct dpif_backer *backer,
                const struct dp_packet *packet, enum dpif_upcall_type type,
                const struct nlattr *userdata, const struct flow *flow,
                const unsigned int mru,
-               const ovs_u128 *ufid, const unsigned pmd_id)
+               const struct ufid *ufid, const unsigned pmd_id)
 {
     int error;
 
@@ -1021,7 +1020,8 @@ upcall_receive(struct upcall *upcall, const struct dpif_backer *backer,
     upcall->have_recirc_ref = false;
     upcall->flow = flow;
     upcall->packet = packet;
-    upcall->ufid = ufid;
+    upcall->ufid = *ufid;
+    upcall->ufid.propagate = ofproto_dpif_get_enable_ufid(backer);
     upcall->pmd_id = pmd_id;
     upcall->type = type;
     upcall->userdata = userdata;
@@ -1122,8 +1122,8 @@ upcall_uninit(struct upcall *upcall)
 }
 
 static int
-upcall_cb(const struct dp_packet *packet, const struct flow *flow, ovs_u128 *ufid,
-          unsigned pmd_id, enum dpif_upcall_type type,
+upcall_cb(const struct dp_packet *packet, const struct flow *flow,
+          const struct ufid *ufid, unsigned pmd_id, enum dpif_upcall_type type,
           const struct nlattr *userdata, struct ofpbuf *actions,
           struct flow_wildcards *wc, struct ofpbuf *put_actions, void *aux)
 {
@@ -1216,7 +1216,7 @@ process_upcall(struct udpif *udpif, struct upcall *upcall,
             }
             if (actions_len == 0) {
                 /* Lookup actions in userspace cache. */
-                struct udpif_key *ukey = ukey_lookup(udpif, upcall->ufid,
+                struct udpif_key *ukey = ukey_lookup(udpif, &upcall->ufid,
                                                      upcall->pmd_id);
                 if (ukey) {
                     ukey_get_actions(ukey, &actions, &actions_len);
@@ -1327,7 +1327,7 @@ handle_upcalls(struct udpif *udpif, struct upcall *upcalls,
             op->dop.u.flow_put.key_len = ukey->key_len;
             op->dop.u.flow_put.mask = ukey->mask;
             op->dop.u.flow_put.mask_len = ukey->mask_len;
-            op->dop.u.flow_put.ufid = upcall->ufid;
+            op->dop.u.flow_put.ufid = &upcall->ufid;
             op->dop.u.flow_put.stats = NULL;
             ukey_get_actions(ukey, &op->dop.u.flow_put.actions,
                              &op->dop.u.flow_put.actions_len);
@@ -1377,13 +1377,14 @@ handle_upcalls(struct udpif *udpif, struct upcall *upcalls,
 }
 
 static uint32_t
-get_ukey_hash(const ovs_u128 *ufid, const unsigned pmd_id)
+get_ukey_hash(const struct ufid *ufid, const unsigned pmd_id)
 {
-    return hash_2words(ufid->u32[0], pmd_id);
+    return hash_2words(ufid->u128.u32[0], pmd_id);
 }
 
 static struct udpif_key *
-ukey_lookup(struct udpif *udpif, const ovs_u128 *ufid, const unsigned pmd_id)
+ukey_lookup(struct udpif *udpif, const struct ufid *ufid,
+            const unsigned pmd_id)
 {
     struct udpif_key *ukey;
     int idx = get_ukey_hash(ufid, pmd_id) % N_UMAPS;
@@ -1391,7 +1392,7 @@ ukey_lookup(struct udpif *udpif, const ovs_u128 *ufid, const unsigned pmd_id)
 
     CMAP_FOR_EACH_WITH_HASH (ukey, cmap_node,
                              get_ukey_hash(ufid, pmd_id), cmap) {
-        if (ovs_u128_equals(ukey->ufid, *ufid)) {
+        if (ovs_u128_equals(ukey->ufid.u128, ufid->u128)) {
             return ukey;
         }
     }
@@ -1419,8 +1420,8 @@ ukey_set_actions(struct udpif_key *ukey, const struct ofpbuf *actions)
 static struct udpif_key *
 ukey_create__(const struct nlattr *key, size_t key_len,
               const struct nlattr *mask, size_t mask_len,
-              bool ufid_present, const ovs_u128 *ufid,
-              const unsigned pmd_id, const struct ofpbuf *actions,
+              const struct ufid *ufid, const unsigned pmd_id,
+              const struct ofpbuf *actions,
               uint64_t dump_seq, uint64_t reval_seq, long long int used,
               uint32_t key_recirc_id, struct xlate_out *xout)
     OVS_NO_THREAD_SAFETY_ANALYSIS
@@ -1433,7 +1434,6 @@ ukey_create__(const struct nlattr *key, size_t key_len,
     memcpy(&ukey->maskbuf, mask, mask_len);
     ukey->mask = &ukey->maskbuf.nla;
     ukey->mask_len = mask_len;
-    ukey->ufid_present = ufid_present;
     ukey->ufid = *ufid;
     ukey->pmd_id = pmd_id;
     ukey->hash = get_ukey_hash(&ukey->ufid, pmd_id);
@@ -1492,9 +1492,8 @@ ukey_create_from_upcall(struct upcall *upcall, struct flow_wildcards *wc)
     }
 
     return ukey_create__(keybuf.data, keybuf.size, maskbuf.data, maskbuf.size,
-                         true, upcall->ufid, upcall->pmd_id,
-                         &upcall->put_actions, upcall->dump_seq,
-                         upcall->reval_seq, 0,
+                         &upcall->ufid, upcall->pmd_id, &upcall->put_actions,
+                         upcall->dump_seq, upcall->reval_seq, 0,
                          upcall->have_recirc_ref ? upcall->recirc->id : 0,
                          &upcall->xout);
 }
@@ -1518,8 +1517,7 @@ ukey_create_from_dpif_flow(const struct udpif *udpif,
         /* If the key or actions were not provided by the datapath, fetch the
          * full flow. */
         ofpbuf_use_stack(&buf, &stub, sizeof stub);
-        err = dpif_flow_get(udpif->dpif, flow->key, flow->key_len,
-                            flow->ufid_present ? &flow->ufid : NULL,
+        err = dpif_flow_get(udpif->dpif, flow->key, flow->key_len, &flow->ufid,
                             flow->pmd_id, &buf, &full_flow);
         if (err) {
             return err;
@@ -1547,8 +1545,8 @@ ukey_create_from_dpif_flow(const struct udpif *udpif,
     reval_seq = seq_read(udpif->reval_seq);
     ofpbuf_use_const(&actions, &flow->actions, flow->actions_len);
     *ukey = ukey_create__(flow->key, flow->key_len,
-                          flow->mask, flow->mask_len, flow->ufid_present,
-                          &flow->ufid, flow->pmd_id, &actions, dump_seq,
+                          flow->mask, flow->mask_len, &flow->ufid,
+                          flow->pmd_id, &actions, dump_seq,
                           reval_seq, flow->stats.used, 0, NULL);
 
     return 0;
@@ -1901,7 +1899,7 @@ delete_op_init__(struct udpif *udpif, struct ukey_op *op,
     op->dop.type = DPIF_OP_FLOW_DEL;
     op->dop.u.flow_del.key = flow->key;
     op->dop.u.flow_del.key_len = flow->key_len;
-    op->dop.u.flow_del.ufid = flow->ufid_present ? &flow->ufid : NULL;
+    op->dop.u.flow_del.ufid = &flow->ufid;
     op->dop.u.flow_del.pmd_id = flow->pmd_id;
     op->dop.u.flow_del.stats = &op->stats;
     op->dop.u.flow_del.terse = udpif_use_ufid(udpif);
@@ -1914,7 +1912,7 @@ delete_op_init(struct udpif *udpif, struct ukey_op *op, struct udpif_key *ukey)
     op->dop.type = DPIF_OP_FLOW_DEL;
     op->dop.u.flow_del.key = ukey->key;
     op->dop.u.flow_del.key_len = ukey->key_len;
-    op->dop.u.flow_del.ufid = ukey->ufid_present ? &ukey->ufid : NULL;
+    op->dop.u.flow_del.ufid = &ukey->ufid;
     op->dop.u.flow_del.pmd_id = ukey->pmd_id;
     op->dop.u.flow_del.stats = &op->stats;
     op->dop.u.flow_del.terse = udpif_use_ufid(udpif);
@@ -1930,7 +1928,7 @@ modify_op_init(struct ukey_op *op, struct udpif_key *ukey)
     op->dop.u.flow_put.key_len = ukey->key_len;
     op->dop.u.flow_put.mask = ukey->mask;
     op->dop.u.flow_put.mask_len = ukey->mask_len;
-    op->dop.u.flow_put.ufid = ukey->ufid_present ? &ukey->ufid: NULL;
+    op->dop.u.flow_put.ufid = &ukey->ufid;
     op->dop.u.flow_put.pmd_id = ukey->pmd_id;
     op->dop.u.flow_put.stats = NULL;
     ukey_get_actions(ukey, &op->dop.u.flow_put.actions,

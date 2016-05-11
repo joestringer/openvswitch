@@ -407,6 +407,7 @@ struct flow;
 struct flow_wildcards;
 struct nlattr;
 struct sset;
+struct ufid;
 
 int dp_register_provider(const struct dpif_class *);
 int dp_unregister_provider(const char *type);
@@ -517,23 +518,22 @@ enum dpif_flow_put_flags {
 };
 
 bool dpif_probe_feature(struct dpif *, const char *name,
-                        const struct ofpbuf *key, const ovs_u128 *ufid);
-void dpif_flow_hash(const struct dpif *, const void *key, size_t key_len,
-                    ovs_u128 *hash);
+                        const struct ofpbuf *key, const struct ufid *ufid);
+void dpif_flow_generate_ufid(const void *key, size_t key_len, struct ufid *);
 int dpif_flow_flush(struct dpif *);
 int dpif_flow_put(struct dpif *, enum dpif_flow_put_flags,
                   const struct nlattr *key, size_t key_len,
                   const struct nlattr *mask, size_t mask_len,
                   const struct nlattr *actions, size_t actions_len,
-                  const ovs_u128 *ufid, const unsigned pmd_id,
+                  const struct ufid *ufid, const unsigned pmd_id,
                   struct dpif_flow_stats *);
 int dpif_flow_del(struct dpif *,
                   const struct nlattr *key, size_t key_len,
-                  const ovs_u128 *ufid, const unsigned pmd_id,
+                  const struct ufid *ufid, const unsigned pmd_id,
                   struct dpif_flow_stats *);
 int dpif_flow_get(struct dpif *,
                   const struct nlattr *key, size_t key_len,
-                  const ovs_u128 *ufid, const unsigned pmd_id,
+                  const struct ufid *ufid, const unsigned pmd_id,
                   struct ofpbuf *, struct dpif_flow *);
 
 /* Flow dumping interface
@@ -573,6 +573,14 @@ void dpif_flow_dump_thread_destroy(struct dpif_flow_dump_thread *);
 
 #define PMD_ID_NULL OVS_CORE_UNSPEC
 
+/* A datapath "unique flow identifier", UFID, allows more efficient datapath
+ * operations by referring to flows using a 128-bit identifier.
+ */
+struct ufid {
+    ovs_u128 u128;      /* 128-bit hash of flow key. */
+    bool propagate;     /* True if datapath supports UFID; false otherwise. */
+};
+
 /* A datapath flow as dumped by dpif_flow_dump_next(). */
 struct dpif_flow {
     const struct nlattr *key;     /* Flow key, as OVS_KEY_ATTR_* attrs. */
@@ -581,8 +589,7 @@ struct dpif_flow {
     size_t mask_len;              /* 'mask' length in bytes. */
     const struct nlattr *actions; /* Actions, as OVS_ACTION_ATTR_ */
     size_t actions_len;           /* 'actions' length in bytes. */
-    ovs_u128 ufid;                /* Unique flow identifier. */
-    bool ufid_present;            /* True if 'ufid' was provided by datapath.*/
+    struct ufid ufid;             /* Unique flow identifier. */
     unsigned pmd_id;              /* Datapath poll mode driver id. */
     struct dpif_flow_stats stats; /* Flow statistics. */
 };
@@ -629,6 +636,10 @@ enum dpif_op_type {
  *   - If the datapath implements multiple pmd thread with its own flow
  *     table, 'pmd_id' should be used to specify the particular polling
  *     thread for the operation.
+ *
+ *   - The caller must use the same 'ufid' for each datapath operation that
+ *     refers to this flow. If it is non_NULL, the caller must only set
+ *     'ufid->propagate' to true if the datapath supports the UFID feature.
  */
 struct dpif_flow_put {
     /* Input. */
@@ -639,7 +650,7 @@ struct dpif_flow_put {
     size_t mask_len;                /* Length of 'mask' in bytes. */
     const struct nlattr *actions;   /* Actions to perform on flow. */
     size_t actions_len;             /* Length of 'actions' in bytes. */
-    const ovs_u128 *ufid;           /* Optional unique flow identifier. */
+    const struct ufid *ufid;        /* Optional unique flow identifier. */
     unsigned pmd_id;                /* Datapath poll mode driver id. */
 
     /* Output. */
@@ -649,11 +660,10 @@ struct dpif_flow_put {
 /* Delete a flow.
  *
  * The flow is specified by the Netlink attributes with types OVS_KEY_ATTR_* in
- * the 'key_len' bytes starting at 'key', or the unique identifier 'ufid'. If
- * the flow was created using 'ufid', then 'ufid' must be specified to delete
- * the flow. If both are specified, 'key' will be ignored for flow deletion.
- * Succeeds with status 0 if the flow is deleted, or fails with ENOENT if the
- * dpif does not contain such a flow.
+ * the 'key_len' bytes starting at 'key', and the unique identifier 'ufid'. The
+ * UFID should be the same as the one provided during flow_put. Succeeds with
+ * status 0 if the flow is deleted, or fails with ENOENT if the dpif does not
+ * contain such a flow.
  *
  * Callers should always provide the 'key' to improve dpif logging in the event
  * of errors or unexpected behaviour.
@@ -668,7 +678,7 @@ struct dpif_flow_del {
     /* Input. */
     const struct nlattr *key;       /* Flow to delete. */
     size_t key_len;                 /* Length of 'key' in bytes. */
-    const ovs_u128 *ufid;           /* Unique identifier of flow to delete. */
+    const struct ufid *ufid;        /* Unique identifier of flow to delete. */
     bool terse;                     /* OK to skip sending/receiving full flow
                                      * info? */
     unsigned pmd_id;                /* Datapath poll mode driver id. */
@@ -707,11 +717,10 @@ struct dpif_execute {
 /* Queries the dpif for a flow entry.
  *
  * The flow is specified by the Netlink attributes with types OVS_KEY_ATTR_* in
- * the 'key_len' bytes starting at 'key', or the unique identifier 'ufid'. If
- * the flow was created using 'ufid', then 'ufid' must be specified to fetch
- * the flow. If both are specified, 'key' will be ignored for the flow query.
- * 'buffer' must point to an initialized buffer, with a recommended size of
- * DPIF_FLOW_BUFSIZE bytes.
+ * the 'key_len' bytes starting at 'key', or the unique identifier 'ufid'. The
+ * same 'ufid' must be specified during flow_get as was provided during the
+ * original flow_put. 'buffer' must point to an initialized buffer, with a
+ * recommended size of DPIF_FLOW_BUFSIZE bytes.
  *
  * On success, 'flow' will be populated with the mask, actions and stats for
  * the datapath flow corresponding to 'key'. The mask and actions may point
@@ -733,7 +742,7 @@ struct dpif_flow_get {
     /* Input. */
     const struct nlattr *key;       /* Flow to get. */
     size_t key_len;                 /* Length of 'key' in bytes. */
-    const ovs_u128 *ufid;           /* Unique identifier of flow to get. */
+    const struct ufid *ufid;        /* Unique identifier of flow to get. */
     unsigned pmd_id;                /* Datapath poll mode driver id. */
     struct ofpbuf *buffer;          /* Storage for output parameters. */
 
@@ -781,7 +790,7 @@ struct dpif_upcall {
     struct dp_packet packet;       /* Packet data. */
     struct nlattr *key;         /* Flow key. */
     size_t key_len;             /* Length of 'key' in bytes. */
-    ovs_u128 ufid;              /* Unique flow identifier for 'key'. */
+    struct ufid ufid;           /* Unique flow identifier for 'key'. */
     struct nlattr *mru;         /* Maximum receive unit. */
 
     /* DPIF_UC_ACTION only. */
@@ -806,8 +815,8 @@ void dpif_register_dp_purge_cb(struct dpif *, dp_purge_callback *, void *aux);
 /* A callback to process an upcall, currently implemented only by dpif-netdev.
  *
  * The caller provides the 'packet' and 'flow' to process, the corresponding
- * 'ufid' as generated by dpif_flow_hash(), the polling thread id 'pmd_id',
- * the 'type' of the upcall, and if 'type' is DPIF_UC_ACTION then the
+ * 'ufid' as generated by dpif_flow_generate_ufid(), the polling thread id
+ * 'pmd_id', the 'type' of the upcall, and if 'type' is DPIF_UC_ACTION then the
  * 'userdata' attached to the action.
  *
  * The callback must fill in 'actions' with the datapath actions to apply to
@@ -823,7 +832,7 @@ void dpif_register_dp_purge_cb(struct dpif *, dp_purge_callback *, void *aux);
  * flow should be installed, or some otherwise a positive errno value. */
 typedef int upcall_callback(const struct dp_packet *packet,
                             const struct flow *flow,
-                            ovs_u128 *ufid,
+                            const struct ufid *ufid,
                             unsigned pmd_id,
                             enum dpif_upcall_type type,
                             const struct nlattr *userdata,

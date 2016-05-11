@@ -1021,7 +1021,7 @@ check_ufid(struct dpif_backer *backer)
     struct flow flow;
     struct odputil_keybuf keybuf;
     struct ofpbuf key;
-    ovs_u128 ufid;
+    struct ufid ufid;
     bool enable_ufid;
     struct odp_flow_key_parms odp_parms = {
         .flow = &flow,
@@ -1032,7 +1032,8 @@ check_ufid(struct dpif_backer *backer)
 
     ofpbuf_use_stack(&key, &keybuf, sizeof keybuf);
     odp_flow_key_from_flow(&odp_parms, &key);
-    dpif_flow_hash(backer->dpif, key.data, key.size, &ufid);
+    dpif_flow_generate_ufid(key.data, key.size, &ufid);
+    ufid.propagate = true;
 
     enable_ufid = dpif_probe_feature(backer->dpif, "UFID", &key, &ufid);
 
