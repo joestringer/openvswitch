@@ -81,6 +81,10 @@ elif [ "$CC" != "clang" ]; then
     SPARSE_FLAGS="$SPARSE_FLAGS -Wsparse-error"
 fi
 
+if [ "$COVERAGE" ] && [ "$CC" == "gcc" ]; then
+    EXTRA_OPTS="$EXTRA_OPTS --enable-coverage"
+fi
+
 configure_ovs $EXTRA_OPTS $*
 
 # Only build datapath if we are testing kernel w/o running testsuite
@@ -103,6 +107,10 @@ if [ "$TESTSUITE" ] && [ "$CC" != "clang" ]; then
         cat */_build/tests/testsuite.log
         exit 1
     fi
+fi
+
+if [ "$COVERAGE" ] && [ "$CC" == "gcc" ]; then
+    coveralls --exclude datapath --exclude tests --gcov-options '\-lp'
 fi
 
 exit 0
