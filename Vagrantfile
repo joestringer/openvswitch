@@ -10,6 +10,7 @@ dnf -y update
 dnf -y install autoconf automake openssl-devel libtool \
                python-twisted-core python-zope-interface PyQt4 \
                desktop-file-utils groff graphviz rpmdevtools \
+               python-six pyftpdlib \
                libcap-ng-devel kernel-devel-`uname -r`
 echo "search extra update built-in" >/etc/depmod.d/search_path.conf
 cd /vagrant
