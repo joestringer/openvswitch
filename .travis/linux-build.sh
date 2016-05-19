@@ -111,7 +111,7 @@ if [ "$TESTSUITE" ] && [ "$CC" != "clang" ]; then
 fi
 
 if [ "$COVERAGE" ] && [ "$CC" == "gcc" ]; then
-    coveralls -b. --gcov-options '\-lp' --verbose
+    coveralls --gcov-options '\-lp -b.' --verbose
 fi
 
 exit 0
