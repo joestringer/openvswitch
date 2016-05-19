@@ -101,6 +101,10 @@ To run the unit tests, you also need:
   - Perl.  Version 5.10.1 is known to work.  Earlier versions should
     also work.
 
+The "system" tests for userspace and Linux datapaths also rely upon:
+
+  - pyftpdlib.
+
 The ovs-vswitchd.conf.db(5) manpage will include an E-R diagram, in
 formats other than plain text, only if you have the following:
 
@@ -593,10 +597,28 @@ test failures that you believe to represent bugs in Open vSwitch.
 Include the precise versions of Open vSwitch and Ryu in your bug
 report, plus any other information needed to reproduce the problem.
 
-Vagrant
--------
+Datapath traffic testing
+------------------------
 
-Requires: Vagrant (version 1.7.0 or later) and a compatible hypervisor
+Open vSwitch also includes a suite of tests specifically for datapath
+functionality, which can be run against the userspace or kernel datapaths.
+If you are developing datapath features, it is recommended that you use
+these tests and build upon them to verify your implementation.
+
+The datapath tests make some assumptions about the environment. They
+must be run under root privileges on a Linux system with support for
+network namespaces. These tests are recommended to be run within an
+isolated environment that is separate from your development system.
+
+For ease of use, a vagrant box is provided to invoke these tests. This
+also provides kernel isolation, protecting your development host from
+kernel panics or configuration conflicts in the testsuite. If you wish
+to run the tests without using the vagrant box, there are further
+instructions below.
+
+### Vagrant
+
+*Requires Vagrant (version 1.7.0 or later) and a compatible hypervisor*
 
 You must bootstrap and configure the sources (steps are in "Building
 and Installing Open vSwitch for Linux, FreeBSD or NetBSD" above) before
@@ -608,9 +630,8 @@ tree as found locally in a virtual machine using the following commands:
 	vagrant up
 	vagrant ssh
 
-This will bring up w Fedora 20 VM by default, alternatively the
-`Vagrantfile` can be modified to use a different distribution box as
-base. Also, the VM can be reprovisioned at any time:
+This will bring up a Fedora 20 VM by default, The VM can be reprovisioned
+at any time:
 
 	vagrant provision
 
@@ -634,6 +655,32 @@ the self-tests mentioned above.  To run them:
 
 	./boot.sh
 	vagrant provision --provision-with configure_ovs,test_ovs_kmod,test_ovs_system_userspace
+
+### Native
+
+The datapath testsuite as invoked by Vagrant above may also be run
+manually on a Linux system with root privileges. If some tests are
+being skipped, consider updating your iproute2 package and Linux kernel
+version. These tests may take several minutes to complete, and cannot be
+run in parallel.
+
+To invoke the system testsuite with the userspace datapath:
+
+        make check-system-userspace
+
+Alternatively, to install the kernel module from the current build
+directory and run the testsuite against that kernel module:
+
+        make check-kmod
+
+If you simply want to run the testsuite against the kernel module which
+is currently installed on your system, without installing a new module:
+
+        make check-kernel
+
+The testsuite logs will be placed in tests/system-userspace-traffic.log
+for the userspace target, or tests/system-kmod-traffic.log for the
+kernel targets.
 
 Continuous Integration with Travis-CI
 -------------------------------------
