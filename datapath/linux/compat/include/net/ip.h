@@ -81,34 +81,41 @@ static inline bool ip_defrag_user_in_between(u32 user,
 }
 #endif /* < v4.2 */
 
-#ifndef HAVE_IP_DO_FRAGMENT_USING_NET
-static inline int rpl_ip_do_fragment(struct net *net, struct sock *sk,
-				     struct sk_buff *skb,
-				     int (*output)(OVS_VPORT_OUTPUT_PARAMS))
+static inline void rpl_ip_options_fragment(struct sk_buff *skb)
 {
-	unsigned int mtu = ip_skb_dst_mtu(skb);
-	struct iphdr *iph = ip_hdr(skb);
-	struct rtable *rt = skb_rtable(skb);
-	struct net_device *dev = rt->dst.dev;
+	unsigned char *optptr = skb_network_header(skb) + sizeof(struct iphdr);
+	struct ip_options *opt = &(IPCB(skb)->opt);
+	int  l = opt->optlen;
+	int  optlen;
 
-	if (unlikely(((iph->frag_off & htons(IP_DF)) && !skb->ignore_df) ||
-		     (IPCB(skb)->frag_max_size &&
-		      IPCB(skb)->frag_max_size > mtu))) {
-
-		pr_warn("Dropping packet in ip_do_fragment()\n");
-		IP_INC_STATS(net, IPSTATS_MIB_FRAGFAILS);
-		kfree_skb(skb);
-		return -EMSGSIZE;
+	while (l > 0) {
+		switch (*optptr) {
+		case IPOPT_END:
+			return;
+		case IPOPT_NOOP:
+			l--;
+			optptr++;
+			continue;
+		}
+		optlen = optptr[1];
+		if (optlen < 2 || optlen > l)
+		  return;
+		if (!IPOPT_COPIED(*optptr))
+			memset(optptr, IPOPT_NOOP, optlen);
+		l -= optlen;
+		optptr += optlen;
 	}
-
-#ifndef HAVE_IP_FRAGMENT_TAKES_SOCK
-	return ip_fragment(skb, output);
-#else
-	return ip_fragment(sk, skb, output);
-#endif
+	opt->ts = 0;
+	opt->rr = 0;
+	opt->rr_needaddr = 0;
+	opt->ts_needaddr = 0;
+	opt->ts_needtime = 0;
 }
+#define ip_options_fragment rpl_ip_options_fragment
+
+int rpl_ip_do_fragment(struct net *net, struct sock *sk, struct sk_buff *skb,
+		       int (*output)(OVS_VPORT_OUTPUT_PARAMS));
 #define ip_do_fragment rpl_ip_do_fragment
-#endif /* IP_DO_FRAGMENT_USING_NET */
 
 /* If backporting IP defrag, then init/exit functions need to be called from
  * compat_{in,ex}it() to prepare the backported fragmentation cache. In this
