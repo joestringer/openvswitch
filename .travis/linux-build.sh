@@ -97,10 +97,18 @@ else
     make CFLAGS="$CFLAGS $BUILD_ENV $SPARSE_FLAGS" C=1
 fi
 
-if [ "$TESTSUITE" ] && [ "$CC" != "clang" ]; then
+if [ "$TESTSUITE" = "unit" ] && [ "$CC" != "clang" ]; then
     if ! make distcheck RECHECK=yes; then
         # testsuite.log is necessary for debugging.
         cat */_build/tests/testsuite.log
+        exit 1
+    fi
+fi
+
+if [ "$TESTSUITE" = "system" ] && [ "$CC" != "clang" ]; then
+    if ! sudo make check-system-userspace; then
+        # testsuite.log is necessary for debugging.
+        cat */_build/tests/system-userspace-traffic.dir/testsuite.log
         exit 1
     fi
 fi
