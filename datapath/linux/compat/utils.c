@@ -72,6 +72,9 @@ void __percpu *__alloc_percpu_gfp(size_t size, size_t align, gfp_t gfp)
 	void __percpu *p;
 	int i;
 
+	/* older kernel do not allow all GFP flags, specifically atomic
+	 * allocation.
+	 */
 	if (gfp & ~(GFP_KERNEL | __GFP_ZERO))
 		return NULL;
 	p = __alloc_percpu(size, align);

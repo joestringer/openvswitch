@@ -87,9 +87,9 @@ int rpl_iptunnel_xmit(struct sock *sk, struct rtable *rt, struct sk_buff *skb,
 }
 EXPORT_SYMBOL_GPL(rpl_iptunnel_xmit);
 
-struct sk_buff *ovs_iptunnel_handle_offloads(struct sk_buff *skb,
-					     bool csum_help, int gso_type_mask,
-					     void (*fix_segment)(struct sk_buff *))
+int ovs_iptunnel_handle_offloads(struct sk_buff *skb,
+				 bool csum_help, int gso_type_mask,
+				 void (*fix_segment)(struct sk_buff *))
 {
 	int err;
 
@@ -113,7 +113,7 @@ struct sk_buff *ovs_iptunnel_handle_offloads(struct sk_buff *skb,
 		if (unlikely(err))
 			goto error;
 		skb_shinfo(skb)->gso_type |= gso_type_mask;
-		return skb;
+		return 0;
 	}
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)
@@ -133,10 +133,9 @@ struct sk_buff *ovs_iptunnel_handle_offloads(struct sk_buff *skb,
 	} else if (skb->ip_summed != CHECKSUM_PARTIAL)
 		skb->ip_summed = CHECKSUM_NONE;
 
-	return skb;
+	return 0;
 error:
-	kfree_skb(skb);
-	return ERR_PTR(err);
+	return err;
 }
 EXPORT_SYMBOL_GPL(ovs_iptunnel_handle_offloads);
 #endif
