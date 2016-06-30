@@ -5,8 +5,11 @@
 #include_next <net/dst_metadata.h>
 #else
 #include <linux/skbuff.h>
-#include <net/ip_tunnels.h>
+
+#include <net/dsfield.h>
 #include <net/dst.h>
+#include <net/ipv6.h>
+#include <net/ip_tunnels.h>
 
 struct metadata_dst {
 	unsigned long dst;
@@ -25,18 +28,57 @@ static inline struct metadata_dst *metadata_dst_alloc(u8 optslen, gfp_t flags)
 
 	return md_dst;
 }
+
 #define skb_tunnel_info ovs_skb_tunnel_info
 #endif
+
+static inline void ovs_tun_rx_dst(struct ip_tunnel_info *info, int md_size)
+{
+	/* No need to allocate for OVS backport case. */
+#if 0
+	struct metadata_dst *tun_dst;
+	struct ip_tunnel_info *info;
+
+	tun_dst = metadata_dst_alloc(md_size, GFP_ATOMIC);
+	if (!tun_dst)
+		return NULL;
+#endif
+	info->mode = 0;
+	info->options_len = 0;
+}
+
 static inline void ovs_ip_tun_rx_dst(struct ip_tunnel_info *tun_info,
 				 struct sk_buff *skb, __be16 flags,
 				 __be64 tunnel_id, int md_size)
 {
 	const struct iphdr *iph = ip_hdr(skb);
 
+	ovs_tun_rx_dst(tun_info, md_size);
 	ip_tunnel_key_init(&tun_info->key,
 			   iph->saddr, iph->daddr, iph->tos, iph->ttl,
 			   0, 0, tunnel_id, flags);
-	tun_info->mode = 0;
+}
+
+static inline void ovs_ipv6_tun_rx_dst(struct ip_tunnel_info *info,
+				       struct sk_buff *skb,
+				       __be16 flags,
+				       __be64 tunnel_id,
+				       int md_size)
+{
+	const struct ipv6hdr *ip6h = ipv6_hdr(skb);
+
+	ovs_tun_rx_dst(info, md_size);
+	info->mode = IP_TUNNEL_INFO_IPV6;
+	info->key.tun_flags = flags;
+	info->key.tun_id = tunnel_id;
+	info->key.tp_src = 0;
+	info->key.tp_dst = 0;
+
+	info->key.u.ipv6.src = ip6h->saddr;
+	info->key.u.ipv6.dst = ip6h->daddr;
+
+	info->key.tos = ipv6_get_dsfield(ip6h);
+	info->key.ttl = ip6h->hop_limit;
 }
 
 void ovs_ip_tunnel_rcv(struct net_device *dev, struct sk_buff *skb,
