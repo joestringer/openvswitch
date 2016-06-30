@@ -924,7 +924,7 @@ static int vxlan_udp_encap_recv(struct sock *sk, struct sk_buff *skb)
 		goto bad_flags;
 	}
 
-	if (iptunnel_pull_header(skb, VXLAN_HLEN, htons(ETH_P_TEB)))
+	if (iptunnel_pull_header(skb, VXLAN_HLEN, htons(ETH_P_TEB), false))
 		goto drop;
 	vxh = (struct vxlanhdr *)(udp_hdr(skb) + 1);
 
