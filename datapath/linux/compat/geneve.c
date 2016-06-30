@@ -1017,8 +1017,8 @@ tx_error:
 		dev->stats.collisions++;
 	else if (err == -ENETUNREACH)
 		dev->stats.tx_carrier_errors++;
-	else
-		dev->stats.tx_errors++;
+
+	dev->stats.tx_errors++;
 	return NETDEV_TX_OK;
 }
 
@@ -1106,8 +1106,8 @@ tx_error:
 		dev->stats.collisions++;
 	else if (err == -ENETUNREACH)
 		dev->stats.tx_carrier_errors++;
-	else
-		dev->stats.tx_errors++;
+
+	dev->stats.tx_errors++;
 	return NETDEV_TX_OK;
 }
 #endif
