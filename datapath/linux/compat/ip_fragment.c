@@ -268,6 +268,7 @@ out:
 	ipq_put(qp);
 }
 
+#ifdef HAVE_INET_FRAG_EVICTOR
 /* Memory limiting on fragments.  Evictor trashes the oldest
  * fragment queue until we are back under the threshold.
  *
@@ -276,14 +277,13 @@ out:
  */
 static void ip_evictor(struct net *net)
 {
-#ifdef HAVE_INET_FRAG_EVICTOR
 	int evicted;
 
 	evicted = inet_frag_evictor(&net->ipv4.frags, &ip4_frags, false);
 	if (evicted)
 		IP_ADD_STATS_BH(net, IPSTATS_MIB_REASMFAILS, evicted);
-#endif
 }
+#endif
 
 /* Find the correct entry in the "incomplete datagrams" queue for
  * this IP datagram, and create new one, if nothing is found.
@@ -298,8 +298,6 @@ static struct ipq *ip_find(struct net *net, struct iphdr *iph,
 	arg.iph = iph;
 	arg.user = user;
 	arg.vif = vif;
-
-	ip_evictor(net);
 
 #ifdef HAVE_INET_FRAGS_WITH_RWLOCK
 	read_lock(&ip4_frags.lock);
@@ -705,6 +703,11 @@ int rpl_ip_defrag(struct net *net, struct sk_buff *skb, u32 user)
 
 	IP_INC_STATS_BH(net, IPSTATS_MIB_REASMREQDS);
 	skb_orphan(skb);
+
+#ifdef HAVE_INET_FRAG_EVICTOR
+	/* Start by cleaning up the memory. */
+	ip_evictor(net);
+#endif
 
 	/* Lookup (or create) queue header */
 	qp = ip_find(net, ip_hdr(skb), user, vif);
