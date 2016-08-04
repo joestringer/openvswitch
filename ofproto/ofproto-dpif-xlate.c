@@ -627,13 +627,23 @@ xlate_report(struct xlate_ctx *ctx, const char *format, ...)
 
 static struct vlog_rate_limit error_report_rl = VLOG_RATE_LIMIT_INIT(1, 5);
 
-#define XLATE_REPORT_ERROR(CTX, ...)                    \
-    do {                                                \
-        if (OVS_UNLIKELY((CTX)->xin->report_hook)) {    \
-            xlate_report(CTX, __VA_ARGS__);             \
-        } else {                                        \
-            VLOG_ERR_RL(&error_report_rl, __VA_ARGS__); \
-        }                                               \
+#define XLATE_REORDER(LAST, DUMMY, ...) __VA_ARGS__, LAST
+#define XLATE_REPORT_ERROR(CTX, FMT, ...)                               \
+    do {                                                                \
+        struct ds ds = DS_EMPTY_INITIALIZER;                            \
+        const char *flow_fmt;                                           \
+                                                                        \
+        flow_format(&ds, &ctx->base_flow);                              \
+        flow_fmt = ds_cstr(&ds);                                        \
+        if (OVS_UNLIKELY((CTX)->xin->report_hook)) {                    \
+            xlate_report(XLATE_REORDER(flow_fmt, dummy, CTX, FMT": %s", \
+                                       ## __VA_ARGS__));                \
+        } else {                                                        \
+            VLOG_ERR_RL(&error_report_rl,                               \
+                        XLATE_REORDER(flow_fmt, dummy, FMT": %s",       \
+                                      ## __VA_ARGS__));                 \
+        }                                                               \
+        ds_destroy(&ds);                                                \
     } while (0)
 
 static inline void
