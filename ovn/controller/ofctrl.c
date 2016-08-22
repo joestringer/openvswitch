@@ -350,6 +350,7 @@ run_S_CLEAR_FLOWS(void)
 {
     /* Send a flow_mod to delete all flows. */
     struct ofputil_flow_mod fm = {
+        .buffer_id = UINT32_MAX,
         .match = MATCH_CATCHALL_INITIALIZER,
         .table_id = OFPTT_ALL,
         .command = OFPFC_DELETE,
@@ -967,6 +968,7 @@ ofctrl_put(int64_t nb_cfg)
             /* Installed flow is no longer desirable.  Delete it from the
              * switch and from installed_flows. */
             struct ofputil_flow_mod fm = {
+                .buffer_id = UINT32_MAX,
                 .match = i->match,
                 .priority = i->priority,
                 .table_id = i->table_id,
@@ -992,6 +994,7 @@ ofctrl_put(int64_t nb_cfg)
                                d->ofpacts, d->ofpacts_len)) {
                 /* Update actions in installed flow. */
                 struct ofputil_flow_mod fm = {
+                    .buffer_id = UINT32_MAX,
                     .match = i->match,
                     .priority = i->priority,
                     .table_id = i->table_id,
@@ -1025,6 +1028,7 @@ ofctrl_put(int64_t nb_cfg)
             struct ovn_flow *d = ovn_flow_select_from_list(&candidates);
             /* Send flow_mod to add flow. */
             struct ofputil_flow_mod fm = {
+                .buffer_id = UINT32_MAX,
                 .match = d->match,
                 .priority = d->priority,
                 .table_id = d->table_id,

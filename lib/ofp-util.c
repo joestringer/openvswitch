@@ -45,7 +45,6 @@
 #include "openvswitch/vlog.h"
 #include "openflow/intel-ext.h"
 #include "packets.h"
-#include "pktbuf.h"
 #include "random.h"
 #include "tun-metadata.h"
 #include "unaligned.h"
@@ -3857,11 +3856,6 @@ ofputil_encode_ofp12_packet_in(const struct ofputil_packet_in *pin,
 /* Converts abstract ofputil_packet_in_private 'pin' into a PACKET_IN message
  * for 'protocol', using the packet-in format specified by 'packet_in_format'.
  *
- * If 'pkt_buf' is nonnull and 'max_len' allows the packet to be buffered, this
- * function will attempt to obtain a buffer ID from 'pktbuf' and truncate the
- * packet to 'max_len' bytes.  Otherwise, or if 'pktbuf' doesn't have a free
- * buffer, it will send the whole packet without buffering.
- *
  * This function is really meant only for use by ovs-vswitchd.  To any other
  * code, the "continuation" data, i.e. the data that is in struct
  * ofputil_packet_in_private but not in struct ofputil_packet_in, is supposed
@@ -3873,27 +3867,10 @@ ofputil_encode_ofp12_packet_in(const struct ofputil_packet_in *pin,
 struct ofpbuf *
 ofputil_encode_packet_in_private(const struct ofputil_packet_in_private *pin,
                                  enum ofputil_protocol protocol,
-                                 enum nx_packet_in_format packet_in_format,
-                                 uint16_t max_len, struct pktbuf *pktbuf)
+                                 enum nx_packet_in_format packet_in_format)
 {
     enum ofp_version version = ofputil_protocol_to_ofp_version(protocol);
-
-    /* Get buffer ID. */
-    ofp_port_t in_port = pin->public.flow_metadata.flow.in_port.ofp_port;
-    uint32_t buffer_id = (max_len != OFPCML12_NO_BUFFER && pktbuf
-                          ? pktbuf_save(pktbuf, pin->public.packet,
-                                        pin->public.packet_len, in_port)
-                          : UINT32_MAX);
-
-    /* Calculate the number of bytes of the packet to include in the
-     * packet-in:
-     *
-     *    - If not buffered, the whole thing.
-     *
-     *    - Otherwise, no more than 'max_len' bytes. */
-    size_t include_bytes = (buffer_id == UINT32_MAX
-                            ? pin->public.packet_len
-                            : MIN(max_len, pin->public.packet_len));
+    uint32_t buffer_id = UINT32_MAX;
 
     struct ofpbuf *msg;
     switch (packet_in_format) {
@@ -3929,13 +3906,13 @@ ofputil_encode_packet_in_private(const struct ofputil_packet_in_private *pin,
 
     case NXPIF_NXT_PACKET_IN2:
         return ofputil_encode_nx_packet_in2(pin, version, buffer_id,
-                                            include_bytes);
+                                            pin->public.packet_len);
 
     default:
         OVS_NOT_REACHED();
     }
 
-    ofpbuf_put(msg, pin->public.packet, include_bytes);
+    ofpbuf_put(msg, pin->public.packet, pin->public.packet_len);
     ofpmsg_update_length(msg);
     return msg;
 }
