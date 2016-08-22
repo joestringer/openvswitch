@@ -152,4 +152,9 @@ struct eth_addr {
     };
 };
 
+/* Moved from ofproto/ofproto-dpif-mirror.h to avoid including the whole file,
+ * which introduces function name collisions. */
+#define MAX_MIRRORS 32
+typedef uint32_t mirror_mask_t;
+
 #endif /* openvswitch/types.h */

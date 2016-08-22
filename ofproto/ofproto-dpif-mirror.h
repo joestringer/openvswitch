@@ -18,9 +18,7 @@
 #include <stdint.h>
 
 #include "util.h"
-
-#define MAX_MIRRORS 32
-typedef uint32_t mirror_mask_t;
+#include "openvswitch/types.h"
 
 struct ofproto_dpif;
 struct ofbundle;
