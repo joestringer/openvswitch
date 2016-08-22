@@ -1343,6 +1343,7 @@ struct ofputil_bundle_msg {
     union {
         struct ofputil_flow_mod fm;
         struct ofputil_group_mod gm;
+        struct ofputil_packet_out po;
     };
 };
 

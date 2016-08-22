@@ -1662,6 +1662,58 @@ ofctl_send(struct unixctl_conn *conn, int argc,
     ds_destroy(&reply);
 }
 
+static void
+unixctl_packet_out(struct unixctl_conn *conn, int OVS_UNUSED argc,
+                   const char *argv[], void *vconn_)
+{
+    struct vconn *vconn = vconn_;
+    enum ofputil_protocol protocol
+        = ofputil_protocol_from_ofp_version(vconn_get_version(vconn));
+    struct ds reply = DS_EMPTY_INITIALIZER;
+    bool ok = true;
+
+    enum ofputil_protocol usable_protocols;
+    struct ofputil_packet_out po;
+    char *error_msg;
+
+    error_msg = parse_ofp_packet_out_str(&po, argv[1], &usable_protocols);
+    if (error_msg) {
+        ds_put_format(&reply, "%s\n", error_msg);
+        free(error_msg);
+        ok = false;
+    }
+
+    if (ok && !(usable_protocols & protocol)) {
+        ds_put_format(&reply, "PACKET_OUT actions are incompatible with the OpenFlow connection.\n");
+        ok = false;
+    }
+
+    if (ok) {
+        struct ofpbuf *msg = ofputil_encode_packet_out(&po, protocol);
+
+        ofp_print(stderr, msg->data, msg->size, verbosity);
+
+        int error = vconn_send_block(vconn, msg);
+        if (error) {
+            ofpbuf_delete(msg);
+            ds_put_format(&reply, "%s\n", ovs_strerror(error));
+            ok = false;
+        }
+    }
+
+    if (ok) {
+        unixctl_command_reply(conn, ds_cstr(&reply));
+    } else {
+        unixctl_command_reply_error(conn, ds_cstr(&reply));
+    }
+    ds_destroy(&reply);
+
+    if (!error_msg) {
+        free(CONST_CAST(void *, po.packet));
+        free(po.ofpacts);
+    }
+}
+
 struct barrier_aux {
     struct vconn *vconn;        /* OpenFlow connection for sending barrier. */
     struct unixctl_conn *conn;  /* Connection waiting for barrier response. */
@@ -1762,6 +1814,8 @@ monitor_vconn(struct vconn *vconn, bool reply_to_echo_requests,
     unixctl_command_register("exit", "", 0, 0, ofctl_exit, &exiting);
     unixctl_command_register("ofctl/send", "OFMSG...", 1, INT_MAX,
                              ofctl_send, vconn);
+    unixctl_command_register("ofctl/packet-out", "\"[in_port=<port>] [buffer_id=<buffer>] [packet=<hex data>] [actions=...]\"", 1, 1,
+                             unixctl_packet_out, vconn);
     unixctl_command_register("ofctl/barrier", "", 0, 0,
                              ofctl_barrier, &barrier_aux);
     unixctl_command_register("ofctl/set-output-file", "FILE", 1, 1,
@@ -2760,6 +2814,7 @@ ofctl_bundle(struct ovs_cmdl_context *ctx)
     protocol = open_vconn_for_flow_mod(ctx->argv[1], &vconn, usable_protocols);
 
     ovs_list_init(&requests);
+    /* Takes ownership of 'bms'. */
     ofputil_encode_bundle_msgs(bms, n_bms, &requests, protocol);
     bundle_transact(vconn, &requests, OFPBF_ORDERED | OFPBF_ATOMIC);
     ofpbuf_list_delete(&requests);

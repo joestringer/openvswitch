@@ -9489,6 +9489,11 @@ ofputil_encode_bundle_msgs(struct ofputil_bundle_msg *bms, size_t n_bms,
             request = ofputil_encode_group_mod(version, &bms[i].gm);
             ofputil_uninit_group_mod(&bms[i].gm);
             break;
+        case OFPTYPE_PACKET_OUT:
+            request = ofputil_encode_packet_out(&bms[i].po, protocol);
+            free(bms[i].po.ofpacts);
+            free(CONST_CAST(void *, bms[i].po.packet));
+            break;
         default:
             break;
         }
@@ -9884,13 +9889,13 @@ ofputil_is_bundlable(enum ofptype type)
     case OFPTYPE_FLOW_MOD:
         /* Other supported types. */
     case OFPTYPE_GROUP_MOD:
+    case OFPTYPE_PACKET_OUT:
         return true;
 
         /* Nice to have later. */
     case OFPTYPE_FLOW_MOD_TABLE_ID:
     case OFPTYPE_TABLE_MOD:
     case OFPTYPE_METER_MOD:
-    case OFPTYPE_PACKET_OUT:
     case OFPTYPE_NXT_TLV_TABLE_MOD:
 
         /* Not to be bundlable. */
