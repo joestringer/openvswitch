@@ -32,6 +32,7 @@
 #include "openvswitch/ofpbuf.h"
 #include "openvswitch/vconn.h"
 #include "openvswitch/vlog.h"
+#include "ovs-atomic.h"
 #include "pinsched.h"
 #include "poll-loop.h"
 #include "rconn.h"
@@ -210,6 +211,8 @@ struct connmgr {
     struct sockaddr_in *extra_in_band_remotes;
     size_t n_extra_remotes;
     int in_band_queue;
+
+    ATOMIC(int) want_packet_in_on_miss;
 };
 
 static void update_in_band_remotes(struct connmgr *);
@@ -248,6 +251,8 @@ connmgr_create(struct ofproto *ofproto,
     mgr->extra_in_band_remotes = NULL;
     mgr->n_extra_remotes = 0;
     mgr->in_band_queue = -1;
+
+    atomic_init(&mgr->want_packet_in_on_miss, 0);
 
     return mgr;
 }
@@ -1200,6 +1205,32 @@ ofconn_get_target(const struct ofconn *ofconn)
     return rconn_get_target(ofconn->rconn);
 }
 
+/* The default "table-miss" behaviour for OpenFlow1.3+ is to drop the
+ * packet rather than to send the packet to the controller.
+ *
+ * This function maintains the count of pre-OpenFlow1.3 with controller_id 0,
+ * as we assume these are the controllers that should receive "table-miss"
+ * notifications.
+ *
+ * This function must be called with 'add' = 'true' whenever a controller is
+ * added, and with 'add' = 'false' whenever a controller is removed.
+ */
+static void
+update_want_packet_in_on_miss(const struct ofconn *ofconn, bool add)
+{
+    if (ofconn->controller_id == 0) {
+        enum ofputil_protocol protocol = ofconn_get_protocol(ofconn);
+
+        if (protocol == OFPUTIL_P_NONE ||
+            ofputil_protocol_to_ofp_version(protocol) < OFP13_VERSION) {
+            int count;
+            atomic_read_relaxed(&ofconn->connmgr->want_packet_in_on_miss,
+                                &count);
+            atomic_store_relaxed(&ofconn->connmgr->want_packet_in_on_miss,
+                                 count + (add ? 1 : -1));
+        }
+    }
+}
 static struct ofconn *
 ofconn_create(struct connmgr *mgr, struct rconn *rconn, enum ofconn_type type,
               bool enable_async_msgs)
@@ -1219,6 +1250,8 @@ ofconn_create(struct connmgr *mgr, struct rconn *rconn, enum ofconn_type type,
     hmap_init(&ofconn->bundles);
 
     ofconn_flush(ofconn);
+
+    update_want_packet_in_on_miss(ofconn, true);
 
     return ofconn;
 }
@@ -1279,6 +1312,8 @@ ofconn_destroy(struct ofconn *ofconn)
     OVS_REQUIRES(ofproto_mutex)
 {
     ofconn_flush(ofconn);
+
+    update_want_packet_in_on_miss(ofconn, false);
 
     if (ofconn->type == OFCONN_PRIMARY) {
         hmap_remove(&ofconn->connmgr->controllers, &ofconn->hmap_node);
@@ -1470,28 +1505,14 @@ ofconn_receives_async_msg(const struct ofconn *ofconn,
  * which connected using an OpenFlow version earlier than OpenFlow1.3.
  *
  * False otherwise.
- *
- * This logic assumes that "table-miss" packet_in messages
- * are always sent to controller_id 0. */
+ */
 bool
-connmgr_wants_packet_in_on_miss(struct connmgr *mgr) OVS_EXCLUDED(ofproto_mutex)
+connmgr_wants_packet_in_on_miss(struct connmgr *mgr)
 {
-    struct ofconn *ofconn;
+    int count;
 
-    ovs_mutex_lock(&ofproto_mutex);
-    LIST_FOR_EACH (ofconn, node, &mgr->all_conns) {
-        enum ofputil_protocol protocol = ofconn_get_protocol(ofconn);
-
-        if (ofconn->controller_id == 0 &&
-            (protocol == OFPUTIL_P_NONE ||
-             ofputil_protocol_to_ofp_version(protocol) < OFP13_VERSION)) {
-            ovs_mutex_unlock(&ofproto_mutex);
-            return true;
-        }
-    }
-    ovs_mutex_unlock(&ofproto_mutex);
-
-    return false;
+    atomic_read_relaxed(&mgr->want_packet_in_on_miss, &count);
+    return count > 0;
 }
 
 /* Returns a human-readable name for an OpenFlow connection between 'mgr' and
