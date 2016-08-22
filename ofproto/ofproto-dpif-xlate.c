@@ -4068,37 +4068,42 @@ xlate_bundle_action(struct xlate_ctx *ctx,
 }
 
 static void
-xlate_learn_action__(struct xlate_ctx *ctx, const struct ofpact_learn *learn,
-                     struct ofputil_flow_mod *fm, struct ofpbuf *ofpacts)
-{
-    learn_execute(learn, &ctx->xin->flow, fm, ofpacts);
-    if (ctx->xin->may_learn) {
-        ofproto_dpif_flow_mod(ctx->xbridge->ofproto, fm);
-    }
-}
-
-static void
 xlate_learn_action(struct xlate_ctx *ctx, const struct ofpact_learn *learn)
 {
     learn_mask(learn, ctx->wc);
 
-    if (ctx->xin->xcache) {
-        struct xc_entry *entry;
-
-        entry = xlate_cache_add_entry(ctx->xin->xcache, XC_LEARN);
-        entry->u.learn.ofproto = ctx->xbridge->ofproto;
-        entry->u.learn.fm = xmalloc(sizeof *entry->u.learn.fm);
-        entry->u.learn.ofpacts = ofpbuf_new(64);
-        xlate_learn_action__(ctx, learn, entry->u.learn.fm,
-                             entry->u.learn.ofpacts);
-    } else if (ctx->xin->may_learn) {
+    if (ctx->xin->xcache || ctx->xin->may_learn) {
         uint64_t ofpacts_stub[1024 / 8];
         struct ofputil_flow_mod fm;
+        struct ofproto_flow_mod ofm__, *ofm;
         struct ofpbuf ofpacts;
+        enum ofperr error;
+
+        if (ctx->xin->xcache) {
+            struct xc_entry *entry;
+
+            entry = xlate_cache_add_entry(ctx->xin->xcache, XC_LEARN);
+            entry->u.learn.ofm = xmalloc(sizeof *entry->u.learn.ofm);
+            ofm = entry->u.learn.ofm;
+        } else {
+            ofm = &ofm__;
+        }
 
         ofpbuf_use_stub(&ofpacts, ofpacts_stub, sizeof ofpacts_stub);
-        xlate_learn_action__(ctx, learn, &fm, &ofpacts);
+        learn_execute(learn, &ctx->xin->flow, &fm, &ofpacts);
+        error = ofproto_dpif_flow_mod_init_for_learn(ctx->xbridge->ofproto,
+                                                     &fm, ofm);
         ofpbuf_uninit(&ofpacts);
+
+        if (!error && ctx->xin->may_learn) {
+            error = ofproto_flow_mod_learn(ofm, ctx->xin->xcache != NULL);
+        }
+
+        if (error) {
+            static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+            VLOG_WARN_RL(&rl, "%s: LEARN action execution failed.",
+                         ctx->xbridge->name);
+        }
     }
 }
 
@@ -5779,9 +5784,15 @@ xlate_push_stats_entry(struct xc_entry *entry,
                             entry->u.mirror.mirrors,
                             stats->n_packets, stats->n_bytes);
         break;
-    case XC_LEARN:
-        ofproto_dpif_flow_mod(entry->u.learn.ofproto, entry->u.learn.fm);
+    case XC_LEARN: {
+        enum ofperr error;
+        error = ofproto_flow_mod_learn(entry->u.learn.ofm, true);
+        if (error) {
+            static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+            VLOG_WARN_RL(&rl, "xcache LEARN action execution failed.");
+        }
         break;
+    }
     case XC_NORMAL:
         xlate_cache_normal(entry->u.normal.ofproto, entry->u.normal.flow,
                            entry->u.normal.vlan);
@@ -5864,8 +5875,8 @@ xlate_cache_clear_entry(struct xc_entry *entry)
         mbridge_unref(entry->u.mirror.mbridge);
         break;
     case XC_LEARN:
-        free(entry->u.learn.fm);
-        ofpbuf_delete(entry->u.learn.ofpacts);
+        ofproto_flow_mod_uninit(entry->u.learn.ofm);
+        free(entry->u.learn.ofm);
         break;
     case XC_NORMAL:
         free(entry->u.normal.flow);
