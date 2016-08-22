@@ -3595,6 +3595,10 @@ execute_controller_action(struct xlate_ctx *ctx, int len,
         return;
     }
 
+    if (!ctx->xin->may_learn && !ctx->xin->xcache) {
+        return;
+    }
+
     packet = dp_packet_clone(ctx->xin->packet);
     packet_batch_init_packet(&batch, packet);
     odp_execute_actions(NULL, &batch, false,
@@ -3633,13 +3637,26 @@ execute_controller_action(struct xlate_ctx *ctx, int len,
     };
     flow_get_metadata(&ctx->xin->flow, &am->pin.up.public.flow_metadata);
 
-    ofproto_dpif_send_async_msg(ctx->xbridge->ofproto, am);
-    dp_packet_delete(packet);
+    /* Async messages are only sent once, so if we send one now, no
+     * xlate cache entry is created.  */
+    if (ctx->xin->may_learn) {
+        ofproto_dpif_send_async_msg(ctx->xbridge->ofproto, am);
+    } else /* xcache */ {
+        struct xc_entry *entry;
+
+        entry = xlate_cache_add_entry(ctx->xin->xcache, XC_CONTROLLER);
+        entry->u.controller.ofproto = ctx->xbridge->ofproto;
+        entry->u.controller.am = am;
+    }
 }
 
 static void
 emit_continuation(struct xlate_ctx *ctx, const struct frozen_state *state)
 {
+    if (!ctx->xin->may_learn && !ctx->xin->xcache) {
+        return;
+    }
+
     struct ofproto_async_msg *am = xmalloc(sizeof *am);
     *am = (struct ofproto_async_msg) {
         .controller_id = ctx->pause->controller_id,
@@ -3671,7 +3688,18 @@ emit_continuation(struct xlate_ctx *ctx, const struct frozen_state *state)
         },
     };
     flow_get_metadata(&ctx->xin->flow, &am->pin.up.public.flow_metadata);
-    ofproto_dpif_send_async_msg(ctx->xbridge->ofproto, am);
+
+    /* Async messages are only sent once, so if we send one now, no
+     * xlate cache entry is created.  */
+    if (ctx->xin->may_learn) {
+        ofproto_dpif_send_async_msg(ctx->xbridge->ofproto, am);
+    } else /* xcache */ {
+        struct xc_entry *entry;
+
+        entry = xlate_cache_add_entry(ctx->xin->xcache, XC_CONTROLLER);
+        entry->u.controller.ofproto = ctx->xbridge->ofproto;
+        entry->u.controller.am = am;
+    }
 }
 
 static void
@@ -4121,8 +4149,10 @@ xlate_fin_timeout(struct xlate_ctx *ctx,
                   const struct ofpact_fin_timeout *oft)
 {
     if (ctx->rule) {
-        xlate_fin_timeout__(ctx->rule, ctx->xin->tcp_flags,
-                            oft->fin_idle_timeout, oft->fin_hard_timeout);
+        if (ctx->xin->may_learn) {
+            xlate_fin_timeout__(ctx->rule, ctx->xin->tcp_flags,
+                                oft->fin_idle_timeout, oft->fin_hard_timeout);
+        }
         if (ctx->xin->xcache) {
             struct xc_entry *entry;
 
@@ -5810,6 +5840,13 @@ xlate_push_stats_entry(struct xc_entry *entry,
         tnl_neigh_lookup(entry->u.tnl_neigh_cache.br_name,
                          &entry->u.tnl_neigh_cache.d_ipv6, &dmac);
         break;
+    case XC_CONTROLLER:
+        if (entry->u.controller.am) {
+            ofproto_dpif_send_async_msg(entry->u.controller.ofproto,
+                                        entry->u.controller.am);
+            entry->u.controller.am = NULL; /* One time only. */
+        }
+        break;
     default:
         OVS_NOT_REACHED();
     }
@@ -5889,6 +5926,12 @@ xlate_cache_clear_entry(struct xc_entry *entry)
         group_dpif_unref(entry->u.group.group);
         break;
     case XC_TNL_NEIGH:
+        break;
+    case XC_CONTROLLER:
+        if (entry->u.controller.am) {
+            ofproto_async_msg_free(entry->u.controller.am);
+            entry->u.controller.am = NULL;
+        }
         break;
     default:
         OVS_NOT_REACHED();
