@@ -1474,7 +1474,7 @@ ofproto_rule_delete(struct ofproto *ofproto, struct rule *rule)
      * be killed. */
     ovs_mutex_lock(&ofproto_mutex);
 
-    if (!rule->removed) {
+    if (rule->state == RULE_INSERTED) {
         /* Make sure there is no postponed removal of the rule. */
         ovs_assert(cls_rule_visible_in_version(&rule->cr, OVS_VERSION_MAX));
 
@@ -4796,7 +4796,7 @@ ofproto_rule_create(struct ofproto *ofproto, struct cls_rule *cr,
         return error;
     }
 
-    rule->removed = true;   /* Not yet in ofproto data structures. */
+    rule->state = RULE_INITIALIZED;
 
     *new_rule = rule;
     return 0;
@@ -8074,7 +8074,8 @@ ofproto_rule_insert__(struct ofproto *ofproto, struct rule *rule)
 {
     const struct rule_actions *actions = rule_get_actions(rule);
 
-    ovs_assert(rule->removed);
+    /* A rule may not be reinserted. */
+    ovs_assert(rule->state == RULE_INITIALIZED);
 
     if (rule->hard_timeout || rule->idle_timeout) {
         ovs_list_insert(&ofproto->expirable, &rule->expirable);
@@ -8096,8 +8097,9 @@ ofproto_rule_insert__(struct ofproto *ofproto, struct rule *rule)
             group_add_rule(group, rule);
         }
     }
-
-    rule->removed = false;
+    ovs_mutex_lock(&rule->mutex);
+    rule->state = RULE_INSERTED;
+    ovs_mutex_unlock(&rule->mutex);
 }
 
 /* Removes 'rule' from the ofproto data structures.  Caller may have deferred
@@ -8106,7 +8108,7 @@ static void
 ofproto_rule_remove__(struct ofproto *ofproto, struct rule *rule)
     OVS_REQUIRES(ofproto_mutex)
 {
-    ovs_assert(!rule->removed);
+    ovs_assert(rule->state == RULE_INSERTED);
 
     cookies_remove(ofproto, rule);
 
@@ -8142,7 +8144,9 @@ ofproto_rule_remove__(struct ofproto *ofproto, struct rule *rule)
         }
     }
 
-    rule->removed = true;
+    ovs_mutex_lock(&rule->mutex);
+    rule->state = RULE_REMOVED;
+    ovs_mutex_unlock(&rule->mutex);
 }
 
 /* unixctl commands. */

@@ -323,6 +323,13 @@ struct oftable {
  *      'rule->mutex', and safely written only by coding holding ofproto_mutex
  *      AND 'rule->mutex'.  These are marked OVS_GUARDED.
  */
+enum OVS_PACKED_ENUM rule_state {
+    RULE_INITIALIZED, /* Rule has been initialized, but not inserted to the
+                       * ofproto data structures. */
+    RULE_INSERTED,    /* Rule has been inserted to ofproto data structures. */
+    RULE_REMOVED,     /* Rule has been removed from ofproto data structures. */
+};
+
 struct rule {
     /* Where this rule resides in an OpenFlow switch.
      *
@@ -330,8 +337,6 @@ struct rule {
     struct ofproto *const ofproto; /* The ofproto that contains this rule. */
     const struct cls_rule cr;      /* In owning ofproto's classifier. */
     const uint8_t table_id;        /* Index in ofproto's 'tables' array. */
-    bool removed;                  /* Rule has been removed from the ofproto
-                                    * data structures. */
 
     /* Protects members marked OVS_GUARDED.
      * Readers only need to hold this mutex.
@@ -345,6 +350,8 @@ struct rule {
      * Any thread trying to keep a rule from being freed should hold its own
      * reference. */
     struct ovs_refcount ref_count;
+
+    enum rule_state state OVS_GUARDED;
 
     /* A "flow cookie" is the OpenFlow name for a 64-bit value associated with
      * a flow.. */
