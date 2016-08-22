@@ -35,6 +35,7 @@
 #include "netdev.h"
 #include "nx-match.h"
 #include "ofproto.h"
+#include "ofproto-dpif-xlate.h"
 #include "ofproto-provider.h"
 #include "openflow/nicira-ext.h"
 #include "openflow/openflow.h"
@@ -258,6 +259,9 @@ static enum ofperr ofproto_flow_mod_init(struct ofproto *,
     OVS_EXCLUDED(ofproto_mutex);
 static enum ofperr ofproto_flow_mod_start(struct ofproto *,
                                           struct ofproto_flow_mod *)
+    OVS_REQUIRES(ofproto_mutex);
+static void ofproto_flow_mod_revert(struct ofproto *,
+                                    struct ofproto_flow_mod *)
     OVS_REQUIRES(ofproto_mutex);
 static void ofproto_flow_mod_finish(struct ofproto *,
                                     struct ofproto_flow_mod *,
@@ -3342,10 +3346,13 @@ reject_slave_controller(struct ofconn *ofconn)
  *
  *    - If they use any groups, then 'ofproto' has that group configured.
  *
- * Returns 0 if successful, otherwise an OpenFlow error. */
+ * Returns 0 if successful, otherwise an OpenFlow error.  Caller must hold
+ * 'ofproto_mutex' for the result to be valid also after this function
+ * returns. */
 enum ofperr
 ofproto_check_ofpacts(struct ofproto *ofproto,
                       const struct ofpact ofpacts[], size_t ofpacts_len)
+    OVS_REQUIRES(ofproto_mutex)
 {
     uint32_t mid;
 
@@ -3364,71 +3371,185 @@ ofproto_check_ofpacts(struct ofproto *ofproto,
     return 0;
 }
 
-static enum ofperr
-handle_packet_out(struct ofconn *ofconn, const struct ofp_header *oh)
+void
+ofproto_packet_out_uninit(struct ofproto_packet_out *opo)
 {
-    struct ofproto *p = ofconn_get_ofproto(ofconn);
-    struct ofputil_packet_out po;
-    struct dp_packet *payload;
-    uint64_t ofpacts_stub[1024 / 8];
-    struct ofpbuf ofpacts;
-    struct flow flow;
+    dp_packet_delete(opo->packet);
+    opo->packet = NULL;
+    free(opo->flow);
+    opo->flow = NULL;
+    free(opo->ofpacts);
+    opo->ofpacts = NULL;
+    opo->ofpacts_len = 0;
+    xlate_cache_delete(opo->xcache);
+    opo->xcache = NULL;
+
+    ofpbuf_uninit(&opo->odp_actions);
+    recirc_refs_unref(&opo->rr);
+}
+
+/* Takes ownership of po->ofpacts, which must have been malloc'ed. */
+static enum ofperr
+ofproto_packet_out_init(struct ofproto *ofproto,
+                        struct ofconn *ofconn,
+                        struct ofproto_packet_out *opo,
+                        const struct ofputil_packet_out *po)
+{
     enum ofperr error;
 
-    COVERAGE_INC(ofproto_packet_out);
-
-    error = reject_slave_controller(ofconn);
-    if (error) {
-        goto exit;
-    }
-
-    /* Decode message. */
-    ofpbuf_use_stub(&ofpacts, ofpacts_stub, sizeof ofpacts_stub);
-    error = ofputil_decode_packet_out(&po, oh, &ofpacts);
-    if (error) {
-        goto exit_free_ofpacts;
-    }
-    if (ofp_to_u16(po.in_port) >= p->max_ports
-        && ofp_to_u16(po.in_port) < ofp_to_u16(OFPP_MAX)) {
-        error = OFPERR_OFPBRC_BAD_PORT;
-        goto exit_free_ofpacts;
+    if (ofp_to_u16(po->in_port) >= ofproto->max_ports
+        && ofp_to_u16(po->in_port) < ofp_to_u16(OFPP_MAX)) {
+        return OFPERR_OFPBRC_BAD_PORT;
     }
 
     /* Get payload. */
-    if (po.buffer_id != UINT32_MAX) {
-        error = OFPERR_OFPBRC_BUFFER_UNKNOWN;
-        goto exit_free_ofpacts;
+    if (po->buffer_id != UINT32_MAX) {
+        return OFPERR_OFPBRC_BUFFER_UNKNOWN;
     }
-    /* Ensure that the L3 header is 32-bit aligned. */
-    payload = dp_packet_clone_data_with_headroom(po.packet, po.packet_len, 2);
 
-    /* Verify actions against packet, then send packet if successful. */
-    flow_extract(payload, &flow);
-    flow.in_port.ofp_port = po.in_port;
+    /* Ensure that the L3 header is 32-bit aligned. */
+    opo->packet = dp_packet_clone_data_with_headroom(po->packet,
+                                                     po->packet_len, 2);
+    /* Store struct flow. */
+    opo->flow = xmalloc(sizeof *opo->flow);
+    flow_extract(opo->packet, opo->flow);
+    opo->flow->in_port.ofp_port = po->in_port;
 
     /* Check actions like for flow mods.  We pass a 'table_id' of 0 to
      * ofproto_check_consistency(), which isn't strictly correct because these
      * actions aren't in any table.  This is OK as 'table_id' is only used to
      * check instructions (e.g., goto-table), which can't appear on the action
      * list of a packet-out. */
-    error = ofpacts_check_consistency(po.ofpacts, po.ofpacts_len,
-                                      &flow, u16_to_ofp(p->max_ports),
-                                      0, p->n_tables,
+    error = ofpacts_check_consistency(po->ofpacts, po->ofpacts_len,
+                                      opo->flow,
+                                      u16_to_ofp(ofproto->max_ports), 0,
+                                      ofproto->n_tables,
                                       ofconn_get_protocol(ofconn));
+    if (error) {
+        dp_packet_delete(opo->packet);
+        free(opo->flow);
+        return error;
+    }
+
+    opo->ofpacts = po->ofpacts;
+    opo->ofpacts_len = po->ofpacts_len;
+
+    opo->xcache = xlate_cache_new();
+    ofpbuf_init(&opo->odp_actions, 64);
+    opo->rr = RECIRC_REFS_EMPTY_INITIALIZER;
+    return 0;
+}
+
+static enum ofperr
+ofproto_packet_out_start(struct ofproto *ofproto,
+                         struct ofproto_packet_out *opo)
+    OVS_REQUIRES(ofproto_mutex)
+{
+    enum ofperr error;
+
+    error = ofproto_check_ofpacts(ofproto, opo->ofpacts, opo->ofpacts_len);
+    if (error) {
+        return error;
+    }
+
+    error = ofproto->ofproto_class->packet_xlate(ofproto, opo);
     if (!error) {
-        /* Should hold ofproto_mutex to guarantee state don't
-         * change between the check and the execution. */
-        error = ofproto_check_ofpacts(p, po.ofpacts, po.ofpacts_len);
-        if (!error) {
-            error = p->ofproto_class->packet_out(p, payload, &flow,
-                                                 po.ofpacts, po.ofpacts_len);
+        struct xc_entry *entry;
+        struct ofpbuf entries = opo->xcache->entries;
+
+        XC_ENTRY_FOR_EACH (entry, &entries) {
+            if (entry->type == XC_LEARN) {
+                struct ofproto_flow_mod *ofm = entry->u.learn.ofm;
+                struct rule *rule = ofm->temp_rule;
+                ovs_assert(rule);
+
+                /* If learning on a different bridge, must use its next
+                 * version number. */
+                ofm->version = (rule->ofproto == ofproto)
+                    ? opo->version : rule->ofproto->tables_version + 1;
+
+                error = ofproto_flow_mod_start(rule->ofproto, ofm);
+                if (error) {
+                    break;
+                }
+            }
         }
     }
-    dp_packet_delete(payload);
+    return error;
+}
 
-exit_free_ofpacts:
-    ofpbuf_uninit(&ofpacts);
-exit:
+static void
+ofproto_packet_out_finish(struct ofproto *ofproto,
+                          struct ofproto_packet_out *opo)
+    OVS_REQUIRES(ofproto_mutex)
+{
+    /* Finish the learned flows. */
+    struct xc_entry *entry;
+    struct ofpbuf entries = opo->xcache->entries;
+
+    XC_ENTRY_FOR_EACH (entry, &entries) {
+        if (entry->type == XC_LEARN) {
+            struct ofproto_flow_mod *ofm = entry->u.learn.ofm;
+            struct rule *rule = rule_collection_rules(&ofm->new_rules)[0];
+            ovs_assert(rule);
+
+            /* If learning on a different bridge, must bump its version
+             * number and flush connmgr afterwards. */
+            if (rule->ofproto != ofproto) {
+                ofproto_bump_tables_version(rule->ofproto);
+            }
+            ofproto_flow_mod_finish(rule->ofproto, ofm, NULL);
+            if (rule->ofproto != ofproto) {
+                ofmonitor_flush(rule->ofproto->connmgr);
+            }
+        }
+    }
+
+    ofproto->ofproto_class->packet_execute(ofproto, opo);
+}
+
+static enum ofperr
+handle_packet_out(struct ofconn *ofconn, const struct ofp_header *oh)
+    OVS_EXCLUDED(ofproto_mutex)
+{
+    struct ofproto *p = ofconn_get_ofproto(ofconn);
+    struct ofputil_packet_out po;
+    struct ofproto_packet_out opo;
+    uint64_t ofpacts_stub[1024 / 8];
+    struct ofpbuf ofpacts;
+    enum ofperr error;
+
+    COVERAGE_INC(ofproto_packet_out);
+
+    error = reject_slave_controller(ofconn);
+    if (error) {
+        return error;
+    }
+
+    /* Decode message. */
+    ofpbuf_use_stub(&ofpacts, ofpacts_stub, sizeof ofpacts_stub);
+    error = ofputil_decode_packet_out(&po, oh, &ofpacts);
+    if (error) {
+        ofpbuf_uninit(&ofpacts);
+        return error;
+    }
+
+    po.ofpacts = ofpbuf_steal_data(&ofpacts);   /* Move to heap. */
+    error = ofproto_packet_out_init(p, ofconn, &opo, &po);
+    if (error) {
+        free(po.ofpacts);
+        return error;
+    }
+
+    ovs_mutex_lock(&ofproto_mutex);
+    opo.version = p->tables_version;
+    error = ofproto_packet_out_start(p, &opo);
+    if (!error) {
+        ofproto_packet_out_finish(p, &opo);
+    }
+    ovs_mutex_unlock(&ofproto_mutex);
+
+    ofproto_packet_out_uninit(&opo);
     return error;
 }
 
@@ -5125,7 +5246,6 @@ modify_flows_start__(struct ofproto *ofproto, struct ofproto_flow_mod *ofm)
     } else if (ofm->modify_may_add_flow) {
         /* No match, add a new flow, consumes 'temp'. */
         error = add_flow_start(ofproto, ofm);
-        new_rules->collection.n = 1;
     } else {
         error = 0;
     }
@@ -5215,7 +5335,6 @@ modify_flows_finish(struct ofproto *ofproto, struct ofproto_flow_mod *ofm,
         }
         learned_cookies_flush(ofproto, &dead_cookies);
         remove_rules_postponed(old_rules);
-        rule_collection_destroy(new_rules);
     }
 }
 
@@ -5387,8 +5506,7 @@ delete_flows_revert(struct ofproto *ofproto, struct ofproto_flow_mod *ofm)
 }
 
 static void
-delete_flows_finish(struct ofproto *ofproto,
-                    struct ofproto_flow_mod *ofm,
+delete_flows_finish(struct ofproto *ofproto, struct ofproto_flow_mod *ofm,
                     const struct openflow_mod_requester *req)
     OVS_REQUIRES(ofproto_mutex)
 {
@@ -5411,8 +5529,7 @@ delete_flows_init_strict(struct ofproto *ofproto OVS_UNUSED,
 
 /* Implements OFPFC_DELETE_STRICT. */
 static enum ofperr
-delete_flow_start_strict(struct ofproto *ofproto,
-                         struct ofproto_flow_mod *ofm)
+delete_flow_start_strict(struct ofproto *ofproto, struct ofproto_flow_mod *ofm)
     OVS_REQUIRES(ofproto_mutex)
 {
     struct rule_collection *rules = &ofm->old_rules;
@@ -5486,6 +5603,26 @@ reduce_timeout(uint16_t max, uint16_t *timeout)
  * 'idle_timeout' seconds.  Similarly for 'hard_timeout'.
  *
  * Suitable for implementing OFPACT_FIN_TIMEOUT. */
+void
+ofproto_rule_reduce_timeouts__(struct rule *rule,
+                               uint16_t idle_timeout, uint16_t hard_timeout)
+    OVS_REQUIRES(ofproto_mutex)
+    OVS_EXCLUDED(rule->mutex)
+{
+    if (!idle_timeout && !hard_timeout) {
+        return;
+    }
+
+    if (ovs_list_is_empty(&rule->expirable)) {
+        ovs_list_insert(&rule->ofproto->expirable, &rule->expirable);
+    }
+
+    ovs_mutex_lock(&rule->mutex);
+    reduce_timeout(idle_timeout, &rule->idle_timeout);
+    reduce_timeout(hard_timeout, &rule->hard_timeout);
+    ovs_mutex_unlock(&rule->mutex);
+}
+
 void
 ofproto_rule_reduce_timeouts(struct rule *rule,
                              uint16_t idle_timeout, uint16_t hard_timeout)
@@ -7254,13 +7391,13 @@ ofproto_flow_mod_revert(struct ofproto *ofproto, struct ofproto_flow_mod *ofm)
     default:
         break;
     }
+
     rule_collection_destroy(&ofm->old_rules);
     rule_collection_destroy(&ofm->new_rules);
 }
 
 static void
-ofproto_flow_mod_finish(struct ofproto *ofproto,
-                        struct ofproto_flow_mod *ofm,
+ofproto_flow_mod_finish(struct ofproto *ofproto, struct ofproto_flow_mod *ofm,
                         const struct openflow_mod_requester *req)
     OVS_REQUIRES(ofproto_mutex)
 {
