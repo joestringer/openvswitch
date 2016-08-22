@@ -3275,8 +3275,8 @@ xlate_table_action(struct xlate_ctx *ctx, ofp_port_t in_port, uint8_t table_id,
                                            &ctx->xin->flow, ctx->wc,
                                            ctx->xin->resubmit_stats,
                                            &ctx->table_id, in_port,
-                                           may_packet_in, honor_table_miss);
-
+                                           may_packet_in, honor_table_miss,
+                                           ctx->xin->xcache);
         if (OVS_UNLIKELY(ctx->xin->resubmit_hook)) {
             ctx->xin->resubmit_hook(ctx->xin, rule, ctx->indentation + 1);
         }
@@ -5422,7 +5422,7 @@ xlate_actions(struct xlate_in *xin, struct xlate_out *xout)
         ctx.rule = rule_dpif_lookup_from_table(
             ctx.xbridge->ofproto, ctx.tables_version, flow, ctx.wc,
             ctx.xin->resubmit_stats, &ctx.table_id,
-            flow->in_port.ofp_port, true, true);
+            flow->in_port.ofp_port, true, true, ctx.xin->xcache);
         if (ctx.xin->resubmit_stats) {
             rule_dpif_credit_stats(ctx.rule, ctx.xin->resubmit_stats);
         }
@@ -5752,6 +5752,14 @@ xlate_push_stats_entry(struct xc_entry *entry,
     struct eth_addr dmac;
 
     switch (entry->type) {
+    case XC_TABLE:
+        ofproto_dpif_credit_table_stats(entry->u.table.ofproto,
+                                        entry->u.table.id,
+                                        entry->u.table.match
+                                        ? stats->n_packets : 0,
+                                        entry->u.table.match
+                                        ? 0 : stats->n_packets);
+        break;
     case XC_RULE:
         rule_dpif_credit_stats(entry->u.rule, stats);
         break;
@@ -5837,6 +5845,8 @@ void
 xlate_cache_clear_entry(struct xc_entry *entry)
 {
     switch (entry->type) {
+    case XC_TABLE:
+        break;
     case XC_RULE:
         rule_dpif_unref(entry->u.rule);
         break;

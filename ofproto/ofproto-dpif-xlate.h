@@ -37,6 +37,7 @@ struct mac_learning;
 struct mcast_snooping;
 
 enum xc_type {
+    XC_TABLE,
     XC_RULE,
     XC_BOND,
     XC_NETDEV,
@@ -57,6 +58,11 @@ enum xc_type {
 struct xc_entry {
     enum xc_type type;
     union {
+        struct {
+            struct ofproto_dpif *ofproto;
+            uint8_t id;
+            bool    match; /* or miss. */
+        } table;
         struct rule_dpif *rule;
         struct {
             struct netdev *tx;
