@@ -50,6 +50,7 @@ COVERAGE_DEFINE(dumped_duplicate_flow);
 COVERAGE_DEFINE(dumped_new_flow);
 COVERAGE_DEFINE(handler_duplicate_upcall);
 COVERAGE_DEFINE(upcall_ukey_contention);
+COVERAGE_DEFINE(upcall_ukey_replace);
 COVERAGE_DEFINE(revalidate_missed_dp_flow);
 
 /* A thread that reads upcalls from dpif, forwards each upcall's packet,
@@ -1569,6 +1570,33 @@ ukey_create_from_dpif_flow(const struct udpif *udpif,
     return 0;
 }
 
+static bool
+try_ukey_replace(struct umap *umap, struct udpif_key *old_ukey,
+                 struct udpif_key *new_ukey)
+    OVS_REQUIRES(umap->mutex)
+    OVS_TRY_LOCK(true, new_ukey->mutex)
+{
+    bool replaced = false;
+
+    if (!ovs_mutex_trylock(&old_ukey->mutex)) {
+        if (!old_ukey->flow_exists) {
+            /* The flow was deleted during the current revalidator dump,
+             * but its ukey won't be cleaned up until the sweep phase.
+             * In the mean time, we are receiving upcalls for this traffic.
+             * Expedite the flow install by replacing the ukey. */
+            COVERAGE_INC(upcall_ukey_replace);
+            ovs_mutex_lock(&new_ukey->mutex);
+            cmap_replace(&umap->cmap, &old_ukey->cmap_node,
+                         &new_ukey->cmap_node, new_ukey->hash);
+            ovsrcu_postpone(ukey_delete__, old_ukey);
+            replaced = true;
+        }
+        ovs_mutex_unlock(&old_ukey->mutex);
+    }
+
+    return replaced;
+}
+
 /* Attempts to insert a ukey into the shared ukey maps.
  *
  * On success, returns true, installs the ukey and returns it in a locked
@@ -1591,6 +1619,7 @@ ukey_install_start(struct udpif *udpif, struct udpif_key *new_ukey)
         if (old_ukey->key_len == new_ukey->key_len
             && !memcmp(old_ukey->key, new_ukey->key, new_ukey->key_len)) {
             COVERAGE_INC(handler_duplicate_upcall);
+            locked = try_ukey_replace(umap, old_ukey, new_ukey);
         } else {
             struct ds ds = DS_EMPTY_INITIALIZER;
 
