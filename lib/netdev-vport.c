@@ -912,6 +912,7 @@ netdev_vport_get_ifindex(const struct netdev *netdev_)
     get_pt_mode,                                            \
                                                             \
     NULL,                       /* set_policing */          \
+    NULL,                       /* set_filter */            \
     NULL,                       /* get_qos_types */         \
     NULL,                       /* get_qos_capabilities */  \
     NULL,                       /* get_qos */               \

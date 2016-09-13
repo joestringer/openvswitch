@@ -46,6 +46,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "bpf.h"
 #include "coverage.h"
 #include "dp-packet.h"
 #include "dpif-netlink.h"
@@ -227,6 +228,8 @@ enum {
     VALID_VPORT_STAT_ERROR  = 1 << 5,
     VALID_DRVINFO           = 1 << 6,
     VALID_FEATURES          = 1 << 7,
+    VALID_INGRESS_FILTER    = 1 << 8,
+    VALID_EGRESS_FILTER     = 1 << 9,
 };
 
 /* Traffic control. */
@@ -447,6 +450,9 @@ static struct tcmsg *netdev_linux_tc_make_request(const struct netdev *,
 static int clsact_install__(struct netdev *netdev_);
 static int tc_add_policer(struct netdev *,
                           uint32_t kbits_rate, uint32_t kbits_burst);
+static int tc_add_filter(struct netdev *, int fd, uint32_t parent,
+                         const char *name);
+static bool tc_is_clsact(const struct tc *tc);
 
 static int tc_parse_qdisc(const struct ofpbuf *, const char **kind,
                           struct nlattr **options);
@@ -488,11 +494,15 @@ struct netdev_linux {
     long long int carrier_resets;
     uint32_t kbits_rate;        /* Policing data. */
     uint32_t kbits_burst;
+    uint32_t ingress_filter;    /* BPF ingress filter fd. */
+    uint32_t egress_filter;     /* BPF egress filter fd. */
     int vport_stats_error;      /* Cached error code from vport_get_stats().
                                    0 or an errno value. */
     int netdev_mtu_error;       /* Cached error code from SIOCGIFMTU or SIOCSIFMTU. */
     int ether_addr_error;       /* Cached error code from set/get etheraddr. */
     int netdev_policing_error;  /* Cached error code from set policing. */
+    int ingress_filter_error;   /* Cached error code from set filter. */
+    int egress_filter_error;    /* Cached error code from set filter. */
     int get_features_error;     /* Cached error code from ETHTOOL_GSET. */
     int get_ifindex_error;      /* Cached error code from SIOCGIFINDEX. */
 
@@ -2142,8 +2152,14 @@ netdev_linux_set_policing(struct netdev *netdev_,
     if (kbits_rate) {
         error = tc_add_del_ingress_qdisc(ifindex, true);
         if (error) {
-            VLOG_WARN_RL(&rl, "%s: adding policing qdisc failed: %s",
-                         netdev_name, ovs_strerror(error));
+            const char *bpf_conflict = "";
+
+            if (error == EEXIST && (netdev->ingress_filter
+                                    || netdev->egress_filter)) {
+                bpf_conflict = " (conflicts with BPF)";
+            }
+            VLOG_WARN_RL(&rl, "%s: adding policing qdisc failed: %s%s",
+                         netdev_name, ovs_strerror(error), bpf_conflict);
             goto out;
         }
 
@@ -2164,6 +2180,88 @@ out:
         netdev->cache_valid |= VALID_POLICING;
     }
     ovs_mutex_unlock(&netdev->mutex);
+    return error;
+}
+
+/* Attempts to set a BPF filter on the device. Returns 0 if successful,
+ * otherwise a positive errno value. */
+static int
+netdev_linux_set_filter__(struct netdev *netdev_, const struct bpf_prog *prog,
+                          unsigned int valid_bit, int *filter_error,
+                          uint32_t *netdev_filter)
+{
+    struct netdev_linux *netdev = netdev_linux_cast(netdev_);
+    const char *netdev_name = netdev_get_name(netdev_);
+    int error;
+
+    VLOG_DBG("Setting %s filter %d on %s (handle %08"PRIx32")", prog->name,
+             prog->fd, netdev_name, prog->handle);
+
+    if (netdev->cache_valid & valid_bit) {
+        error = *filter_error;
+        if (error || (prog && prog->fd == *netdev_filter)) {
+            /* Assume that settings haven't changed since we last set them. */
+            goto out;
+        }
+        netdev->cache_valid &= ~valid_bit;
+    }
+
+    /* Remove non-clsact qdiscs. */
+    if (netdev->tc && !tc_is_clsact(netdev->tc)) {
+        error = tc_del_qdisc(netdev_);
+        if (error) {
+            VLOG_WARN_RL(&rl, "%s: removing qdisc failed: %s",
+                         netdev_name, ovs_strerror(error));
+            goto out;
+        }
+    }
+
+    if (prog) {
+        if (!netdev->tc || !tc_is_clsact(netdev->tc)) {
+            error = clsact_install__(netdev_);
+            if (error && error != EEXIST) {
+                VLOG_WARN_RL(&rl, "%s: clsact qdisc setup failed: %s",
+                             netdev_name, ovs_strerror(error));
+                goto out;
+            }
+        }
+
+        error = tc_add_filter(netdev_, prog->fd, prog->handle, prog->name);
+        if (error){
+            VLOG_WARN_RL(&rl, "%s: adding filter %s failed: %s",
+                         netdev_name, prog->name, ovs_strerror(error));
+            goto out;
+        }
+    }
+
+    *netdev_filter = prog ? prog->fd : 0;
+
+out:
+    if (!error || error == ENODEV) {
+        *filter_error = error;
+        netdev->cache_valid |= valid_bit;
+    }
+    return error;
+}
+
+static int
+netdev_linux_set_filter(struct netdev *netdev_, const struct bpf_prog *prog)
+{
+    struct netdev_linux *netdev = netdev_linux_cast(netdev_);
+    int error;
+
+    ovs_mutex_lock(&netdev->mutex);
+    if (!prog || prog->handle == INGRESS_HANDLE) {
+        error = netdev_linux_set_filter__(netdev_, prog, VALID_INGRESS_FILTER,
+                                          &netdev->ingress_filter_error,
+                                          &netdev->ingress_filter);
+    } else {
+        error = netdev_linux_set_filter__(netdev_, prog, VALID_EGRESS_FILTER,
+                                          &netdev->egress_filter_error,
+                                          &netdev->egress_filter);
+    }
+    ovs_mutex_unlock(&netdev->mutex);
+
     return error;
 }
 
@@ -2861,6 +2959,7 @@ netdev_linux_update_flags(struct netdev *netdev_, enum netdev_flags off,
     NULL,                       /* get_pt_mode */               \
                                                                 \
     netdev_linux_set_policing,                                  \
+    netdev_linux_set_filter,                                    \
     netdev_linux_get_qos_types,                                 \
     netdev_linux_get_qos_capabilities,                          \
     netdev_linux_get_qos,                                       \
@@ -4826,6 +4925,49 @@ tc_add_policer(struct netdev *netdev,
     return 0;
 }
 
+/* Adds a filter to 'netdev' corresponding to BPF program associated with 'fd'.
+ *
+ * This function is equivalent to running:
+ *     /sbin/tc filter add dev <devname> <parent> bpf da object-pinned <path>
+ *
+ * The configuration and stats may be seen with the following command:
+ *     /sbin/tc -s filter show dev <devname> <parent>
+ *
+ * Returns 0 if successful, otherwise a positive errno value.
+ */
+static int
+tc_add_filter(struct netdev *netdev, int fd, uint32_t parent, const char *name)
+{
+    struct ofpbuf request;
+    struct tcmsg *tcmsg;
+    size_t opts_offset;
+    int error;
+
+    tcmsg = netdev_linux_tc_make_request(netdev, RTM_NEWTFILTER,
+                                         NLM_F_EXCL | NLM_F_CREATE, &request);
+    if (!tcmsg) {
+        return ENODEV;
+    }
+    tcmsg->tcm_handle = tc_make_handle(0, 0x1);
+    tcmsg->tcm_parent = parent;
+    tcmsg->tcm_info = tc_make_handle(0, /* preference */
+                                     (OVS_FORCE uint16_t) htons(ETH_P_ALL));
+
+    nl_msg_put_string(&request, TCA_KIND, "bpf");
+    opts_offset = nl_msg_start_nested(&request, TCA_OPTIONS);
+    nl_msg_put_u32(&request, TCA_BPF_FLAGS, TCA_BPF_FLAG_ACT_DIRECT);
+    nl_msg_put_u32(&request, TCA_BPF_FD, fd);
+    nl_msg_put_string(&request, TCA_BPF_NAME, name);
+    nl_msg_end_nested(&request, opts_offset);
+
+    error = tc_transact(&request, NULL);
+    if (error) {
+        return error;
+    }
+
+    return 0;
+}
+
 static void
 read_psched(void)
 {
@@ -5111,21 +5253,21 @@ tc_delete_class(const struct netdev *netdev, unsigned int handle)
     return error;
 }
 
-/* Equivalent to "tc qdisc del dev <name> root". */
+/* Equivalent to "tc qdisc del dev <name> handle <handle> <parent>". */
 static int
-tc_del_qdisc(struct netdev *netdev_)
+tc_del_qdisc__(struct netdev_linux *netdev, uint32_t parent, uint32_t handle)
 {
-    struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     struct ofpbuf request;
     struct tcmsg *tcmsg;
     int error;
 
-    tcmsg = netdev_linux_tc_make_request(netdev_, RTM_DELQDISC, 0, &request);
+    tcmsg = netdev_linux_tc_make_request(&netdev->up, RTM_DELQDISC, 0,
+                                         &request);
     if (!tcmsg) {
         return ENODEV;
     }
-    tcmsg->tcm_handle = tc_make_handle(1, 0);
-    tcmsg->tcm_parent = TC_H_ROOT;
+    tcmsg->tcm_handle = handle;
+    tcmsg->tcm_parent = parent;
 
     error = tc_transact(&request, NULL);
     if (error == EINVAL) {
@@ -5140,6 +5282,27 @@ tc_del_qdisc(struct netdev *netdev_)
         netdev->tc = NULL;
     }
     return error;
+}
+
+static bool
+tc_is_clsact(const struct tc *tc)
+{
+    if (!tc || !tc->ops->linux_name) {
+        return false;
+    }
+    return !strcmp(tc->ops->linux_name, "clsact");
+}
+
+static int
+tc_del_qdisc(struct netdev *netdev_)
+{
+    struct netdev_linux *netdev = netdev_linux_cast(netdev_);
+
+    if (netdev->tc && tc_is_clsact(netdev->tc)) {
+        return tc_del_qdisc__(netdev, TC_H_INGRESS,
+                              tc_make_handle(TC_H_INGRESS, 0));
+    }
+    return tc_del_qdisc__(netdev, TC_H_ROOT, tc_make_handle(1, 0));
 }
 
 static bool

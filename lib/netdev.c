@@ -1435,6 +1435,15 @@ netdev_set_policing(struct netdev *netdev, uint32_t kbits_rate,
             : EOPNOTSUPP);
 }
 
+/* Attempts to apply (e)BPF filter 'prog' to the netdev. */
+int
+netdev_set_filter(struct netdev *netdev, struct bpf_prog *prog)
+{
+    return (netdev->netdev_class->set_filter
+            ? netdev->netdev_class->set_filter(netdev, prog)
+            : EOPNOTSUPP);
+}
+
 /* Adds to 'types' all of the forms of QoS supported by 'netdev', or leaves it
  * empty if 'netdev' does not support QoS.  Any names added to 'types' should
  * be documented as valid for the "type" column in the "QoS" table in
