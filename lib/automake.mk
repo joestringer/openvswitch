@@ -350,6 +350,7 @@ endif
 
 if LINUX
 lib_libopenvswitch_la_SOURCES += \
+	lib/bpf.h \
 	lib/dpif-netlink.c \
 	lib/dpif-netlink.h \
 	lib/dpif-netlink-rtnl.c \
