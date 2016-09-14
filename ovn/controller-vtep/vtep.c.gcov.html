@@ -1,0 +1,687 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ovn/controller-vtep/vtep.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">ovn/controller-vtep</a> - vtep.c<span style="font-size: 80%;"> (source / <a href="vtep.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">230</td>
+            <td class="headerCovTableEntry">239</td>
+            <td class="headerCovTableEntryHi">96.2 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">14</td>
+            <td class="headerCovTableEntry">14</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">133</td>
+            <td class="headerCovTableEntry">168</td>
+            <td class="headerCovTableEntryMed">79.2 %</td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (c) 2015 Nicira, Inc.</a>
+<span class="lineNum">       2 </span>                :            :  *
+<span class="lineNum">       3 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       4 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       5 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       6 </span>                :            :  *
+<span class="lineNum">       7 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       8 </span>                :            :  *
+<span class="lineNum">       9 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      10 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      11 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      12 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      13 </span>                :            :  * limitations under the License.
+<span class="lineNum">      14 </span>                :            :  */
+<span class="lineNum">      15 </span>                :            : 
+<span class="lineNum">      16 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      17 </span>                :            : 
+<span class="lineNum">      18 </span>                :            : #include &quot;vtep.h&quot;
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &quot;lib/hash.h&quot;
+<span class="lineNum">      21 </span>                :            : #include &quot;openvswitch/hmap.h&quot;
+<span class="lineNum">      22 </span>                :            : #include &quot;openvswitch/shash.h&quot;
+<span class="lineNum">      23 </span>                :            : #include &quot;lib/smap.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;lib/sset.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;lib/util.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;ovn-controller-vtep.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;openvswitch/vlog.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;ovn/lib/ovn-sb-idl.h&quot;
+<a name="29"><span class="lineNum">      29 </span>                :            : #include &quot;vtep/vtep-idl.h&quot;</a>
+<span class="lineNum">      30 </span>                :            : 
+<span class="lineNum">      31 </span>                :<span class="lineCov">         14 : VLOG_DEFINE_THIS_MODULE(vtep);</span>
+<span class="lineNum">      32 </span>                :            : 
+<span class="lineNum">      33 </span>                :            : struct vtep_rec_physical_locator_list_entry {
+<span class="lineNum">      34 </span>                :            :     struct ovs_list locators_node;
+<span class="lineNum">      35 </span>                :            :     const struct vteprec_physical_locator *vteprec_ploc;
+<span class="lineNum">      36 </span>                :            : };
+<span class="lineNum">      37 </span>                :            : 
+<span class="lineNum">      38 </span>                :            : struct mmr_hash_node_data {
+<span class="lineNum">      39 </span>                :            :     const struct vteprec_mcast_macs_remote *mmr;
+<span class="lineNum">      40 </span>                :            :     struct shash physical_locators;
+<span class="lineNum">      41 </span>                :            : };
+<span class="lineNum">      42 </span>                :            : 
+<span class="lineNum">      43 </span>                :            : /*
+<span class="lineNum">      44 </span>                :            :  * Scans through the Binding table in ovnsb, and updates the vtep logical
+<span class="lineNum">      45 </span>                :            :  * switch tunnel keys and the 'Ucast_Macs_Remote' table in the VTEP
+<span class="lineNum">      46 </span>                :            :  * database.
+<span class="lineNum">      47 </span>                :            :  *
+<span class="lineNum">      48 </span>                :            :  */
+<span class="lineNum">      49 </span>                :            : 
+<span class="lineNum">      50 </span>                :            : /* Searches the 'chassis_rec-&gt;encaps' for the first vtep tunnel
+<span class="lineNum">      51 </span>                :            :  * configuration, returns the 'ip'.  Unless duplicated, the returned
+<a name="52"><span class="lineNum">      52 </span>                :            :  * pointer cannot live past current vtep_run() execution. */</a>
+<span class="lineNum">      53 </span>                :            : static const char *
+<span class="lineNum">      54 </span>                :<span class="lineCov">         95 : get_chassis_vtep_ip(const struct sbrec_chassis *chassis_rec)</span>
+<span class="lineNum">      55 </span>                :            : {
+<span class="lineNum">      56 </span>        [<span class="branchCov" title="Branch 0 was taken 95 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         95 :     if (chassis_rec) {</span>
+<span class="lineNum">      57 </span>                :            :         size_t i;
+<span class="lineNum">      58 </span>                :            : 
+<span class="lineNum">      59 </span>        [<span class="branchCov" title="Branch 0 was taken 95 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         95 :         for (i = 0; i &lt; chassis_rec-&gt;n_encaps; i++) {</span>
+<span class="lineNum">      60 </span>        [<span class="branchCov" title="Branch 0 was taken 95 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         95 :             if (!strcmp(chassis_rec-&gt;encaps[i]-&gt;type, &quot;vxlan&quot;)) {</span>
+<span class="lineNum">      61 </span>                :<span class="lineCov">         95 :                 return chassis_rec-&gt;encaps[i]-&gt;ip;</span>
+<span class="lineNum">      62 </span>                :            :             }
+<span class="lineNum">      63 </span>                :            :         }
+<span class="lineNum">      64 </span>                :            :     }
+<span class="lineNum">      65 </span>                :            : 
+<span class="lineNum">      66 </span>                :<span class="lineNoCov">          0 :     return NULL;</span>
+<span class="lineNum">      67 </span>                :            : }
+<span class="lineNum">      68 </span>                :            : 
+<a name="69"><span class="lineNum">      69 </span>                :            : /* Creates a new 'Ucast_Macs_Remote'. */</a>
+<span class="lineNum">      70 </span>                :            : static struct vteprec_ucast_macs_remote *
+<span class="lineNum">      71 </span>                :<span class="lineCov">          6 : create_umr(struct ovsdb_idl_txn *vtep_idl_txn, const char *mac,</span>
+<span class="lineNum">      72 </span>                :            :            const struct vteprec_logical_switch *vtep_ls)
+<span class="lineNum">      73 </span>                :            : {
+<span class="lineNum">      74 </span>                :<span class="lineCov">          6 :     struct vteprec_ucast_macs_remote *new_umr =</span>
+<span class="lineNum">      75 </span>                :            :         vteprec_ucast_macs_remote_insert(vtep_idl_txn);
+<span class="lineNum">      76 </span>                :            : 
+<span class="lineNum">      77 </span>                :<span class="lineCov">          6 :     vteprec_ucast_macs_remote_set_MAC(new_umr, mac);</span>
+<span class="lineNum">      78 </span>                :<span class="lineCov">          6 :     vteprec_ucast_macs_remote_set_logical_switch(new_umr, vtep_ls);</span>
+<span class="lineNum">      79 </span>                :            : 
+<span class="lineNum">      80 </span>                :<span class="lineCov">          6 :     return new_umr;</span>
+<span class="lineNum">      81 </span>                :            : }
+<span class="lineNum">      82 </span>                :            : 
+<a name="83"><span class="lineNum">      83 </span>                :            : /* Creates a new 'Physical_Locator'. */</a>
+<span class="lineNum">      84 </span>                :            : static struct vteprec_physical_locator *
+<span class="lineNum">      85 </span>                :<span class="lineCov">          5 : create_pl(struct ovsdb_idl_txn *vtep_idl_txn, const char *chassis_ip)</span>
+<span class="lineNum">      86 </span>                :            : {
+<span class="lineNum">      87 </span>                :<span class="lineCov">          5 :     struct vteprec_physical_locator *new_pl =</span>
+<span class="lineNum">      88 </span>                :            :         vteprec_physical_locator_insert(vtep_idl_txn);
+<span class="lineNum">      89 </span>                :            : 
+<span class="lineNum">      90 </span>                :<span class="lineCov">          5 :     vteprec_physical_locator_set_dst_ip(new_pl, chassis_ip);</span>
+<span class="lineNum">      91 </span>                :<span class="lineCov">          5 :     vteprec_physical_locator_set_encapsulation_type(new_pl, VTEP_ENCAP_TYPE);</span>
+<span class="lineNum">      92 </span>                :            : 
+<span class="lineNum">      93 </span>                :<span class="lineCov">          5 :     return new_pl;</span>
+<span class="lineNum">      94 </span>                :            : }
+<span class="lineNum">      95 </span>                :            : 
+<a name="96"><span class="lineNum">      96 </span>                :            : /* Creates a new 'Mcast_Macs_Remote'. */</a>
+<span class="lineNum">      97 </span>                :            : static void
+<span class="lineNum">      98 </span>                :<span class="lineCov">          8 : vtep_create_mmr(struct ovsdb_idl_txn *vtep_idl_txn, const char *mac,</span>
+<span class="lineNum">      99 </span>                :            :                 const struct vteprec_logical_switch *vtep_ls,
+<span class="lineNum">     100 </span>                :            :                 const struct vteprec_physical_locator_set *ploc_set)
+<span class="lineNum">     101 </span>                :            : {
+<span class="lineNum">     102 </span>                :<span class="lineCov">          8 :     struct vteprec_mcast_macs_remote *new_mmr =</span>
+<span class="lineNum">     103 </span>                :            :        vteprec_mcast_macs_remote_insert(vtep_idl_txn);
+<span class="lineNum">     104 </span>                :            : 
+<span class="lineNum">     105 </span>                :<span class="lineCov">          8 :     vteprec_mcast_macs_remote_set_MAC(new_mmr, mac);</span>
+<span class="lineNum">     106 </span>                :<span class="lineCov">          8 :     vteprec_mcast_macs_remote_set_logical_switch(new_mmr, vtep_ls);</span>
+<span class="lineNum">     107 </span>                :<span class="lineCov">          8 :     vteprec_mcast_macs_remote_set_locator_set(new_mmr, ploc_set);</span>
+<span class="lineNum">     108 </span>                :<span class="lineCov">          8 : }</span>
+<span class="lineNum">     109 </span>                :            : 
+<span class="lineNum">     110 </span>                :            : /* Compares previous and new mmr locator sets and returns true if they
+<span class="lineNum">     111 </span>                :            :  * differ and false otherwise. This function also preps a new locator
+<span class="lineNum">     112 </span>                :            :  * set for database write.
+<span class="lineNum">     113 </span>                :            :  *
+<span class="lineNum">     114 </span>                :            :  * 'locators_list' is the new set of locators for the associated
+<span class="lineNum">     115 </span>                :            :  * 'Mcast_Macs_Remote' entry passed in and is queried to generate the
+<a name="116"><span class="lineNum">     116 </span>                :            :  * new set of locators in vtep database format. */</a>
+<span class="lineNum">     117 </span>                :            : static bool
+<span class="lineNum">     118 </span>                :<span class="lineCov">        232 : vtep_process_pls(const struct ovs_list *locators_list,</span>
+<span class="lineNum">     119 </span>                :            :                  const struct mmr_hash_node_data *mmr_ext,
+<span class="lineNum">     120 </span>                :            :                  struct vteprec_physical_locator **locators)
+<span class="lineNum">     121 </span>                :            : {
+<span class="lineNum">     122 </span>                :<span class="lineCov">        232 :     size_t n_locators_prev = 0;</span>
+<span class="lineNum">     123 </span>                :<span class="lineCov">        232 :     size_t n_locators_new = ovs_list_size(locators_list);</span>
+<span class="lineNum">     124 </span>                :<span class="lineCov">        232 :     bool locator_lists_differ = false;</span>
+<span class="lineNum">     125 </span>                :            : 
+<span class="lineNum">     126 </span>        [<span class="branchCov" title="Branch 0 was taken 69 times"> + </span><span class="branchCov" title="Branch 1 was taken 163 times"> + </span>]:<span class="lineCov">        232 :     if (mmr_ext) {</span>
+<span class="lineNum">     127 </span>                :<span class="lineCov">         69 :         n_locators_prev = mmr_ext-&gt;mmr-&gt;locator_set-&gt;n_locators;</span>
+<span class="lineNum">     128 </span>                :            :     }
+<span class="lineNum">     129 </span>        [<span class="branchCov" title="Branch 0 was taken 8 times"> + </span><span class="branchCov" title="Branch 1 was taken 224 times"> + </span>]:<span class="lineCov">        232 :     if (n_locators_prev != n_locators_new) {</span>
+<span class="lineNum">     130 </span>                :<span class="lineCov">          8 :         locator_lists_differ = true;</span>
+<span class="lineNum">     131 </span>                :            :     }
+<span class="lineNum">     132 </span>                :            : 
+<span class="lineNum">     133 </span>        [<span class="branchCov" title="Branch 0 was taken 75 times"> + </span><span class="branchCov" title="Branch 1 was taken 157 times"> + </span>]:<span class="lineCov">        232 :     if (n_locators_new) {</span>
+<span class="lineNum">     134 </span>                :<span class="lineCov">         75 :         int i = 0;</span>
+<span class="lineNum">     135 </span>                :            :         struct vtep_rec_physical_locator_list_entry *ploc_entry;
+<span class="lineNum">     136 </span>        [<span class="branchCov" title="Branch 0 was taken 92 times"> + </span><span class="branchCov" title="Branch 1 was taken 75 times"> + </span>]:<span class="lineCov">        167 :         LIST_FOR_EACH (ploc_entry, locators_node, locators_list) {</span>
+<span class="lineNum">     137 </span>                :<span class="lineCov">        184 :             locators[i] = (struct vteprec_physical_locator *)</span>
+<span class="lineNum">     138 </span>                :<span class="lineCov">         92 :                            ploc_entry-&gt;vteprec_ploc;</span>
+<span class="lineNum">     139 </span>[<span class="branchCov" title="Branch 0 was taken 84 times"> + </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 84 times"> + </span>]:<span class="lineCov">         92 :             if (mmr_ext &amp;&amp; !shash_find_data(&amp;mmr_ext-&gt;physical_locators,</span>
+<span class="lineNum">     140 </span>                :<span class="lineCov">         84 :                                             locators[i]-&gt;dst_ip)) {</span>
+<span class="lineNum">     141 </span>                :<span class="lineNoCov">          0 :                     locator_lists_differ = true;</span>
+<span class="lineNum">     142 </span>                :            :             }
+<span class="lineNum">     143 </span>                :<span class="lineCov">         92 :             i++;</span>
+<span class="lineNum">     144 </span>                :            :         }
+<span class="lineNum">     145 </span>                :            :     }
+<span class="lineNum">     146 </span>                :            : 
+<span class="lineNum">     147 </span>                :<span class="lineCov">        232 :     return locator_lists_differ;</span>
+<span class="lineNum">     148 </span>                :            : }
+<span class="lineNum">     149 </span>                :            : 
+<span class="lineNum">     150 </span>                :            : /* Creates a new 'Mcast_Macs_Remote' entry if needed and also cleans up
+<a name="151"><span class="lineNum">     151 </span>                :            :  * out-dated remote mcast mac entries as needed. */</a>
+<span class="lineNum">     152 </span>                :            : static void
+<span class="lineNum">     153 </span>                :<span class="lineCov">        232 : vtep_update_mmr(struct ovsdb_idl_txn *vtep_idl_txn,</span>
+<span class="lineNum">     154 </span>                :            :                 struct ovs_list *locators_list,
+<span class="lineNum">     155 </span>                :            :                 const struct vteprec_logical_switch *vtep_ls,
+<span class="lineNum">     156 </span>                :            :                 const struct mmr_hash_node_data *mmr_ext)
+<span class="lineNum">     157 </span>                :            : {
+<span class="lineNum">     158 </span>                :<span class="lineCov">        232 :     struct vteprec_physical_locator **locators = NULL;</span>
+<span class="lineNum">     159 </span>                :<span class="lineCov">        232 :     size_t n_locators_new = ovs_list_size(locators_list);</span>
+<span class="lineNum">     160 </span>                :            :     bool mmr_changed;
+<span class="lineNum">     161 </span>                :            : 
+<span class="lineNum">     162 </span>                :<span class="lineCov">        232 :     locators = xmalloc(n_locators_new * sizeof *locators);</span>
+<span class="lineNum">     163 </span>                :            : 
+<span class="lineNum">     164 </span>                :<span class="lineCov">        232 :     mmr_changed = vtep_process_pls(locators_list, mmr_ext, locators);</span>
+<span class="lineNum">     165 </span>                :            : 
+<span class="lineNum">     166 </span>[<span class="branchCov" title="Branch 0 was taken 69 times"> + </span><span class="branchCov" title="Branch 1 was taken 163 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 69 times"> + </span>]:<span class="lineCov">        232 :     if (mmr_ext &amp;&amp; !n_locators_new) {</span>
+<span class="lineNum">     167 </span>                :<span class="lineNoCov">          0 :         vteprec_mcast_macs_remote_delete(mmr_ext-&gt;mmr);</span>
+<span class="lineNum">     168 </span>[<span class="branchCov" title="Branch 0 was taken 69 times"> + </span><span class="branchCov" title="Branch 1 was taken 163 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 67 times"> + </span><span class="branchCov" title="Branch 3 was taken 2 times"> + </span>]:<span class="lineCov">        232 :     } else if ((mmr_ext &amp;&amp; mmr_changed) ||</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 4 was taken 163 times"> + </span><span class="branchCov" title="Branch 5 was taken 67 times"> + </span>]
+<span class="lineNum">     169 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 157 times"> + </span>]:<span class="lineCov">        163 :                (!mmr_ext &amp;&amp; n_locators_new)) {</span>
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>                :<span class="lineCov">          8 :         const struct vteprec_physical_locator_set *ploc_set =</span>
+<span class="lineNum">     172 </span>                :            :             vteprec_physical_locator_set_insert(vtep_idl_txn);
+<span class="lineNum">     173 </span>                :            : 
+<span class="lineNum">     174 </span>                :<span class="lineCov">          8 :         vtep_create_mmr(vtep_idl_txn, &quot;unknown-dst&quot;, vtep_ls, ploc_set);</span>
+<span class="lineNum">     175 </span>                :            : 
+<span class="lineNum">     176 </span>                :<span class="lineCov">          8 :         vteprec_physical_locator_set_set_locators(ploc_set, locators,</span>
+<span class="lineNum">     177 </span>                :            :                                                   n_locators_new);
+<span class="lineNum">     178 </span>                :            :     }
+<span class="lineNum">     179 </span>                :<span class="lineCov">        232 :     free(locators);</span>
+<span class="lineNum">     180 </span>                :<span class="lineCov">        232 : }</span>
+<span class="lineNum">     181 </span>                :            : 
+<span class="lineNum">     182 </span>                :            : /* Updates the vtep Logical_Switch table entries' tunnel keys based
+<a name="183"><span class="lineNum">     183 </span>                :            :  * on the port bindings. */</a>
+<span class="lineNum">     184 </span>                :            : static void
+<span class="lineNum">     185 </span>                :<span class="lineCov">        216 : vtep_lswitch_run(struct shash *vtep_pbs, struct sset *vtep_pswitches,</span>
+<span class="lineNum">     186 </span>                :            :                  struct shash *vtep_lswitches)
+<span class="lineNum">     187 </span>                :            : {
+<span class="lineNum">     188 </span>                :<span class="lineCov">        216 :     struct sset used_ls = SSET_INITIALIZER(&amp;used_ls);</span>
+<span class="lineNum">     189 </span>                :            :     struct shash_node *node;
+<span class="lineNum">     190 </span>                :            : 
+<span class="lineNum">     191 </span>                :            :     /* Collects the logical switch bindings from port binding entries.
+<span class="lineNum">     192 </span>                :            :      * Since the binding module has already guaranteed that each vtep
+<span class="lineNum">     193 </span>                :            :      * logical switch is bound only to one ovn-sb logical datapath,
+<span class="lineNum">     194 </span>                :            :      * we can just iterate and assign tunnel key to vtep logical switch. */
+<span class="lineNum">     195 </span>[<span class="branchCov" title="Branch 2 was taken 151 times"> + </span><span class="branchCov" title="Branch 3 was taken 216 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 216 times"> + </span>]:<span class="lineCov">        367 :     SHASH_FOR_EACH (node, vtep_pbs) {</span>
+<span class="lineNum">     196 </span>                :<span class="lineCov">        151 :         const struct sbrec_port_binding *port_binding_rec = node-&gt;data;</span>
+<span class="lineNum">     197 </span>                :<span class="lineCov">        151 :         const char *pswitch_name = smap_get(&amp;port_binding_rec-&gt;options,</span>
+<span class="lineNum">     198 </span>                :            :                                             &quot;vtep-physical-switch&quot;);
+<span class="lineNum">     199 </span>                :<span class="lineCov">        151 :         const char *lswitch_name = smap_get(&amp;port_binding_rec-&gt;options,</span>
+<span class="lineNum">     200 </span>                :            :                                             &quot;vtep-logical-switch&quot;);
+<span class="lineNum">     201 </span>                :            :         const struct vteprec_logical_switch *vtep_ls;
+<span class="lineNum">     202 </span>                :            : 
+<span class="lineNum">     203 </span>                :            :         /* If 'port_binding_rec-&gt;chassis' exists then 'pswitch_name'
+<span class="lineNum">     204 </span>                :            :          * and 'lswitch_name' must also exist. */
+<span class="lineNum">     205 </span>[<span class="branchCov" title="Branch 0 was taken 151 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 151 times"> + </span>]:<span class="lineCov">        151 :         if (!pswitch_name || !lswitch_name) {</span>
+<span class="lineNum">     206 </span>                :            :             /* This could only happen when someone directly modifies the
+<span class="lineNum">     207 </span>                :            :              * database,  (e.g. using ovn-sbctl). */
+<span class="lineNum">     208 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_ERR(&quot;logical port (%s) with no 'options:vtep-physical-&quot;</span>
+<span class="lineNum">     209 </span>                :            :                      &quot;switch' or 'options:vtep-logical-switch' specified &quot;
+<span class="lineNum">     210 </span>                :            :                      &quot;is bound to chassis (%s).&quot;,
+<span class="lineNum">     211 </span>                :            :                      port_binding_rec-&gt;logical_port,
+<span class="lineNum">     212 </span>                :            :                      port_binding_rec-&gt;chassis-&gt;name);
+<span class="lineNum">     213 </span>                :<span class="lineNoCov">          0 :             continue;</span>
+<span class="lineNum">     214 </span>                :            :         }
+<span class="lineNum">     215 </span>                :<span class="lineCov">        151 :         vtep_ls = shash_find_data(vtep_lswitches, lswitch_name);</span>
+<span class="lineNum">     216 </span>                :            :         /* Also checks 'pswitch_name' since the same 'lswitch_name' could
+<span class="lineNum">     217 </span>                :            :          * exist in multiple vtep database instances and be bound to different
+<span class="lineNum">     218 </span>                :            :          * ovn logical networks. */
+<span class="lineNum">     219 </span>[<span class="branchCov" title="Branch 0 was taken 151 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 3 was taken 150 times"> + </span><span class="branchCov" title="Branch 4 was taken 1 time"> + </span>]:<span class="lineCov">        151 :         if (vtep_ls &amp;&amp; sset_find(vtep_pswitches, pswitch_name)) {</span>
+<span class="lineNum">     220 </span>                :            :             int64_t tnl_key;
+<span class="lineNum">     221 </span>                :            : 
+<span class="lineNum">     222 </span>        [<span class="branchCov" title="Branch 1 was taken 5 times"> + </span><span class="branchCov" title="Branch 2 was taken 145 times"> + </span>]:<span class="lineCov">        150 :             if (sset_find(&amp;used_ls, lswitch_name)) {</span>
+<span class="lineNum">     223 </span>                :<span class="lineCov">          5 :                 continue;</span>
+<span class="lineNum">     224 </span>                :            :             }
+<span class="lineNum">     225 </span>                :            : 
+<span class="lineNum">     226 </span>                :<span class="lineCov">        145 :             tnl_key = port_binding_rec-&gt;datapath-&gt;tunnel_key;</span>
+<span class="lineNum">     227 </span>        [<span class="branchCov" title="Branch 0 was taken 145 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        145 :             if (vtep_ls-&gt;n_tunnel_key</span>
+<span class="lineNum">     228 </span>        [<span class="branchCov" title="Branch 0 was taken 11 times"> + </span><span class="branchCov" title="Branch 1 was taken 134 times"> + </span>]:<span class="lineCov">        145 :                 &amp;&amp; vtep_ls-&gt;tunnel_key[0] != tnl_key) {</span>
+<span class="lineNum">     229 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 11 times"> + </span>]:<span class="lineCov">         11 :                 VLOG_DBG(&quot;set vtep logical switch (%s) tunnel key from &quot;</span>
+<span class="lineNum">     230 </span>                :            :                          &quot;(%&quot;PRId64&quot;) to (%&quot;PRId64&quot;)&quot;, vtep_ls-&gt;name,
+<span class="lineNum">     231 </span>                :            :                          vtep_ls-&gt;tunnel_key[0], tnl_key);
+<span class="lineNum">     232 </span>                :            :             }
+<span class="lineNum">     233 </span>                :<span class="lineCov">        145 :             vteprec_logical_switch_set_tunnel_key(vtep_ls, &amp;tnl_key, 1);</span>
+<span class="lineNum">     234 </span>                :            : 
+<span class="lineNum">     235 </span>                :            :             /* OVN is expected to always use source node replication mode,
+<span class="lineNum">     236 </span>                :            :              * hence the replication mode is hard-coded for each logical
+<span class="lineNum">     237 </span>                :            :              * switch in the context of ovn-controller-vtep. */
+<span class="lineNum">     238 </span>                :<span class="lineCov">        145 :             vteprec_logical_switch_set_replication_mode(vtep_ls, &quot;source_node&quot;);</span>
+<span class="lineNum">     239 </span>                :<span class="lineCov">        145 :             sset_add(&amp;used_ls, lswitch_name);</span>
+<span class="lineNum">     240 </span>                :            :         }
+<span class="lineNum">     241 </span>                :            :     }
+<span class="lineNum">     242 </span>                :            :     /* Resets the tunnel keys for unused vtep logical switches. */
+<span class="lineNum">     243 </span>[<span class="branchCov" title="Branch 2 was taken 232 times"> + </span><span class="branchCov" title="Branch 3 was taken 216 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 216 times"> + </span>]:<span class="lineCov">        448 :     SHASH_FOR_EACH (node, vtep_lswitches) {</span>
+<span class="lineNum">     244 </span>        [<span class="branchCov" title="Branch 1 was taken 87 times"> + </span><span class="branchCov" title="Branch 2 was taken 145 times"> + </span>]:<span class="lineCov">        232 :         if (!sset_find(&amp;used_ls, node-&gt;name)) {</span>
+<span class="lineNum">     245 </span>                :<span class="lineCov">         87 :             int64_t tnl_key = 0;</span>
+<span class="lineNum">     246 </span>                :<span class="lineCov">         87 :             vteprec_logical_switch_set_tunnel_key(node-&gt;data, &amp;tnl_key, 1);</span>
+<span class="lineNum">     247 </span>                :            :         }
+<span class="lineNum">     248 </span>                :            :     }
+<span class="lineNum">     249 </span>                :<span class="lineCov">        216 :     sset_destroy(&amp;used_ls);</span>
+<span class="lineNum">     250 </span>                :<span class="lineCov">        216 : }</span>
+<span class="lineNum">     251 </span>                :            : 
+<span class="lineNum">     252 </span>                :            : /* Updates the vtep 'Ucast_Macs_Remote' and 'Mcast_Macs_Remote' tables based
+<a name="253"><span class="lineNum">     253 </span>                :            :  * on non-vtep port bindings. */</a>
+<span class="lineNum">     254 </span>                :            : static void
+<span class="lineNum">     255 </span>                :<span class="lineCov">        216 : vtep_macs_run(struct ovsdb_idl_txn *vtep_idl_txn, struct shash *ucast_macs_rmts,</span>
+<span class="lineNum">     256 </span>                :            :               struct shash *mcast_macs_rmts, struct shash *physical_locators,
+<span class="lineNum">     257 </span>                :            :               struct shash *vtep_lswitches, struct shash *non_vtep_pbs)
+<span class="lineNum">     258 </span>                :            : {
+<span class="lineNum">     259 </span>                :            :     struct shash_node *node;
+<span class="lineNum">     260 </span>                :            :     struct hmap ls_map;
+<span class="lineNum">     261 </span>                :            : 
+<span class="lineNum">     262 </span>                :            :     /* Maps from ovn logical datapath tunnel key (which is also the vtep
+<span class="lineNum">     263 </span>                :            :      * logical switch tunnel key) to the corresponding vtep logical switch
+<span class="lineNum">     264 </span>                :            :      * instance.  Also, the shash map 'added_macs' is used for checking
+<span class="lineNum">     265 </span>                :            :      * duplicated MAC addresses in the same ovn logical datapath. 'mmr_ext'
+<span class="lineNum">     266 </span>                :            :      * is used to track mmr info per LS that needs creation/update and
+<span class="lineNum">     267 </span>                :            :      * 'locators_list' collects the new physical locators to be bound for
+<span class="lineNum">     268 </span>                :            :      * an mmr_ext; 'physical_locators' is used to track existing locators and
+<span class="lineNum">     269 </span>                :            :      * filter duplicates per logical switch. */
+<span class="lineNum">     270 </span>                :            :     struct ls_hash_node {
+<span class="lineNum">     271 </span>                :            :         struct hmap_node hmap_node;
+<span class="lineNum">     272 </span>                :            : 
+<span class="lineNum">     273 </span>                :            :         const struct vteprec_logical_switch *vtep_ls;
+<span class="lineNum">     274 </span>                :            :         struct shash added_macs;
+<span class="lineNum">     275 </span>                :            : 
+<span class="lineNum">     276 </span>                :            :         struct ovs_list locators_list;
+<span class="lineNum">     277 </span>                :            :         struct shash physical_locators;
+<span class="lineNum">     278 </span>                :            :         struct mmr_hash_node_data *mmr_ext;
+<span class="lineNum">     279 </span>                :            :     };
+<span class="lineNum">     280 </span>                :            : 
+<span class="lineNum">     281 </span>                :<span class="lineCov">        216 :     hmap_init(&amp;ls_map);</span>
+<span class="lineNum">     282 </span>[<span class="branchCov" title="Branch 2 was taken 232 times"> + </span><span class="branchCov" title="Branch 3 was taken 216 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 216 times"> + </span>]:<span class="lineCov">        448 :     SHASH_FOR_EACH (node, vtep_lswitches) {</span>
+<span class="lineNum">     283 </span>                :<span class="lineCov">        232 :         const struct vteprec_logical_switch *vtep_ls = node-&gt;data;</span>
+<span class="lineNum">     284 </span>                :            :         struct ls_hash_node *ls_node;
+<span class="lineNum">     285 </span>                :            : 
+<span class="lineNum">     286 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 232 times"> + </span>]:<span class="lineCov">        232 :         if (!vtep_ls-&gt;n_tunnel_key) {</span>
+<span class="lineNum">     287 </span>                :<span class="lineNoCov">          0 :             continue;</span>
+<span class="lineNum">     288 </span>                :            :         }
+<span class="lineNum">     289 </span>                :<span class="lineCov">        232 :         ls_node = xmalloc(sizeof *ls_node);</span>
+<span class="lineNum">     290 </span>                :<span class="lineCov">        232 :         ls_node-&gt;vtep_ls = vtep_ls;</span>
+<span class="lineNum">     291 </span>                :<span class="lineCov">        232 :         shash_init(&amp;ls_node-&gt;added_macs);</span>
+<span class="lineNum">     292 </span>                :<span class="lineCov">        232 :         shash_init(&amp;ls_node-&gt;physical_locators);</span>
+<span class="lineNum">     293 </span>                :<span class="lineCov">        232 :         ovs_list_init(&amp;ls_node-&gt;locators_list);</span>
+<span class="lineNum">     294 </span>                :<span class="lineCov">        232 :         ls_node-&gt;mmr_ext = NULL;</span>
+<span class="lineNum">     295 </span>                :<span class="lineCov">        232 :         hmap_insert(&amp;ls_map, &amp;ls_node-&gt;hmap_node,</span>
+<span class="lineNum">     296 </span>                :            :                     hash_uint64((uint64_t) vtep_ls-&gt;tunnel_key[0]));
+<span class="lineNum">     297 </span>                :            :     }
+<span class="lineNum">     298 </span>                :            : 
+<span class="lineNum">     299 </span>[<span class="branchCov" title="Branch 2 was taken 141 times"> + </span><span class="branchCov" title="Branch 3 was taken 216 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 216 times"> + </span>]:<span class="lineCov">        357 :     SHASH_FOR_EACH (node, non_vtep_pbs) {</span>
+<span class="lineNum">     300 </span>                :<span class="lineCov">        141 :         const struct sbrec_port_binding *port_binding_rec = node-&gt;data;</span>
+<span class="lineNum">     301 </span>                :            :         const struct sbrec_chassis *chassis_rec;
+<span class="lineNum">     302 </span>                :            :         struct ls_hash_node *ls_node;
+<span class="lineNum">     303 </span>                :            :         const char *chassis_ip;
+<span class="lineNum">     304 </span>                :            :         int64_t tnl_key;
+<span class="lineNum">     305 </span>                :            :         size_t i;
+<span class="lineNum">     306 </span>                :            : 
+<span class="lineNum">     307 </span>                :<span class="lineCov">        141 :         chassis_rec = port_binding_rec-&gt;chassis;</span>
+<span class="lineNum">     308 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 141 times"> + </span>]:<span class="lineCov">        141 :         if (!chassis_rec) {</span>
+<span class="lineNum">     309 </span>                :<span class="lineNoCov">          0 :             continue;</span>
+<span class="lineNum">     310 </span>                :            :         }
+<span class="lineNum">     311 </span>                :            : 
+<span class="lineNum">     312 </span>                :<span class="lineCov">        141 :         tnl_key = port_binding_rec-&gt;datapath-&gt;tunnel_key;</span>
+<span class="lineNum">     313 </span>[<span class="branchCov" title="Branch 3 was taken 95 times"> + </span><span class="branchCov" title="Branch 4 was taken 46 times"> + </span>][<span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchCov" title="Branch 6 was taken 46 times"> + </span>]:<span class="lineCov">        141 :         HMAP_FOR_EACH_WITH_HASH (ls_node, hmap_node,</span>
+<span class="lineNum">     314 </span>                :            :                                  hash_uint64((uint64_t) tnl_key),
+<span class="lineNum">     315 </span>                :            :                                  &amp;ls_map) {
+<span class="lineNum">     316 </span>        [<span class="branchCov" title="Branch 0 was taken 95 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         95 :             if (ls_node-&gt;vtep_ls-&gt;tunnel_key[0] == tnl_key) {</span>
+<span class="lineNum">     317 </span>                :<span class="lineCov">         95 :                 break;</span>
+<span class="lineNum">     318 </span>                :            :             }
+<span class="lineNum">     319 </span>                :            :         }
+<span class="lineNum">     320 </span>                :            :         /* If 'ls_node' is NULL, that means no vtep logical switch is
+<span class="lineNum">     321 </span>                :            :          * attached to the corresponding ovn logical datapath, so pass.
+<span class="lineNum">     322 </span>                :            :          */
+<span class="lineNum">     323 </span>        [<span class="branchCov" title="Branch 0 was taken 46 times"> + </span><span class="branchCov" title="Branch 1 was taken 95 times"> + </span>]:<span class="lineCov">        141 :         if (!ls_node) {</span>
+<span class="lineNum">     324 </span>                :<span class="lineCov">         46 :             continue;</span>
+<span class="lineNum">     325 </span>                :            :         }
+<span class="lineNum">     326 </span>                :            : 
+<span class="lineNum">     327 </span>                :<span class="lineCov">         95 :         chassis_ip = get_chassis_vtep_ip(chassis_rec);</span>
+<span class="lineNum">     328 </span>                :            :         /* Unreachable chassis, continue. */
+<span class="lineNum">     329 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 95 times"> + </span>]:<span class="lineCov">         95 :         if (!chassis_ip) {</span>
+<span class="lineNum">     330 </span>                :            :             static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     331 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_INFO_RL(&amp;rl, &quot;VTEP tunnel encap on chassis (%s) not found&quot;,</span>
+<span class="lineNum">     332 </span>                :            :                          chassis_rec-&gt;name);
+<span class="lineNum">     333 </span>                :<span class="lineNoCov">          0 :             continue;</span>
+<span class="lineNum">     334 </span>                :            :         }
+<span class="lineNum">     335 </span>                :            : 
+<span class="lineNum">     336 </span>                :<span class="lineCov">         95 :         const struct vteprec_physical_locator *pl =</span>
+<span class="lineNum">     337 </span>                :            :             shash_find_data(physical_locators, chassis_ip);
+<span class="lineNum">     338 </span>        [<span class="branchCov" title="Branch 0 was taken 5 times"> + </span><span class="branchCov" title="Branch 1 was taken 90 times"> + </span>]:<span class="lineCov">         95 :         if (!pl) {</span>
+<span class="lineNum">     339 </span>                :<span class="lineCov">          5 :             pl = create_pl(vtep_idl_txn, chassis_ip);</span>
+<span class="lineNum">     340 </span>                :<span class="lineCov">          5 :             shash_add(physical_locators, chassis_ip, pl);</span>
+<span class="lineNum">     341 </span>                :            :         }
+<span class="lineNum">     342 </span>                :            : 
+<span class="lineNum">     343 </span>                :<span class="lineCov">         95 :         const struct vteprec_physical_locator *ls_pl =</span>
+<span class="lineNum">     344 </span>                :<span class="lineCov">         95 :             shash_find_data(&amp;ls_node-&gt;physical_locators, chassis_ip);</span>
+<span class="lineNum">     345 </span>        [<span class="branchCov" title="Branch 0 was taken 92 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">         95 :         if (!ls_pl) {</span>
+<span class="lineNum">     346 </span>                :<span class="lineCov">         92 :             struct vtep_rec_physical_locator_list_entry *ploc_entry =</span>
+<span class="lineNum">     347 </span>                :            :                 xmalloc(sizeof *ploc_entry);
+<span class="lineNum">     348 </span>                :<span class="lineCov">         92 :             ploc_entry-&gt;vteprec_ploc = pl;</span>
+<span class="lineNum">     349 </span>                :<span class="lineCov">         92 :             ovs_list_push_back(&amp;ls_node-&gt;locators_list,</span>
+<span class="lineNum">     350 </span>                :            :                                &amp;ploc_entry-&gt;locators_node);
+<span class="lineNum">     351 </span>                :<span class="lineCov">         92 :             shash_add(&amp;ls_node-&gt;physical_locators, chassis_ip, pl);</span>
+<span class="lineNum">     352 </span>                :            :         }
+<span class="lineNum">     353 </span>                :            : 
+<span class="lineNum">     354 </span>                :<span class="lineCov">         95 :         char *mac_tnlkey = xasprintf(&quot;%s_%&quot;PRId64, &quot;unknown-dst&quot;, tnl_key);</span>
+<span class="lineNum">     355 </span>                :<span class="lineCov">         95 :         ls_node-&gt;mmr_ext = shash_find_data(mcast_macs_rmts, mac_tnlkey);</span>
+<span class="lineNum">     356 </span>                :            : 
+<span class="lineNum">     357 </span>[<span class="branchCov" title="Branch 0 was taken 87 times"> + </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 87 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         95 :         if (ls_node-&gt;mmr_ext &amp;&amp;</span>
+<span class="lineNum">     358 </span>                :<span class="lineCov">         87 :             ls_node-&gt;mmr_ext-&gt;mmr-&gt;logical_switch == ls_node-&gt;vtep_ls) {</span>
+<span class="lineNum">     359 </span>                :            : 
+<span class="lineNum">     360 </span>                :            :             /* Delete the entry from the hash table so the mmr does not get
+<span class="lineNum">     361 </span>                :            :              * removed from the DB later on during stale checking. */
+<span class="lineNum">     362 </span>                :<span class="lineCov">         87 :             shash_find_and_delete(mcast_macs_rmts, mac_tnlkey);</span>
+<span class="lineNum">     363 </span>                :            :         }
+<span class="lineNum">     364 </span>                :<span class="lineCov">         95 :         free(mac_tnlkey);</span>
+<span class="lineNum">     365 </span>                :            : 
+<span class="lineNum">     366 </span>        [<span class="branchCov" title="Branch 0 was taken 90 times"> + </span><span class="branchCov" title="Branch 1 was taken 95 times"> + </span>]:<span class="lineCov">        185 :         for (i = 0; i &lt; port_binding_rec-&gt;n_mac; i++) {</span>
+<span class="lineNum">     367 </span>                :            :             const struct vteprec_ucast_macs_remote *umr;
+<span class="lineNum">     368 </span>                :            :             const struct sbrec_port_binding *conflict;
+<span class="lineNum">     369 </span>                :<span class="lineCov">         90 :             char *mac = port_binding_rec-&gt;mac[i];</span>
+<span class="lineNum">     370 </span>                :            : 
+<span class="lineNum">     371 </span>                :            :             /* Checks for duplicate MAC in the same vtep logical switch. */
+<span class="lineNum">     372 </span>                :<span class="lineCov">         90 :             conflict = shash_find_data(&amp;ls_node-&gt;added_macs, mac);</span>
+<span class="lineNum">     373 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 87 times"> + </span>]:<span class="lineCov">         90 :             if (conflict) {</span>
+<span class="lineNum">     374 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          3 :                 VLOG_WARN(&quot;MAC address (%s) has already been known to be &quot;</span>
+<span class="lineNum">     375 </span>                :            :                           &quot;on logical port (%s) in the same logical &quot;
+<span class="lineNum">     376 </span>                :            :                           &quot;datapath, so just ignore this logical port (%s)&quot;,
+<span class="lineNum">     377 </span>                :            :                           mac, conflict-&gt;logical_port,
+<span class="lineNum">     378 </span>                :            :                           port_binding_rec-&gt;logical_port);
+<span class="lineNum">     379 </span>                :<span class="lineCov">          3 :                 continue;</span>
+<span class="lineNum">     380 </span>                :            :             }
+<span class="lineNum">     381 </span>                :<span class="lineCov">         87 :             shash_add(&amp;ls_node-&gt;added_macs, mac, port_binding_rec);</span>
+<span class="lineNum">     382 </span>                :            : 
+<span class="lineNum">     383 </span>                :<span class="lineCov">         87 :             char *mac_ip_tnlkey = xasprintf(&quot;%s_%s_%&quot;PRId64, mac, chassis_ip,</span>
+<span class="lineNum">     384 </span>                :            :                                             tnl_key);
+<span class="lineNum">     385 </span>                :<span class="lineCov">         87 :             umr = shash_find_data(ucast_macs_rmts, mac_ip_tnlkey);</span>
+<span class="lineNum">     386 </span>                :            :             /* If finds the 'umr' entry for the mac, ip, and tnl_key, deletes
+<span class="lineNum">     387 </span>                :            :              * the entry from shash so that it is not gargage collected.
+<span class="lineNum">     388 </span>                :            :              *
+<span class="lineNum">     389 </span>                :            :              * If not found, creates a new 'umr' entry. */
+<span class="lineNum">     390 </span>[<span class="branchCov" title="Branch 0 was taken 81 times"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 81 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         87 :             if (umr &amp;&amp; umr-&gt;logical_switch == ls_node-&gt;vtep_ls) {</span>
+<span class="lineNum">     391 </span>                :<span class="lineCov">         81 :                 shash_find_and_delete(ucast_macs_rmts, mac_ip_tnlkey);</span>
+<span class="lineNum">     392 </span>                :            :             } else {
+<span class="lineNum">     393 </span>                :            :                 const struct vteprec_ucast_macs_remote *new_umr;
+<span class="lineNum">     394 </span>                :<span class="lineCov">          6 :                 new_umr = create_umr(vtep_idl_txn, mac, ls_node-&gt;vtep_ls);</span>
+<span class="lineNum">     395 </span>                :<span class="lineCov">          6 :                 vteprec_ucast_macs_remote_set_locator(new_umr, pl);</span>
+<span class="lineNum">     396 </span>                :            :             }
+<span class="lineNum">     397 </span>                :<span class="lineCov">         87 :             free(mac_ip_tnlkey);</span>
+<span class="lineNum">     398 </span>                :            :         }
+<span class="lineNum">     399 </span>                :            :     }
+<span class="lineNum">     400 </span>                :            : 
+<span class="lineNum">     401 </span>                :            :     /* Removes all remaining 'umr's, since they do not exist anymore. */
+<span class="lineNum">     402 </span>[<span class="branchCov" title="Branch 2 was taken 4 times"> + </span><span class="branchCov" title="Branch 3 was taken 216 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 216 times"> + </span>]:<span class="lineCov">        220 :     SHASH_FOR_EACH (node, ucast_macs_rmts) {</span>
+<span class="lineNum">     403 </span>                :<span class="lineCov">          4 :         vteprec_ucast_macs_remote_delete(node-&gt;data);</span>
+<span class="lineNum">     404 </span>                :            :     }
+<span class="lineNum">     405 </span>                :            :     struct ls_hash_node *iter, *next;
+<span class="lineNum">     406 </span>[<span class="branchCov" title="Branch 1 was taken 216 times"> + </span><span class="branchCov" title="Branch 2 was taken 232 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 216 times"> + </span>]:<span class="lineCov">        448 :     HMAP_FOR_EACH_SAFE (iter, next, hmap_node, &amp;ls_map) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 6 was taken 232 times"> + </span><span class="branchCov" title="Branch 7 was taken 216 times"> + </span>]
+<span class="lineNum">     407 </span>                :            :         struct vtep_rec_physical_locator_list_entry *ploc_entry;
+<span class="lineNum">     408 </span>                :<span class="lineCov">        232 :         vtep_update_mmr(vtep_idl_txn, &amp;iter-&gt;locators_list,</span>
+<span class="lineNum">     409 </span>                :<span class="lineCov">        232 :                         iter-&gt;vtep_ls, iter-&gt;mmr_ext);</span>
+<span class="lineNum">     410 </span>        [<span class="branchCov" title="Branch 1 was taken 92 times"> + </span><span class="branchCov" title="Branch 2 was taken 232 times"> + </span>]:<span class="lineCov">        324 :         LIST_FOR_EACH_POP(ploc_entry, locators_node,</span>
+<span class="lineNum">     411 </span>                :            :                           &amp;iter-&gt;locators_list) {
+<span class="lineNum">     412 </span>                :<span class="lineCov">         92 :             free(ploc_entry);</span>
+<span class="lineNum">     413 </span>                :            :         }
+<span class="lineNum">     414 </span>                :<span class="lineCov">        232 :         hmap_remove(&amp;ls_map, &amp;iter-&gt;hmap_node);</span>
+<span class="lineNum">     415 </span>                :<span class="lineCov">        232 :         shash_destroy(&amp;iter-&gt;added_macs);</span>
+<span class="lineNum">     416 </span>                :<span class="lineCov">        232 :         shash_destroy(&amp;iter-&gt;physical_locators);</span>
+<span class="lineNum">     417 </span>                :<span class="lineCov">        232 :         free(iter);</span>
+<span class="lineNum">     418 </span>                :            :     }
+<span class="lineNum">     419 </span>                :<span class="lineCov">        216 :     hmap_destroy(&amp;ls_map);</span>
+<span class="lineNum">     420 </span>                :            : 
+<span class="lineNum">     421 </span>                :            :     /* Clean stale 'Mcast_Macs_Remote' */
+<span class="lineNum">     422 </span>                :            :     struct mmr_hash_node_data *mmr_ext;
+<span class="lineNum">     423 </span>[<span class="branchCov" title="Branch 2 was taken 5 times"> + </span><span class="branchCov" title="Branch 3 was taken 216 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 216 times"> + </span>]:<span class="lineCov">        221 :     SHASH_FOR_EACH (node, mcast_macs_rmts) {</span>
+<span class="lineNum">     424 </span>                :<span class="lineCov">          5 :         mmr_ext = node-&gt;data;</span>
+<span class="lineNum">     425 </span>                :<span class="lineCov">          5 :         vteprec_mcast_macs_remote_delete(mmr_ext-&gt;mmr);</span>
+<span class="lineNum">     426 </span>                :            :     }
+<span class="lineNum">     427 </span>                :<span class="lineCov">        216 : }</span>
+<span class="lineNum">     428 </span>                :            : 
+<a name="429"><span class="lineNum">     429 </span>                :            : /* Resets all logical switches' 'tunnel_key' to NULL */</a>
+<span class="lineNum">     430 </span>                :            : static bool
+<span class="lineNum">     431 </span>                :<span class="lineCov">         19 : vtep_lswitch_cleanup(struct ovsdb_idl *vtep_idl)</span>
+<span class="lineNum">     432 </span>                :            : {
+<span class="lineNum">     433 </span>                :            :    const struct vteprec_logical_switch *vtep_ls;
+<span class="lineNum">     434 </span>                :<span class="lineCov">         19 :     bool done = true;</span>
+<span class="lineNum">     435 </span>                :            : 
+<span class="lineNum">     436 </span>        [<span class="branchCov" title="Branch 2 was taken 26 times"> + </span><span class="branchCov" title="Branch 3 was taken 19 times"> + </span>]:<span class="lineCov">         45 :     VTEPREC_LOGICAL_SWITCH_FOR_EACH (vtep_ls, vtep_idl) {</span>
+<span class="lineNum">     437 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchCov" title="Branch 1 was taken 16 times"> + </span>]:<span class="lineCov">         26 :         if (vtep_ls-&gt;n_tunnel_key) {</span>
+<span class="lineNum">     438 </span>                :<span class="lineCov">         10 :             vteprec_logical_switch_set_tunnel_key(vtep_ls, NULL, 0);</span>
+<span class="lineNum">     439 </span>                :<span class="lineCov">         10 :             done = false;</span>
+<span class="lineNum">     440 </span>                :            :         }
+<span class="lineNum">     441 </span>                :            :     }
+<span class="lineNum">     442 </span>                :            : 
+<span class="lineNum">     443 </span>                :<span class="lineCov">         19 :     return done;</span>
+<span class="lineNum">     444 </span>                :            : }
+<span class="lineNum">     445 </span>                :            : 
+<span class="lineNum">     446 </span>                :            : /* Removes all entries in the 'Ucast_Macs_Remote' table in the vtep database.
+<a name="447"><span class="lineNum">     447 </span>                :            :  * Returns true when all done (i.e. no entry to remove). */</a>
+<span class="lineNum">     448 </span>                :            : static bool
+<span class="lineNum">     449 </span>                :<span class="lineCov">         19 : vtep_ucast_macs_cleanup(struct ovsdb_idl *vtep_idl)</span>
+<span class="lineNum">     450 </span>                :            : {
+<span class="lineNum">     451 </span>                :            :     const struct vteprec_ucast_macs_remote *umr;
+<span class="lineNum">     452 </span>                :            : 
+<span class="lineNum">     453 </span>        [<span class="branchCov" title="Branch 1 was taken 2 times"> + </span><span class="branchCov" title="Branch 2 was taken 17 times"> + </span>]:<span class="lineCov">         19 :     VTEPREC_UCAST_MACS_REMOTE_FOR_EACH (umr, vtep_idl) {</span>
+<span class="lineNum">     454 </span>                :<span class="lineCov">          2 :         vteprec_ucast_macs_remote_delete(umr);</span>
+<span class="lineNum">     455 </span>                :<span class="lineCov">          2 :         return false;</span>
+<span class="lineNum">     456 </span>                :            :     }
+<span class="lineNum">     457 </span>                :            : 
+<span class="lineNum">     458 </span>                :<span class="lineCov">         17 :     return true;</span>
+<span class="lineNum">     459 </span>                :            : }
+<span class="lineNum">     460 </span>                :            : 
+<span class="lineNum">     461 </span>                :            : /* Removes all entries in the 'Mcast_Macs_Remote' table in vtep database.
+<a name="462"><span class="lineNum">     462 </span>                :            :  * Returns true when all done (i.e. no entry to remove). */</a>
+<span class="lineNum">     463 </span>                :            : static bool
+<span class="lineNum">     464 </span>                :<span class="lineCov">         19 : vtep_mcast_macs_cleanup(struct ovsdb_idl *vtep_idl)</span>
+<span class="lineNum">     465 </span>                :            : {
+<span class="lineNum">     466 </span>                :            :     const struct vteprec_mcast_macs_remote *mmr;
+<span class="lineNum">     467 </span>                :            : 
+<span class="lineNum">     468 </span>        [<span class="branchCov" title="Branch 1 was taken 3 times"> + </span><span class="branchCov" title="Branch 2 was taken 16 times"> + </span>]:<span class="lineCov">         19 :     VTEPREC_MCAST_MACS_REMOTE_FOR_EACH (mmr, vtep_idl) {</span>
+<span class="lineNum">     469 </span>                :<span class="lineCov">          3 :         vteprec_mcast_macs_remote_delete(mmr);</span>
+<span class="lineNum">     470 </span>                :<span class="lineCov">          3 :         return false;</span>
+<span class="lineNum">     471 </span>                :            :     }
+<span class="lineNum">     472 </span>                :            : 
+<span class="lineNum">     473 </span>                :<span class="lineCov">         16 :     return true;</span>
+<span class="lineNum">     474 </span>                :            : }
+<span class="lineNum">     475 </span>                :            : 
+<a name="476"><span class="lineNum">     476 </span>                :            : /* Updates vtep logical switch tunnel keys. */</a>
+<span class="lineNum">     477 </span>                :            : void
+<span class="lineNum">     478 </span>                :<span class="lineCov">        269 : vtep_run(struct controller_vtep_ctx *ctx)</span>
+<span class="lineNum">     479 </span>                :            : {
+<span class="lineNum">     480 </span>        [<span class="branchCov" title="Branch 0 was taken 53 times"> + </span><span class="branchCov" title="Branch 1 was taken 216 times"> + </span>]:<span class="lineCov">        269 :     if (!ctx-&gt;vtep_idl_txn) {</span>
+<span class="lineNum">     481 </span>                :<span class="lineCov">         53 :         return;</span>
+<span class="lineNum">     482 </span>                :            :     }
+<span class="lineNum">     483 </span>                :            : 
+<span class="lineNum">     484 </span>                :<span class="lineCov">        216 :     struct sset vtep_pswitches = SSET_INITIALIZER(&amp;vtep_pswitches);</span>
+<span class="lineNum">     485 </span>                :<span class="lineCov">        216 :     struct shash vtep_lswitches = SHASH_INITIALIZER(&amp;vtep_lswitches);</span>
+<span class="lineNum">     486 </span>                :<span class="lineCov">        216 :     struct shash ucast_macs_rmts = SHASH_INITIALIZER(&amp;ucast_macs_rmts);</span>
+<span class="lineNum">     487 </span>                :<span class="lineCov">        216 :     struct shash mcast_macs_rmts = SHASH_INITIALIZER(&amp;mcast_macs_rmts);</span>
+<span class="lineNum">     488 </span>                :<span class="lineCov">        216 :     struct shash physical_locators = SHASH_INITIALIZER(&amp;physical_locators);</span>
+<span class="lineNum">     489 </span>                :<span class="lineCov">        216 :     struct shash vtep_pbs = SHASH_INITIALIZER(&amp;vtep_pbs);</span>
+<span class="lineNum">     490 </span>                :<span class="lineCov">        216 :     struct shash non_vtep_pbs = SHASH_INITIALIZER(&amp;non_vtep_pbs);</span>
+<span class="lineNum">     491 </span>                :            :     const struct vteprec_physical_switch *vtep_ps;
+<span class="lineNum">     492 </span>                :            :     const struct vteprec_logical_switch *vtep_ls;
+<span class="lineNum">     493 </span>                :            :     const struct vteprec_ucast_macs_remote *umr;
+<span class="lineNum">     494 </span>                :            :     const struct sbrec_port_binding *port_binding_rec;
+<span class="lineNum">     495 </span>                :            :     const struct vteprec_mcast_macs_remote *mmr;
+<span class="lineNum">     496 </span>                :            :     struct shash_node *node;
+<span class="lineNum">     497 </span>                :            : 
+<span class="lineNum">     498 </span>                :            :     /* Collects 'Physical_Switch's. */
+<span class="lineNum">     499 </span>        [<span class="branchCov" title="Branch 2 was taken 233 times"> + </span><span class="branchCov" title="Branch 3 was taken 216 times"> + </span>]:<span class="lineCov">        449 :     VTEPREC_PHYSICAL_SWITCH_FOR_EACH (vtep_ps, ctx-&gt;vtep_idl) {</span>
+<span class="lineNum">     500 </span>                :<span class="lineCov">        233 :         sset_add(&amp;vtep_pswitches, vtep_ps-&gt;name);</span>
+<span class="lineNum">     501 </span>                :            :     }
+<span class="lineNum">     502 </span>                :            : 
+<span class="lineNum">     503 </span>                :            :     /* Collects 'Logical_Switch's. */
+<span class="lineNum">     504 </span>        [<span class="branchCov" title="Branch 2 was taken 232 times"> + </span><span class="branchCov" title="Branch 3 was taken 216 times"> + </span>]:<span class="lineCov">        448 :     VTEPREC_LOGICAL_SWITCH_FOR_EACH (vtep_ls, ctx-&gt;vtep_idl) {</span>
+<span class="lineNum">     505 </span>                :<span class="lineCov">        232 :         shash_add(&amp;vtep_lswitches, vtep_ls-&gt;name, vtep_ls);</span>
+<span class="lineNum">     506 </span>                :            :     }
+<span class="lineNum">     507 </span>                :            : 
+<span class="lineNum">     508 </span>                :            :     /* Collects 'Ucast_Macs_Remote's. */
+<span class="lineNum">     509 </span>        [<span class="branchCov" title="Branch 2 was taken 85 times"> + </span><span class="branchCov" title="Branch 3 was taken 216 times"> + </span>]:<span class="lineCov">        301 :     VTEPREC_UCAST_MACS_REMOTE_FOR_EACH (umr, ctx-&gt;vtep_idl) {</span>
+<span class="lineNum">     510 </span>                :<span class="lineCov">         85 :         char *mac_ip_tnlkey =</span>
+<span class="lineNum">     511 </span>[<span class="branchCov" title="Branch 0 was taken 85 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 85 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        170 :             xasprintf(&quot;%s_%s_%&quot;PRId64, umr-&gt;MAC,</span>
+<span class="lineNum">     512 </span>                :<span class="lineCov">        170 :                       umr-&gt;locator ? umr-&gt;locator-&gt;dst_ip : &quot;&quot;,</span>
+<span class="lineNum">     513 </span>        [<span class="branchCov" title="Branch 0 was taken 85 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         85 :                       umr-&gt;logical_switch &amp;&amp; umr-&gt;logical_switch-&gt;n_tunnel_key</span>
+<span class="lineNum">     514 </span>                :<span class="lineCov">         85 :                           ? umr-&gt;logical_switch-&gt;tunnel_key[0] : INT64_MAX);</span>
+<span class="lineNum">     515 </span>                :            : 
+<span class="lineNum">     516 </span>                :<span class="lineCov">         85 :         shash_add(&amp;ucast_macs_rmts, mac_ip_tnlkey, umr);</span>
+<span class="lineNum">     517 </span>                :<span class="lineCov">         85 :         free(mac_ip_tnlkey);</span>
+<span class="lineNum">     518 </span>                :            :     }
+<span class="lineNum">     519 </span>                :            : 
+<span class="lineNum">     520 </span>                :            :     /* Collects 'Mcast_Macs_Remote's. */
+<span class="lineNum">     521 </span>        [<span class="branchCov" title="Branch 2 was taken 92 times"> + </span><span class="branchCov" title="Branch 3 was taken 216 times"> + </span>]:<span class="lineCov">        308 :     VTEPREC_MCAST_MACS_REMOTE_FOR_EACH (mmr, ctx-&gt;vtep_idl) {</span>
+<span class="lineNum">     522 </span>                :<span class="lineCov">         92 :         struct mmr_hash_node_data *mmr_ext = xmalloc(sizeof *mmr_ext);;</span>
+<span class="lineNum">     523 </span>                :<span class="lineCov">         92 :         char *mac_tnlkey =</span>
+<span class="lineNum">     524 </span>        [<span class="branchCov" title="Branch 0 was taken 92 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        184 :             xasprintf(&quot;%s_%&quot;PRId64, mmr-&gt;MAC,</span>
+<span class="lineNum">     525 </span>        [<span class="branchCov" title="Branch 0 was taken 92 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         92 :                       mmr-&gt;logical_switch &amp;&amp; mmr-&gt;logical_switch-&gt;n_tunnel_key</span>
+<span class="lineNum">     526 </span>                :<span class="lineCov">         92 :                           ? mmr-&gt;logical_switch-&gt;tunnel_key[0] : INT64_MAX);</span>
+<span class="lineNum">     527 </span>                :            : 
+<span class="lineNum">     528 </span>                :<span class="lineCov">         92 :         shash_add(&amp;mcast_macs_rmts, mac_tnlkey, mmr_ext);</span>
+<span class="lineNum">     529 </span>                :<span class="lineCov">         92 :         mmr_ext-&gt;mmr = mmr;</span>
+<span class="lineNum">     530 </span>                :            : 
+<span class="lineNum">     531 </span>                :<span class="lineCov">         92 :         shash_init(&amp;mmr_ext-&gt;physical_locators);</span>
+<span class="lineNum">     532 </span>        [<span class="branchCov" title="Branch 0 was taken 127 times"> + </span><span class="branchCov" title="Branch 1 was taken 92 times"> + </span>]:<span class="lineCov">        219 :         for (size_t i = 0; i &lt; mmr-&gt;locator_set-&gt;n_locators; i++) {</span>
+<span class="lineNum">     533 </span>                :<span class="lineCov">        127 :             shash_add(&amp;mmr_ext-&gt;physical_locators,</span>
+<span class="lineNum">     534 </span>                :<span class="lineCov">        127 :                       mmr-&gt;locator_set-&gt;locators[i]-&gt;dst_ip,</span>
+<span class="lineNum">     535 </span>                :<span class="lineCov">        127 :                       mmr-&gt;locator_set-&gt;locators[i]);</span>
+<span class="lineNum">     536 </span>                :            :         }
+<span class="lineNum">     537 </span>                :            : 
+<span class="lineNum">     538 </span>                :<span class="lineCov">         92 :         free(mac_tnlkey);</span>
+<span class="lineNum">     539 </span>                :            :     }
+<span class="lineNum">     540 </span>                :            : 
+<span class="lineNum">     541 </span>                :            :     /* Collects 'Physical_Locator's. */
+<span class="lineNum">     542 </span>                :            :     const struct vteprec_physical_locator *pl;
+<span class="lineNum">     543 </span>        [<span class="branchCov" title="Branch 2 was taken 201 times"> + </span><span class="branchCov" title="Branch 3 was taken 216 times"> + </span>]:<span class="lineCov">        417 :     VTEPREC_PHYSICAL_LOCATOR_FOR_EACH (pl, ctx-&gt;vtep_idl) {</span>
+<span class="lineNum">     544 </span>                :<span class="lineCov">        201 :         shash_add(&amp;physical_locators, pl-&gt;dst_ip, pl);</span>
+<span class="lineNum">     545 </span>                :            :     }
+<span class="lineNum">     546 </span>                :            : 
+<span class="lineNum">     547 </span>                :            :     /* Collects and classifies 'Port_Binding's. */
+<span class="lineNum">     548 </span>        [<span class="branchCov" title="Branch 2 was taken 385 times"> + </span><span class="branchCov" title="Branch 3 was taken 216 times"> + </span>]:<span class="lineCov">        601 :     SBREC_PORT_BINDING_FOR_EACH(port_binding_rec, ctx-&gt;ovnsb_idl) {</span>
+<span class="lineNum">     549 </span>                :<span class="lineCov">        385 :         struct shash *target =</span>
+<span class="lineNum">     550 </span>        [<span class="branchCov" title="Branch 0 was taken 202 times"> + </span><span class="branchCov" title="Branch 1 was taken 183 times"> + </span>]:<span class="lineCov">        385 :             !strcmp(port_binding_rec-&gt;type, &quot;vtep&quot;) ? &amp;vtep_pbs : &amp;non_vtep_pbs;</span>
+<span class="lineNum">     551 </span>                :            : 
+<span class="lineNum">     552 </span>        [<span class="branchCov" title="Branch 0 was taken 93 times"> + </span><span class="branchCov" title="Branch 1 was taken 292 times"> + </span>]:<span class="lineCov">        385 :         if (!port_binding_rec-&gt;chassis) {</span>
+<span class="lineNum">     553 </span>                :<span class="lineCov">         93 :             continue;</span>
+<span class="lineNum">     554 </span>                :            :         }
+<span class="lineNum">     555 </span>                :<span class="lineCov">        292 :         shash_add(target, port_binding_rec-&gt;logical_port, port_binding_rec);</span>
+<span class="lineNum">     556 </span>                :            :     }
+<span class="lineNum">     557 </span>                :            : 
+<span class="lineNum">     558 </span>                :<span class="lineCov">        216 :     ovsdb_idl_txn_add_comment(ctx-&gt;vtep_idl_txn,</span>
+<span class="lineNum">     559 </span>                :            :                               &quot;ovn-controller-vtep: update logical switch &quot;
+<span class="lineNum">     560 </span>                :            :                               &quot;tunnel keys and 'ucast_macs_remote's&quot;);
+<span class="lineNum">     561 </span>                :            : 
+<span class="lineNum">     562 </span>                :<span class="lineCov">        216 :     vtep_lswitch_run(&amp;vtep_pbs, &amp;vtep_pswitches, &amp;vtep_lswitches);</span>
+<span class="lineNum">     563 </span>                :<span class="lineCov">        216 :     vtep_macs_run(ctx-&gt;vtep_idl_txn, &amp;ucast_macs_rmts,</span>
+<span class="lineNum">     564 </span>                :            :                   &amp;mcast_macs_rmts, &amp;physical_locators,
+<span class="lineNum">     565 </span>                :            :                   &amp;vtep_lswitches, &amp;non_vtep_pbs);
+<span class="lineNum">     566 </span>                :            : 
+<span class="lineNum">     567 </span>                :<span class="lineCov">        216 :     sset_destroy(&amp;vtep_pswitches);</span>
+<span class="lineNum">     568 </span>                :<span class="lineCov">        216 :     shash_destroy(&amp;vtep_lswitches);</span>
+<span class="lineNum">     569 </span>                :<span class="lineCov">        216 :     shash_destroy(&amp;ucast_macs_rmts);</span>
+<span class="lineNum">     570 </span>[<span class="branchCov" title="Branch 2 was taken 5 times"> + </span><span class="branchCov" title="Branch 3 was taken 216 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 216 times"> + </span>]:<span class="lineCov">        221 :     SHASH_FOR_EACH (node, &amp;mcast_macs_rmts) {</span>
+<span class="lineNum">     571 </span>                :<span class="lineCov">          5 :         struct mmr_hash_node_data *mmr_ext = node-&gt;data;</span>
+<span class="lineNum">     572 </span>                :<span class="lineCov">          5 :         shash_destroy(&amp;mmr_ext-&gt;physical_locators);</span>
+<span class="lineNum">     573 </span>                :<span class="lineCov">          5 :         free(mmr_ext);</span>
+<span class="lineNum">     574 </span>                :            :     }
+<span class="lineNum">     575 </span>                :<span class="lineCov">        216 :     shash_destroy(&amp;mcast_macs_rmts);</span>
+<span class="lineNum">     576 </span>                :<span class="lineCov">        216 :     shash_destroy(&amp;physical_locators);</span>
+<span class="lineNum">     577 </span>                :<span class="lineCov">        216 :     shash_destroy(&amp;vtep_pbs);</span>
+<span class="lineNum">     578 </span>                :<span class="lineCov">        216 :     shash_destroy(&amp;non_vtep_pbs);</span>
+<span class="lineNum">     579 </span>                :            : }
+<span class="lineNum">     580 </span>                :            : 
+<span class="lineNum">     581 </span>                :            : /* Cleans up all related entries in vtep.  Returns true when done (i.e. there
+<a name="582"><span class="lineNum">     582 </span>                :            :  * is no change made to 'ctx-&gt;vtep_idl'), otherwise returns false. */</a>
+<span class="lineNum">     583 </span>                :            : bool
+<span class="lineNum">     584 </span>                :<span class="lineCov">         27 : vtep_cleanup(struct controller_vtep_ctx *ctx)</span>
+<span class="lineNum">     585 </span>                :            : {
+<span class="lineNum">     586 </span>        [<span class="branchCov" title="Branch 0 was taken 8 times"> + </span><span class="branchCov" title="Branch 1 was taken 19 times"> + </span>]:<span class="lineCov">         27 :     if (!ctx-&gt;vtep_idl_txn) {</span>
+<span class="lineNum">     587 </span>                :<span class="lineCov">          8 :         return false;</span>
+<span class="lineNum">     588 </span>                :            :     }
+<span class="lineNum">     589 </span>                :            : 
+<span class="lineNum">     590 </span>                :            :     bool all_done;
+<span class="lineNum">     591 </span>                :            : 
+<span class="lineNum">     592 </span>                :<span class="lineCov">         19 :     ovsdb_idl_txn_add_comment(ctx-&gt;vtep_idl_txn,</span>
+<span class="lineNum">     593 </span>                :            :                               &quot;ovn-controller-vtep: cleaning up vtep &quot;
+<span class="lineNum">     594 </span>                :            :                               &quot;configuration&quot;);
+<span class="lineNum">     595 </span>                :<span class="lineCov">         19 :     all_done = vtep_lswitch_cleanup(ctx-&gt;vtep_idl);</span>
+<span class="lineNum">     596 </span>[<span class="branchCov" title="Branch 1 was taken 17 times"> + </span><span class="branchCov" title="Branch 2 was taken 2 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 11 times"> + </span><span class="branchCov" title="Branch 4 was taken 6 times"> + </span>]:<span class="lineCov">         19 :     all_done = vtep_ucast_macs_cleanup(ctx-&gt;vtep_idl) &amp;&amp; all_done;</span>
+<span class="lineNum">     597 </span>[<span class="branchCov" title="Branch 1 was taken 16 times"> + </span><span class="branchCov" title="Branch 2 was taken 3 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 11 times"> + </span><span class="branchCov" title="Branch 4 was taken 5 times"> + </span>]:<span class="lineCov">         19 :     all_done = vtep_mcast_macs_cleanup(ctx-&gt;vtep_idl) &amp;&amp; all_done;</span>
+<span class="lineNum">     598 </span>                :            : 
+<span class="lineNum">     599 </span>                :<span class="lineCov">         19 :     return all_done;</span>
+<span class="lineNum">     600 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

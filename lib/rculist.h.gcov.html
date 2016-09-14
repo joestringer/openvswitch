@@ -1,0 +1,484 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/rculist.h</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - rculist.h<span style="font-size: 80%;"> (source / <a href="rculist.h.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">40</td>
+            <td class="headerCovTableEntry">40</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">10</td>
+            <td class="headerCovTableEntry">10</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntryHi">-</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2008, 2009, 2010, 2011, 2013, 2014 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : #ifndef RCULIST_H
+<span class="lineNum">      17 </span>                :            : #define RCULIST_H 1
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : /* A single writer multiple RCU-reader doubly linked list.
+<span class="lineNum">      20 </span>                :            :  *
+<span class="lineNum">      21 </span>                :            :  * RCU readers may iterate over the list at the same time as a writer is
+<span class="lineNum">      22 </span>                :            :  * modifying the list.  Multiple writers can be supported by use of mutual
+<span class="lineNum">      23 </span>                :            :  * exclusion, but rculist does not provide that, as the user of rculist
+<span class="lineNum">      24 </span>                :            :  * typically does that already.
+<span class="lineNum">      25 </span>                :            :  *
+<span class="lineNum">      26 </span>                :            :  * To be RCU-friendly, the struct rculist instances must be freed via
+<span class="lineNum">      27 </span>                :            :  * ovsrcu_postpone().
+<span class="lineNum">      28 </span>                :            :  *
+<span class="lineNum">      29 </span>                :            :  * The API is almost the same as for struct ovs_list, with the following
+<span class="lineNum">      30 </span>                :            :  * exeptions:
+<span class="lineNum">      31 </span>                :            :  *
+<span class="lineNum">      32 </span>                :            :  * - The 'prev' pointer may not be accessed by the user.
+<span class="lineNum">      33 </span>                :            :  * - The 'next' pointer should be accessed via rculist_next() by readers, and
+<span class="lineNum">      34 </span>                :            :  *   rculist_next_protected() by the writer.
+<span class="lineNum">      35 </span>                :            :  * - No rculist_moved(): due to the memory management limitation stated above,
+<span class="lineNum">      36 </span>                :            :  *   rculist instances may not be reallocated, as realloc may instantly free
+<span class="lineNum">      37 </span>                :            :  *   the old memory.
+<span class="lineNum">      38 </span>                :            :  * - rculist_front() returns a const pointer to accommodate for an RCU reader.
+<span class="lineNum">      39 </span>                :            :  * - rculist_splice_hidden(): Spliced elements may not have been visible to
+<span class="lineNum">      40 </span>                :            :  *   RCU readers before the operation.
+<span class="lineNum">      41 </span>                :            :  * - rculist_poison(): Only poisons the 'prev' pointer.
+<span class="lineNum">      42 </span>                :            :  *
+<span class="lineNum">      43 </span>                :            :  * The following functions are variations of the struct ovs_list functions with
+<span class="lineNum">      44 </span>                :            :  * similar names, but are now restricted to the writer use:
+<span class="lineNum">      45 </span>                :            :  *
+<span class="lineNum">      46 </span>                :            :  * - rculist_back_protected()
+<span class="lineNum">      47 </span>                :            :  * - rculist_is_short_protected()
+<span class="lineNum">      48 </span>                :            :  * - rculist_is_singleton_protected()
+<span class="lineNum">      49 </span>                :            :  */
+<span class="lineNum">      50 </span>                :            : 
+<span class="lineNum">      51 </span>                :            : #include &lt;stdbool.h&gt;
+<span class="lineNum">      52 </span>                :            : #include &lt;stddef.h&gt;
+<span class="lineNum">      53 </span>                :            : #include &quot;ovs-rcu.h&quot;
+<span class="lineNum">      54 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      55 </span>                :            : 
+<span class="lineNum">      56 </span>                :            : /* A non-existing mutex to make it more difficult for an user to accidentally
+<span class="lineNum">      57 </span>                :            :  * keep using the 'prev' pointer.  This may be helpful when porting code from
+<span class="lineNum">      58 </span>                :            :  * struct ovs_list to rculist. */
+<span class="lineNum">      59 </span>                :            : extern struct ovs_mutex rculist_fake_mutex;
+<span class="lineNum">      60 </span>                :            : 
+<span class="lineNum">      61 </span>                :            : /* Doubly linked list head or element. */
+<span class="lineNum">      62 </span>                :            : struct rculist {
+<span class="lineNum">      63 </span>                :            :     /* Previous list element. */
+<span class="lineNum">      64 </span>                :            :     struct rculist *prev OVS_GUARDED_BY(rculist_fake_mutex);
+<span class="lineNum">      65 </span>                :            : 
+<span class="lineNum">      66 </span>                :            :     /* Next list element. */
+<span class="lineNum">      67 </span>                :            :     OVSRCU_TYPE(struct rculist *) next;
+<span class="lineNum">      68 </span>                :            : };
+<span class="lineNum">      69 </span>                :            : 
+<span class="lineNum">      70 </span>                :            : /* Easier access to 'next' member. */
+<span class="lineNum">      71 </span>                :            : static inline const struct rculist *rculist_next(const struct rculist *);
+<span class="lineNum">      72 </span>                :            : static inline struct rculist *rculist_next_protected(const struct rculist *);
+<span class="lineNum">      73 </span>                :            : 
+<span class="lineNum">      74 </span>                :            : /* List initialization. */
+<span class="lineNum">      75 </span>                :            : #define RCUOVS_LIST_INITIALIZER(LIST) { LIST, OVSRCU_INITIALIZER(LIST) }
+<span class="lineNum">      76 </span>                :            : 
+<span class="lineNum">      77 </span>                :            : static inline void rculist_init(struct rculist *list);
+<span class="lineNum">      78 </span>                :            : static inline void rculist_poison(struct rculist *elem);
+<span class="lineNum">      79 </span>                :            : 
+<span class="lineNum">      80 </span>                :            : /* List insertion. */
+<span class="lineNum">      81 </span>                :            : static inline void rculist_insert(struct rculist *list, struct rculist *elem);
+<span class="lineNum">      82 </span>                :            : static inline void rculist_splice_hidden(struct rculist *before,
+<span class="lineNum">      83 </span>                :            :                                          struct rculist *first,
+<span class="lineNum">      84 </span>                :            :                                          struct rculist *last);
+<span class="lineNum">      85 </span>                :            : static inline void rculist_push_front(struct rculist *list,
+<span class="lineNum">      86 </span>                :            :                                       struct rculist *elem);
+<span class="lineNum">      87 </span>                :            : static inline void rculist_push_back(struct rculist *list,
+<span class="lineNum">      88 </span>                :            :                                      struct rculist *elem);
+<span class="lineNum">      89 </span>                :            : static inline void rculist_replace(struct rculist *replacement,
+<span class="lineNum">      90 </span>                :            :                                    struct rculist *replaced);
+<span class="lineNum">      91 </span>                :            : static inline void rculist_move(struct rculist *dst, struct rculist *src);
+<span class="lineNum">      92 </span>                :            : 
+<span class="lineNum">      93 </span>                :            : /* List removal. */
+<span class="lineNum">      94 </span>                :            : static inline struct rculist *rculist_remove(struct rculist *elem);
+<span class="lineNum">      95 </span>                :            : static inline struct rculist *rculist_pop_front(struct rculist *list);
+<span class="lineNum">      96 </span>                :            : static inline struct rculist *rculist_pop_back(struct rculist *list);
+<span class="lineNum">      97 </span>                :            : 
+<span class="lineNum">      98 </span>                :            : /* List elements. */
+<span class="lineNum">      99 </span>                :            : static inline const struct rculist *rculist_front(const struct rculist *);
+<span class="lineNum">     100 </span>                :            : static inline struct rculist *rculist_back_protected(const struct rculist *);
+<span class="lineNum">     101 </span>                :            : 
+<span class="lineNum">     102 </span>                :            : /* List properties. */
+<span class="lineNum">     103 </span>                :            : static inline size_t rculist_size(const struct rculist *);
+<span class="lineNum">     104 </span>                :            : static inline bool rculist_is_empty(const struct rculist *);
+<span class="lineNum">     105 </span>                :            : static inline bool rculist_is_singleton_protected(const struct rculist *);
+<span class="lineNum">     106 </span>                :            : static inline bool rculist_is_short_protected(const struct rculist *);
+<span class="lineNum">     107 </span>                :            : 
+<span class="lineNum">     108 </span>                :            : 
+<span class="lineNum">     109 </span>                :            : /* Inline implementations. */
+<a name="110"><span class="lineNum">     110 </span>                :            : </a>
+<span class="lineNum">     111 </span>                :            : static inline const struct rculist *
+<span class="lineNum">     112 </span>                :<span class="lineCov">    2646163 : rculist_next(const struct rculist *list)</span>
+<span class="lineNum">     113 </span>                :            : {
+<span class="lineNum">     114 </span>                :<span class="lineCov">    2646163 :     return ovsrcu_get(struct rculist *, &amp;list-&gt;next);</span>
+<span class="lineNum">     115 </span>                :            : }
+<a name="116"><span class="lineNum">     116 </span>                :            : </a>
+<span class="lineNum">     117 </span>                :            : static inline struct rculist *
+<span class="lineNum">     118 </span>                :<span class="lineCov">     484263 : rculist_next_protected(const struct rculist *list)</span>
+<span class="lineNum">     119 </span>                :            : 
+<span class="lineNum">     120 </span>                :            : {
+<span class="lineNum">     121 </span>                :<span class="lineCov">     484263 :     return ovsrcu_get_protected(struct rculist *, &amp;list-&gt;next);</span>
+<span class="lineNum">     122 </span>                :            : }
+<a name="123"><span class="lineNum">     123 </span>                :            : </a>
+<span class="lineNum">     124 </span>                :            : static inline void
+<span class="lineNum">     125 </span>                :<span class="lineCov">     969501 : rculist_init(struct rculist *list)</span>
+<span class="lineNum">     126 </span>                :            :     OVS_NO_THREAD_SAFETY_ANALYSIS
+<span class="lineNum">     127 </span>                :            : {
+<span class="lineNum">     128 </span>                :<span class="lineCov">     969501 :     list-&gt;prev = list;</span>
+<span class="lineNum">     129 </span>                :<span class="lineCov">     969501 :     ovsrcu_init(&amp;list-&gt;next, list);</span>
+<span class="lineNum">     130 </span>                :<span class="lineCov">     969501 : }</span>
+<span class="lineNum">     131 </span>                :            : 
+<span class="lineNum">     132 </span>                :            : #define RCULIST_POISON (struct rculist *)(UINTPTR_MAX / 0xf * 0xc)
+<span class="lineNum">     133 </span>                :            : 
+<span class="lineNum">     134 </span>                :            : /* Initializes 'list' with pointers that will (probably) cause segfaults if
+<a name="135"><span class="lineNum">     135 </span>                :            :  * dereferenced and, better yet, show up clearly in a debugger. */</a>
+<span class="lineNum">     136 </span>                :            : static inline void
+<span class="lineNum">     137 </span>                :<span class="lineCov">     960868 : rculist_poison(struct rculist *list)</span>
+<span class="lineNum">     138 </span>                :            :     OVS_NO_THREAD_SAFETY_ANALYSIS
+<span class="lineNum">     139 </span>                :            : {
+<span class="lineNum">     140 </span>                :<span class="lineCov">     960868 :     list-&gt;prev = RCULIST_POISON;</span>
+<span class="lineNum">     141 </span>                :<span class="lineCov">     960868 : }</span>
+<span class="lineNum">     142 </span>                :            : 
+<span class="lineNum">     143 </span>                :            : /* Initializes 'list' with pointers that will (probably) cause segfaults if
+<span class="lineNum">     144 </span>                :            :  * dereferenced and, better yet, show up clearly in a debugger.
+<span class="lineNum">     145 </span>                :            :  *
+<span class="lineNum">     146 </span>                :            :  * This variant poisons also the next pointer, so this may not be called if
+<a name="147"><span class="lineNum">     147 </span>                :            :  * this list element is still visible to RCU readers. */</a>
+<span class="lineNum">     148 </span>                :            : static inline void
+<span class="lineNum">     149 </span>                :<span class="lineCov">     476605 : rculist_poison__(struct rculist *list)</span>
+<span class="lineNum">     150 </span>                :            :     OVS_NO_THREAD_SAFETY_ANALYSIS
+<span class="lineNum">     151 </span>                :            : {
+<span class="lineNum">     152 </span>                :<span class="lineCov">     476605 :     rculist_poison(list);</span>
+<span class="lineNum">     153 </span>                :<span class="lineCov">     476605 :     ovsrcu_set_hidden(&amp;list-&gt;next, RCULIST_POISON);</span>
+<span class="lineNum">     154 </span>                :<span class="lineCov">     476605 : }</span>
+<span class="lineNum">     155 </span>                :            : 
+<a name="156"><span class="lineNum">     156 </span>                :            : /* rculist insertion. */</a>
+<span class="lineNum">     157 </span>                :            : static inline void
+<span class="lineNum">     158 </span>                :<span class="lineCov">     467846 : rculist_insert(struct rculist *before, struct rculist *elem)</span>
+<span class="lineNum">     159 </span>                :            :     OVS_NO_THREAD_SAFETY_ANALYSIS
+<span class="lineNum">     160 </span>                :            : {
+<span class="lineNum">     161 </span>                :<span class="lineCov">     467846 :     elem-&gt;prev = before-&gt;prev;</span>
+<span class="lineNum">     162 </span>                :<span class="lineCov">     467846 :     ovsrcu_set_hidden(&amp;elem-&gt;next, before);</span>
+<span class="lineNum">     163 </span>                :<span class="lineCov">     467846 :     ovsrcu_set(&amp;before-&gt;prev-&gt;next, elem);</span>
+<span class="lineNum">     164 </span>                :<span class="lineCov">     467846 :     before-&gt;prev = elem;</span>
+<span class="lineNum">     165 </span>                :<span class="lineCov">     467846 : }</span>
+<span class="lineNum">     166 </span>                :            : 
+<span class="lineNum">     167 </span>                :            : /* Removes elements 'first' though 'last' (exclusive) from their current list,
+<span class="lineNum">     168 </span>                :            :  * which may NOT be visible to any other threads (== be hidden from them),
+<span class="lineNum">     169 </span>                :            :  * then inserts them just before 'before'. */
+<span class="lineNum">     170 </span>                :            : static inline void
+<span class="lineNum">     171 </span>                :            : rculist_splice_hidden(struct rculist *before, struct rculist *first,
+<span class="lineNum">     172 </span>                :            :                       struct rculist *last)
+<span class="lineNum">     173 </span>                :            :     OVS_NO_THREAD_SAFETY_ANALYSIS
+<span class="lineNum">     174 </span>                :            : {
+<span class="lineNum">     175 </span>                :            :     struct rculist *last_next;
+<span class="lineNum">     176 </span>                :            : 
+<span class="lineNum">     177 </span>                :            :     if (first == last) {
+<span class="lineNum">     178 </span>                :            :         return;
+<span class="lineNum">     179 </span>                :            :     }
+<span class="lineNum">     180 </span>                :            :     last = last-&gt;prev;
+<span class="lineNum">     181 </span>                :            : 
+<span class="lineNum">     182 </span>                :            :     /* Cleanly remove 'first'...'last' from its current list. */
+<span class="lineNum">     183 </span>                :            :     last_next = rculist_next_protected(last);
+<span class="lineNum">     184 </span>                :            :     last_next-&gt;prev = first-&gt;prev;
+<span class="lineNum">     185 </span>                :            :     ovsrcu_set_hidden(&amp;first-&gt;prev-&gt;next, last_next);
+<span class="lineNum">     186 </span>                :            : 
+<span class="lineNum">     187 </span>                :            :     /* Splice 'first'...'last' into new list. */
+<span class="lineNum">     188 </span>                :            :     first-&gt;prev = before-&gt;prev;
+<span class="lineNum">     189 </span>                :            :     ovsrcu_set(&amp;last-&gt;next, before);
+<span class="lineNum">     190 </span>                :            :     ovsrcu_set(&amp;before-&gt;prev-&gt;next, first);
+<span class="lineNum">     191 </span>                :            :     before-&gt;prev = last;
+<span class="lineNum">     192 </span>                :            : }
+<span class="lineNum">     193 </span>                :            : 
+<span class="lineNum">     194 </span>                :            : /* Inserts 'elem' at the beginning of 'list', so that it becomes the front in
+<span class="lineNum">     195 </span>                :            :  * 'list'. */
+<span class="lineNum">     196 </span>                :            : static inline void
+<span class="lineNum">     197 </span>                :            : rculist_push_front(struct rculist *list, struct rculist *elem)
+<span class="lineNum">     198 </span>                :            : {
+<span class="lineNum">     199 </span>                :            :     rculist_insert(rculist_next_protected(list), elem);
+<span class="lineNum">     200 </span>                :            : }
+<span class="lineNum">     201 </span>                :            : 
+<span class="lineNum">     202 </span>                :            : /* Inserts 'elem' at the end of 'list', so that it becomes the back in
+<a name="203"><span class="lineNum">     203 </span>                :            :  * 'list'. */</a>
+<span class="lineNum">     204 </span>                :            : static inline void
+<span class="lineNum">     205 </span>                :<span class="lineCov">     467846 : rculist_push_back(struct rculist *list, struct rculist *elem)</span>
+<span class="lineNum">     206 </span>                :            : {
+<span class="lineNum">     207 </span>                :<span class="lineCov">     467846 :     rculist_insert(list, elem);</span>
+<span class="lineNum">     208 </span>                :<span class="lineCov">     467846 : }</span>
+<span class="lineNum">     209 </span>                :            : 
+<span class="lineNum">     210 </span>                :            : /* Puts 'element' in the position currently occupied by 'position'.
+<span class="lineNum">     211 </span>                :            :  *
+<span class="lineNum">     212 </span>                :            :  * Afterward, 'position' is not linked to from the list any more, but still
+<span class="lineNum">     213 </span>                :            :  * links to the nodes in the list, and may still be referenced by other threads
+<span class="lineNum">     214 </span>                :            :  * until all other threads quiesce.  The replaced node ('position') may not be
+<span class="lineNum">     215 </span>                :            :  * re-inserted, re-initialized, or deleted until after all other threads have
+<a name="216"><span class="lineNum">     216 </span>                :            :  * quiesced (use ovsrcu_postpone). */</a>
+<span class="lineNum">     217 </span>                :            : static inline void
+<span class="lineNum">     218 </span>                :<span class="lineCov">      23075 : rculist_replace(struct rculist *element, struct rculist *position)</span>
+<span class="lineNum">     219 </span>                :            :     OVS_NO_THREAD_SAFETY_ANALYSIS
+<span class="lineNum">     220 </span>                :            : {
+<span class="lineNum">     221 </span>                :<span class="lineCov">      23075 :     struct rculist *position_next = rculist_next_protected(position);</span>
+<span class="lineNum">     222 </span>                :            : 
+<span class="lineNum">     223 </span>                :<span class="lineCov">      23075 :     ovsrcu_set_hidden(&amp;element-&gt;next, position_next);</span>
+<span class="lineNum">     224 </span>                :<span class="lineCov">      23075 :     position_next-&gt;prev = element;</span>
+<span class="lineNum">     225 </span>                :<span class="lineCov">      23075 :     element-&gt;prev = position-&gt;prev;</span>
+<span class="lineNum">     226 </span>                :<span class="lineCov">      23075 :     ovsrcu_set(&amp;element-&gt;prev-&gt;next, element);</span>
+<span class="lineNum">     227 </span>                :<span class="lineCov">      23075 :     rculist_poison(position);</span>
+<span class="lineNum">     228 </span>                :<span class="lineCov">      23075 : }</span>
+<span class="lineNum">     229 </span>                :            : 
+<span class="lineNum">     230 </span>                :            : /* Initializes 'dst' with the contents of 'src', compensating for moving it
+<span class="lineNum">     231 </span>                :            :  * around in memory.  The effect is that, if 'src' was the head of a list, now
+<span class="lineNum">     232 </span>                :            :  * 'dst' is the head of a list containing the same elements.
+<span class="lineNum">     233 </span>                :            :  *
+<span class="lineNum">     234 </span>                :            :  * Memory for 'src' must be kept around until the next RCU quiescent period.
+<span class="lineNum">     235 </span>                :            :  * rculist cannot be simply reallocated, so there is no rculist_moved(). */
+<span class="lineNum">     236 </span>                :            : static inline void
+<span class="lineNum">     237 </span>                :            : rculist_move(struct rculist *dst, struct rculist *src)
+<span class="lineNum">     238 </span>                :            :     OVS_NO_THREAD_SAFETY_ANALYSIS
+<span class="lineNum">     239 </span>                :            : {
+<span class="lineNum">     240 </span>                :            :     if (!rculist_is_empty(src)) {
+<span class="lineNum">     241 </span>                :            :         struct rculist *src_next = rculist_next_protected(src);
+<span class="lineNum">     242 </span>                :            : 
+<span class="lineNum">     243 </span>                :            :         dst-&gt;prev = src-&gt;prev;
+<span class="lineNum">     244 </span>                :            :         ovsrcu_set_hidden(&amp;dst-&gt;next, src_next);
+<span class="lineNum">     245 </span>                :            : 
+<span class="lineNum">     246 </span>                :            :         src_next-&gt;prev = dst;
+<span class="lineNum">     247 </span>                :            :         ovsrcu_set(&amp;src-&gt;prev-&gt;next, dst);
+<span class="lineNum">     248 </span>                :            :     } else {
+<span class="lineNum">     249 </span>                :            :         rculist_init(dst);
+<span class="lineNum">     250 </span>                :            :     }
+<span class="lineNum">     251 </span>                :            :     rculist_poison(src);
+<span class="lineNum">     252 </span>                :            : }
+<span class="lineNum">     253 </span>                :            : 
+<span class="lineNum">     254 </span>                :            : /* Removes 'elem' from its list and returns the element that followed it.
+<span class="lineNum">     255 </span>                :            :  * Has no effect when 'elem' is initialized, but not in a list.
+<span class="lineNum">     256 </span>                :            :  * Undefined behavior if 'elem' is not initialized.
+<span class="lineNum">     257 </span>                :            :  *
+<span class="lineNum">     258 </span>                :            :  * Afterward, 'elem' is not linked to from the list any more, but still links
+<span class="lineNum">     259 </span>                :            :  * to the nodes in the list, and may still be referenced by other threads until
+<span class="lineNum">     260 </span>                :            :  * all other threads quiesce.  The removed node ('elem') may not be
+<span class="lineNum">     261 </span>                :            :  * re-inserted, re-initialized, or deleted until after all other threads have
+<span class="lineNum">     262 </span>                :            :  * quiesced (use ovsrcu_postpone).
+<a name="263"><span class="lineNum">     263 </span>                :            :  */</a>
+<span class="lineNum">     264 </span>                :            : static inline struct rculist *
+<span class="lineNum">     265 </span>                :<span class="lineCov">     461188 : rculist_remove(struct rculist *elem)</span>
+<span class="lineNum">     266 </span>                :            :     OVS_NO_THREAD_SAFETY_ANALYSIS
+<span class="lineNum">     267 </span>                :            : {
+<span class="lineNum">     268 </span>                :<span class="lineCov">     461188 :     struct rculist *elem_next = rculist_next_protected(elem);</span>
+<span class="lineNum">     269 </span>                :            : 
+<span class="lineNum">     270 </span>                :<span class="lineCov">     461188 :     elem_next-&gt;prev = elem-&gt;prev;</span>
+<span class="lineNum">     271 </span>                :<span class="lineCov">     461188 :     ovsrcu_set(&amp;elem-&gt;prev-&gt;next, elem_next);</span>
+<span class="lineNum">     272 </span>                :<span class="lineCov">     461188 :     rculist_poison(elem);</span>
+<span class="lineNum">     273 </span>                :<span class="lineCov">     461188 :     return elem_next;</span>
+<span class="lineNum">     274 </span>                :            : }
+<span class="lineNum">     275 </span>                :            : 
+<span class="lineNum">     276 </span>                :            : /* Removes the front element from 'list' and returns it.  Undefined behavior if
+<span class="lineNum">     277 </span>                :            :  * 'list' is empty before removal.
+<span class="lineNum">     278 </span>                :            :  *
+<span class="lineNum">     279 </span>                :            :  * Afterward, teh returned former first node is not linked to from the list any
+<span class="lineNum">     280 </span>                :            :  * more, but still links to the nodes in the list, and may still be referenced
+<span class="lineNum">     281 </span>                :            :  * by other threads until all other threads quiesce.  The returned node may not
+<span class="lineNum">     282 </span>                :            :  * be re-inserted, re-initialized, or deleted until after all other threads
+<span class="lineNum">     283 </span>                :            :  * have quiesced (use ovsrcu_postpone). */
+<span class="lineNum">     284 </span>                :            : static inline struct rculist *
+<span class="lineNum">     285 </span>                :            : rculist_pop_front(struct rculist *list)
+<span class="lineNum">     286 </span>                :            :     OVS_NO_THREAD_SAFETY_ANALYSIS
+<span class="lineNum">     287 </span>                :            : {
+<span class="lineNum">     288 </span>                :            :     struct rculist *front = rculist_next_protected(list);
+<span class="lineNum">     289 </span>                :            :     rculist_remove(front);
+<span class="lineNum">     290 </span>                :            :     return front;
+<span class="lineNum">     291 </span>                :            : }
+<span class="lineNum">     292 </span>                :            : 
+<span class="lineNum">     293 </span>                :            : /* Removes the back element from 'list' and returns it.
+<span class="lineNum">     294 </span>                :            :  * Undefined behavior if 'list' is empty before removal.
+<span class="lineNum">     295 </span>                :            :  *
+<span class="lineNum">     296 </span>                :            :  * Afterward, teh returned former last node is not linked to from the list any
+<span class="lineNum">     297 </span>                :            :  * more, but still links to the nodes in the list, and may still be referenced
+<span class="lineNum">     298 </span>                :            :  * by other threads until all other threads quiesce.  The returned node may not
+<span class="lineNum">     299 </span>                :            :  * be re-inserted, re-initialized, or deleted until after all other threads
+<span class="lineNum">     300 </span>                :            :  * have quiesced (use ovsrcu_postpone). */
+<span class="lineNum">     301 </span>                :            : static inline struct rculist *
+<span class="lineNum">     302 </span>                :            : rculist_pop_back(struct rculist *list)
+<span class="lineNum">     303 </span>                :            :     OVS_NO_THREAD_SAFETY_ANALYSIS
+<span class="lineNum">     304 </span>                :            : {
+<span class="lineNum">     305 </span>                :            :     struct rculist *back = list-&gt;prev;
+<span class="lineNum">     306 </span>                :            :     rculist_remove(back);
+<span class="lineNum">     307 </span>                :            :     return back;
+<span class="lineNum">     308 </span>                :            : }
+<span class="lineNum">     309 </span>                :            : 
+<span class="lineNum">     310 </span>                :            : /* Returns the front element in 'list_'.
+<span class="lineNum">     311 </span>                :            :  * Undefined behavior if 'list_' is empty. */
+<span class="lineNum">     312 </span>                :            : static inline const struct rculist *
+<span class="lineNum">     313 </span>                :            : rculist_front(const struct rculist *list)
+<span class="lineNum">     314 </span>                :            : {
+<span class="lineNum">     315 </span>                :            :     ovs_assert(!rculist_is_empty(list));
+<span class="lineNum">     316 </span>                :            : 
+<span class="lineNum">     317 </span>                :            :     return rculist_next(list);
+<span class="lineNum">     318 </span>                :            : }
+<span class="lineNum">     319 </span>                :            : 
+<span class="lineNum">     320 </span>                :            : /* Returns the back element in 'list_'.
+<span class="lineNum">     321 </span>                :            :  * Returns the 'list_' itself, if 'list_' is empty. */
+<span class="lineNum">     322 </span>                :            : static inline struct rculist *
+<span class="lineNum">     323 </span>                :            : rculist_back_protected(const struct rculist *list)
+<span class="lineNum">     324 </span>                :            :     OVS_NO_THREAD_SAFETY_ANALYSIS
+<span class="lineNum">     325 </span>                :            : {
+<span class="lineNum">     326 </span>                :            :     return CONST_CAST(struct rculist *, list)-&gt;prev;
+<span class="lineNum">     327 </span>                :            : }
+<span class="lineNum">     328 </span>                :            : 
+<span class="lineNum">     329 </span>                :            : /* Returns the number of elements in 'list'.
+<span class="lineNum">     330 </span>                :            :  * Runs in O(n) in the number of elements. */
+<span class="lineNum">     331 </span>                :            : static inline size_t
+<span class="lineNum">     332 </span>                :            : rculist_size(const struct rculist *list)
+<span class="lineNum">     333 </span>                :            : {
+<span class="lineNum">     334 </span>                :            :     const struct rculist *e;
+<span class="lineNum">     335 </span>                :            :     size_t cnt = 0;
+<span class="lineNum">     336 </span>                :            : 
+<span class="lineNum">     337 </span>                :            :     for (e = rculist_next(list); e != list; e = rculist_next(e)) {
+<span class="lineNum">     338 </span>                :            :         cnt++;
+<span class="lineNum">     339 </span>                :            :     }
+<span class="lineNum">     340 </span>                :            :     return cnt;
+<span class="lineNum">     341 </span>                :            : }
+<span class="lineNum">     342 </span>                :            : 
+<a name="343"><span class="lineNum">     343 </span>                :            : /* Returns true if 'list' is empty, false otherwise. */</a>
+<span class="lineNum">     344 </span>                :            : static inline bool
+<span class="lineNum">     345 </span>                :<span class="lineCov">     442234 : rculist_is_empty(const struct rculist *list)</span>
+<span class="lineNum">     346 </span>                :            : {
+<span class="lineNum">     347 </span>                :<span class="lineCov">     442234 :     return rculist_next(list) == list;</span>
+<span class="lineNum">     348 </span>                :            : }
+<span class="lineNum">     349 </span>                :            : 
+<span class="lineNum">     350 </span>                :            : /* Returns true if 'list' has 0 or 1 elements, false otherwise. */
+<span class="lineNum">     351 </span>                :            : static inline bool
+<span class="lineNum">     352 </span>                :            : rculist_is_short_protected(const struct rculist *list)
+<span class="lineNum">     353 </span>                :            :     OVS_NO_THREAD_SAFETY_ANALYSIS
+<span class="lineNum">     354 </span>                :            : {
+<span class="lineNum">     355 </span>                :            :     return rculist_next_protected(list) == list-&gt;prev;
+<span class="lineNum">     356 </span>                :            : }
+<span class="lineNum">     357 </span>                :            : 
+<span class="lineNum">     358 </span>                :            : /* Returns true if 'list' has exactly 1 element, false otherwise. */
+<span class="lineNum">     359 </span>                :            : static inline bool
+<span class="lineNum">     360 </span>                :            : rculist_is_singleton_protected(const struct rculist *list)
+<span class="lineNum">     361 </span>                :            :     OVS_NO_THREAD_SAFETY_ANALYSIS
+<span class="lineNum">     362 </span>                :            : {
+<span class="lineNum">     363 </span>                :            :     const struct rculist *list_next = rculist_next_protected(list);
+<span class="lineNum">     364 </span>                :            : 
+<span class="lineNum">     365 </span>                :            :     return list_next == list-&gt;prev &amp;&amp; list_next != list;
+<span class="lineNum">     366 </span>                :            : }
+<span class="lineNum">     367 </span>                :            : 
+<span class="lineNum">     368 </span>                :            : #define RCULIST_FOR_EACH(ITER, MEMBER, RCULIST)                         \
+<span class="lineNum">     369 </span>                :            :     for (INIT_CONTAINER(ITER, rculist_next(RCULIST), MEMBER);           \
+<span class="lineNum">     370 </span>                :            :          &amp;(ITER)-&gt;MEMBER != (RCULIST);                                  \
+<span class="lineNum">     371 </span>                :            :          ASSIGN_CONTAINER(ITER, rculist_next(&amp;(ITER)-&gt;MEMBER), MEMBER))
+<span class="lineNum">     372 </span>                :            : #define RCULIST_FOR_EACH_CONTINUE(ITER, MEMBER, RCULIST)                \
+<span class="lineNum">     373 </span>                :            :     for (ASSIGN_CONTAINER(ITER, rculist_next(&amp;(ITER)-&gt;MEMBER), MEMBER); \
+<span class="lineNum">     374 </span>                :            :          &amp;(ITER)-&gt;MEMBER != (RCULIST);                                  \
+<span class="lineNum">     375 </span>                :            :          ASSIGN_CONTAINER(ITER, rculist_next(&amp;(ITER)-&gt;MEMBER), MEMBER))
+<span class="lineNum">     376 </span>                :            : 
+<span class="lineNum">     377 </span>                :            : #define RCULIST_FOR_EACH_REVERSE_PROTECTED(ITER, MEMBER, RCULIST)       \
+<span class="lineNum">     378 </span>                :            :     for (INIT_CONTAINER(ITER, (RCULIST)-&gt;prev, MEMBER);                 \
+<span class="lineNum">     379 </span>                :            :          &amp;(ITER)-&gt;MEMBER != (RCULIST);                                  \
+<span class="lineNum">     380 </span>                :            :          ASSIGN_CONTAINER(ITER, (ITER)-&gt;MEMBER.prev, MEMBER))
+<span class="lineNum">     381 </span>                :            : #define RCULIST_FOR_EACH_REVERSE_PROTECTED_CONTINUE(ITER, MEMBER, RCULIST) \
+<span class="lineNum">     382 </span>                :            :     for (ASSIGN_CONTAINER(ITER, (ITER)-&gt;MEMBER.prev, MEMBER);           \
+<span class="lineNum">     383 </span>                :            :          &amp;(ITER)-&gt;MEMBER != (RCULIST);                                  \
+<span class="lineNum">     384 </span>                :            :          ASSIGN_CONTAINER(ITER, (ITER)-&gt;MEMBER.prev, MEMBER))
+<span class="lineNum">     385 </span>                :            : 
+<span class="lineNum">     386 </span>                :            : #define RCULIST_FOR_EACH_PROTECTED(ITER, MEMBER, RCULIST)               \
+<span class="lineNum">     387 </span>                :            :     for (INIT_CONTAINER(ITER, rculist_next_protected(RCULIST), MEMBER); \
+<span class="lineNum">     388 </span>                :            :          &amp;(ITER)-&gt;MEMBER != (RCULIST);                                  \
+<span class="lineNum">     389 </span>                :            :          ASSIGN_CONTAINER(ITER, rculist_next_protected(&amp;(ITER)-&gt;MEMBER), \
+<span class="lineNum">     390 </span>                :            :                           MEMBER))
+<span class="lineNum">     391 </span>                :            : 
+<span class="lineNum">     392 </span>                :            : #define RCULIST_FOR_EACH_SAFE_PROTECTED(ITER, NEXT, MEMBER, RCULIST)    \
+<span class="lineNum">     393 </span>                :            :     for (INIT_CONTAINER(ITER, rculist_next_protected(RCULIST), MEMBER); \
+<span class="lineNum">     394 </span>                :            :          (&amp;(ITER)-&gt;MEMBER != (RCULIST)                                  \
+<span class="lineNum">     395 </span>                :            :           ? INIT_CONTAINER(NEXT, rculist_next_protected(&amp;(ITER)-&gt;MEMBER), \
+<span class="lineNum">     396 </span>                :            :                            MEMBER), 1 : 0);                             \
+<span class="lineNum">     397 </span>                :            :          (ITER) = (NEXT))
+<span class="lineNum">     398 </span>                :            : 
+<span class="lineNum">     399 </span>                :            : #endif /* rculist.h */
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,244 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/crc32c.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - crc32c.c<span style="font-size: 80%;"> (source / <a href="crc32c.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">5</td>
+            <td class="headerCovTableEntry">5</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">1</td>
+            <td class="headerCovTableEntry">1</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">2</td>
+            <td class="headerCovTableEntry">2</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*-</a>
+<span class="lineNum">       2 </span>                :            :  *  COPYRIGHT (C) 1986 Gary S. Brown.  You may use this program, or
+<span class="lineNum">       3 </span>                :            :  *  code or tables extracted from it, as desired without restriction.
+<span class="lineNum">       4 </span>                :            :  */
+<span class="lineNum">       5 </span>                :            : 
+<span class="lineNum">       6 </span>                :            : /*
+<span class="lineNum">       7 </span>                :            :  *  First, the polynomial itself and its table of feedback terms.  The
+<span class="lineNum">       8 </span>                :            :  *  polynomial is
+<span class="lineNum">       9 </span>                :            :  *  X^32+X^26+X^23+X^22+X^16+X^12+X^11+X^10+X^8+X^7+X^5+X^4+X^2+X^1+X^0
+<span class="lineNum">      10 </span>                :            :  *
+<span class="lineNum">      11 </span>                :            :  *  Note that we take it &quot;backwards&quot; and put the highest-order term in
+<span class="lineNum">      12 </span>                :            :  *  the lowest-order bit.  The X^32 term is &quot;implied&quot;; the LSB is the
+<span class="lineNum">      13 </span>                :            :  *  X^31 term, etc.  The X^0 term (usually shown as &quot;+1&quot;) results in
+<span class="lineNum">      14 </span>                :            :  *  the MSB being 1
+<span class="lineNum">      15 </span>                :            :  *
+<span class="lineNum">      16 </span>                :            :  *  Note that the usual hardware shift register implementation, which
+<span class="lineNum">      17 </span>                :            :  *  is what we're using (we're merely optimizing it by doing eight-bit
+<span class="lineNum">      18 </span>                :            :  *  chunks at a time) shifts bits into the lowest-order term.  In our
+<span class="lineNum">      19 </span>                :            :  *  implementation, that means shifting towards the right.  Why do we
+<span class="lineNum">      20 </span>                :            :  *  do it this way?  Because the calculated CRC must be transmitted in
+<span class="lineNum">      21 </span>                :            :  *  order from highest-order term to lowest-order term.  UARTs transmit
+<span class="lineNum">      22 </span>                :            :  *  characters in order from LSB to MSB.  By storing the CRC this way
+<span class="lineNum">      23 </span>                :            :  *  we hand it to the UART in the order low-byte to high-byte; the UART
+<span class="lineNum">      24 </span>                :            :  *  sends each low-bit to hight-bit; and the result is transmission bit
+<span class="lineNum">      25 </span>                :            :  *  by bit from highest- to lowest-order term without requiring any bit
+<span class="lineNum">      26 </span>                :            :  *  shuffling on our part.  Reception works similarly
+<span class="lineNum">      27 </span>                :            :  *
+<span class="lineNum">      28 </span>                :            :  *  The feedback terms table consists of 256, 32-bit entries.  Notes
+<span class="lineNum">      29 </span>                :            :  *
+<span class="lineNum">      30 </span>                :            :  *      The table can be generated at runtime if desired; code to do so
+<span class="lineNum">      31 </span>                :            :  *      can be found in FreeBSD.  It might not be obvious, but the feedback
+<span class="lineNum">      32 </span>                :            :  *      terms simply represent the results of eight shift/xor opera
+<span class="lineNum">      33 </span>                :            :  *      tions for all combinations of data and CRC register values
+<span class="lineNum">      34 </span>                :            :  *
+<span class="lineNum">      35 </span>                :            :  *      The values must be right-shifted by eight bits by the &quot;updcrc
+<span class="lineNum">      36 </span>                :            :  *      logic; the shift must be unsigned (bring in zeroes).  On some
+<span class="lineNum">      37 </span>                :            :  *      hardware you could probably optimize the shift in assembler by
+<span class="lineNum">      38 </span>                :            :  *      using byte-swap instructions
+<span class="lineNum">      39 </span>                :            :  *      polynomial $edb88320
+<span class="lineNum">      40 </span>                :            :  *
+<span class="lineNum">      41 </span>                :            :  *
+<span class="lineNum">      42 </span>                :            :  * CRC32 code derived from work by Gary S. Brown.
+<span class="lineNum">      43 </span>                :            :  */
+<span class="lineNum">      44 </span>                :            : 
+<span class="lineNum">      45 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      46 </span>                :            : #include &quot;crc32c.h&quot;
+<span class="lineNum">      47 </span>                :            : #include &quot;byte-order.h&quot;
+<span class="lineNum">      48 </span>                :            : 
+<span class="lineNum">      49 </span>                :            : /*****************************************************************/
+<span class="lineNum">      50 </span>                :            : /*                                                               */
+<span class="lineNum">      51 </span>                :            : /* CRC LOOKUP TABLE                                              */
+<span class="lineNum">      52 </span>                :            : /* ================                                              */
+<span class="lineNum">      53 </span>                :            : /* The following CRC lookup table was generated automagically    */
+<span class="lineNum">      54 </span>                :            : /* by the Rocksoft^tm Model CRC Algorithm Table Generation       */
+<span class="lineNum">      55 </span>                :            : /* Program V1.0 using the following model parameters:            */
+<span class="lineNum">      56 </span>                :            : /*                                                               */
+<span class="lineNum">      57 </span>                :            : /*    Width   : 4 bytes.                                         */
+<span class="lineNum">      58 </span>                :            : /*    Poly    : 0x1EDC6F41L                                      */
+<span class="lineNum">      59 </span>                :            : /*    Reverse : TRUE.                                            */
+<span class="lineNum">      60 </span>                :            : /*                                                               */
+<span class="lineNum">      61 </span>                :            : /* For more information on the Rocksoft^tm Model CRC Algorithm,  */
+<span class="lineNum">      62 </span>                :            : /* see the document titled &quot;A Painless Guide to CRC Error        */
+<span class="lineNum">      63 </span>                :            : /* Detection Algorithms&quot; by Ross Williams                        */
+<span class="lineNum">      64 </span>                :            : /* (ross@guest.adelaide.edu.au.). This document is likely to be  */
+<span class="lineNum">      65 </span>                :            : /* in the FTP archive &quot;ftp.adelaide.edu.au/pub/rocksoft&quot;.        */
+<span class="lineNum">      66 </span>                :            : /*                                                               */
+<span class="lineNum">      67 </span>                :            : /*****************************************************************/
+<span class="lineNum">      68 </span>                :            : static const uint32_t crc32Table[256] = {
+<span class="lineNum">      69 </span>                :            :     0x00000000L, 0xF26B8303L, 0xE13B70F7L, 0x1350F3F4L,
+<span class="lineNum">      70 </span>                :            :     0xC79A971FL, 0x35F1141CL, 0x26A1E7E8L, 0xD4CA64EBL,
+<span class="lineNum">      71 </span>                :            :     0x8AD958CFL, 0x78B2DBCCL, 0x6BE22838L, 0x9989AB3BL,
+<span class="lineNum">      72 </span>                :            :     0x4D43CFD0L, 0xBF284CD3L, 0xAC78BF27L, 0x5E133C24L,
+<span class="lineNum">      73 </span>                :            :     0x105EC76FL, 0xE235446CL, 0xF165B798L, 0x030E349BL,
+<span class="lineNum">      74 </span>                :            :     0xD7C45070L, 0x25AFD373L, 0x36FF2087L, 0xC494A384L,
+<span class="lineNum">      75 </span>                :            :     0x9A879FA0L, 0x68EC1CA3L, 0x7BBCEF57L, 0x89D76C54L,
+<span class="lineNum">      76 </span>                :            :     0x5D1D08BFL, 0xAF768BBCL, 0xBC267848L, 0x4E4DFB4BL,
+<span class="lineNum">      77 </span>                :            :     0x20BD8EDEL, 0xD2D60DDDL, 0xC186FE29L, 0x33ED7D2AL,
+<span class="lineNum">      78 </span>                :            :     0xE72719C1L, 0x154C9AC2L, 0x061C6936L, 0xF477EA35L,
+<span class="lineNum">      79 </span>                :            :     0xAA64D611L, 0x580F5512L, 0x4B5FA6E6L, 0xB93425E5L,
+<span class="lineNum">      80 </span>                :            :     0x6DFE410EL, 0x9F95C20DL, 0x8CC531F9L, 0x7EAEB2FAL,
+<span class="lineNum">      81 </span>                :            :     0x30E349B1L, 0xC288CAB2L, 0xD1D83946L, 0x23B3BA45L,
+<span class="lineNum">      82 </span>                :            :     0xF779DEAEL, 0x05125DADL, 0x1642AE59L, 0xE4292D5AL,
+<span class="lineNum">      83 </span>                :            :     0xBA3A117EL, 0x4851927DL, 0x5B016189L, 0xA96AE28AL,
+<span class="lineNum">      84 </span>                :            :     0x7DA08661L, 0x8FCB0562L, 0x9C9BF696L, 0x6EF07595L,
+<span class="lineNum">      85 </span>                :            :     0x417B1DBCL, 0xB3109EBFL, 0xA0406D4BL, 0x522BEE48L,
+<span class="lineNum">      86 </span>                :            :     0x86E18AA3L, 0x748A09A0L, 0x67DAFA54L, 0x95B17957L,
+<span class="lineNum">      87 </span>                :            :     0xCBA24573L, 0x39C9C670L, 0x2A993584L, 0xD8F2B687L,
+<span class="lineNum">      88 </span>                :            :     0x0C38D26CL, 0xFE53516FL, 0xED03A29BL, 0x1F682198L,
+<span class="lineNum">      89 </span>                :            :     0x5125DAD3L, 0xA34E59D0L, 0xB01EAA24L, 0x42752927L,
+<span class="lineNum">      90 </span>                :            :     0x96BF4DCCL, 0x64D4CECFL, 0x77843D3BL, 0x85EFBE38L,
+<span class="lineNum">      91 </span>                :            :     0xDBFC821CL, 0x2997011FL, 0x3AC7F2EBL, 0xC8AC71E8L,
+<span class="lineNum">      92 </span>                :            :     0x1C661503L, 0xEE0D9600L, 0xFD5D65F4L, 0x0F36E6F7L,
+<span class="lineNum">      93 </span>                :            :     0x61C69362L, 0x93AD1061L, 0x80FDE395L, 0x72966096L,
+<span class="lineNum">      94 </span>                :            :     0xA65C047DL, 0x5437877EL, 0x4767748AL, 0xB50CF789L,
+<span class="lineNum">      95 </span>                :            :     0xEB1FCBADL, 0x197448AEL, 0x0A24BB5AL, 0xF84F3859L,
+<span class="lineNum">      96 </span>                :            :     0x2C855CB2L, 0xDEEEDFB1L, 0xCDBE2C45L, 0x3FD5AF46L,
+<span class="lineNum">      97 </span>                :            :     0x7198540DL, 0x83F3D70EL, 0x90A324FAL, 0x62C8A7F9L,
+<span class="lineNum">      98 </span>                :            :     0xB602C312L, 0x44694011L, 0x5739B3E5L, 0xA55230E6L,
+<span class="lineNum">      99 </span>                :            :     0xFB410CC2L, 0x092A8FC1L, 0x1A7A7C35L, 0xE811FF36L,
+<span class="lineNum">     100 </span>                :            :     0x3CDB9BDDL, 0xCEB018DEL, 0xDDE0EB2AL, 0x2F8B6829L,
+<span class="lineNum">     101 </span>                :            :     0x82F63B78L, 0x709DB87BL, 0x63CD4B8FL, 0x91A6C88CL,
+<span class="lineNum">     102 </span>                :            :     0x456CAC67L, 0xB7072F64L, 0xA457DC90L, 0x563C5F93L,
+<span class="lineNum">     103 </span>                :            :     0x082F63B7L, 0xFA44E0B4L, 0xE9141340L, 0x1B7F9043L,
+<span class="lineNum">     104 </span>                :            :     0xCFB5F4A8L, 0x3DDE77ABL, 0x2E8E845FL, 0xDCE5075CL,
+<span class="lineNum">     105 </span>                :            :     0x92A8FC17L, 0x60C37F14L, 0x73938CE0L, 0x81F80FE3L,
+<span class="lineNum">     106 </span>                :            :     0x55326B08L, 0xA759E80BL, 0xB4091BFFL, 0x466298FCL,
+<span class="lineNum">     107 </span>                :            :     0x1871A4D8L, 0xEA1A27DBL, 0xF94AD42FL, 0x0B21572CL,
+<span class="lineNum">     108 </span>                :            :     0xDFEB33C7L, 0x2D80B0C4L, 0x3ED04330L, 0xCCBBC033L,
+<span class="lineNum">     109 </span>                :            :     0xA24BB5A6L, 0x502036A5L, 0x4370C551L, 0xB11B4652L,
+<span class="lineNum">     110 </span>                :            :     0x65D122B9L, 0x97BAA1BAL, 0x84EA524EL, 0x7681D14DL,
+<span class="lineNum">     111 </span>                :            :     0x2892ED69L, 0xDAF96E6AL, 0xC9A99D9EL, 0x3BC21E9DL,
+<span class="lineNum">     112 </span>                :            :     0xEF087A76L, 0x1D63F975L, 0x0E330A81L, 0xFC588982L,
+<span class="lineNum">     113 </span>                :            :     0xB21572C9L, 0x407EF1CAL, 0x532E023EL, 0xA145813DL,
+<span class="lineNum">     114 </span>                :            :     0x758FE5D6L, 0x87E466D5L, 0x94B49521L, 0x66DF1622L,
+<span class="lineNum">     115 </span>                :            :     0x38CC2A06L, 0xCAA7A905L, 0xD9F75AF1L, 0x2B9CD9F2L,
+<span class="lineNum">     116 </span>                :            :     0xFF56BD19L, 0x0D3D3E1AL, 0x1E6DCDEEL, 0xEC064EEDL,
+<span class="lineNum">     117 </span>                :            :     0xC38D26C4L, 0x31E6A5C7L, 0x22B65633L, 0xD0DDD530L,
+<span class="lineNum">     118 </span>                :            :     0x0417B1DBL, 0xF67C32D8L, 0xE52CC12CL, 0x1747422FL,
+<span class="lineNum">     119 </span>                :            :     0x49547E0BL, 0xBB3FFD08L, 0xA86F0EFCL, 0x5A048DFFL,
+<span class="lineNum">     120 </span>                :            :     0x8ECEE914L, 0x7CA56A17L, 0x6FF599E3L, 0x9D9E1AE0L,
+<span class="lineNum">     121 </span>                :            :     0xD3D3E1ABL, 0x21B862A8L, 0x32E8915CL, 0xC083125FL,
+<span class="lineNum">     122 </span>                :            :     0x144976B4L, 0xE622F5B7L, 0xF5720643L, 0x07198540L,
+<span class="lineNum">     123 </span>                :            :     0x590AB964L, 0xAB613A67L, 0xB831C993L, 0x4A5A4A90L,
+<span class="lineNum">     124 </span>                :            :     0x9E902E7BL, 0x6CFBAD78L, 0x7FAB5E8CL, 0x8DC0DD8FL,
+<span class="lineNum">     125 </span>                :            :     0xE330A81AL, 0x115B2B19L, 0x020BD8EDL, 0xF0605BEEL,
+<span class="lineNum">     126 </span>                :            :     0x24AA3F05L, 0xD6C1BC06L, 0xC5914FF2L, 0x37FACCF1L,
+<span class="lineNum">     127 </span>                :            :     0x69E9F0D5L, 0x9B8273D6L, 0x88D28022L, 0x7AB90321L,
+<span class="lineNum">     128 </span>                :            :     0xAE7367CAL, 0x5C18E4C9L, 0x4F48173DL, 0xBD23943EL,
+<span class="lineNum">     129 </span>                :            :     0xF36E6F75L, 0x0105EC76L, 0x12551F82L, 0xE03E9C81L,
+<span class="lineNum">     130 </span>                :            :     0x34F4F86AL, 0xC69F7B69L, 0xD5CF889DL, 0x27A40B9EL,
+<span class="lineNum">     131 </span>                :            :     0x79B737BAL, 0x8BDCB4B9L, 0x988C474DL, 0x6AE7C44EL,
+<span class="lineNum">     132 </span>                :            :     0xBE2DA0A5L, 0x4C4623A6L, 0x5F16D052L, 0xAD7D5351L
+<span class="lineNum">     133 </span>                :            : };
+<span class="lineNum">     134 </span>                :            : 
+<span class="lineNum">     135 </span>                :            : /*
+<span class="lineNum">     136 </span>                :            :  * Compute a CRC32c checksum as per the SCTP requirements in RFC4960. This
+<span class="lineNum">     137 </span>                :            :  * includes beginning with a checksum of all ones, and returning the negated
+<span class="lineNum">     138 </span>                :            :  * CRC. Unlike the RFC, we return the checksum in network byte-order.
+<a name="139"><span class="lineNum">     139 </span>                :            :  */</a>
+<span class="lineNum">     140 </span>                :            : ovs_be32
+<span class="lineNum">     141 </span>                :<span class="lineCov">         19 : crc32c(const uint8_t *data, size_t size)</span>
+<span class="lineNum">     142 </span>                :            : {
+<span class="lineNum">     143 </span>                :<span class="lineCov">         19 :     uint32_t crc = 0xffffffffL;</span>
+<span class="lineNum">     144 </span>                :            : 
+<span class="lineNum">     145 </span>        [<span class="branchCov" title="Branch 0 was taken 400 times"> + </span><span class="branchCov" title="Branch 1 was taken 19 times"> + </span>]:<span class="lineCov">        419 :     while (size--) {</span>
+<span class="lineNum">     146 </span>                :<span class="lineCov">        400 :         crc = crc32Table[(crc ^ *data++) &amp; 0xff] ^ (crc &gt;&gt; 8);</span>
+<span class="lineNum">     147 </span>                :            :     }
+<span class="lineNum">     148 </span>                :            : 
+<span class="lineNum">     149 </span>                :            :     /* The result of this CRC calculation provides us a value in the reverse
+<span class="lineNum">     150 </span>                :            :      * byte-order as compared with our architecture. On big-endian systems,
+<span class="lineNum">     151 </span>                :            :      * this is opposite to our return type. So, to return a big-endian
+<span class="lineNum">     152 </span>                :            :      * value, we must swap the byte-order. */
+<span class="lineNum">     153 </span>                :            : #if defined(WORDS_BIGENDIAN)
+<span class="lineNum">     154 </span>                :            :     crc = uint32_byteswap(crc);
+<span class="lineNum">     155 </span>                :            : #endif
+<span class="lineNum">     156 </span>                :            : 
+<span class="lineNum">     157 </span>                :            :     /* Our value is in network byte-order. OVS_FORCE keeps sparse happy. */
+<span class="lineNum">     158 </span>                :<span class="lineCov">         19 :     return (OVS_FORCE ovs_be32) ~crc;</span>
+<span class="lineNum">     159 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

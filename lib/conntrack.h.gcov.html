@@ -1,0 +1,289 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/conntrack.h</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - conntrack.h<span style="font-size: 80%;"> (source / <a href="conntrack.h.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">12</td>
+            <td class="headerCovTableEntry">12</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntryHi">-</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2015, 2016 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #ifndef CONNTRACK_H
+<span class="lineNum">      18 </span>                :            : #define CONNTRACK_H 1
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &lt;stdbool.h&gt;
+<span class="lineNum">      21 </span>                :            : 
+<span class="lineNum">      22 </span>                :            : #include &quot;latch.h&quot;
+<span class="lineNum">      23 </span>                :            : #include &quot;odp-netlink.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;openvswitch/hmap.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;openvswitch/list.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;openvswitch/thread.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;openvswitch/types.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;ovs-atomic.h&quot;
+<span class="lineNum">      29 </span>                :            : 
+<span class="lineNum">      30 </span>                :            : /* Userspace connection tracker
+<span class="lineNum">      31 </span>                :            :  * ============================
+<span class="lineNum">      32 </span>                :            :  *
+<span class="lineNum">      33 </span>                :            :  * This is a connection tracking module that keeps all the state in userspace.
+<span class="lineNum">      34 </span>                :            :  *
+<span class="lineNum">      35 </span>                :            :  * Usage
+<span class="lineNum">      36 </span>                :            :  * =====
+<span class="lineNum">      37 </span>                :            :  *
+<span class="lineNum">      38 </span>                :            :  *     struct conntrack ct;
+<span class="lineNum">      39 </span>                :            :  *
+<span class="lineNum">      40 </span>                :            :  * Initialization:
+<span class="lineNum">      41 </span>                :            :  *
+<span class="lineNum">      42 </span>                :            :  *     conntrack_init(&amp;ct);
+<span class="lineNum">      43 </span>                :            :  *
+<span class="lineNum">      44 </span>                :            :  * It is necessary to periodically issue a call to
+<span class="lineNum">      45 </span>                :            :  *
+<span class="lineNum">      46 </span>                :            :  *     conntrack_run(&amp;ct);
+<span class="lineNum">      47 </span>                :            :  *
+<span class="lineNum">      48 </span>                :            :  * to allow the module to clean up expired connections.
+<span class="lineNum">      49 </span>                :            :  *
+<span class="lineNum">      50 </span>                :            :  * To send a group of packets through the connection tracker:
+<span class="lineNum">      51 </span>                :            :  *
+<span class="lineNum">      52 </span>                :            :  *     conntrack_execute(&amp;ct, pkts, n_pkts, ...);
+<span class="lineNum">      53 </span>                :            :  *
+<span class="lineNum">      54 </span>                :            :  * Thread-safety
+<span class="lineNum">      55 </span>                :            :  * =============
+<span class="lineNum">      56 </span>                :            :  *
+<span class="lineNum">      57 </span>                :            :  * conntrack_execute() can be called by multiple threads simultaneoulsy.
+<span class="lineNum">      58 </span>                :            :  */
+<span class="lineNum">      59 </span>                :            : 
+<span class="lineNum">      60 </span>                :            : struct dp_packet_batch;
+<span class="lineNum">      61 </span>                :            : 
+<span class="lineNum">      62 </span>                :            : struct conntrack;
+<span class="lineNum">      63 </span>                :            : 
+<span class="lineNum">      64 </span>                :            : void conntrack_init(struct conntrack *);
+<span class="lineNum">      65 </span>                :            : void conntrack_destroy(struct conntrack *);
+<span class="lineNum">      66 </span>                :            : 
+<span class="lineNum">      67 </span>                :            : int conntrack_execute(struct conntrack *, struct dp_packet_batch *,
+<span class="lineNum">      68 </span>                :            :                       ovs_be16 dl_type, bool commit,
+<span class="lineNum">      69 </span>                :            :                       uint16_t zone, const uint32_t *setmark,
+<span class="lineNum">      70 </span>                :            :                       const struct ovs_key_ct_labels *setlabel,
+<span class="lineNum">      71 </span>                :            :                       const char *helper);
+<span class="lineNum">      72 </span>                :            : 
+<span class="lineNum">      73 </span>                :            : struct conntrack_dump {
+<span class="lineNum">      74 </span>                :            :     struct conntrack *ct;
+<span class="lineNum">      75 </span>                :            :     unsigned bucket;
+<span class="lineNum">      76 </span>                :            :     struct hmap_position bucket_pos;
+<span class="lineNum">      77 </span>                :            :     bool filter_zone;
+<span class="lineNum">      78 </span>                :            :     uint16_t zone;
+<span class="lineNum">      79 </span>                :            : };
+<span class="lineNum">      80 </span>                :            : 
+<span class="lineNum">      81 </span>                :            : struct ct_dpif_entry;
+<span class="lineNum">      82 </span>                :            : 
+<span class="lineNum">      83 </span>                :            : int conntrack_dump_start(struct conntrack *, struct conntrack_dump *,
+<span class="lineNum">      84 </span>                :            :                          const uint16_t *pzone);
+<span class="lineNum">      85 </span>                :            : int conntrack_dump_next(struct conntrack_dump *, struct ct_dpif_entry *);
+<span class="lineNum">      86 </span>                :            : int conntrack_dump_done(struct conntrack_dump *);
+<span class="lineNum">      87 </span>                :            : 
+<span class="lineNum">      88 </span>                :            : int conntrack_flush(struct conntrack *, const uint16_t *zone);
+<span class="lineNum">      89 </span>                :            : 
+<span class="lineNum">      90 </span>                :            : /* 'struct ct_lock' is a wrapper for an adaptive mutex.  It's useful to try
+<span class="lineNum">      91 </span>                :            :  * different types of locks (e.g. spinlocks) */
+<span class="lineNum">      92 </span>                :            : 
+<span class="lineNum">      93 </span>                :            : struct OVS_LOCKABLE ct_lock {
+<span class="lineNum">      94 </span>                :            :     struct ovs_mutex lock;
+<a name="95"><span class="lineNum">      95 </span>                :            : };</a>
+<span class="lineNum">      96 </span>                :            : 
+<span class="lineNum">      97 </span>                :<span class="lineCov">     141568 : static inline void ct_lock_init(struct ct_lock *lock)</span>
+<span class="lineNum">      98 </span>                :            : {
+<span class="lineNum">      99 </span>                :<span class="lineCov">     141568 :     ovs_mutex_init_adaptive(&amp;lock-&gt;lock);</span>
+<a name="100"><span class="lineNum">     100 </span>                :<span class="lineCov">     141568 : }</span></a>
+<span class="lineNum">     101 </span>                :            : 
+<span class="lineNum">     102 </span>                :<span class="lineCov">     164254 : static inline void ct_lock_lock(struct ct_lock *lock)</span>
+<span class="lineNum">     103 </span>                :            :     OVS_ACQUIRES(lock)
+<span class="lineNum">     104 </span>                :            :     OVS_NO_THREAD_SAFETY_ANALYSIS
+<span class="lineNum">     105 </span>                :            : {
+<span class="lineNum">     106 </span>                :<span class="lineCov">     164254 :     ovs_mutex_lock(&amp;lock-&gt;lock);</span>
+<a name="107"><span class="lineNum">     107 </span>                :<span class="lineCov">     164254 : }</span></a>
+<span class="lineNum">     108 </span>                :            : 
+<span class="lineNum">     109 </span>                :<span class="lineCov">     164254 : static inline void ct_lock_unlock(struct ct_lock *lock)</span>
+<span class="lineNum">     110 </span>                :            :     OVS_RELEASES(lock)
+<span class="lineNum">     111 </span>                :            :     OVS_NO_THREAD_SAFETY_ANALYSIS
+<span class="lineNum">     112 </span>                :            : {
+<span class="lineNum">     113 </span>                :<span class="lineCov">     164254 :     ovs_mutex_unlock(&amp;lock-&gt;lock);</span>
+<a name="114"><span class="lineNum">     114 </span>                :<span class="lineCov">     164254 : }</span></a>
+<span class="lineNum">     115 </span>                :            : 
+<span class="lineNum">     116 </span>                :<span class="lineCov">        512 : static inline void ct_lock_destroy(struct ct_lock *lock)</span>
+<span class="lineNum">     117 </span>                :            : {
+<span class="lineNum">     118 </span>                :<span class="lineCov">        512 :     ovs_mutex_destroy(&amp;lock-&gt;lock);</span>
+<span class="lineNum">     119 </span>                :<span class="lineCov">        512 : }</span>
+<span class="lineNum">     120 </span>                :            : 
+<span class="lineNum">     121 </span>                :            : /* Timeouts: all the possible timeout states passed to update_expiration()
+<span class="lineNum">     122 </span>                :            :  * are listed here. The name will be prefix by CT_TM_ and the value is in
+<span class="lineNum">     123 </span>                :            :  * milliseconds */
+<span class="lineNum">     124 </span>                :            : #define CT_TIMEOUTS \
+<span class="lineNum">     125 </span>                :            :     CT_TIMEOUT(TCP_FIRST_PACKET, 30 * 1000) \
+<span class="lineNum">     126 </span>                :            :     CT_TIMEOUT(TCP_OPENING, 30 * 1000) \
+<span class="lineNum">     127 </span>                :            :     CT_TIMEOUT(TCP_ESTABLISHED, 24 * 60 * 60 * 1000) \
+<span class="lineNum">     128 </span>                :            :     CT_TIMEOUT(TCP_CLOSING, 15 * 60 * 1000) \
+<span class="lineNum">     129 </span>                :            :     CT_TIMEOUT(TCP_FIN_WAIT, 45 * 1000) \
+<span class="lineNum">     130 </span>                :            :     CT_TIMEOUT(TCP_CLOSED, 30 * 1000) \
+<span class="lineNum">     131 </span>                :            :     CT_TIMEOUT(OTHER_FIRST, 60 * 1000) \
+<span class="lineNum">     132 </span>                :            :     CT_TIMEOUT(OTHER_MULTIPLE, 60 * 1000) \
+<span class="lineNum">     133 </span>                :            :     CT_TIMEOUT(OTHER_BIDIR, 30 * 1000) \
+<span class="lineNum">     134 </span>                :            :     CT_TIMEOUT(ICMP_FIRST, 60 * 1000) \
+<span class="lineNum">     135 </span>                :            :     CT_TIMEOUT(ICMP_REPLY, 30 * 1000)
+<span class="lineNum">     136 </span>                :            : 
+<span class="lineNum">     137 </span>                :            : /* The smallest of the above values: it is used as an upper bound for the
+<span class="lineNum">     138 </span>                :            :  * interval between two rounds of cleanup of expired entries */
+<span class="lineNum">     139 </span>                :            : #define CT_TM_MIN (30 * 1000)
+<span class="lineNum">     140 </span>                :            : 
+<span class="lineNum">     141 </span>                :            : #define CT_TIMEOUT(NAME, VAL) BUILD_ASSERT_DECL(VAL &gt;= CT_TM_MIN);
+<span class="lineNum">     142 </span>                :            :     CT_TIMEOUTS
+<span class="lineNum">     143 </span>                :            : #undef CT_TIMEOUT
+<span class="lineNum">     144 </span>                :            : 
+<span class="lineNum">     145 </span>                :            : enum ct_timeout {
+<span class="lineNum">     146 </span>                :            : #define CT_TIMEOUT(NAME, VALUE) CT_TM_##NAME,
+<span class="lineNum">     147 </span>                :            :     CT_TIMEOUTS
+<span class="lineNum">     148 </span>                :            : #undef CT_TIMEOUT
+<span class="lineNum">     149 </span>                :            :     N_CT_TM
+<span class="lineNum">     150 </span>                :            : };
+<span class="lineNum">     151 </span>                :            : 
+<span class="lineNum">     152 </span>                :            : /* Locking:
+<span class="lineNum">     153 </span>                :            :  *
+<span class="lineNum">     154 </span>                :            :  * The connections are kept in different buckets, which are completely
+<span class="lineNum">     155 </span>                :            :  * independent. The connection bucket is determined by the hash of its key.
+<span class="lineNum">     156 </span>                :            :  *
+<span class="lineNum">     157 </span>                :            :  * Each bucket has two locks. Acquisition order is, from outermost to
+<span class="lineNum">     158 </span>                :            :  * innermost:
+<span class="lineNum">     159 </span>                :            :  *
+<span class="lineNum">     160 </span>                :            :  *    cleanup_mutex
+<span class="lineNum">     161 </span>                :            :  *    lock
+<span class="lineNum">     162 </span>                :            :  *
+<span class="lineNum">     163 </span>                :            :  * */
+<span class="lineNum">     164 </span>                :            : struct conntrack_bucket {
+<span class="lineNum">     165 </span>                :            :     /* Protects 'connections' and 'exp_lists'.  Used in the fast path */
+<span class="lineNum">     166 </span>                :            :     struct ct_lock lock;
+<span class="lineNum">     167 </span>                :            :     /* Contains the connections in the bucket, indexed by 'struct conn_key' */
+<span class="lineNum">     168 </span>                :            :     struct hmap connections OVS_GUARDED;
+<span class="lineNum">     169 </span>                :            :     /* For each possible timeout we have a list of connections. When the
+<span class="lineNum">     170 </span>                :            :      * timeout of a connection is updated, we move it to the back of the list.
+<span class="lineNum">     171 </span>                :            :      * Since the connection in a list have the same relative timeout, the list
+<span class="lineNum">     172 </span>                :            :      * will be ordered, with the oldest connections to the front. */
+<span class="lineNum">     173 </span>                :            :     struct ovs_list exp_lists[N_CT_TM] OVS_GUARDED;
+<span class="lineNum">     174 </span>                :            : 
+<span class="lineNum">     175 </span>                :            :     /* Protects 'next_cleanup'. Used to make sure that there's only one thread
+<span class="lineNum">     176 </span>                :            :      * performing the cleanup. */
+<span class="lineNum">     177 </span>                :            :     struct ovs_mutex cleanup_mutex;
+<span class="lineNum">     178 </span>                :            :     long long next_cleanup OVS_GUARDED;
+<span class="lineNum">     179 </span>                :            : };
+<span class="lineNum">     180 </span>                :            : 
+<span class="lineNum">     181 </span>                :            : #define CONNTRACK_BUCKETS_SHIFT 8
+<span class="lineNum">     182 </span>                :            : #define CONNTRACK_BUCKETS (1 &lt;&lt; CONNTRACK_BUCKETS_SHIFT)
+<span class="lineNum">     183 </span>                :            : 
+<span class="lineNum">     184 </span>                :            : struct conntrack {
+<span class="lineNum">     185 </span>                :            :     /* Independent buckets containing the connections */
+<span class="lineNum">     186 </span>                :            :     struct conntrack_bucket buckets[CONNTRACK_BUCKETS];
+<span class="lineNum">     187 </span>                :            : 
+<span class="lineNum">     188 </span>                :            :     /* Salt for hashing a connection key. */
+<span class="lineNum">     189 </span>                :            :     uint32_t hash_basis;
+<span class="lineNum">     190 </span>                :            : 
+<span class="lineNum">     191 </span>                :            :     /* The thread performing periodic cleanup of the connection
+<span class="lineNum">     192 </span>                :            :      * tracker */
+<span class="lineNum">     193 </span>                :            :     pthread_t clean_thread;
+<span class="lineNum">     194 </span>                :            :     /* Latch to destroy the 'clean_thread' */
+<span class="lineNum">     195 </span>                :            :     struct latch clean_thread_exit;
+<span class="lineNum">     196 </span>                :            : 
+<span class="lineNum">     197 </span>                :            :     /* Number of connections currently in the connection tracker. */
+<span class="lineNum">     198 </span>                :            :     atomic_count n_conn;
+<span class="lineNum">     199 </span>                :            :     /* Connections limit. When this limit is reached, no new connection
+<span class="lineNum">     200 </span>                :            :      * will be accepted. */
+<span class="lineNum">     201 </span>                :            :     atomic_uint n_conn_limit;
+<span class="lineNum">     202 </span>                :            : };
+<span class="lineNum">     203 </span>                :            : 
+<span class="lineNum">     204 </span>                :            : #endif /* conntrack.h */
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

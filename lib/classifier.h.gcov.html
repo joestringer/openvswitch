@@ -1,0 +1,560 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/classifier.h</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - classifier.h<span style="font-size: 80%;"> (source / <a href="classifier.h.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">7</td>
+            <td class="headerCovTableEntry">7</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">2</td>
+            <td class="headerCovTableEntry">2</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntryHi">-</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2009, 2010, 2011, 2012, 2013, 2014, 2015 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #ifndef CLASSIFIER_H
+<span class="lineNum">      18 </span>                :            : #define CLASSIFIER_H 1
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : /* Flow classifier.
+<span class="lineNum">      21 </span>                :            :  *
+<span class="lineNum">      22 </span>                :            :  *
+<span class="lineNum">      23 </span>                :            :  * What?
+<span class="lineNum">      24 </span>                :            :  * =====
+<span class="lineNum">      25 </span>                :            :  *
+<span class="lineNum">      26 </span>                :            :  * A flow classifier holds any number of &quot;rules&quot;, each of which specifies
+<span class="lineNum">      27 </span>                :            :  * values to match for some fields or subfields and a priority.  Each OpenFlow
+<span class="lineNum">      28 </span>                :            :  * table is implemented as a flow classifier.
+<span class="lineNum">      29 </span>                :            :  *
+<span class="lineNum">      30 </span>                :            :  * The classifier has two primary design goals.  The first is obvious: given a
+<span class="lineNum">      31 </span>                :            :  * set of packet headers, as quickly as possible find the highest-priority rule
+<span class="lineNum">      32 </span>                :            :  * that matches those headers.  The following section describes the second
+<span class="lineNum">      33 </span>                :            :  * goal.
+<span class="lineNum">      34 </span>                :            :  *
+<span class="lineNum">      35 </span>                :            :  *
+<span class="lineNum">      36 </span>                :            :  * &quot;Un-wildcarding&quot;
+<span class="lineNum">      37 </span>                :            :  * ================
+<span class="lineNum">      38 </span>                :            :  *
+<span class="lineNum">      39 </span>                :            :  * A primary goal of the flow classifier is to produce, as a side effect of a
+<span class="lineNum">      40 </span>                :            :  * packet lookup, a wildcard mask that indicates which bits of the packet
+<span class="lineNum">      41 </span>                :            :  * headers were essential to the classification result.  Ideally, a 1-bit in
+<span class="lineNum">      42 </span>                :            :  * any position of this mask means that, if the corresponding bit in the packet
+<span class="lineNum">      43 </span>                :            :  * header were flipped, then the classification result might change.  A 0-bit
+<span class="lineNum">      44 </span>                :            :  * means that changing the packet header bit would have no effect.  Thus, the
+<span class="lineNum">      45 </span>                :            :  * wildcarded bits are the ones that played no role in the classification
+<span class="lineNum">      46 </span>                :            :  * decision.
+<span class="lineNum">      47 </span>                :            :  *
+<span class="lineNum">      48 </span>                :            :  * Such a wildcard mask is useful with datapaths that support installing flows
+<span class="lineNum">      49 </span>                :            :  * that wildcard fields or subfields.  If an OpenFlow lookup for a TCP flow
+<span class="lineNum">      50 </span>                :            :  * does not actually look at the TCP source or destination ports, for example,
+<span class="lineNum">      51 </span>                :            :  * then the switch may install into the datapath a flow that wildcards the port
+<span class="lineNum">      52 </span>                :            :  * numbers, which in turn allows the datapath to handle packets that arrive for
+<span class="lineNum">      53 </span>                :            :  * other TCP source or destination ports without additional help from
+<span class="lineNum">      54 </span>                :            :  * ovs-vswitchd.  This is useful for the Open vSwitch software and,
+<span class="lineNum">      55 </span>                :            :  * potentially, for ASIC-based switches as well.
+<span class="lineNum">      56 </span>                :            :  *
+<span class="lineNum">      57 </span>                :            :  * Some properties of the wildcard mask:
+<span class="lineNum">      58 </span>                :            :  *
+<span class="lineNum">      59 </span>                :            :  *     - &quot;False 1-bits&quot; are acceptable, that is, setting a bit in the wildcard
+<span class="lineNum">      60 </span>                :            :  *       mask to 1 will never cause a packet to be forwarded the wrong way.
+<span class="lineNum">      61 </span>                :            :  *       As a corollary, a wildcard mask composed of all 1-bits will always
+<span class="lineNum">      62 </span>                :            :  *       yield correct (but often needlessly inefficient) behavior.
+<span class="lineNum">      63 </span>                :            :  *
+<span class="lineNum">      64 </span>                :            :  *     - &quot;False 0-bits&quot; can cause problems, so they must be avoided.  In the
+<span class="lineNum">      65 </span>                :            :  *       extreme case, a mask of all 0-bits is only correct if the classifier
+<span class="lineNum">      66 </span>                :            :  *       contains only a single flow that matches all packets.
+<span class="lineNum">      67 </span>                :            :  *
+<span class="lineNum">      68 </span>                :            :  *     - 0-bits are desirable because they allow the datapath to act more
+<span class="lineNum">      69 </span>                :            :  *       autonomously, relying less on ovs-vswitchd to process flow setups,
+<span class="lineNum">      70 </span>                :            :  *       thereby improving performance.
+<span class="lineNum">      71 </span>                :            :  *
+<span class="lineNum">      72 </span>                :            :  *     - We don't know a good way to generate wildcard masks with the maximum
+<span class="lineNum">      73 </span>                :            :  *       (correct) number of 0-bits.  We use various approximations, described
+<span class="lineNum">      74 </span>                :            :  *       in later sections.
+<span class="lineNum">      75 </span>                :            :  *
+<span class="lineNum">      76 </span>                :            :  *     - Wildcard masks for lookups in a given classifier yield a
+<span class="lineNum">      77 </span>                :            :  *       non-overlapping set of rules.  More specifically:
+<span class="lineNum">      78 </span>                :            :  *
+<span class="lineNum">      79 </span>                :            :  *       Consider an classifier C1 filled with an arbitrary collection of rules
+<span class="lineNum">      80 </span>                :            :  *       and an empty classifier C2.  Now take a set of packet headers H and
+<span class="lineNum">      81 </span>                :            :  *       look it up in C1, yielding a highest-priority matching rule R1 and
+<span class="lineNum">      82 </span>                :            :  *       wildcard mask M.  Form a new classifier rule R2 out of packet headers
+<span class="lineNum">      83 </span>                :            :  *       H and mask M, and add R2 to C2 with a fixed priority.  If one were to
+<span class="lineNum">      84 </span>                :            :  *       do this for every possible set of packet headers H, then this
+<span class="lineNum">      85 </span>                :            :  *       process would not attempt to add any overlapping rules to C2, that is,
+<span class="lineNum">      86 </span>                :            :  *       any packet lookup using the rules generated by this process matches at
+<span class="lineNum">      87 </span>                :            :  *       most one rule in C2.
+<span class="lineNum">      88 </span>                :            :  *
+<span class="lineNum">      89 </span>                :            :  * During the lookup process, the classifier starts out with a wildcard mask
+<span class="lineNum">      90 </span>                :            :  * that is all 0-bits, that is, fully wildcarded.  As lookup proceeds, each
+<span class="lineNum">      91 </span>                :            :  * step tends to add constraints to the wildcard mask, that is, change
+<span class="lineNum">      92 </span>                :            :  * wildcarded 0-bits into exact-match 1-bits.  We call this &quot;un-wildcarding&quot;.
+<span class="lineNum">      93 </span>                :            :  * A lookup step that examines a particular field must un-wildcard that field.
+<span class="lineNum">      94 </span>                :            :  * In general, un-wildcarding is necessary for correctness but undesirable for
+<span class="lineNum">      95 </span>                :            :  * performance.
+<span class="lineNum">      96 </span>                :            :  *
+<span class="lineNum">      97 </span>                :            :  *
+<span class="lineNum">      98 </span>                :            :  * Basic Classifier Design
+<span class="lineNum">      99 </span>                :            :  * =======================
+<span class="lineNum">     100 </span>                :            :  *
+<span class="lineNum">     101 </span>                :            :  * Suppose that all the rules in a classifier had the same form.  For example,
+<span class="lineNum">     102 </span>                :            :  * suppose that they all matched on the source and destination Ethernet address
+<span class="lineNum">     103 </span>                :            :  * and wildcarded all the other fields.  Then the obvious way to implement a
+<span class="lineNum">     104 </span>                :            :  * classifier would be a hash table on the source and destination Ethernet
+<span class="lineNum">     105 </span>                :            :  * addresses.  If new classification rules came along with a different form,
+<span class="lineNum">     106 </span>                :            :  * you could add a second hash table that hashed on the fields matched in those
+<span class="lineNum">     107 </span>                :            :  * rules.  With two hash tables, you look up a given flow in each hash table.
+<span class="lineNum">     108 </span>                :            :  * If there are no matches, the classifier didn't contain a match; if you find
+<span class="lineNum">     109 </span>                :            :  * a match in one of them, that's the result; if you find a match in both of
+<span class="lineNum">     110 </span>                :            :  * them, then the result is the rule with the higher priority.
+<span class="lineNum">     111 </span>                :            :  *
+<span class="lineNum">     112 </span>                :            :  * This is how the classifier works.  In a &quot;struct classifier&quot;, each form of
+<span class="lineNum">     113 </span>                :            :  * &quot;struct cls_rule&quot; present (based on its -&gt;match.mask) goes into a separate
+<span class="lineNum">     114 </span>                :            :  * &quot;struct cls_subtable&quot;.  A lookup does a hash lookup in every &quot;struct
+<span class="lineNum">     115 </span>                :            :  * cls_subtable&quot; in the classifier and tracks the highest-priority match that
+<span class="lineNum">     116 </span>                :            :  * it finds.  The subtables are kept in a descending priority order according
+<span class="lineNum">     117 </span>                :            :  * to the highest priority rule in each subtable, which allows lookup to skip
+<span class="lineNum">     118 </span>                :            :  * over subtables that can't possibly have a higher-priority match than already
+<span class="lineNum">     119 </span>                :            :  * found.  Eliminating lookups through priority ordering aids both classifier
+<span class="lineNum">     120 </span>                :            :  * primary design goals: skipping lookups saves time and avoids un-wildcarding
+<span class="lineNum">     121 </span>                :            :  * fields that those lookups would have examined.
+<span class="lineNum">     122 </span>                :            :  *
+<span class="lineNum">     123 </span>                :            :  * One detail: a classifier can contain multiple rules that are identical other
+<span class="lineNum">     124 </span>                :            :  * than their priority.  When this happens, only the highest priority rule out
+<span class="lineNum">     125 </span>                :            :  * of a group of otherwise identical rules is stored directly in the &quot;struct
+<span class="lineNum">     126 </span>                :            :  * cls_subtable&quot;, with the other almost-identical rules chained off a linked
+<span class="lineNum">     127 </span>                :            :  * list inside that highest-priority rule.
+<span class="lineNum">     128 </span>                :            :  *
+<span class="lineNum">     129 </span>                :            :  * The following sub-sections describe various optimizations over this simple
+<span class="lineNum">     130 </span>                :            :  * approach.
+<span class="lineNum">     131 </span>                :            :  *
+<span class="lineNum">     132 </span>                :            :  *
+<span class="lineNum">     133 </span>                :            :  * Staged Lookup (Wildcard Optimization)
+<span class="lineNum">     134 </span>                :            :  * -------------------------------------
+<span class="lineNum">     135 </span>                :            :  *
+<span class="lineNum">     136 </span>                :            :  * Subtable lookup is performed in ranges defined for struct flow, starting
+<span class="lineNum">     137 </span>                :            :  * from metadata (registers, in_port, etc.), then L2 header, L3, and finally
+<span class="lineNum">     138 </span>                :            :  * L4 ports.  Whenever it is found that there are no matches in the current
+<span class="lineNum">     139 </span>                :            :  * subtable, the rest of the subtable can be skipped.
+<span class="lineNum">     140 </span>                :            :  *
+<span class="lineNum">     141 </span>                :            :  * Staged lookup does not reduce lookup time, and it may increase it, because
+<span class="lineNum">     142 </span>                :            :  * it changes a single hash table lookup into multiple hash table lookups.
+<span class="lineNum">     143 </span>                :            :  * It reduces un-wildcarding significantly in important use cases.
+<span class="lineNum">     144 </span>                :            :  *
+<span class="lineNum">     145 </span>                :            :  *
+<span class="lineNum">     146 </span>                :            :  * Prefix Tracking (Wildcard Optimization)
+<span class="lineNum">     147 </span>                :            :  * ---------------------------------------
+<span class="lineNum">     148 </span>                :            :  *
+<span class="lineNum">     149 </span>                :            :  * Classifier uses prefix trees (&quot;tries&quot;) for tracking the used
+<span class="lineNum">     150 </span>                :            :  * address space, enabling skipping classifier tables containing
+<span class="lineNum">     151 </span>                :            :  * longer masks than necessary for the given address.  This reduces
+<span class="lineNum">     152 </span>                :            :  * un-wildcarding for datapath flows in parts of the address space
+<span class="lineNum">     153 </span>                :            :  * without host routes, but consulting extra data structures (the
+<span class="lineNum">     154 </span>                :            :  * tries) may slightly increase lookup time.
+<span class="lineNum">     155 </span>                :            :  *
+<span class="lineNum">     156 </span>                :            :  * Trie lookup is interwoven with staged lookup, so that a trie is
+<span class="lineNum">     157 </span>                :            :  * searched only when the configured trie field becomes relevant for
+<span class="lineNum">     158 </span>                :            :  * the lookup.  The trie lookup results are retained so that each trie
+<span class="lineNum">     159 </span>                :            :  * is checked at most once for each classifier lookup.
+<span class="lineNum">     160 </span>                :            :  *
+<span class="lineNum">     161 </span>                :            :  * This implementation tracks the number of rules at each address
+<span class="lineNum">     162 </span>                :            :  * prefix for the whole classifier.  More aggressive table skipping
+<span class="lineNum">     163 </span>                :            :  * would be possible by maintaining lists of tables that have prefixes
+<span class="lineNum">     164 </span>                :            :  * at the lengths encountered on tree traversal, or by maintaining
+<span class="lineNum">     165 </span>                :            :  * separate tries for subsets of rules separated by metadata fields.
+<span class="lineNum">     166 </span>                :            :  *
+<span class="lineNum">     167 </span>                :            :  * Prefix tracking is configured via OVSDB &quot;Flow_Table&quot; table,
+<span class="lineNum">     168 </span>                :            :  * &quot;fieldspec&quot; column.  &quot;fieldspec&quot; is a string map where a &quot;prefix&quot;
+<span class="lineNum">     169 </span>                :            :  * key tells which fields should be used for prefix tracking.  The
+<span class="lineNum">     170 </span>                :            :  * value of the &quot;prefix&quot; key is a comma separated list of field names.
+<span class="lineNum">     171 </span>                :            :  *
+<span class="lineNum">     172 </span>                :            :  * There is a maximum number of fields that can be enabled for any one
+<span class="lineNum">     173 </span>                :            :  * flow table.  Currently this limit is 3.
+<span class="lineNum">     174 </span>                :            :  *
+<span class="lineNum">     175 </span>                :            :  *
+<span class="lineNum">     176 </span>                :            :  * Partitioning (Lookup Time and Wildcard Optimization)
+<span class="lineNum">     177 </span>                :            :  * ----------------------------------------------------
+<span class="lineNum">     178 </span>                :            :  *
+<span class="lineNum">     179 </span>                :            :  * Suppose that a given classifier is being used to handle multiple stages in a
+<span class="lineNum">     180 </span>                :            :  * pipeline using &quot;resubmit&quot;, with metadata (that is, the OpenFlow 1.1+ field
+<span class="lineNum">     181 </span>                :            :  * named &quot;metadata&quot;) distinguishing between the different stages.  For example,
+<span class="lineNum">     182 </span>                :            :  * metadata value 1 might identify ingress rules, metadata value 2 might
+<span class="lineNum">     183 </span>                :            :  * identify ACLs, and metadata value 3 might identify egress rules.  Such a
+<span class="lineNum">     184 </span>                :            :  * classifier is essentially partitioned into multiple sub-classifiers on the
+<span class="lineNum">     185 </span>                :            :  * basis of the metadata value.
+<span class="lineNum">     186 </span>                :            :  *
+<span class="lineNum">     187 </span>                :            :  * The classifier has a special optimization to speed up matching in this
+<span class="lineNum">     188 </span>                :            :  * scenario:
+<span class="lineNum">     189 </span>                :            :  *
+<span class="lineNum">     190 </span>                :            :  *     - Each cls_subtable that matches on metadata gets a tag derived from the
+<span class="lineNum">     191 </span>                :            :  *       subtable's mask, so that it is likely that each subtable has a unique
+<span class="lineNum">     192 </span>                :            :  *       tag.  (Duplicate tags have a performance cost but do not affect
+<span class="lineNum">     193 </span>                :            :  *       correctness.)
+<span class="lineNum">     194 </span>                :            :  *
+<span class="lineNum">     195 </span>                :            :  *     - For each metadata value matched by any cls_rule, the classifier
+<span class="lineNum">     196 </span>                :            :  *       constructs a &quot;struct cls_partition&quot; indexed by the metadata value.
+<span class="lineNum">     197 </span>                :            :  *       The cls_partition has a 'tags' member whose value is the bitwise-OR of
+<span class="lineNum">     198 </span>                :            :  *       the tags of each cls_subtable that contains any rule that matches on
+<span class="lineNum">     199 </span>                :            :  *       the cls_partition's metadata value.  In other words, struct
+<span class="lineNum">     200 </span>                :            :  *       cls_partition associates metadata values with subtables that need to
+<span class="lineNum">     201 </span>                :            :  *       be checked with flows with that specific metadata value.
+<span class="lineNum">     202 </span>                :            :  *
+<span class="lineNum">     203 </span>                :            :  * Thus, a flow lookup can start by looking up the partition associated with
+<span class="lineNum">     204 </span>                :            :  * the flow's metadata, and then skip over any cls_subtable whose 'tag' does
+<span class="lineNum">     205 </span>                :            :  * not intersect the partition's 'tags'.  (The flow must also be looked up in
+<span class="lineNum">     206 </span>                :            :  * any cls_subtable that doesn't match on metadata.  We handle that by giving
+<span class="lineNum">     207 </span>                :            :  * any such cls_subtable TAG_ALL as its 'tags' so that it matches any tag.)
+<span class="lineNum">     208 </span>                :            :  *
+<span class="lineNum">     209 </span>                :            :  * Partitioning saves lookup time by reducing the number of subtable lookups.
+<span class="lineNum">     210 </span>                :            :  * Each eliminated subtable lookup also reduces the amount of un-wildcarding.
+<span class="lineNum">     211 </span>                :            :  *
+<span class="lineNum">     212 </span>                :            :  *
+<span class="lineNum">     213 </span>                :            :  * Classifier Versioning
+<span class="lineNum">     214 </span>                :            :  * =====================
+<span class="lineNum">     215 </span>                :            :  *
+<span class="lineNum">     216 </span>                :            :  * Classifier lookups are always done in a specific classifier version, where
+<span class="lineNum">     217 </span>                :            :  * a version is defined to be a natural number.
+<span class="lineNum">     218 </span>                :            :  *
+<span class="lineNum">     219 </span>                :            :  * When a new rule is added to a classifier, it is set to become visible in a
+<span class="lineNum">     220 </span>                :            :  * specific version.  If the version number used at insert time is larger than
+<span class="lineNum">     221 </span>                :            :  * any version number currently used in lookups, the new rule is said to be
+<span class="lineNum">     222 </span>                :            :  * invisible to lookups.  This means that lookups won't find the rule, but the
+<span class="lineNum">     223 </span>                :            :  * rule is immediately available to classifier iterations.
+<span class="lineNum">     224 </span>                :            :  *
+<span class="lineNum">     225 </span>                :            :  * Similarly, a rule can be marked as to be deleted in a future version.  To
+<span class="lineNum">     226 </span>                :            :  * delete a rule in a way to not remove the rule before all ongoing lookups are
+<span class="lineNum">     227 </span>                :            :  * finished, the rule should be made invisible in a specific version number.
+<span class="lineNum">     228 </span>                :            :  * Then, when all the lookups use a later version number, the rule can be
+<span class="lineNum">     229 </span>                :            :  * actually removed from the classifier.
+<span class="lineNum">     230 </span>                :            :  *
+<span class="lineNum">     231 </span>                :            :  * Classifiers can hold duplicate rules (rules with the same match criteria and
+<span class="lineNum">     232 </span>                :            :  * priority) when at most one of these duplicates is visible in any given
+<span class="lineNum">     233 </span>                :            :  * lookup version.  The caller responsible for classifier modifications must
+<span class="lineNum">     234 </span>                :            :  * maintain this invariant.
+<span class="lineNum">     235 </span>                :            :  *
+<span class="lineNum">     236 </span>                :            :  * The classifier supports versioning for two reasons:
+<span class="lineNum">     237 </span>                :            :  *
+<span class="lineNum">     238 </span>                :            :  *     1. Support for versioned modifications makes it possible to perform an
+<span class="lineNum">     239 </span>                :            :  *        arbitraty series of classifier changes as one atomic transaction,
+<span class="lineNum">     240 </span>                :            :  *        where intermediate versions of the classifier are not visible to any
+<span class="lineNum">     241 </span>                :            :  *        lookups.  Also, when a rule is added for a future version, or marked
+<span class="lineNum">     242 </span>                :            :  *        for removal after the current version, such modifications can be
+<span class="lineNum">     243 </span>                :            :  *        reverted without any visible effects to any of the current lookups.
+<span class="lineNum">     244 </span>                :            :  *
+<span class="lineNum">     245 </span>                :            :  *     2. Performance: Adding (or deleting) a large set of rules can, in
+<span class="lineNum">     246 </span>                :            :  *        pathological cases, have a cost proportional to the number of rules
+<span class="lineNum">     247 </span>                :            :  *        already in the classifier.  When multiple rules are being added (or
+<span class="lineNum">     248 </span>                :            :  *        deleted) in one go, though, this pathological case cost can be
+<span class="lineNum">     249 </span>                :            :  *        typically avoided, as long as it is OK for any new rules to be
+<span class="lineNum">     250 </span>                :            :  *        invisible until the batch change is complete.
+<span class="lineNum">     251 </span>                :            :  *
+<span class="lineNum">     252 </span>                :            :  * Note that the classifier_replace() function replaces a rule immediately, and
+<span class="lineNum">     253 </span>                :            :  * is therefore not safe to use with versioning.  It is still available for the
+<span class="lineNum">     254 </span>                :            :  * users that do not use versioning.
+<span class="lineNum">     255 </span>                :            :  *
+<span class="lineNum">     256 </span>                :            :  *
+<span class="lineNum">     257 </span>                :            :  * Deferred Publication
+<span class="lineNum">     258 </span>                :            :  * ====================
+<span class="lineNum">     259 </span>                :            :  *
+<span class="lineNum">     260 </span>                :            :  * Removing large number of rules from classifier can be costly, as the
+<span class="lineNum">     261 </span>                :            :  * supporting data structures are teared down, in many cases just to be
+<span class="lineNum">     262 </span>                :            :  * re-instantiated right after.  In the worst case, as when each rule has a
+<span class="lineNum">     263 </span>                :            :  * different match pattern (mask), the maintenance of the match patterns can
+<span class="lineNum">     264 </span>                :            :  * have cost O(N^2), where N is the number of different match patterns.  To
+<span class="lineNum">     265 </span>                :            :  * alleviate this, the classifier supports a &quot;deferred mode&quot;, in which changes
+<span class="lineNum">     266 </span>                :            :  * in internal data structures needed for future version lookups may not be
+<span class="lineNum">     267 </span>                :            :  * fully computed yet.  The computation is finalized when the deferred mode is
+<span class="lineNum">     268 </span>                :            :  * turned off.
+<span class="lineNum">     269 </span>                :            :  *
+<span class="lineNum">     270 </span>                :            :  * This feature can be used with versioning such that all changes to future
+<span class="lineNum">     271 </span>                :            :  * versions are made in the deferred mode.  Then, right before making the new
+<span class="lineNum">     272 </span>                :            :  * version visible to lookups, the deferred mode is turned off so that all the
+<span class="lineNum">     273 </span>                :            :  * data structures are ready for lookups with the new version number.
+<span class="lineNum">     274 </span>                :            :  *
+<span class="lineNum">     275 </span>                :            :  * To use deferred publication, first call classifier_defer().  Then, modify
+<span class="lineNum">     276 </span>                :            :  * the classifier via additions (classifier_insert() with a specific, future
+<span class="lineNum">     277 </span>                :            :  * version number) and deletions (use cls_rule_make_removable_after_version()).
+<span class="lineNum">     278 </span>                :            :  * Then call classifier_publish(), and after that, announce the new version
+<span class="lineNum">     279 </span>                :            :  * number to be used in lookups.
+<span class="lineNum">     280 </span>                :            :  *
+<span class="lineNum">     281 </span>                :            :  *
+<span class="lineNum">     282 </span>                :            :  * Thread-safety
+<span class="lineNum">     283 </span>                :            :  * =============
+<span class="lineNum">     284 </span>                :            :  *
+<span class="lineNum">     285 </span>                :            :  * The classifier may safely be accessed by many reader threads concurrently
+<span class="lineNum">     286 </span>                :            :  * and by a single writer, or by multiple writers when they guarantee mutually
+<span class="lineNum">     287 </span>                :            :  * exlucive access to classifier modifications.
+<span class="lineNum">     288 </span>                :            :  *
+<span class="lineNum">     289 </span>                :            :  * Since the classifier rules are RCU protected, the rule destruction after
+<span class="lineNum">     290 </span>                :            :  * removal from the classifier must be RCU postponed.  Also, when versioning is
+<span class="lineNum">     291 </span>                :            :  * used, the rule removal itself needs to be typically RCU postponed.  In this
+<span class="lineNum">     292 </span>                :            :  * case the rule destruction is doubly RCU postponed, i.e., the second
+<span class="lineNum">     293 </span>                :            :  * ovsrcu_postpone() call to destruct the rule is called from the first RCU
+<span class="lineNum">     294 </span>                :            :  * callback that removes the rule.
+<span class="lineNum">     295 </span>                :            :  *
+<span class="lineNum">     296 </span>                :            :  * Rules that have never been visible to lookups are an exeption to the above
+<span class="lineNum">     297 </span>                :            :  * rule.  Such rules can be removed immediately, but their destruction must
+<span class="lineNum">     298 </span>                :            :  * still be RCU postponed, as the rule's visibility attribute may be examined
+<span class="lineNum">     299 </span>                :            :  * parallel to the rule's removal. */
+<span class="lineNum">     300 </span>                :            : 
+<span class="lineNum">     301 </span>                :            : #include &quot;cmap.h&quot;
+<span class="lineNum">     302 </span>                :            : #include &quot;openvswitch/match.h&quot;
+<span class="lineNum">     303 </span>                :            : #include &quot;openvswitch/meta-flow.h&quot;
+<span class="lineNum">     304 </span>                :            : #include &quot;pvector.h&quot;
+<span class="lineNum">     305 </span>                :            : #include &quot;rculist.h&quot;
+<span class="lineNum">     306 </span>                :            : #include &quot;openvswitch/type-props.h&quot;
+<span class="lineNum">     307 </span>                :            : #include &quot;versions.h&quot;
+<span class="lineNum">     308 </span>                :            : 
+<span class="lineNum">     309 </span>                :            : #ifdef __cplusplus
+<span class="lineNum">     310 </span>                :            : extern &quot;C&quot; {
+<span class="lineNum">     311 </span>                :            : #endif
+<span class="lineNum">     312 </span>                :            : 
+<span class="lineNum">     313 </span>                :            : /* Classifier internal data structures. */
+<span class="lineNum">     314 </span>                :            : struct cls_subtable;
+<span class="lineNum">     315 </span>                :            : struct cls_match;
+<span class="lineNum">     316 </span>                :            : 
+<span class="lineNum">     317 </span>                :            : struct trie_node;
+<span class="lineNum">     318 </span>                :            : typedef OVSRCU_TYPE(struct trie_node *) rcu_trie_ptr;
+<span class="lineNum">     319 </span>                :            : 
+<span class="lineNum">     320 </span>                :            : /* Prefix trie for a 'field' */
+<span class="lineNum">     321 </span>                :            : struct cls_trie {
+<span class="lineNum">     322 </span>                :            :     const struct mf_field *field; /* Trie field, or NULL. */
+<span class="lineNum">     323 </span>                :            :     rcu_trie_ptr root;            /* NULL if none. */
+<span class="lineNum">     324 </span>                :            : };
+<span class="lineNum">     325 </span>                :            : 
+<span class="lineNum">     326 </span>                :            : enum {
+<span class="lineNum">     327 </span>                :            :     CLS_MAX_INDICES = 3,   /* Maximum number of lookup indices per subtable. */
+<span class="lineNum">     328 </span>                :            :     CLS_MAX_TRIES = 3      /* Maximum number of prefix trees per classifier. */
+<span class="lineNum">     329 </span>                :            : };
+<span class="lineNum">     330 </span>                :            : 
+<span class="lineNum">     331 </span>                :            : /* A flow classifier. */
+<span class="lineNum">     332 </span>                :            : struct classifier {
+<span class="lineNum">     333 </span>                :            :     int n_rules;                    /* Total number of rules. */
+<span class="lineNum">     334 </span>                :            :     uint8_t n_flow_segments;
+<span class="lineNum">     335 </span>                :            :     uint8_t flow_segments[CLS_MAX_INDICES]; /* Flow segment boundaries to use
+<span class="lineNum">     336 </span>                :            :                                              * for staged lookup. */
+<span class="lineNum">     337 </span>                :            :     struct cmap subtables_map;      /* Contains &quot;struct cls_subtable&quot;s.  */
+<span class="lineNum">     338 </span>                :            :     struct pvector subtables;
+<span class="lineNum">     339 </span>                :            :     struct cmap partitions;         /* Contains &quot;struct cls_partition&quot;s. */
+<span class="lineNum">     340 </span>                :            :     struct cls_trie tries[CLS_MAX_TRIES]; /* Prefix tries. */
+<span class="lineNum">     341 </span>                :            :     unsigned int n_tries;
+<span class="lineNum">     342 </span>                :            :     bool publish;                   /* Make changes visible to lookups? */
+<span class="lineNum">     343 </span>                :            : };
+<span class="lineNum">     344 </span>                :            : 
+<span class="lineNum">     345 </span>                :            : struct cls_conjunction {
+<span class="lineNum">     346 </span>                :            :     uint32_t id;
+<span class="lineNum">     347 </span>                :            :     uint8_t clause;
+<span class="lineNum">     348 </span>                :            :     uint8_t n_clauses;
+<span class="lineNum">     349 </span>                :            : };
+<span class="lineNum">     350 </span>                :            : 
+<span class="lineNum">     351 </span>                :            : /* A rule to be inserted to the classifier. */
+<span class="lineNum">     352 </span>                :            : struct cls_rule {
+<span class="lineNum">     353 </span>                :            :     struct rculist node;          /* In struct cls_subtable 'rules_list'. */
+<span class="lineNum">     354 </span>                :            :     const int priority;           /* Larger numbers are higher priorities. */
+<span class="lineNum">     355 </span>                :            :     OVSRCU_TYPE(struct cls_match *) cls_match;  /* NULL if not in a
+<span class="lineNum">     356 </span>                :            :                                                  * classifier. */
+<span class="lineNum">     357 </span>                :            :     const struct minimatch match; /* Matching rule. */
+<span class="lineNum">     358 </span>                :            : };
+<span class="lineNum">     359 </span>                :            : 
+<span class="lineNum">     360 </span>                :            : /* Constructor/destructor.  Must run single-threaded. */
+<span class="lineNum">     361 </span>                :            : void classifier_init(struct classifier *, const uint8_t *flow_segments);
+<span class="lineNum">     362 </span>                :            : void classifier_destroy(struct classifier *);
+<span class="lineNum">     363 </span>                :            : 
+<span class="lineNum">     364 </span>                :            : /* Modifiers.  Caller MUST exclude concurrent calls from other threads. */
+<span class="lineNum">     365 </span>                :            : bool classifier_set_prefix_fields(struct classifier *,
+<span class="lineNum">     366 </span>                :            :                                   const enum mf_field_id *trie_fields,
+<span class="lineNum">     367 </span>                :            :                                   unsigned int n_trie_fields);
+<span class="lineNum">     368 </span>                :            : 
+<span class="lineNum">     369 </span>                :            : void cls_rule_init(struct cls_rule *, const struct match *, int priority);
+<span class="lineNum">     370 </span>                :            : void cls_rule_init_from_minimatch(struct cls_rule *, const struct minimatch *,
+<span class="lineNum">     371 </span>                :            :                                   int priority);
+<span class="lineNum">     372 </span>                :            : void cls_rule_clone(struct cls_rule *, const struct cls_rule *);
+<span class="lineNum">     373 </span>                :            : void cls_rule_move(struct cls_rule *dst, struct cls_rule *src);
+<span class="lineNum">     374 </span>                :            : void cls_rule_destroy(struct cls_rule *);
+<span class="lineNum">     375 </span>                :            : 
+<span class="lineNum">     376 </span>                :            : void cls_rule_set_conjunctions(struct cls_rule *,
+<span class="lineNum">     377 </span>                :            :                                const struct cls_conjunction *, size_t n);
+<span class="lineNum">     378 </span>                :            : void cls_rule_make_invisible_in_version(const struct cls_rule *,
+<span class="lineNum">     379 </span>                :            :                                         ovs_version_t);
+<span class="lineNum">     380 </span>                :            : void cls_rule_restore_visibility(const struct cls_rule *);
+<span class="lineNum">     381 </span>                :            : 
+<span class="lineNum">     382 </span>                :            : void classifier_insert(struct classifier *, const struct cls_rule *,
+<span class="lineNum">     383 </span>                :            :                        ovs_version_t, const struct cls_conjunction *,
+<span class="lineNum">     384 </span>                :            :                        size_t n_conjunctions);
+<span class="lineNum">     385 </span>                :            : const struct cls_rule *classifier_replace(struct classifier *,
+<span class="lineNum">     386 </span>                :            :                                           const struct cls_rule *,
+<span class="lineNum">     387 </span>                :            :                                           ovs_version_t,
+<span class="lineNum">     388 </span>                :            :                                           const struct cls_conjunction *,
+<span class="lineNum">     389 </span>                :            :                                           size_t n_conjunctions);
+<span class="lineNum">     390 </span>                :            : const struct cls_rule *classifier_remove(struct classifier *,
+<span class="lineNum">     391 </span>                :            :                                          const struct cls_rule *);
+<span class="lineNum">     392 </span>                :            : static inline void classifier_defer(struct classifier *);
+<span class="lineNum">     393 </span>                :            : static inline void classifier_publish(struct classifier *);
+<span class="lineNum">     394 </span>                :            : 
+<span class="lineNum">     395 </span>                :            : /* Lookups.  These are RCU protected and may run concurrently with modifiers
+<span class="lineNum">     396 </span>                :            :  * and each other. */
+<span class="lineNum">     397 </span>                :            : const struct cls_rule *classifier_lookup(const struct classifier *,
+<span class="lineNum">     398 </span>                :            :                                          ovs_version_t, struct flow *,
+<span class="lineNum">     399 </span>                :            :                                          struct flow_wildcards *);
+<span class="lineNum">     400 </span>                :            : bool classifier_rule_overlaps(const struct classifier *,
+<span class="lineNum">     401 </span>                :            :                               const struct cls_rule *, ovs_version_t);
+<span class="lineNum">     402 </span>                :            : const struct cls_rule *classifier_find_rule_exactly(const struct classifier *,
+<span class="lineNum">     403 </span>                :            :                                                     const struct cls_rule *,
+<span class="lineNum">     404 </span>                :            :                                                     ovs_version_t);
+<span class="lineNum">     405 </span>                :            : const struct cls_rule *classifier_find_match_exactly(const struct classifier *,
+<span class="lineNum">     406 </span>                :            :                                                      const struct match *,
+<span class="lineNum">     407 </span>                :            :                                                      int priority,
+<span class="lineNum">     408 </span>                :            :                                                      ovs_version_t);
+<span class="lineNum">     409 </span>                :            : bool classifier_is_empty(const struct classifier *);
+<span class="lineNum">     410 </span>                :            : int classifier_count(const struct classifier *);
+<span class="lineNum">     411 </span>                :            : 
+<span class="lineNum">     412 </span>                :            : /* Classifier rule properties.  These are RCU protected and may run
+<span class="lineNum">     413 </span>                :            :  * concurrently with modifiers and each other. */
+<span class="lineNum">     414 </span>                :            : bool cls_rule_equal(const struct cls_rule *, const struct cls_rule *);
+<span class="lineNum">     415 </span>                :            : void cls_rule_format(const struct cls_rule *, struct ds *);
+<span class="lineNum">     416 </span>                :            : bool cls_rule_is_catchall(const struct cls_rule *);
+<span class="lineNum">     417 </span>                :            : bool cls_rule_is_loose_match(const struct cls_rule *rule,
+<span class="lineNum">     418 </span>                :            :                              const struct minimatch *criteria);
+<span class="lineNum">     419 </span>                :            : bool cls_rule_visible_in_version(const struct cls_rule *, ovs_version_t);
+<span class="lineNum">     420 </span>                :            : 
+<span class="lineNum">     421 </span>                :            : /* Iteration.
+<span class="lineNum">     422 </span>                :            :  *
+<span class="lineNum">     423 </span>                :            :  * Iteration is lockless and RCU-protected.  Concurrent threads may perform all
+<span class="lineNum">     424 </span>                :            :  * kinds of concurrent modifications without ruining the iteration.  Obviously,
+<span class="lineNum">     425 </span>                :            :  * any modifications may or may not be visible to the concurrent iterator, but
+<span class="lineNum">     426 </span>                :            :  * all the rules not deleted are visited by the iteration.  The iterating
+<span class="lineNum">     427 </span>                :            :  * thread may also modify the classifier rules itself.
+<span class="lineNum">     428 </span>                :            :  *
+<span class="lineNum">     429 </span>                :            :  * 'TARGET' iteration only iterates rules matching the 'TARGET' criteria.
+<span class="lineNum">     430 </span>                :            :  * Rather than looping through all the rules and skipping ones that can't
+<span class="lineNum">     431 </span>                :            :  * match, 'TARGET' iteration skips whole subtables, if the 'TARGET' happens to
+<span class="lineNum">     432 </span>                :            :  * be more specific than the subtable. */
+<span class="lineNum">     433 </span>                :            : struct cls_cursor {
+<span class="lineNum">     434 </span>                :            :     const struct classifier *cls;
+<span class="lineNum">     435 </span>                :            :     const struct cls_subtable *subtable;
+<span class="lineNum">     436 </span>                :            :     const struct cls_rule *target;
+<span class="lineNum">     437 </span>                :            :     ovs_version_t version;   /* Version to iterate. */
+<span class="lineNum">     438 </span>                :            :     struct pvector_cursor subtables;
+<span class="lineNum">     439 </span>                :            :     const struct cls_rule *rule;
+<span class="lineNum">     440 </span>                :            : };
+<span class="lineNum">     441 </span>                :            : 
+<span class="lineNum">     442 </span>                :            : struct cls_cursor cls_cursor_start(const struct classifier *,
+<span class="lineNum">     443 </span>                :            :                                    const struct cls_rule *target,
+<span class="lineNum">     444 </span>                :            :                                    ovs_version_t);
+<span class="lineNum">     445 </span>                :            : void cls_cursor_advance(struct cls_cursor *);
+<span class="lineNum">     446 </span>                :            : 
+<span class="lineNum">     447 </span>                :            : #define CLS_FOR_EACH(RULE, MEMBER, CLS)             \
+<span class="lineNum">     448 </span>                :            :     CLS_FOR_EACH_TARGET(RULE, MEMBER, CLS, NULL, OVS_VERSION_MAX)
+<span class="lineNum">     449 </span>                :            : #define CLS_FOR_EACH_TARGET(RULE, MEMBER, CLS, TARGET, VERSION)         \
+<span class="lineNum">     450 </span>                :            :     for (struct cls_cursor cursor__ = cls_cursor_start(CLS, TARGET, VERSION); \
+<span class="lineNum">     451 </span>                :            :          (cursor__.rule                                                 \
+<span class="lineNum">     452 </span>                :            :           ? (INIT_CONTAINER(RULE, cursor__.rule, MEMBER),               \
+<span class="lineNum">     453 </span>                :            :              cls_cursor_advance(&amp;cursor__),                             \
+<span class="lineNum">     454 </span>                :            :              true)                                                      \
+<span class="lineNum">     455 </span>                :            :           : false);                                                     \
+<span class="lineNum">     456 </span>                :            :         )
+<span class="lineNum">     457 </span>                :            : 
+<a name="458"><span class="lineNum">     458 </span>                :            : </a>
+<span class="lineNum">     459 </span>                :            : static inline void
+<span class="lineNum">     460 </span>                :<span class="lineCov">      29390 : classifier_defer(struct classifier *cls)</span>
+<span class="lineNum">     461 </span>                :            : {
+<span class="lineNum">     462 </span>                :<span class="lineCov">      29390 :     cls-&gt;publish = false;</span>
+<span class="lineNum">     463 </span>                :<span class="lineCov">      29390 : }</span>
+<a name="464"><span class="lineNum">     464 </span>                :            : </a>
+<span class="lineNum">     465 </span>                :            : static inline void
+<span class="lineNum">     466 </span>                :<span class="lineCov">       8011 : classifier_publish(struct classifier *cls)</span>
+<span class="lineNum">     467 </span>                :            : {
+<span class="lineNum">     468 </span>                :<span class="lineCov">       8011 :     cls-&gt;publish = true;</span>
+<span class="lineNum">     469 </span>                :<span class="lineCov">       8011 :     pvector_publish(&amp;cls-&gt;subtables);</span>
+<span class="lineNum">     470 </span>                :<span class="lineCov">       8011 : }</span>
+<span class="lineNum">     471 </span>                :            : 
+<span class="lineNum">     472 </span>                :            : #ifdef __cplusplus
+<span class="lineNum">     473 </span>                :            : }
+<span class="lineNum">     474 </span>                :            : #endif
+<span class="lineNum">     475 </span>                :            : #endif /* classifier.h */
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

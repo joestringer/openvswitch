@@ -19,7 +19,7 @@
         <table cellpadding=1 border=0 width="100%">
           <tr>
             <td width="10%" class="headerItem">Current view:</td>
-            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">ofproto</a> - ofproto-dpif-rid.c<span style="font-size: 80%;"> (source / <a href="ofproto-dpif-rid.c.func.html">functions</a>)</span></td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">ofproto</a> - ofproto-dpif-rid.c<span style="font-size: 80%;"> (source / <a href="ofproto-dpif-rid.c.func-sort-c.html">functions</a>)</span></td>
             <td width="5%"></td>
             <td width="15%"></td>
             <td width="10%" class="headerCovTableHead">Hit</td>
@@ -31,27 +31,27 @@
             <td class="headerValue">coverage.info</td>
             <td></td>
             <td class="headerItem">Lines:</td>
-            <td class="headerCovTableEntry">59</td>
-            <td class="headerCovTableEntry">65</td>
-            <td class="headerCovTableEntryHi">90.8 %</td>
+            <td class="headerCovTableEntry">125</td>
+            <td class="headerCovTableEntry">136</td>
+            <td class="headerCovTableEntryHi">91.9 %</td>
           </tr>
           <tr>
             <td class="headerItem">Date:</td>
-            <td class="headerValue">2014-07-01</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
             <td></td>
             <td class="headerItem">Functions:</td>
-            <td class="headerCovTableEntry">10</td>
-            <td class="headerCovTableEntry">10</td>
-            <td class="headerCovTableEntryHi">100.0 %</td>
+            <td class="headerCovTableEntry">17</td>
+            <td class="headerCovTableEntry">18</td>
+            <td class="headerCovTableEntryHi">94.4 %</td>
           </tr>
           <tr>
             <td></td>
             <td></td>
             <td></td>
             <td class="headerItem">Branches:</td>
-            <td class="headerCovTableEntry">14</td>
-            <td class="headerCovTableEntry">24</td>
-            <td class="headerCovTableEntryLo">58.3 %</td>
+            <td class="headerCovTableEntry">53</td>
+            <td class="headerCovTableEntry">80</td>
+            <td class="headerCovTableEntryLo">66.2 %</td>
           </tr>
           <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
         </table>
@@ -70,7 +70,7 @@
 <pre class="sourceHeading">           Branch data     Line data    Source code</pre>
 <pre class="source">
 <a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
-<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2014 Nicira, Inc.
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2014, 2015, 2016 Nicira, Inc.
 <span class="lineNum">       3 </span>                :            :  *
 <span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
 <span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
@@ -87,178 +87,337 @@
 <span class="lineNum">      16 </span>                :            : 
 <span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
 <span class="lineNum">      18 </span>                :            : 
-<span class="lineNum">      19 </span>                :            : #include &quot;hmap.h&quot;
-<span class="lineNum">      20 </span>                :            : #include &quot;hash.h&quot;
-<span class="lineNum">      21 </span>                :            : #include &quot;ovs-thread.h&quot;
-<span class="lineNum">      22 </span>                :            : #include &quot;ofproto-dpif-rid.h&quot;
-<span class="lineNum">      23 </span>                :            : 
-<span class="lineNum">      24 </span>                :            : struct rid_map {
-<span class="lineNum">      25 </span>                :            :     struct hmap map;
-<span class="lineNum">      26 </span>                :            : };
-<span class="lineNum">      27 </span>                :            : 
-<span class="lineNum">      28 </span>                :            : struct rid_node {
-<span class="lineNum">      29 </span>                :            :     struct hmap_node node;
-<span class="lineNum">      30 </span>                :            :     uint32_t recirc_id;
-<span class="lineNum">      31 </span>                :            : };
-<span class="lineNum">      32 </span>                :            : 
-<span class="lineNum">      33 </span>                :            : struct rid_pool {
-<span class="lineNum">      34 </span>                :            :     struct rid_map ridmap;
-<span class="lineNum">      35 </span>                :            :     uint32_t base;         /* IDs in the range of [base, base + n_ids). */
-<span class="lineNum">      36 </span>                :            :     uint32_t n_ids;        /* Total number of ids in the pool. */
-<span class="lineNum">      37 </span>                :            :     uint32_t next_free_id; /* Possible next free id. */
-<span class="lineNum">      38 </span>                :            : };
-<span class="lineNum">      39 </span>                :            : 
-<span class="lineNum">      40 </span>                :            : struct recirc_id_pool {
-<span class="lineNum">      41 </span>                :            :     struct ovs_mutex lock;
-<span class="lineNum">      42 </span>                :            :     struct rid_pool rids;
-<span class="lineNum">      43 </span>                :            : };
-<span class="lineNum">      44 </span>                :            : 
-<span class="lineNum">      45 </span>                :            : #define RECIRC_ID_BASE  300
-<span class="lineNum">      46 </span>                :            : #define RECIRC_ID_N_IDS  1024
-<span class="lineNum">      47 </span>                :            : 
-<span class="lineNum">      48 </span>                :            : static void rid_pool_init(struct rid_pool *rids,
-<span class="lineNum">      49 </span>                :            :                          uint32_t base, uint32_t n_ids);
-<span class="lineNum">      50 </span>                :            : static void rid_pool_uninit(struct rid_pool *pool);
-<span class="lineNum">      51 </span>                :            : static uint32_t rid_pool_alloc_id(struct rid_pool *pool);
-<span class="lineNum">      52 </span>                :            : static void rid_pool_free_id(struct rid_pool *rids, uint32_t rid);
-<span class="lineNum">      53 </span>                :            : static struct rid_node *rid_pool_find(struct rid_pool *rids, uint32_t id);
-<span class="lineNum">      54 </span>                :            : static struct rid_node *rid_pool_add(struct rid_pool *rids, uint32_t id);
-<a name="55"><span class="lineNum">      55 </span>                :            : </a>
-<span class="lineNum">      56 </span>                :            : struct recirc_id_pool *
-<span class="lineNum">      57 </span>                :<span class="lineCov">        257 : recirc_id_pool_create(void)</span>
-<span class="lineNum">      58 </span>                :            : {
-<span class="lineNum">      59 </span>                :            :     struct recirc_id_pool *pool;
-<span class="lineNum">      60 </span>                :            : 
-<span class="lineNum">      61 </span>                :<span class="lineCov">        257 :     pool = xmalloc(sizeof *pool);</span>
-<span class="lineNum">      62 </span>                :<span class="lineCov">        257 :     rid_pool_init(&amp;pool-&gt;rids, RECIRC_ID_BASE, RECIRC_ID_N_IDS);</span>
-<span class="lineNum">      63 </span>                :<span class="lineCov">        257 :     ovs_mutex_init(&amp;pool-&gt;lock);</span>
-<span class="lineNum">      64 </span>                :            : 
-<span class="lineNum">      65 </span>                :<span class="lineCov">        257 :     return pool;</span>
-<span class="lineNum">      66 </span>                :            : }
-<a name="67"><span class="lineNum">      67 </span>                :            : </a>
-<span class="lineNum">      68 </span>                :            : void
-<span class="lineNum">      69 </span>                :<span class="lineCov">        257 : recirc_id_pool_destroy(struct recirc_id_pool *pool)</span>
-<span class="lineNum">      70 </span>                :            : {
-<span class="lineNum">      71 </span>                :<span class="lineCov">        257 :     rid_pool_uninit(&amp;pool-&gt;rids);</span>
-<span class="lineNum">      72 </span>                :<span class="lineCov">        257 :     ovs_mutex_destroy(&amp;pool-&gt;lock);</span>
-<span class="lineNum">      73 </span>                :<span class="lineCov">        257 :     free(pool);</span>
-<span class="lineNum">      74 </span>                :<span class="lineCov">        257 : }</span>
-<a name="75"><span class="lineNum">      75 </span>                :            : </a>
-<span class="lineNum">      76 </span>                :            : uint32_t
-<span class="lineNum">      77 </span>                :<span class="lineCov">         25 : recirc_id_alloc(struct recirc_id_pool *pool)</span>
-<span class="lineNum">      78 </span>                :            : {
-<span class="lineNum">      79 </span>                :            :     uint32_t id;
-<span class="lineNum">      80 </span>                :            : 
-<span class="lineNum">      81 </span>                :<span class="lineCov">         25 :     ovs_mutex_lock(&amp;pool-&gt;lock);</span>
-<span class="lineNum">      82 </span>                :<span class="lineCov">         25 :     id = rid_pool_alloc_id(&amp;pool-&gt;rids);</span>
-<span class="lineNum">      83 </span>                :<span class="lineCov">         25 :     ovs_mutex_unlock(&amp;pool-&gt;lock);</span>
-<span class="lineNum">      84 </span>                :            : 
-<span class="lineNum">      85 </span>                :<span class="lineCov">         25 :     return id;</span>
-<span class="lineNum">      86 </span>                :            : }
-<a name="87"><span class="lineNum">      87 </span>                :            : </a>
-<span class="lineNum">      88 </span>                :            : void
-<span class="lineNum">      89 </span>                :<span class="lineCov">          7 : recirc_id_free(struct recirc_id_pool *pool, uint32_t id)</span>
-<span class="lineNum">      90 </span>                :            : {
-<span class="lineNum">      91 </span>                :<span class="lineCov">          7 :     ovs_mutex_lock(&amp;pool-&gt;lock);</span>
-<span class="lineNum">      92 </span>                :<span class="lineCov">          7 :     rid_pool_free_id(&amp;pool-&gt;rids, id);</span>
-<span class="lineNum">      93 </span>                :<span class="lineCov">          7 :     ovs_mutex_unlock(&amp;pool-&gt;lock);</span>
-<span class="lineNum">      94 </span>                :<span class="lineCov">          7 : }</span>
-<a name="95"><span class="lineNum">      95 </span>                :            : </a>
-<span class="lineNum">      96 </span>                :            : static void
-<span class="lineNum">      97 </span>                :<span class="lineCov">        257 : rid_pool_init(struct rid_pool *rids, uint32_t base, uint32_t n_ids)</span>
-<span class="lineNum">      98 </span>                :            : {
-<span class="lineNum">      99 </span>                :<span class="lineCov">        257 :     rids-&gt;base = base;</span>
-<span class="lineNum">     100 </span>                :<span class="lineCov">        257 :     rids-&gt;n_ids = n_ids;</span>
-<span class="lineNum">     101 </span>                :<span class="lineCov">        257 :     rids-&gt;next_free_id = base;</span>
-<span class="lineNum">     102 </span>                :<span class="lineCov">        257 :     hmap_init(&amp;rids-&gt;ridmap.map);</span>
-<span class="lineNum">     103 </span>                :<span class="lineCov">        257 : }</span>
-<a name="104"><span class="lineNum">     104 </span>                :            : </a>
-<span class="lineNum">     105 </span>                :            : static void
-<span class="lineNum">     106 </span>                :<span class="lineCov">        257 : rid_pool_uninit(struct rid_pool *rids)</span>
-<span class="lineNum">     107 </span>                :            : {
-<span class="lineNum">     108 </span>                :            :     struct rid_node *rid, *next;
-<span class="lineNum">     109 </span>                :            : 
-<span class="lineNum">     110 </span>[<span class="branchCov" title="Branch 1 was taken 22 times"> + </span><span class="branchCov" title="Branch 2 was taken 257 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 22 times"> + </span><span class="branchCov" title="Branch 5 was taken 257 times"> + </span>]:<span class="lineCov">        279 :     HMAP_FOR_EACH_SAFE(rid, next, node, &amp;rids-&gt;ridmap.map) {</span>
-<span class="lineNum">     111 </span>                :<span class="lineCov">         22 :         hmap_remove(&amp;rids-&gt;ridmap.map, &amp;rid-&gt;node);</span>
-<span class="lineNum">     112 </span>                :<span class="lineCov">         22 :         free(rid);</span>
-<span class="lineNum">     113 </span>                :            :     }
+<span class="lineNum">      19 </span>                :            : #include &quot;openvswitch/ofpbuf.h&quot;
+<span class="lineNum">      20 </span>                :            : #include &quot;ofproto-dpif.h&quot;
+<span class="lineNum">      21 </span>                :            : #include &quot;ofproto-dpif-rid.h&quot;
+<span class="lineNum">      22 </span>                :            : #include &quot;ofproto-provider.h&quot;
+<a name="23"><span class="lineNum">      23 </span>                :            : #include &quot;openvswitch/vlog.h&quot;</a>
+<span class="lineNum">      24 </span>                :            : 
+<span class="lineNum">      25 </span>                :<span class="lineCov">       1288 : VLOG_DEFINE_THIS_MODULE(ofproto_dpif_rid);</span>
+<span class="lineNum">      26 </span>                :            : 
+<span class="lineNum">      27 </span>                :            : static struct ovs_mutex mutex = OVS_MUTEX_INITIALIZER;
+<span class="lineNum">      28 </span>                :            : 
+<span class="lineNum">      29 </span>                :            : static struct cmap id_map = CMAP_INITIALIZER;
+<span class="lineNum">      30 </span>                :            : static struct cmap metadata_map = CMAP_INITIALIZER;
+<span class="lineNum">      31 </span>                :            : 
+<span class="lineNum">      32 </span>                :            : static struct ovs_list expiring OVS_GUARDED_BY(mutex)
+<span class="lineNum">      33 </span>                :            :     = OVS_LIST_INITIALIZER(&amp;expiring);
+<span class="lineNum">      34 </span>                :            : static struct ovs_list expired OVS_GUARDED_BY(mutex)
+<span class="lineNum">      35 </span>                :            :     = OVS_LIST_INITIALIZER(&amp;expired);
+<span class="lineNum">      36 </span>                :            : 
+<span class="lineNum">      37 </span>                :            : static uint32_t next_id OVS_GUARDED_BY(mutex) = 1; /* Possible next free id. */
+<span class="lineNum">      38 </span>                :            : 
+<span class="lineNum">      39 </span>                :            : #define RECIRC_POOL_STATIC_IDS 1024
+<span class="lineNum">      40 </span>                :            : 
+<span class="lineNum">      41 </span>                :            : static void recirc_id_node_free(struct recirc_id_node *);
+<span class="lineNum">      42 </span>                :            : 
+<span class="lineNum">      43 </span>                :            : /* This should be called by the revalidator once at each round (every 500ms or
+<a name="44"><span class="lineNum">      44 </span>                :            :  * more). */</a>
+<span class="lineNum">      45 </span>                :            : void
+<span class="lineNum">      46 </span>                :<span class="lineCov">      30430 : recirc_run(void)</span>
+<span class="lineNum">      47 </span>                :            : {
+<span class="lineNum">      48 </span>                :            :     static long long int last = 0;
+<span class="lineNum">      49 </span>                :<span class="lineCov">      30430 :     long long int now = time_msec();</span>
+<span class="lineNum">      50 </span>                :            : 
+<span class="lineNum">      51 </span>                :            :     /* Do maintenance at most 4 times / sec. */
+<span class="lineNum">      52 </span>                :<span class="lineCov">      30430 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">      53 </span>        [<span class="branchCov" title="Branch 0 was taken 8508 times"> + </span><span class="branchCov" title="Branch 1 was taken 21922 times"> + </span>]:<span class="lineCov">      30430 :     if (now - last &gt; 250) {</span>
+<span class="lineNum">      54 </span>                :            :         struct recirc_id_node *node;
+<span class="lineNum">      55 </span>                :            : 
+<span class="lineNum">      56 </span>                :<span class="lineCov">       8508 :         last = now;</span>
+<span class="lineNum">      57 </span>                :            : 
+<span class="lineNum">      58 </span>                :            :         /* Nodes in 'expiring' and 'expired' lists have the refcount of zero,
+<span class="lineNum">      59 </span>                :            :          * which means that while they can still be found (by id), no new
+<span class="lineNum">      60 </span>                :            :          * references can be taken on them.  We have removed the entry from the
+<span class="lineNum">      61 </span>                :            :          * 'metadata_map', at the time when refcount reached zero, causing any
+<span class="lineNum">      62 </span>                :            :          * new translations to allocate a new ID.  This allows the expiring
+<span class="lineNum">      63 </span>                :            :          * entry to be safely deleted while any sudden new use of the similar
+<span class="lineNum">      64 </span>                :            :          * recirculation will safely start using a new recirculation ID.  When
+<span class="lineNum">      65 </span>                :            :          * the refcount gets to zero, the node is also added to the 'expiring'
+<span class="lineNum">      66 </span>                :            :          * list.  At any time after that the nodes in the 'expiring' list can
+<span class="lineNum">      67 </span>                :            :          * be moved to the 'expired' list, from which they are deleted at least
+<span class="lineNum">      68 </span>                :            :          * 250ms afterwards. */
+<span class="lineNum">      69 </span>                :            : 
+<span class="lineNum">      70 </span>                :            :         /* Delete the expired.  These have been lingering for at least 250 ms,
+<span class="lineNum">      71 </span>                :            :          * which should be enough for any ongoing recirculations to be
+<span class="lineNum">      72 </span>                :            :          * finished. */
+<span class="lineNum">      73 </span>        [<span class="branchCov" title="Branch 1 was taken 42 times"> + </span><span class="branchCov" title="Branch 2 was taken 8508 times"> + </span>]:<span class="lineCov">       8550 :         LIST_FOR_EACH_POP (node, exp_node, &amp;expired) {</span>
+<span class="lineNum">      74 </span>                :<span class="lineCov">         42 :             cmap_remove(&amp;id_map, &amp;node-&gt;id_node, node-&gt;id);</span>
+<span class="lineNum">      75 </span>                :<span class="lineCov">         42 :             ovsrcu_postpone(recirc_id_node_free, node);</span>
+<span class="lineNum">      76 </span>                :            :         }
+<span class="lineNum">      77 </span>                :            : 
+<span class="lineNum">      78 </span>        [<span class="branchCov" title="Branch 1 was taken 39 times"> + </span><span class="branchCov" title="Branch 2 was taken 8469 times"> + </span>]:<span class="lineCov">       8508 :         if (!ovs_list_is_empty(&amp;expiring)) {</span>
+<span class="lineNum">      79 </span>                :            :             /* 'expired' is now empty, move nodes in 'expiring' to it. */
+<span class="lineNum">      80 </span>                :<span class="lineCov">         39 :             ovs_list_splice(&amp;expired, ovs_list_front(&amp;expiring), &amp;expiring);</span>
+<span class="lineNum">      81 </span>                :            :         }
+<span class="lineNum">      82 </span>                :            :     }
+<span class="lineNum">      83 </span>                :<span class="lineCov">      30430 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">      84 </span>                :<span class="lineCov">      30430 : }</span>
+<span class="lineNum">      85 </span>                :            : 
+<span class="lineNum">      86 </span>                :            : /* We use the id as the hash value, which works due to cmap internal rehashing.
+<span class="lineNum">      87 </span>                :            :  * We also only insert nodes with unique IDs, so all possible hash collisions
+<a name="88"><span class="lineNum">      88 </span>                :            :  * remain internal to the cmap. */</a>
+<span class="lineNum">      89 </span>                :            : static struct recirc_id_node *
+<span class="lineNum">      90 </span>                :<span class="lineCov">        254 : recirc_find__(uint32_t id)</span>
+<span class="lineNum">      91 </span>                :            :     OVS_REQUIRES(mutex)
+<span class="lineNum">      92 </span>                :            : {
+<span class="lineNum">      93 </span>                :<span class="lineCov">        254 :     struct cmap_node *node = cmap_find_protected(&amp;id_map, id);</span>
+<span class="lineNum">      94 </span>                :            : 
+<span class="lineNum">      95 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 254 times"> + </span>]:<span class="lineCov">        254 :     return node ? CONTAINER_OF(node, struct recirc_id_node, id_node) : NULL;</span>
+<span class="lineNum">      96 </span>                :            : }
+<span class="lineNum">      97 </span>                :            : 
+<span class="lineNum">      98 </span>                :            : /* Lockless RCU protected lookup.  If node is needed accross RCU quiescent
+<a name="99"><span class="lineNum">      99 </span>                :            :  * state, caller should copy the contents. */</a>
+<span class="lineNum">     100 </span>                :            : const struct recirc_id_node *
+<span class="lineNum">     101 </span>                :<span class="lineCov">       3024 : recirc_id_node_find(uint32_t id)</span>
+<span class="lineNum">     102 </span>                :            : {
+<span class="lineNum">     103 </span>                :<span class="lineCov">       3024 :     const struct cmap_node *node = cmap_find(&amp;id_map, id);</span>
+<span class="lineNum">     104 </span>                :            : 
+<span class="lineNum">     105 </span>                :<span class="lineCov">       3024 :     return node</span>
+<span class="lineNum">     106 </span>                :            :         ? CONTAINER_OF(node, const struct recirc_id_node, id_node)
+<span class="lineNum">     107 </span>        [<span class="branchCov" title="Branch 0 was taken 3024 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       3024 :         : NULL;</span>
+<span class="lineNum">     108 </span>                :            : }
+<a name="109"><span class="lineNum">     109 </span>                :            : </a>
+<span class="lineNum">     110 </span>                :            : static uint32_t
+<span class="lineNum">     111 </span>                :<span class="lineCov">        959 : frozen_state_hash(const struct frozen_state *state)</span>
+<span class="lineNum">     112 </span>                :            : {
+<span class="lineNum">     113 </span>                :            :     uint32_t hash;
 <span class="lineNum">     114 </span>                :            : 
-<span class="lineNum">     115 </span>                :<span class="lineCov">        257 :     hmap_destroy(&amp;rids-&gt;ridmap.map);</span>
-<span class="lineNum">     116 </span>                :<span class="lineCov">        257 : }</span>
-<a name="117"><span class="lineNum">     117 </span>                :            : </a>
-<span class="lineNum">     118 </span>                :            : static struct rid_node *
-<span class="lineNum">     119 </span>                :<span class="lineCov">         28 : rid_pool_find(struct rid_pool *rids, uint32_t id)</span>
-<span class="lineNum">     120 </span>                :            : {
-<span class="lineNum">     121 </span>                :            :     size_t hash;
-<span class="lineNum">     122 </span>                :            :     struct rid_node *rid;
-<span class="lineNum">     123 </span>                :            : 
-<span class="lineNum">     124 </span>                :<span class="lineCov">         28 :     hash = hash_int(id, 0);</span>
-<span class="lineNum">     125 </span>        [<span class="branchCov" title="Branch 2 was taken 3 times"> + </span><span class="branchCov" title="Branch 3 was taken 25 times"> + </span>]:<span class="lineCov">         28 :     HMAP_FOR_EACH_WITH_HASH(rid, node, hash, &amp;rids-&gt;ridmap.map) {</span>
-<span class="lineNum">     126 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          3 :         if (id == rid-&gt;recirc_id) {</span>
-<span class="lineNum">     127 </span>                :<span class="lineCov">          3 :             return rid;</span>
-<span class="lineNum">     128 </span>                :            :         }
-<span class="lineNum">     129 </span>                :            :     }
-<span class="lineNum">     130 </span>                :<span class="lineCov">         28 :     return NULL;</span>
-<span class="lineNum">     131 </span>                :            : }
-<a name="132"><span class="lineNum">     132 </span>                :            : </a>
-<span class="lineNum">     133 </span>                :            : static struct rid_node *
-<span class="lineNum">     134 </span>                :<span class="lineCov">         25 : rid_pool_add(struct rid_pool *rids, uint32_t id)</span>
-<span class="lineNum">     135 </span>                :            : {
-<span class="lineNum">     136 </span>                :<span class="lineCov">         25 :     struct rid_node *rid = xmalloc(sizeof *rid);</span>
-<span class="lineNum">     137 </span>                :            :     size_t hash;
-<span class="lineNum">     138 </span>                :            : 
-<span class="lineNum">     139 </span>                :<span class="lineCov">         25 :     rid-&gt;recirc_id = id;</span>
-<span class="lineNum">     140 </span>                :<span class="lineCov">         25 :     hash = hash_int(id, 0);</span>
-<span class="lineNum">     141 </span>                :<span class="lineCov">         25 :     hmap_insert(&amp;rids-&gt;ridmap.map, &amp;rid-&gt;node, hash);</span>
-<span class="lineNum">     142 </span>                :<span class="lineCov">         25 :     return rid;</span>
-<span class="lineNum">     143 </span>                :            : }
-<a name="144"><span class="lineNum">     144 </span>                :            : </a>
-<span class="lineNum">     145 </span>                :            : static uint32_t
-<span class="lineNum">     146 </span>                :<span class="lineCov">         25 : rid_pool_alloc_id(struct rid_pool *rids)</span>
-<span class="lineNum">     147 </span>                :            : {
-<span class="lineNum">     148 </span>                :            :     uint32_t id;
-<span class="lineNum">     149 </span>                :            : 
-<span class="lineNum">     150 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 25 times"> + </span>]:<span class="lineCov">         25 :     if (rids-&gt;n_ids == 0) {</span>
-<span class="lineNum">     151 </span>                :<span class="lineNoCov">          0 :         return 0;</span>
-<span class="lineNum">     152 </span>                :            :     }
-<span class="lineNum">     153 </span>                :            : 
-<span class="lineNum">     154 </span>        [<span class="branchCov" title="Branch 1 was taken 25 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">         25 :     if (!(rid_pool_find(rids, rids-&gt;next_free_id))) {</span>
-<span class="lineNum">     155 </span>                :<span class="lineCov">         25 :         id = rids-&gt;next_free_id;</span>
-<span class="lineNum">     156 </span>                :<span class="lineCov">         25 :         goto found_free_id;</span>
-<span class="lineNum">     157 </span>                :            :     }
-<span class="lineNum">     158 </span>                :            : 
-<span class="lineNum">     159 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for(id = rids-&gt;base; id &lt; rids-&gt;base + rids-&gt;n_ids; id++) {</span>
-<span class="lineNum">     160 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (rid_pool_find(rids, id)) {</span>
-<span class="lineNum">     161 </span>                :<span class="lineNoCov">          0 :             goto found_free_id;</span>
-<span class="lineNum">     162 </span>                :            :         }
-<span class="lineNum">     163 </span>                :            :     }
-<span class="lineNum">     164 </span>                :            : 
-<span class="lineNum">     165 </span>                :            :     /* Not available. */
-<span class="lineNum">     166 </span>                :<span class="lineNoCov">          0 :     return 0;</span>
-<span class="lineNum">     167 </span>                :            : 
-<span class="lineNum">     168 </span>                :            : found_free_id:
-<span class="lineNum">     169 </span>                :<span class="lineCov">         25 :     rid_pool_add(rids, id);</span>
-<span class="lineNum">     170 </span>                :            : 
-<span class="lineNum">     171 </span>        [<span class="branchCov" title="Branch 0 was taken 25 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         25 :     if (id &lt; rids-&gt;base + rids-&gt;n_ids) {</span>
-<span class="lineNum">     172 </span>                :<span class="lineCov">         25 :         rids-&gt;next_free_id = id + 1;</span>
-<span class="lineNum">     173 </span>                :            :     } else {
-<span class="lineNum">     174 </span>                :<span class="lineNoCov">          0 :         rids-&gt;next_free_id = rids-&gt;base;</span>
-<span class="lineNum">     175 </span>                :            :     }
-<span class="lineNum">     176 </span>                :            : 
-<span class="lineNum">     177 </span>                :<span class="lineCov">         25 :     return id;</span>
-<span class="lineNum">     178 </span>                :            : }
-<a name="179"><span class="lineNum">     179 </span>                :            : </a>
-<span class="lineNum">     180 </span>                :            : static void
-<span class="lineNum">     181 </span>                :<span class="lineCov">          7 : rid_pool_free_id(struct rid_pool *rids, uint32_t id)</span>
-<span class="lineNum">     182 </span>                :            : {
-<span class="lineNum">     183 </span>                :            :     struct rid_node *rid;
-<span class="lineNum">     184 </span>[<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 4 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">          7 :     if (id &gt; rids-&gt;base &amp;&amp; (id &lt;= rids-&gt;base + rids-&gt;n_ids)) {</span>
-<span class="lineNum">     185 </span>                :<span class="lineCov">          3 :         rid = rid_pool_find(rids, id);</span>
-<span class="lineNum">     186 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          3 :         if (rid) {</span>
-<span class="lineNum">     187 </span>                :<span class="lineCov">          3 :             hmap_remove(&amp;rids-&gt;ridmap.map, &amp;rid-&gt;node);</span>
-<span class="lineNum">     188 </span>                :            :         }
-<span class="lineNum">     189 </span>                :            :     }
-<span class="lineNum">     190 </span>                :<span class="lineCov">          7 : }</span>
+<span class="lineNum">     115 </span>                :<span class="lineCov">        959 :     hash = uuid_hash(&amp;state-&gt;ofproto_uuid);</span>
+<span class="lineNum">     116 </span>                :<span class="lineCov">        959 :     hash = hash_int(state-&gt;table_id, hash);</span>
+<span class="lineNum">     117 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 959 times"> + </span>]:<span class="lineCov">        959 :     if (flow_tnl_dst_is_set(state-&gt;metadata.tunnel)) {</span>
+<span class="lineNum">     118 </span>                :            :         /* We may leave remainder bytes unhashed, but that is unlikely as
+<span class="lineNum">     119 </span>                :            :          * the tunnel is not in the datapath format. */
+<span class="lineNum">     120 </span>                :<span class="lineNoCov">          0 :         hash = hash_bytes64((const uint64_t *) state-&gt;metadata.tunnel,</span>
+<span class="lineNum">     121 </span>                :            :                             flow_tnl_size(state-&gt;metadata.tunnel), hash);
+<span class="lineNum">     122 </span>                :            :     }
+<span class="lineNum">     123 </span>                :<span class="lineCov">        959 :     hash = hash_boolean(state-&gt;conntracked, hash);</span>
+<span class="lineNum">     124 </span>                :<span class="lineCov">        959 :     hash = hash_bytes64((const uint64_t *) &amp;state-&gt;metadata.metadata,</span>
+<span class="lineNum">     125 </span>                :            :                         sizeof state-&gt;metadata - sizeof state-&gt;metadata.tunnel,
+<span class="lineNum">     126 </span>                :            :                         hash);
+<span class="lineNum">     127 </span>[<span class="branchCov" title="Branch 0 was taken 947 times"> + </span><span class="branchCov" title="Branch 1 was taken 12 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchCov" title="Branch 3 was taken 946 times"> + </span>]:<span class="lineCov">        959 :     if (state-&gt;stack &amp;&amp; state-&gt;n_stack) {</span>
+<span class="lineNum">     128 </span>                :<span class="lineCov">          1 :         hash = hash_bytes64((const uint64_t *) state-&gt;stack,</span>
+<span class="lineNum">     129 </span>                :<span class="lineCov">          1 :                             state-&gt;n_stack * sizeof *state-&gt;stack, hash);</span>
+<span class="lineNum">     130 </span>                :            :     }
+<span class="lineNum">     131 </span>                :<span class="lineCov">        959 :     hash = hash_int(state-&gt;mirrors, hash);</span>
+<span class="lineNum">     132 </span>                :<span class="lineCov">        959 :     hash = hash_int(state-&gt;action_set_len, hash);</span>
+<span class="lineNum">     133 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 959 times"> + </span>]:<span class="lineCov">        959 :     if (state-&gt;action_set_len) {</span>
+<span class="lineNum">     134 </span>                :<span class="lineNoCov">          0 :         hash = hash_bytes64(ALIGNED_CAST(const uint64_t *, state-&gt;action_set),</span>
+<span class="lineNum">     135 </span>                :            :                             state-&gt;action_set_len, hash);
+<span class="lineNum">     136 </span>                :            :     }
+<span class="lineNum">     137 </span>        [<span class="branchCov" title="Branch 0 was taken 43 times"> + </span><span class="branchCov" title="Branch 1 was taken 916 times"> + </span>]:<span class="lineCov">        959 :     if (state-&gt;ofpacts_len) {</span>
+<span class="lineNum">     138 </span>                :<span class="lineCov">         43 :         hash = hash_bytes64(ALIGNED_CAST(const uint64_t *, state-&gt;ofpacts),</span>
+<span class="lineNum">     139 </span>                :            :                             state-&gt;ofpacts_len, hash);
+<span class="lineNum">     140 </span>                :            :     }
+<span class="lineNum">     141 </span>                :<span class="lineCov">        959 :     return hash;</span>
+<span class="lineNum">     142 </span>                :            : }
+<a name="143"><span class="lineNum">     143 </span>                :            : </a>
+<span class="lineNum">     144 </span>                :            : static bool
+<span class="lineNum">     145 </span>                :<span class="lineCov">        705 : frozen_state_equal(const struct frozen_state *a, const struct frozen_state *b)</span>
+<span class="lineNum">     146 </span>                :            : {
+<span class="lineNum">     147 </span>                :<span class="lineCov">        705 :     return (a-&gt;table_id == b-&gt;table_id</span>
+<span class="lineNum">     148 </span>        [<span class="branchCov" title="Branch 1 was taken 705 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        705 :             &amp;&amp; uuid_equals(&amp;a-&gt;ofproto_uuid, &amp;b-&gt;ofproto_uuid)</span>
+<span class="lineNum">     149 </span>        [<span class="branchCov" title="Branch 1 was taken 705 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        705 :             &amp;&amp; flow_tnl_equal(a-&gt;metadata.tunnel, b-&gt;metadata.tunnel)</span>
+<span class="lineNum">     150 </span>        [<span class="branchCov" title="Branch 0 was taken 705 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        705 :             &amp;&amp; !memcmp(&amp;a-&gt;metadata.metadata, &amp;b-&gt;metadata.metadata,</span>
+<span class="lineNum">     151 </span>                :            :                        sizeof a-&gt;metadata - sizeof a-&gt;metadata.tunnel)
+<span class="lineNum">     152 </span>        [<span class="branchCov" title="Branch 0 was taken 705 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        705 :             &amp;&amp; a-&gt;n_stack == b-&gt;n_stack</span>
+<span class="lineNum">     153 </span>        [<span class="branchCov" title="Branch 0 was taken 705 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        705 :             &amp;&amp; !memcmp(a-&gt;stack, b-&gt;stack, a-&gt;n_stack * sizeof *a-&gt;stack)</span>
+<span class="lineNum">     154 </span>        [<span class="branchCov" title="Branch 0 was taken 705 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        705 :             &amp;&amp; a-&gt;mirrors == b-&gt;mirrors</span>
+<span class="lineNum">     155 </span>        [<span class="branchCov" title="Branch 0 was taken 705 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        705 :             &amp;&amp; a-&gt;conntracked == b-&gt;conntracked</span>
+<span class="lineNum">     156 </span>        [<span class="branchCov" title="Branch 1 was taken 705 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        705 :             &amp;&amp; ofpacts_equal(a-&gt;ofpacts, a-&gt;ofpacts_len,</span>
+<span class="lineNum">     157 </span>                :<span class="lineCov">        705 :                              b-&gt;ofpacts, b-&gt;ofpacts_len)</span>
+<span class="lineNum">     158 </span>[<span class="branchCov" title="Branch 0 was taken 705 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 3 was taken 705 times"> + </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span>]:<span class="lineCov">       1410 :             &amp;&amp; ofpacts_equal(a-&gt;action_set, a-&gt;action_set_len,</span>
+<span class="lineNum">     159 </span>                :<span class="lineCov">        705 :                              b-&gt;action_set, b-&gt;action_set_len));</span>
+<span class="lineNum">     160 </span>                :            : }
+<span class="lineNum">     161 </span>                :            : 
+<span class="lineNum">     162 </span>                :            : /* Lockless RCU protected lookup.  If node is needed accross RCU quiescent
+<a name="163"><span class="lineNum">     163 </span>                :            :  * state, caller should take a reference. */</a>
+<span class="lineNum">     164 </span>                :            : static struct recirc_id_node *
+<span class="lineNum">     165 </span>                :<span class="lineCov">        947 : recirc_find_equal(const struct frozen_state *target, uint32_t hash)</span>
+<span class="lineNum">     166 </span>                :            : {
+<span class="lineNum">     167 </span>                :            :     struct recirc_id_node *node;
+<span class="lineNum">     168 </span>                :            : 
+<span class="lineNum">     169 </span>        [<span class="branchCov" title="Branch 2 was taken 705 times"> + </span><span class="branchCov" title="Branch 3 was taken 242 times"> + </span>]:<span class="lineCov">        947 :     CMAP_FOR_EACH_WITH_HASH (node, metadata_node, hash, &amp;metadata_map) {</span>
+<span class="lineNum">     170 </span>        [<span class="branchCov" title="Branch 1 was taken 705 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        705 :         if (frozen_state_equal(&amp;node-&gt;state, target)) {</span>
+<span class="lineNum">     171 </span>                :<span class="lineCov">        705 :             return node;</span>
+<span class="lineNum">     172 </span>                :            :         }
+<span class="lineNum">     173 </span>                :            :     }
+<span class="lineNum">     174 </span>                :<span class="lineCov">        242 :     return NULL;</span>
+<span class="lineNum">     175 </span>                :            : }
+<a name="176"><span class="lineNum">     176 </span>                :            : </a>
+<span class="lineNum">     177 </span>                :            : static struct recirc_id_node *
+<span class="lineNum">     178 </span>                :<span class="lineCov">        947 : recirc_ref_equal(const struct frozen_state *target, uint32_t hash)</span>
+<span class="lineNum">     179 </span>                :            : {
+<span class="lineNum">     180 </span>                :            :     struct recirc_id_node *node;
+<span class="lineNum">     181 </span>                :            : 
+<span class="lineNum">     182 </span>                :            :     do {
+<span class="lineNum">     183 </span>                :<span class="lineCov">        947 :         node = recirc_find_equal(target, hash);</span>
+<span class="lineNum">     184 </span>                :            : 
+<span class="lineNum">     185 </span>                :            :         /* Try again if the node was released before we get the reference. */
+<span class="lineNum">     186 </span>[<span class="branchCov" title="Branch 0 was taken 705 times"> + </span><span class="branchCov" title="Branch 1 was taken 242 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 705 times"> + </span>]:<span class="lineCov">        947 :     } while (node &amp;&amp; !ovs_refcount_try_ref_rcu(&amp;node-&gt;refcount));</span>
+<span class="lineNum">     187 </span>                :            : 
+<span class="lineNum">     188 </span>                :<span class="lineCov">        947 :     return node;</span>
+<span class="lineNum">     189 </span>                :            : }
+<a name="190"><span class="lineNum">     190 </span>                :            : </a>
+<span class="lineNum">     191 </span>                :            : static void
+<span class="lineNum">     192 </span>                :<span class="lineCov">        254 : frozen_state_clone(struct frozen_state *new, const struct frozen_state *old,</span>
+<span class="lineNum">     193 </span>                :            :                    struct flow_tnl *tunnel)
+<span class="lineNum">     194 </span>                :            : {
+<span class="lineNum">     195 </span>                :<span class="lineCov">        254 :     *new = *old;</span>
+<span class="lineNum">     196 </span>                :<span class="lineCov">        254 :     flow_tnl_copy__(tunnel, old-&gt;metadata.tunnel);</span>
+<span class="lineNum">     197 </span>                :<span class="lineCov">        254 :     new-&gt;metadata.tunnel = tunnel;</span>
+<span class="lineNum">     198 </span>                :            : 
+<span class="lineNum">     199 </span>                :<span class="lineCov">        508 :     new-&gt;stack = (new-&gt;n_stack</span>
+<span class="lineNum">     200 </span>                :<span class="lineCov">          1 :                   ? xmemdup(new-&gt;stack, new-&gt;n_stack * sizeof *new-&gt;stack)</span>
+<span class="lineNum">     201 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 253 times"> + </span>]:<span class="lineCov">        254 :                   : NULL);</span>
+<span class="lineNum">     202 </span>                :<span class="lineCov">        508 :     new-&gt;ofpacts = (new-&gt;ofpacts_len</span>
+<span class="lineNum">     203 </span>                :<span class="lineCov">         24 :                     ? xmemdup(new-&gt;ofpacts, new-&gt;ofpacts_len)</span>
+<span class="lineNum">     204 </span>        [<span class="branchCov" title="Branch 0 was taken 24 times"> + </span><span class="branchCov" title="Branch 1 was taken 230 times"> + </span>]:<span class="lineCov">        254 :                     : NULL);</span>
+<span class="lineNum">     205 </span>                :<span class="lineCov">        508 :     new-&gt;action_set = (new-&gt;action_set_len</span>
+<span class="lineNum">     206 </span>                :<span class="lineNoCov">          0 :                        ? xmemdup(new-&gt;action_set, new-&gt;action_set_len)</span>
+<span class="lineNum">     207 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 254 times"> + </span>]:<span class="lineCov">        254 :                        : NULL);</span>
+<span class="lineNum">     208 </span>                :<span class="lineCov">        254 : }</span>
+<a name="209"><span class="lineNum">     209 </span>                :            : </a>
+<span class="lineNum">     210 </span>                :            : static void
+<span class="lineNum">     211 </span>                :<span class="lineCov">         42 : frozen_state_free(struct frozen_state *state)</span>
+<span class="lineNum">     212 </span>                :            : {
+<span class="lineNum">     213 </span>                :<span class="lineCov">         42 :     free(state-&gt;stack);</span>
+<span class="lineNum">     214 </span>                :<span class="lineCov">         42 :     free(state-&gt;ofpacts);</span>
+<span class="lineNum">     215 </span>                :<span class="lineCov">         42 :     free(state-&gt;action_set);</span>
+<span class="lineNum">     216 </span>                :<span class="lineCov">         42 : }</span>
+<span class="lineNum">     217 </span>                :            : 
+<span class="lineNum">     218 </span>                :            : /* Allocate a unique recirculation id for the given set of flow metadata.
+<span class="lineNum">     219 </span>                :            :  * The ID space is 2^^32, so there should never be a situation in which all
+<span class="lineNum">     220 </span>                :            :  * the IDs are used up.  We loop until we find a free one.
+<a name="221"><span class="lineNum">     221 </span>                :            :  * hash is recomputed if it is passed in as 0. */</a>
+<span class="lineNum">     222 </span>                :            : static struct recirc_id_node *
+<span class="lineNum">     223 </span>                :<span class="lineCov">        254 : recirc_alloc_id__(const struct frozen_state *state, uint32_t hash)</span>
+<span class="lineNum">     224 </span>                :            : {
+<span class="lineNum">     225 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 254 times"> + </span>]:<span class="lineCov">        254 :     ovs_assert(state-&gt;action_set_len &lt;= state-&gt;ofpacts_len);</span>
+<span class="lineNum">     226 </span>                :            : 
+<span class="lineNum">     227 </span>                :<span class="lineCov">        254 :     struct recirc_id_node *node = xzalloc(sizeof *node);</span>
+<span class="lineNum">     228 </span>                :            : 
+<span class="lineNum">     229 </span>                :<span class="lineCov">        254 :     node-&gt;hash = hash;</span>
+<span class="lineNum">     230 </span>                :<span class="lineCov">        254 :     ovs_refcount_init(&amp;node-&gt;refcount);</span>
+<span class="lineNum">     231 </span>                :<span class="lineCov">        254 :     frozen_state_clone(CONST_CAST(struct frozen_state *, &amp;node-&gt;state), state,</span>
+<span class="lineNum">     232 </span>                :            :                        &amp;node-&gt;state_metadata_tunnel);
+<span class="lineNum">     233 </span>                :            : 
+<span class="lineNum">     234 </span>                :<span class="lineCov">        254 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     235 </span>                :            :     for (;;) {
+<span class="lineNum">     236 </span>                :            :         /* Claim the next ID.  The ID space should be sparse enough for the
+<span class="lineNum">     237 </span>                :            :            allocation to succeed at the first try.  We do skip the first
+<span class="lineNum">     238 </span>                :            :            RECIRC_POOL_STATIC_IDS IDs on the later rounds, though, as some of
+<span class="lineNum">     239 </span>                :            :            the initial allocations may be for long term uses (like bonds). */
+<span class="lineNum">     240 </span>                :<span class="lineCov">        254 :         node-&gt;id = next_id++;</span>
+<span class="lineNum">     241 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 254 times"> + </span>]:<span class="lineCov">        254 :         if (OVS_UNLIKELY(!node-&gt;id)) {</span>
+<span class="lineNum">     242 </span>                :<span class="lineNoCov">          0 :             next_id = RECIRC_POOL_STATIC_IDS + 1;</span>
+<span class="lineNum">     243 </span>                :<span class="lineNoCov">          0 :             node-&gt;id = next_id++;</span>
+<span class="lineNum">     244 </span>                :            :         }
+<span class="lineNum">     245 </span>                :            :         /* Find if the id is free. */
+<span class="lineNum">     246 </span>        [<span class="branchCov" title="Branch 1 was taken 254 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        254 :         if (OVS_LIKELY(!recirc_find__(node-&gt;id))) {</span>
+<span class="lineNum">     247 </span>                :<span class="lineCov">        254 :             break;</span>
+<span class="lineNum">     248 </span>                :            :         }
+<span class="lineNum">     249 </span>                :<span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     250 </span>                :<span class="lineCov">        254 :     cmap_insert(&amp;id_map, &amp;node-&gt;id_node, node-&gt;id);</span>
+<span class="lineNum">     251 </span>                :<span class="lineCov">        254 :     cmap_insert(&amp;metadata_map, &amp;node-&gt;metadata_node, node-&gt;hash);</span>
+<span class="lineNum">     252 </span>                :<span class="lineCov">        254 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     253 </span>                :<span class="lineCov">        254 :     return node;</span>
+<span class="lineNum">     254 </span>                :            : }
+<span class="lineNum">     255 </span>                :            : 
+<span class="lineNum">     256 </span>                :            : /* Look up an existing ID for the given flow's metadata and optional actions.
+<a name="257"><span class="lineNum">     257 </span>                :            :  */</a>
+<span class="lineNum">     258 </span>                :            : uint32_t
+<span class="lineNum">     259 </span>                :<span class="lineNoCov">          0 : recirc_find_id(const struct frozen_state *target)</span>
+<span class="lineNum">     260 </span>                :            : {
+<span class="lineNum">     261 </span>                :<span class="lineNoCov">          0 :     uint32_t hash = frozen_state_hash(target);</span>
+<span class="lineNum">     262 </span>                :<span class="lineNoCov">          0 :     struct recirc_id_node *node = recirc_find_equal(target, hash);</span>
+<span class="lineNum">     263 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     return node ? node-&gt;id : 0;</span>
+<span class="lineNum">     264 </span>                :            : }
+<span class="lineNum">     265 </span>                :            : 
+<span class="lineNum">     266 </span>                :            : /* Allocate a unique recirculation id for the given set of flow metadata and
+<a name="267"><span class="lineNum">     267 </span>                :            :    optional actions. */</a>
+<span class="lineNum">     268 </span>                :            : uint32_t
+<span class="lineNum">     269 </span>                :<span class="lineCov">        947 : recirc_alloc_id_ctx(const struct frozen_state *state)</span>
+<span class="lineNum">     270 </span>                :            : {
+<span class="lineNum">     271 </span>                :<span class="lineCov">        947 :     uint32_t hash = frozen_state_hash(state);</span>
+<span class="lineNum">     272 </span>                :<span class="lineCov">        947 :     struct recirc_id_node *node = recirc_ref_equal(state, hash);</span>
+<span class="lineNum">     273 </span>        [<span class="branchCov" title="Branch 0 was taken 242 times"> + </span><span class="branchCov" title="Branch 1 was taken 705 times"> + </span>]:<span class="lineCov">        947 :     if (!node) {</span>
+<span class="lineNum">     274 </span>                :<span class="lineCov">        242 :         node = recirc_alloc_id__(state, hash);</span>
+<span class="lineNum">     275 </span>                :            :     }
+<span class="lineNum">     276 </span>                :<span class="lineCov">        947 :     return node-&gt;id;</span>
+<span class="lineNum">     277 </span>                :            : }
+<span class="lineNum">     278 </span>                :            : 
+<a name="279"><span class="lineNum">     279 </span>                :            : /* Allocate a unique recirculation id. */</a>
+<span class="lineNum">     280 </span>                :            : uint32_t
+<span class="lineNum">     281 </span>                :<span class="lineCov">         12 : recirc_alloc_id(struct ofproto_dpif *ofproto)</span>
+<span class="lineNum">     282 </span>                :            : {
+<span class="lineNum">     283 </span>                :            :     struct flow_tnl tunnel;
+<span class="lineNum">     284 </span>                :<span class="lineCov">         12 :     tunnel.ip_dst = htonl(0);</span>
+<span class="lineNum">     285 </span>                :<span class="lineCov">         12 :     tunnel.ipv6_dst = in6addr_any;</span>
+<span class="lineNum">     286 </span>                :<span class="lineCov">         24 :     struct frozen_state state = {</span>
+<span class="lineNum">     287 </span>                :            :         .table_id = TBL_INTERNAL,
+<span class="lineNum">     288 </span>                :<span class="lineCov">         12 :         .ofproto_uuid = *ofproto_dpif_get_uuid(ofproto),</span>
+<span class="lineNum">     289 </span>                :            :         .metadata = { .tunnel = &amp;tunnel, .in_port = OFPP_NONE },
+<span class="lineNum">     290 </span>                :            :     };
+<span class="lineNum">     291 </span>                :<span class="lineCov">         12 :     return recirc_alloc_id__(&amp;state, frozen_state_hash(&amp;state))-&gt;id;</span>
+<span class="lineNum">     292 </span>                :            : }
+<a name="293"><span class="lineNum">     293 </span>                :            : </a>
+<span class="lineNum">     294 </span>                :            : static void
+<span class="lineNum">     295 </span>                :<span class="lineCov">         42 : recirc_id_node_free(struct recirc_id_node *node)</span>
+<span class="lineNum">     296 </span>                :            : {
+<span class="lineNum">     297 </span>                :<span class="lineCov">         42 :     frozen_state_free(CONST_CAST(struct frozen_state *, &amp;node-&gt;state));</span>
+<span class="lineNum">     298 </span>                :<span class="lineCov">         42 :     free(node);</span>
+<span class="lineNum">     299 </span>                :<span class="lineCov">         42 : }</span>
+<a name="300"><span class="lineNum">     300 </span>                :            : </a>
+<span class="lineNum">     301 </span>                :            : void
+<span class="lineNum">     302 </span>                :<span class="lineCov">       1720 : recirc_id_node_unref(const struct recirc_id_node *node_)</span>
+<span class="lineNum">     303 </span>                :            :     OVS_EXCLUDED(mutex)
+<span class="lineNum">     304 </span>                :            : {
+<span class="lineNum">     305 </span>                :<span class="lineCov">       1720 :     struct recirc_id_node *node = CONST_CAST(struct recirc_id_node *, node_);</span>
+<span class="lineNum">     306 </span>                :            : 
+<span class="lineNum">     307 </span>[<span class="branchCov" title="Branch 0 was taken 1720 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 3 was taken 251 times"> + </span><span class="branchCov" title="Branch 4 was taken 1469 times"> + </span>]:<span class="lineCov">       1720 :     if (node &amp;&amp; ovs_refcount_unref(&amp;node-&gt;refcount) == 1) {</span>
+<span class="lineNum">     308 </span>                :<span class="lineCov">        251 :         ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     309 </span>                :            :         /* Prevent re-use of this node by removing the node from 'metadata_map'
+<span class="lineNum">     310 </span>                :            :          */
+<span class="lineNum">     311 </span>                :<span class="lineCov">        251 :         cmap_remove(&amp;metadata_map, &amp;node-&gt;metadata_node, node-&gt;hash);</span>
+<span class="lineNum">     312 </span>                :            :         /* We keep the node in the 'id_map' so that it can be found as long
+<span class="lineNum">     313 </span>                :            :          * as it lingers, and add it to the 'expiring' list. */
+<span class="lineNum">     314 </span>                :<span class="lineCov">        251 :         ovs_list_insert(&amp;expiring, &amp;node-&gt;exp_node);</span>
+<span class="lineNum">     315 </span>                :<span class="lineCov">        251 :         ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     316 </span>                :            :     }
+<span class="lineNum">     317 </span>                :<span class="lineCov">       1720 : }</span>
+<a name="318"><span class="lineNum">     318 </span>                :            : </a>
+<span class="lineNum">     319 </span>                :            : void
+<span class="lineNum">     320 </span>                :<span class="lineCov">       1720 : recirc_free_id(uint32_t id)</span>
+<span class="lineNum">     321 </span>                :            : {
+<span class="lineNum">     322 </span>                :            :     const struct recirc_id_node *node;
+<span class="lineNum">     323 </span>                :            : 
+<span class="lineNum">     324 </span>                :<span class="lineCov">       1720 :     node = recirc_id_node_find(id);</span>
+<span class="lineNum">     325 </span>        [<span class="branchCov" title="Branch 0 was taken 1720 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       1720 :     if (node) {</span>
+<span class="lineNum">     326 </span>                :<span class="lineCov">       1720 :         recirc_id_node_unref(node);</span>
+<span class="lineNum">     327 </span>                :            :     } else {
+<span class="lineNum">     328 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;Freeing nonexistent recirculation ID: %&quot;PRIu32, id);</span>
+<span class="lineNum">     329 </span>                :            :     }
+<span class="lineNum">     330 </span>                :<span class="lineCov">       1720 : }</span>
+<span class="lineNum">     331 </span>                :            : 
+<span class="lineNum">     332 </span>                :            : /* Called when 'ofproto' is destructed.  Checks for and clears any
+<span class="lineNum">     333 </span>                :            :  * recirc_id leak.
+<span class="lineNum">     334 </span>                :            :  * No other thread may have access to the 'ofproto' being destructed.
+<a name="335"><span class="lineNum">     335 </span>                :            :  * All related datapath flows must be deleted before calling this. */</a>
+<span class="lineNum">     336 </span>                :            : void
+<span class="lineNum">     337 </span>                :<span class="lineCov">        749 : recirc_free_ofproto(struct ofproto_dpif *ofproto, const char *ofproto_name)</span>
+<span class="lineNum">     338 </span>                :            : {
+<span class="lineNum">     339 </span>                :            :     struct recirc_id_node *n;
+<span class="lineNum">     340 </span>                :            : 
+<span class="lineNum">     341 </span>                :<span class="lineCov">        749 :     const struct uuid *ofproto_uuid = ofproto_dpif_get_uuid(ofproto);</span>
+<span class="lineNum">     342 </span>[<span class="branchCov" title="Branch 1 was taken 17 times"> + </span><span class="branchCov" title="Branch 2 was taken 749 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 17 times"> + </span><span class="branchCov" title="Branch 5 was taken 749 times"> + </span>]:<span class="lineCov">        766 :     CMAP_FOR_EACH (n, metadata_node, &amp;metadata_map) {</span>
+<span class="lineNum">     343 </span>        [<span class="branchCov" title="Branch 1 was taken 10 times"> + </span><span class="branchCov" title="Branch 2 was taken 7 times"> + </span>]:<span class="lineCov">         17 :         if (uuid_equals(&amp;n-&gt;state.ofproto_uuid, ofproto_uuid)) {</span>
+<span class="lineNum">     344 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         10 :             VLOG_ERR(&quot;recirc_id %&quot;PRIu32</span>
+<span class="lineNum">     345 </span>                :            :                      &quot; left allocated when ofproto (%s)&quot;
+<span class="lineNum">     346 </span>                :            :                      &quot; is destructed&quot;, n-&gt;id, ofproto_name);
+<span class="lineNum">     347 </span>                :            :         }
+<span class="lineNum">     348 </span>                :            :     }
+<span class="lineNum">     349 </span>                :<span class="lineCov">        749 : }</span>
 </pre>
       </td>
     </tr>
@@ -267,7 +426,7 @@
 
   <table width="100%" border=0 cellspacing=0 cellpadding=0>
     <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
-    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.9</a></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
   </table>
   <br>
 

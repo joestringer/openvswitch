@@ -1,0 +1,1617 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/rstp.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - rstp.c<span style="font-size: 80%;"> (source / <a href="rstp.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">547</td>
+            <td class="headerCovTableEntry">634</td>
+            <td class="headerCovTableEntryMed">86.3 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">71</td>
+            <td class="headerCovTableEntry">79</td>
+            <td class="headerCovTableEntryMed">89.9 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">173</td>
+            <td class="headerCovTableEntry">303</td>
+            <td class="headerCovTableEntryLo">57.1 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2011-2015 M3S, Srl - Italy
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : /*
+<span class="lineNum">      18 </span>                :            :  * Rapid Spanning Tree Protocol (IEEE 802.1D-2004) public interface.
+<span class="lineNum">      19 </span>                :            :  *
+<span class="lineNum">      20 </span>                :            :  * Authors:
+<span class="lineNum">      21 </span>                :            :  *         Martino Fornasa &lt;mf@fornasa.it&gt;
+<span class="lineNum">      22 </span>                :            :  *         Daniele Venturino &lt;daniele.venturino@m3s.it&gt;
+<span class="lineNum">      23 </span>                :            :  *         Carlo Andreotti &lt;c.andreotti@m3s.it&gt;
+<span class="lineNum">      24 </span>                :            :  *
+<span class="lineNum">      25 </span>                :            :  * References to IEEE 802.1D-2004 standard are enclosed in square brackets.
+<span class="lineNum">      26 </span>                :            :  * E.g. [17.3], [Table 17-1], etc.
+<span class="lineNum">      27 </span>                :            :  *
+<span class="lineNum">      28 </span>                :            :  */
+<span class="lineNum">      29 </span>                :            : 
+<span class="lineNum">      30 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      31 </span>                :            : 
+<span class="lineNum">      32 </span>                :            : #include &quot;rstp.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;rstp-common.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;rstp-state-machines.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &lt;arpa/inet.h&gt;
+<span class="lineNum">      36 </span>                :            : #include &lt;inttypes.h&gt;
+<span class="lineNum">      37 </span>                :            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      38 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      39 </span>                :            : #include &lt;sys/types.h&gt;
+<span class="lineNum">      40 </span>                :            : #include &quot;byte-order.h&quot;
+<span class="lineNum">      41 </span>                :            : #include &quot;connectivity.h&quot;
+<span class="lineNum">      42 </span>                :            : #include &quot;openvswitch/ofpbuf.h&quot;
+<span class="lineNum">      43 </span>                :            : #include &quot;ofproto/ofproto.h&quot;
+<span class="lineNum">      44 </span>                :            : #include &quot;dp-packet.h&quot;
+<span class="lineNum">      45 </span>                :            : #include &quot;packets.h&quot;
+<span class="lineNum">      46 </span>                :            : #include &quot;seq.h&quot;
+<span class="lineNum">      47 </span>                :            : #include &quot;unixctl.h&quot;
+<span class="lineNum">      48 </span>                :            : #include &quot;util.h&quot;
+<a name="49"><span class="lineNum">      49 </span>                :            : #include &quot;openvswitch/vlog.h&quot;</a>
+<span class="lineNum">      50 </span>                :            : 
+<span class="lineNum">      51 </span>                :<span class="lineCov">       2462 : VLOG_DEFINE_THIS_MODULE(rstp);</span>
+<span class="lineNum">      52 </span>                :            : 
+<span class="lineNum">      53 </span>                :            : struct ovs_mutex rstp_mutex = OVS_MUTEX_INITIALIZER;
+<span class="lineNum">      54 </span>                :            : 
+<span class="lineNum">      55 </span>                :            : static struct ovs_list all_rstps__ = OVS_LIST_INITIALIZER(&amp;all_rstps__);
+<span class="lineNum">      56 </span>                :            : static struct ovs_list *const all_rstps OVS_GUARDED_BY(rstp_mutex) = &amp;all_rstps__;
+<span class="lineNum">      57 </span>                :            : 
+<span class="lineNum">      58 </span>                :            : /* Internal use only. */
+<span class="lineNum">      59 </span>                :            : static void rstp_set_bridge_address__(struct rstp *, rstp_identifier)
+<span class="lineNum">      60 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      61 </span>                :            : static void rstp_set_bridge_priority__(struct rstp *, int new_priority)
+<span class="lineNum">      62 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      63 </span>                :            : static void rstp_set_bridge_ageing_time__(struct rstp *, int new_ageing_time)
+<span class="lineNum">      64 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      65 </span>                :            : static void rstp_set_bridge_force_protocol_version__(struct rstp *,
+<span class="lineNum">      66 </span>                :            :                                                      enum rstp_force_protocol_version)
+<span class="lineNum">      67 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      68 </span>                :            : static void rstp_set_bridge_hello_time__(struct rstp *)
+<span class="lineNum">      69 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      70 </span>                :            : static void rstp_set_bridge_max_age__(struct rstp *, int new_max_age)
+<span class="lineNum">      71 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      72 </span>                :            : static void rstp_set_bridge_forward_delay__(struct rstp *, int new_forward_delay)
+<span class="lineNum">      73 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      74 </span>                :            : static void rstp_set_bridge_transmit_hold_count__(struct rstp *,
+<span class="lineNum">      75 </span>                :            :                                                   int new_transmit_hold_count)
+<span class="lineNum">      76 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      77 </span>                :            : static void rstp_set_bridge_migrate_time__(struct rstp *)
+<span class="lineNum">      78 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      79 </span>                :            : static void rstp_set_bridge_times__(struct rstp *, int new_forward_delay,
+<span class="lineNum">      80 </span>                :            :                                     int new_hello_time, int new_max_age,
+<span class="lineNum">      81 </span>                :            :                                     int new_message_age)
+<span class="lineNum">      82 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      83 </span>                :            : 
+<span class="lineNum">      84 </span>                :            : static struct rstp_port *rstp_get_port__(struct rstp *rstp,
+<span class="lineNum">      85 </span>                :            :                                          uint16_t port_number)
+<span class="lineNum">      86 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      87 </span>                :            : static void set_port_id__(struct rstp_port *)
+<span class="lineNum">      88 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      89 </span>                :            : static void update_port_enabled__(struct rstp_port *)
+<span class="lineNum">      90 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      91 </span>                :            : static void set_bridge_priority__(struct rstp *)
+<span class="lineNum">      92 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      93 </span>                :            : static void reinitialize_rstp__(struct rstp *)
+<span class="lineNum">      94 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      95 </span>                :            : static bool is_port_number_available__(struct rstp *, int, struct rstp_port *)
+<span class="lineNum">      96 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      97 </span>                :            : static uint16_t rstp_first_free_number__(struct rstp *, struct rstp_port *)
+<span class="lineNum">      98 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">      99 </span>                :            : static void rstp_initialize_port_defaults__(struct rstp_port *)
+<span class="lineNum">     100 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">     101 </span>                :            : static void rstp_port_set_priority__(struct rstp_port *, int priority)
+<span class="lineNum">     102 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">     103 </span>                :            : static void rstp_port_set_port_number__(struct rstp_port *,
+<span class="lineNum">     104 </span>                :            :                                         uint16_t port_number)
+<span class="lineNum">     105 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">     106 </span>                :            : static void rstp_port_set_path_cost__(struct rstp_port *, uint32_t path_cost)
+<span class="lineNum">     107 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">     108 </span>                :            : static void rstp_port_set_administrative_bridge_port__(struct rstp_port *,
+<span class="lineNum">     109 </span>                :            :                                                        uint8_t admin_port_state,
+<span class="lineNum">     110 </span>                :            :                                                        bool initializing)
+<span class="lineNum">     111 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">     112 </span>                :            : static void rstp_port_set_admin_edge__(struct rstp_port *, bool admin_edge)
+<span class="lineNum">     113 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">     114 </span>                :            : static void rstp_port_set_auto_edge__(struct rstp_port *, bool auto_edge)
+<span class="lineNum">     115 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">     116 </span>                :            : static void rstp_port_set_admin_point_to_point_mac__(struct rstp_port *,
+<span class="lineNum">     117 </span>                :            :         enum rstp_admin_point_to_point_mac_state admin_p2p_mac_state)
+<span class="lineNum">     118 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">     119 </span>                :            : static void rstp_port_set_mcheck__(struct rstp_port *, bool mcheck)
+<span class="lineNum">     120 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<span class="lineNum">     121 </span>                :            : static void reinitialize_port__(struct rstp_port *p)
+<span class="lineNum">     122 </span>                :            :     OVS_REQUIRES(rstp_mutex);
+<a name="123"><span class="lineNum">     123 </span>                :            : </a>
+<span class="lineNum">     124 </span>                :            : const char *
+<span class="lineNum">     125 </span>                :<span class="lineCov">         34 : rstp_state_name(enum rstp_state state)</span>
+<span class="lineNum">     126 </span>                :            : {
+<span class="lineNum">     127 </span>  [<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 9 times"> + </span><span class="branchCov" title="Branch 3 was taken 21 times"> + </span> :<span class="lineCov">         34 :     switch (state) {</span>
+<span class="lineNum">         </span>            <span class="branchNoCov" title="Branch 4 was not taken"> - </span>]
+<span class="lineNum">     128 </span>                :            :     case RSTP_DISABLED:
+<span class="lineNum">     129 </span>                :<span class="lineCov">          4 :         return &quot;Disabled&quot;;</span>
+<span class="lineNum">     130 </span>                :            :     case RSTP_LEARNING:
+<span class="lineNum">     131 </span>                :<span class="lineNoCov">          0 :         return &quot;Learning&quot;;</span>
+<span class="lineNum">     132 </span>                :            :     case RSTP_FORWARDING:
+<span class="lineNum">     133 </span>                :<span class="lineCov">          9 :         return &quot;Forwarding&quot;;</span>
+<span class="lineNum">     134 </span>                :            :     case RSTP_DISCARDING:
+<span class="lineNum">     135 </span>                :<span class="lineCov">         21 :         return &quot;Discarding&quot;;</span>
+<span class="lineNum">     136 </span>                :            :     default:
+<span class="lineNum">     137 </span>                :<span class="lineNoCov">          0 :         return &quot;Unknown&quot;;</span>
+<span class="lineNum">     138 </span>                :            :     }
+<span class="lineNum">     139 </span>                :            : }
+<a name="140"><span class="lineNum">     140 </span>                :            : </a>
+<span class="lineNum">     141 </span>                :            : const char *
+<span class="lineNum">     142 </span>                :<span class="lineCov">         22 : rstp_port_role_name(enum rstp_port_role role)</span>
+<span class="lineNum">     143 </span>                :            : {
+<span class="lineNum">     144 </span>  [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 15 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span> :<span class="lineCov">         22 :     switch (role) {</span>
+<span class="lineNum">         </span>         <span class="branchCov" title="Branch 4 was taken 5 times"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span>]
+<span class="lineNum">     145 </span>                :            :     case ROLE_ROOT:
+<span class="lineNum">     146 </span>                :<span class="lineCov">          2 :         return &quot;Root&quot;;</span>
+<span class="lineNum">     147 </span>                :            :     case ROLE_DESIGNATED:
+<span class="lineNum">     148 </span>                :<span class="lineCov">         15 :         return &quot;Designated&quot;;</span>
+<span class="lineNum">     149 </span>                :            :     case ROLE_ALTERNATE:
+<span class="lineNum">     150 </span>                :<span class="lineNoCov">          0 :         return &quot;Alternate&quot;;</span>
+<span class="lineNum">     151 </span>                :            :     case ROLE_BACKUP:
+<span class="lineNum">     152 </span>                :<span class="lineNoCov">          0 :         return &quot;Backup&quot;;</span>
+<span class="lineNum">     153 </span>                :            :     case ROLE_DISABLED:
+<span class="lineNum">     154 </span>                :<span class="lineCov">          5 :         return &quot;Disabled&quot;;</span>
+<span class="lineNum">     155 </span>                :            :     default:
+<span class="lineNum">     156 </span>                :<span class="lineNoCov">          0 :         return &quot;Unknown&quot;;</span>
+<span class="lineNum">     157 </span>                :            :     }
+<span class="lineNum">     158 </span>                :            : }
+<span class="lineNum">     159 </span>                :            : 
+<span class="lineNum">     160 </span>                :            : /* Caller has to hold a reference to prevent 'rstp' from being deleted
+<a name="161"><span class="lineNum">     161 </span>                :            :  * while taking a new reference. */</a>
+<span class="lineNum">     162 </span>                :            : struct rstp *
+<span class="lineNum">     163 </span>                :<span class="lineCov">         77 : rstp_ref(struct rstp *rstp)</span>
+<span class="lineNum">     164 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     165 </span>                :            : {
+<span class="lineNum">     166 </span>        [<span class="branchCov" title="Branch 0 was taken 77 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         77 :     if (rstp) {</span>
+<span class="lineNum">     167 </span>                :<span class="lineCov">         77 :         ovs_refcount_ref(&amp;rstp-&gt;ref_cnt);</span>
+<span class="lineNum">     168 </span>                :            :     }
+<span class="lineNum">     169 </span>                :<span class="lineCov">         77 :     return rstp;</span>
+<span class="lineNum">     170 </span>                :            : }
+<span class="lineNum">     171 </span>                :            : 
+<a name="172"><span class="lineNum">     172 </span>                :            : /* Frees RSTP struct when reference count reaches zero. */</a>
+<span class="lineNum">     173 </span>                :            : void
+<span class="lineNum">     174 </span>                :<span class="lineCov">      46565 : rstp_unref(struct rstp *rstp)</span>
+<span class="lineNum">     175 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     176 </span>                :            : {
+<span class="lineNum">     177 </span>[<span class="branchCov" title="Branch 0 was taken 103 times"> + </span><span class="branchCov" title="Branch 1 was taken 46462 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 26 times"> + </span><span class="branchCov" title="Branch 4 was taken 77 times"> + </span>]:<span class="lineCov">      46565 :     if (rstp &amp;&amp; ovs_refcount_unref_relaxed(&amp;rstp-&gt;ref_cnt) == 1) {</span>
+<span class="lineNum">     178 </span>                :<span class="lineCov">         26 :         ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     179 </span>                :            : 
+<span class="lineNum">     180 </span>                :            :         /* Each RSTP port points back to struct rstp without holding a
+<span class="lineNum">     181 </span>                :            :          * reference for that pointer.  This is OK as we never move
+<span class="lineNum">     182 </span>                :            :          * ports from one bridge to another, and holders always
+<span class="lineNum">     183 </span>                :            :          * release their ports before releasing the bridge.  This
+<span class="lineNum">     184 </span>                :            :          * means that there should be not ports at this time. */
+<span class="lineNum">     185 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 26 times"> + </span>]:<span class="lineCov">         26 :         ovs_assert(hmap_is_empty(&amp;rstp-&gt;ports));</span>
+<span class="lineNum">     186 </span>                :            : 
+<span class="lineNum">     187 </span>                :<span class="lineCov">         26 :         ovs_list_remove(&amp;rstp-&gt;node);</span>
+<span class="lineNum">     188 </span>                :<span class="lineCov">         26 :         ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     189 </span>                :<span class="lineCov">         26 :         hmap_destroy(&amp;rstp-&gt;ports);</span>
+<span class="lineNum">     190 </span>                :<span class="lineCov">         26 :         free(rstp-&gt;name);</span>
+<span class="lineNum">     191 </span>                :<span class="lineCov">         26 :         free(rstp);</span>
+<span class="lineNum">     192 </span>                :            :     }
+<span class="lineNum">     193 </span>                :<span class="lineCov">      46565 : }</span>
+<span class="lineNum">     194 </span>                :            : 
+<span class="lineNum">     195 </span>                :            : /* Returns the port number.  Mutex is needed to guard against
+<span class="lineNum">     196 </span>                :            :  * concurrent reinitialization (which can temporarily clear the
+<a name="197"><span class="lineNum">     197 </span>                :            :  * port_number). */</a>
+<span class="lineNum">     198 </span>                :            : int
+<span class="lineNum">     199 </span>                :<span class="lineNoCov">          0 : rstp_port_get_number(const struct rstp_port *p)</span>
+<span class="lineNum">     200 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     201 </span>                :            : {
+<span class="lineNum">     202 </span>                :            :     int number;
+<span class="lineNum">     203 </span>                :            : 
+<span class="lineNum">     204 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     205 </span>                :<span class="lineNoCov">          0 :     number = p-&gt;port_number;</span>
+<span class="lineNum">     206 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     207 </span>                :            : 
+<span class="lineNum">     208 </span>                :<span class="lineNoCov">          0 :     return number;</span>
+<span class="lineNum">     209 </span>                :            : }
+<span class="lineNum">     210 </span>                :            : 
+<span class="lineNum">     211 </span>                :            : static void rstp_unixctl_tcn(struct unixctl_conn *, int argc,
+<span class="lineNum">     212 </span>                :            :                              const char *argv[], void *aux);
+<span class="lineNum">     213 </span>                :            : 
+<a name="214"><span class="lineNum">     214 </span>                :            : /* Decrements the State Machines' timers. */</a>
+<span class="lineNum">     215 </span>                :            : void
+<span class="lineNum">     216 </span>                :<span class="lineCov">      10804 : rstp_tick_timers(struct rstp *rstp)</span>
+<span class="lineNum">     217 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     218 </span>                :            : {
+<span class="lineNum">     219 </span>                :<span class="lineCov">      10804 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     220 </span>                :<span class="lineCov">      10804 :     decrease_rstp_port_timers__(rstp);</span>
+<span class="lineNum">     221 </span>                :<span class="lineCov">      10804 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     222 </span>                :<span class="lineCov">      10804 : }</span>
+<span class="lineNum">     223 </span>                :            : 
+<a name="224"><span class="lineNum">     224 </span>                :            : /* Processes an incoming BPDU. */</a>
+<span class="lineNum">     225 </span>                :            : void
+<span class="lineNum">     226 </span>                :<span class="lineCov">       7069 : rstp_port_received_bpdu(struct rstp_port *rp, const void *bpdu,</span>
+<span class="lineNum">     227 </span>                :            :                         size_t bpdu_size)
+<span class="lineNum">     228 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     229 </span>                :            : {
+<span class="lineNum">     230 </span>                :<span class="lineCov">       7069 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     231 </span>                :            :     /* Only process packets on ports that have RSTP enabled. */
+<span class="lineNum">     232 </span>[<span class="branchCov" title="Branch 0 was taken 7069 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 6349 times"> + </span><span class="branchCov" title="Branch 3 was taken 720 times"> + </span>]:<span class="lineCov">       7069 :     if (rp &amp;&amp; rp-&gt;rstp_state != RSTP_DISABLED) {</span>
+<span class="lineNum">     233 </span>                :<span class="lineCov">       6349 :         process_received_bpdu__(rp, bpdu, bpdu_size);</span>
+<span class="lineNum">     234 </span>                :            :     }
+<span class="lineNum">     235 </span>                :<span class="lineCov">       7069 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     236 </span>                :<span class="lineCov">       7069 : }</span>
+<a name="237"><span class="lineNum">     237 </span>                :            : </a>
+<span class="lineNum">     238 </span>                :            : void
+<span class="lineNum">     239 </span>                :<span class="lineCov">        617 : rstp_init(void)</span>
+<span class="lineNum">     240 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     241 </span>                :            : {
+<span class="lineNum">     242 </span>                :<span class="lineCov">        617 :     unixctl_command_register(&quot;rstp/tcn&quot;, &quot;[bridge]&quot;, 0, 1, rstp_unixctl_tcn,</span>
+<span class="lineNum">     243 </span>                :            :                              NULL);
+<span class="lineNum">     244 </span>                :<span class="lineCov">        617 : }</span>
+<span class="lineNum">     245 </span>                :            : 
+<a name="246"><span class="lineNum">     246 </span>                :            : /* Creates and returns a new RSTP instance that initially has no ports. */</a>
+<span class="lineNum">     247 </span>                :            : struct rstp *
+<span class="lineNum">     248 </span>                :<span class="lineCov">         28 : rstp_create(const char *name, rstp_identifier bridge_address,</span>
+<span class="lineNum">     249 </span>                :            :             void (*send_bpdu)(struct dp_packet *bpdu, void *port_aux,
+<span class="lineNum">     250 </span>                :            :                               void *rstp_aux),
+<span class="lineNum">     251 </span>                :            :             void *aux)
+<span class="lineNum">     252 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     253 </span>                :            : {
+<span class="lineNum">     254 </span>                :            :     struct rstp *rstp;
+<span class="lineNum">     255 </span>                :            : 
+<span class="lineNum">     256 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 28 times"> + </span>]:<span class="lineCov">         28 :     VLOG_DBG(&quot;Creating RSTP instance&quot;);</span>
+<span class="lineNum">     257 </span>                :            : 
+<span class="lineNum">     258 </span>                :<span class="lineCov">         28 :     rstp = xzalloc(sizeof *rstp);</span>
+<span class="lineNum">     259 </span>                :<span class="lineCov">         28 :     rstp-&gt;name = xstrdup(name);</span>
+<span class="lineNum">     260 </span>                :            : 
+<span class="lineNum">     261 </span>                :            :     /* Initialize the ports map before calling any setters,
+<span class="lineNum">     262 </span>                :            :      * so that the state machines will see an empty ports map. */
+<span class="lineNum">     263 </span>                :<span class="lineCov">         28 :     hmap_init(&amp;rstp-&gt;ports);</span>
+<span class="lineNum">     264 </span>                :            : 
+<span class="lineNum">     265 </span>                :<span class="lineCov">         28 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     266 </span>                :            :     /* Set bridge address. */
+<span class="lineNum">     267 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_address__(rstp, bridge_address);</span>
+<span class="lineNum">     268 </span>                :            :     /* Set default parameters values. */
+<span class="lineNum">     269 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_priority__(rstp, RSTP_DEFAULT_PRIORITY);</span>
+<span class="lineNum">     270 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_ageing_time__(rstp, RSTP_DEFAULT_AGEING_TIME);</span>
+<span class="lineNum">     271 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_force_protocol_version__(rstp, FPV_DEFAULT);</span>
+<span class="lineNum">     272 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_forward_delay__(rstp, RSTP_DEFAULT_BRIDGE_FORWARD_DELAY);</span>
+<span class="lineNum">     273 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_hello_time__(rstp);</span>
+<span class="lineNum">     274 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_max_age__(rstp, RSTP_DEFAULT_BRIDGE_MAX_AGE);</span>
+<span class="lineNum">     275 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_migrate_time__(rstp);</span>
+<span class="lineNum">     276 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_transmit_hold_count__(rstp,</span>
+<span class="lineNum">     277 </span>                :            :                                           RSTP_DEFAULT_TRANSMIT_HOLD_COUNT);
+<span class="lineNum">     278 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_times__(rstp, RSTP_DEFAULT_BRIDGE_FORWARD_DELAY,</span>
+<span class="lineNum">     279 </span>                :            :                             RSTP_BRIDGE_HELLO_TIME,
+<span class="lineNum">     280 </span>                :            :                             RSTP_DEFAULT_BRIDGE_MAX_AGE, 0);
+<span class="lineNum">     281 </span>                :<span class="lineCov">         28 :     rstp-&gt;send_bpdu = send_bpdu;</span>
+<span class="lineNum">     282 </span>                :<span class="lineCov">         28 :     rstp-&gt;aux = aux;</span>
+<span class="lineNum">     283 </span>                :<span class="lineCov">         28 :     rstp-&gt;changes = false;</span>
+<span class="lineNum">     284 </span>                :<span class="lineCov">         28 :     rstp-&gt;begin = true;</span>
+<span class="lineNum">     285 </span>                :<span class="lineCov">         28 :     rstp-&gt;old_root_aux = NULL;</span>
+<span class="lineNum">     286 </span>                :<span class="lineCov">         28 :     rstp-&gt;new_root_aux = NULL;</span>
+<span class="lineNum">     287 </span>                :            : 
+<span class="lineNum">     288 </span>                :<span class="lineCov">         28 :     ovs_refcount_init(&amp;rstp-&gt;ref_cnt);</span>
+<span class="lineNum">     289 </span>                :            : 
+<span class="lineNum">     290 </span>                :<span class="lineCov">         28 :     ovs_list_push_back(all_rstps, &amp;rstp-&gt;node);</span>
+<span class="lineNum">     291 </span>                :<span class="lineCov">         28 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     292 </span>                :            : 
+<span class="lineNum">     293 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 28 times"> + </span>]:<span class="lineCov">         28 :     VLOG_DBG(&quot;RSTP instance creation done&quot;);</span>
+<span class="lineNum">     294 </span>                :<span class="lineCov">         28 :     return rstp;</span>
+<span class="lineNum">     295 </span>                :            : }
+<span class="lineNum">     296 </span>                :            : 
+<span class="lineNum">     297 </span>                :            : /* Called by rstp_set_bridge_address() and rstp_set_bridge_priority(),
+<span class="lineNum">     298 </span>                :            :  * it updates the bridge priority vector according to the values passed by
+<span class="lineNum">     299 </span>                :            :  * those setters.
+<a name="300"><span class="lineNum">     300 </span>                :            :  */</a>
+<span class="lineNum">     301 </span>                :            : static void
+<span class="lineNum">     302 </span>                :<span class="lineCov">        111 : set_bridge_priority__(struct rstp *rstp)</span>
+<span class="lineNum">     303 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     304 </span>                :            : {
+<span class="lineNum">     305 </span>                :            :     struct rstp_port *p;
+<span class="lineNum">     306 </span>                :            : 
+<span class="lineNum">     307 </span>                :<span class="lineCov">        111 :     rstp-&gt;bridge_priority.root_bridge_id = rstp-&gt;bridge_identifier;</span>
+<span class="lineNum">     308 </span>                :<span class="lineCov">        111 :     rstp-&gt;bridge_priority.designated_bridge_id = rstp-&gt;bridge_identifier;</span>
+<span class="lineNum">     309 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 111 times"> + </span>]:<span class="lineCov">        111 :     VLOG_DBG(&quot;%s: new bridge identifier: &quot;RSTP_ID_FMT&quot;&quot;, rstp-&gt;name,</span>
+<span class="lineNum">     310 </span>                :            :              RSTP_ID_ARGS(rstp-&gt;bridge_identifier));
+<span class="lineNum">     311 </span>                :            : 
+<span class="lineNum">     312 </span>                :            :     /* [17.13] When the bridge address changes, recalculates all priority
+<span class="lineNum">     313 </span>                :            :      * vectors.
+<span class="lineNum">     314 </span>                :            :      */
+<span class="lineNum">     315 </span>[<span class="branchCov" title="Branch 2 was taken 9 times"> + </span><span class="branchCov" title="Branch 3 was taken 111 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 111 times"> + </span>]:<span class="lineCov">        120 :     HMAP_FOR_EACH (p, node, &amp;rstp-&gt;ports) {</span>
+<span class="lineNum">     316 </span>                :<span class="lineCov">          9 :         p-&gt;selected = false;</span>
+<span class="lineNum">     317 </span>                :<span class="lineCov">          9 :         p-&gt;reselect = true;</span>
+<span class="lineNum">     318 </span>                :            :     }
+<span class="lineNum">     319 </span>                :<span class="lineCov">        111 :     rstp-&gt;changes = true;</span>
+<span class="lineNum">     320 </span>                :<span class="lineCov">        111 :     updt_roles_tree__(rstp);</span>
+<span class="lineNum">     321 </span>                :<span class="lineCov">        111 : }</span>
+<span class="lineNum">     322 </span>                :            : 
+<a name="323"><span class="lineNum">     323 </span>                :            : /* Sets the bridge address. */</a>
+<span class="lineNum">     324 </span>                :            : static void
+<span class="lineNum">     325 </span>                :<span class="lineCov">         68 : rstp_set_bridge_address__(struct rstp *rstp, rstp_identifier bridge_address)</span>
+<span class="lineNum">     326 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     327 </span>                :            : {
+<span class="lineNum">     328 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 68 times"> + </span>]:<span class="lineCov">         68 :     VLOG_DBG(&quot;%s: set bridge address to: &quot;RSTP_ID_FMT&quot;&quot;, rstp-&gt;name,</span>
+<span class="lineNum">     329 </span>                :            :              RSTP_ID_ARGS(bridge_address));
+<span class="lineNum">     330 </span>        [<span class="branchCov" title="Branch 0 was taken 54 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>]:<span class="lineCov">         68 :     if (rstp-&gt;address != bridge_address) {</span>
+<span class="lineNum">     331 </span>                :<span class="lineCov">         54 :         rstp-&gt;address = bridge_address;</span>
+<span class="lineNum">     332 </span>                :<span class="lineCov">         54 :         rstp-&gt;bridge_identifier &amp;= 0xffff000000000000ULL;</span>
+<span class="lineNum">     333 </span>                :<span class="lineCov">         54 :         rstp-&gt;bridge_identifier |= bridge_address;</span>
+<span class="lineNum">     334 </span>                :<span class="lineCov">         54 :         set_bridge_priority__(rstp);</span>
+<span class="lineNum">     335 </span>                :            :     }
+<span class="lineNum">     336 </span>                :<span class="lineCov">         68 : }</span>
+<span class="lineNum">     337 </span>                :            : 
+<a name="338"><span class="lineNum">     338 </span>                :            : /* Sets the bridge address. */</a>
+<span class="lineNum">     339 </span>                :            : void
+<span class="lineNum">     340 </span>                :<span class="lineCov">         12 : rstp_set_bridge_address(struct rstp *rstp, rstp_identifier bridge_address)</span>
+<span class="lineNum">     341 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     342 </span>                :            : {
+<span class="lineNum">     343 </span>                :<span class="lineCov">         12 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     344 </span>                :<span class="lineCov">         12 :     rstp_set_bridge_address__(rstp, bridge_address);</span>
+<span class="lineNum">     345 </span>                :<span class="lineCov">         12 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     346 </span>                :<span class="lineCov">         12 : }</span>
+<a name="347"><span class="lineNum">     347 </span>                :            : </a>
+<span class="lineNum">     348 </span>                :            : const char *
+<span class="lineNum">     349 </span>                :<span class="lineNoCov">          0 : rstp_get_name(const struct rstp *rstp)</span>
+<span class="lineNum">     350 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     351 </span>                :            : {
+<span class="lineNum">     352 </span>                :            :     char *name;
+<span class="lineNum">     353 </span>                :            : 
+<span class="lineNum">     354 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     355 </span>                :<span class="lineNoCov">          0 :     name = rstp-&gt;name;</span>
+<span class="lineNum">     356 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     357 </span>                :<span class="lineNoCov">          0 :     return name;</span>
+<span class="lineNum">     358 </span>                :            : }
+<a name="359"><span class="lineNum">     359 </span>                :            : </a>
+<span class="lineNum">     360 </span>                :            : rstp_identifier
+<span class="lineNum">     361 </span>                :<span class="lineCov">         25 : rstp_get_bridge_id(const struct rstp *rstp)</span>
+<span class="lineNum">     362 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     363 </span>                :            : {
+<span class="lineNum">     364 </span>                :            :     rstp_identifier bridge_id;
+<span class="lineNum">     365 </span>                :            : 
+<span class="lineNum">     366 </span>                :<span class="lineCov">         25 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     367 </span>                :<span class="lineCov">         25 :     bridge_id = rstp-&gt;bridge_identifier;</span>
+<span class="lineNum">     368 </span>                :<span class="lineCov">         25 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     369 </span>                :            : 
+<span class="lineNum">     370 </span>                :<span class="lineCov">         25 :     return bridge_id;</span>
+<span class="lineNum">     371 </span>                :            : }
+<span class="lineNum">     372 </span>                :            : 
+<a name="373"><span class="lineNum">     373 </span>                :            : /* Sets the bridge priority. */</a>
+<span class="lineNum">     374 </span>                :            : static void
+<span class="lineNum">     375 </span>                :<span class="lineCov">         69 : rstp_set_bridge_priority__(struct rstp *rstp, int new_priority)</span>
+<span class="lineNum">     376 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     377 </span>                :            : {
+<span class="lineNum">     378 </span>                :<span class="lineCov">         69 :     new_priority = ROUND_DOWN(new_priority, RSTP_PRIORITY_STEP);</span>
+<span class="lineNum">     379 </span>                :            : 
+<span class="lineNum">     380 </span>        [<span class="branchCov" title="Branch 0 was taken 57 times"> + </span><span class="branchCov" title="Branch 1 was taken 12 times"> + </span>]:<span class="lineCov">         69 :     if (rstp-&gt;priority != new_priority</span>
+<span class="lineNum">     381 </span>        [<span class="branchCov" title="Branch 0 was taken 57 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         57 :         &amp;&amp; new_priority &gt;= RSTP_MIN_PRIORITY</span>
+<span class="lineNum">     382 </span>        [<span class="branchCov" title="Branch 0 was taken 57 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         57 :         &amp;&amp; new_priority &lt;= RSTP_MAX_PRIORITY) {</span>
+<span class="lineNum">     383 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 57 times"> + </span>]:<span class="lineCov">         57 :         VLOG_DBG(&quot;%s: set bridge priority to %d&quot;, rstp-&gt;name, new_priority);</span>
+<span class="lineNum">     384 </span>                :            : 
+<span class="lineNum">     385 </span>                :<span class="lineCov">         57 :         rstp-&gt;priority = new_priority;</span>
+<span class="lineNum">     386 </span>                :<span class="lineCov">         57 :         rstp-&gt;bridge_identifier &amp;= 0x0000ffffffffffffULL;</span>
+<span class="lineNum">     387 </span>                :<span class="lineCov">         57 :         rstp-&gt;bridge_identifier |= (uint64_t)new_priority &lt;&lt; 48;</span>
+<span class="lineNum">     388 </span>                :<span class="lineCov">         57 :         set_bridge_priority__(rstp);</span>
+<span class="lineNum">     389 </span>                :            :     }
+<span class="lineNum">     390 </span>                :<span class="lineCov">         69 : }</span>
+<a name="391"><span class="lineNum">     391 </span>                :            : </a>
+<span class="lineNum">     392 </span>                :            : void
+<span class="lineNum">     393 </span>                :<span class="lineCov">         13 : rstp_set_bridge_priority(struct rstp *rstp, int new_priority)</span>
+<span class="lineNum">     394 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     395 </span>                :            : {
+<span class="lineNum">     396 </span>                :<span class="lineCov">         13 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     397 </span>                :<span class="lineCov">         13 :     rstp_set_bridge_priority__(rstp, new_priority);</span>
+<span class="lineNum">     398 </span>                :<span class="lineCov">         13 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     399 </span>                :<span class="lineCov">         13 : }</span>
+<span class="lineNum">     400 </span>                :            : 
+<a name="401"><span class="lineNum">     401 </span>                :            : /* Sets the bridge ageing time. */</a>
+<span class="lineNum">     402 </span>                :            : static void
+<span class="lineNum">     403 </span>                :<span class="lineCov">         68 : rstp_set_bridge_ageing_time__(struct rstp *rstp, int new_ageing_time)</span>
+<span class="lineNum">     404 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     405 </span>                :            : {
+<span class="lineNum">     406 </span>        [<span class="branchCov" title="Branch 0 was taken 68 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         68 :     if (new_ageing_time &gt;= RSTP_MIN_AGEING_TIME</span>
+<span class="lineNum">     407 </span>        [<span class="branchCov" title="Branch 0 was taken 68 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         68 :         &amp;&amp; new_ageing_time &lt;= RSTP_MAX_AGEING_TIME) {</span>
+<span class="lineNum">     408 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 68 times"> + </span>]:<span class="lineCov">         68 :         VLOG_DBG(&quot;%s: set ageing time to %d&quot;, rstp-&gt;name, new_ageing_time);</span>
+<span class="lineNum">     409 </span>                :            : 
+<span class="lineNum">     410 </span>                :<span class="lineCov">         68 :         rstp-&gt;ageing_time = new_ageing_time;</span>
+<span class="lineNum">     411 </span>                :            :     }
+<span class="lineNum">     412 </span>                :<span class="lineCov">         68 : }</span>
+<a name="413"><span class="lineNum">     413 </span>                :            : </a>
+<span class="lineNum">     414 </span>                :            : void
+<span class="lineNum">     415 </span>                :<span class="lineCov">         12 : rstp_set_bridge_ageing_time(struct rstp *rstp, int new_ageing_time)</span>
+<span class="lineNum">     416 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     417 </span>                :            : {
+<span class="lineNum">     418 </span>                :<span class="lineCov">         12 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     419 </span>                :<span class="lineCov">         12 :     rstp_set_bridge_ageing_time__(rstp, new_ageing_time);</span>
+<span class="lineNum">     420 </span>                :<span class="lineCov">         12 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     421 </span>                :<span class="lineCov">         12 : }</span>
+<span class="lineNum">     422 </span>                :            : 
+<span class="lineNum">     423 </span>                :            : /* Reinitializes RSTP when switching from RSTP mode to STP mode
+<span class="lineNum">     424 </span>                :            :  * or vice versa.
+<a name="425"><span class="lineNum">     425 </span>                :            :  */</a>
+<span class="lineNum">     426 </span>                :            : static void
+<span class="lineNum">     427 </span>                :<span class="lineCov">         28 : reinitialize_rstp__(struct rstp *rstp)</span>
+<span class="lineNum">     428 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     429 </span>                :            : {
+<span class="lineNum">     430 </span>                :            :     struct rstp temp;
+<span class="lineNum">     431 </span>                :            :     static struct hmap ports;
+<span class="lineNum">     432 </span>                :            :     struct rstp_port *p;
+<span class="lineNum">     433 </span>                :            : 
+<span class="lineNum">     434 </span>                :            :     /* Copy rstp in temp */
+<span class="lineNum">     435 </span>                :<span class="lineCov">         28 :     temp = *rstp;</span>
+<span class="lineNum">     436 </span>                :<span class="lineCov">         28 :     ports = rstp-&gt;ports;</span>
+<span class="lineNum">     437 </span>                :            : 
+<span class="lineNum">     438 </span>                :            :     /* stop and clear rstp */
+<span class="lineNum">     439 </span>                :<span class="lineCov">         28 :     memset(rstp, 0, sizeof(struct rstp));</span>
+<span class="lineNum">     440 </span>                :            : 
+<span class="lineNum">     441 </span>                :            :     /* Initialize rstp. */
+<span class="lineNum">     442 </span>                :<span class="lineCov">         28 :     rstp-&gt;name = temp.name;</span>
+<span class="lineNum">     443 </span>                :            : 
+<span class="lineNum">     444 </span>                :            :     /* Initialize the ports hmap before calling any setters,
+<span class="lineNum">     445 </span>                :            :      * so that the state machines will see an empty ports list. */
+<span class="lineNum">     446 </span>                :<span class="lineCov">         28 :     hmap_init(&amp;rstp-&gt;ports);</span>
+<span class="lineNum">     447 </span>                :            : 
+<span class="lineNum">     448 </span>                :            :     /* Set bridge address. */
+<span class="lineNum">     449 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_address__(rstp, temp.address);</span>
+<span class="lineNum">     450 </span>                :            :     /* Set default parameters values. */
+<span class="lineNum">     451 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_priority__(rstp, RSTP_DEFAULT_PRIORITY);</span>
+<span class="lineNum">     452 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_ageing_time__(rstp, RSTP_DEFAULT_AGEING_TIME);</span>
+<span class="lineNum">     453 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_forward_delay__(rstp, RSTP_DEFAULT_BRIDGE_FORWARD_DELAY);</span>
+<span class="lineNum">     454 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_hello_time__(rstp);</span>
+<span class="lineNum">     455 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_max_age__(rstp, RSTP_DEFAULT_BRIDGE_MAX_AGE);</span>
+<span class="lineNum">     456 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_migrate_time__(rstp);</span>
+<span class="lineNum">     457 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_transmit_hold_count__(rstp,</span>
+<span class="lineNum">     458 </span>                :            :                                           RSTP_DEFAULT_TRANSMIT_HOLD_COUNT);
+<span class="lineNum">     459 </span>                :<span class="lineCov">         28 :     rstp_set_bridge_times__(rstp, RSTP_DEFAULT_BRIDGE_FORWARD_DELAY,</span>
+<span class="lineNum">     460 </span>                :            :                             RSTP_BRIDGE_HELLO_TIME,
+<span class="lineNum">     461 </span>                :            :                             RSTP_DEFAULT_BRIDGE_MAX_AGE, 0);
+<span class="lineNum">     462 </span>                :            : 
+<span class="lineNum">     463 </span>                :<span class="lineCov">         28 :     rstp-&gt;send_bpdu = temp.send_bpdu;</span>
+<span class="lineNum">     464 </span>                :<span class="lineCov">         28 :     rstp-&gt;aux = temp.aux;</span>
+<span class="lineNum">     465 </span>                :<span class="lineCov">         28 :     rstp-&gt;node = temp.node;</span>
+<span class="lineNum">     466 </span>                :<span class="lineCov">         28 :     rstp-&gt;changes = false;</span>
+<span class="lineNum">     467 </span>                :<span class="lineCov">         28 :     rstp-&gt;begin = true;</span>
+<span class="lineNum">     468 </span>                :            : 
+<span class="lineNum">     469 </span>                :            :     /* Restore ports. */
+<span class="lineNum">     470 </span>                :<span class="lineCov">         28 :     rstp-&gt;ports = ports;</span>
+<span class="lineNum">     471 </span>                :            : 
+<span class="lineNum">     472 </span>[<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 28 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 28 times"> + </span>]:<span class="lineCov">         28 :     HMAP_FOR_EACH (p, node, &amp;rstp-&gt;ports) {</span>
+<span class="lineNum">     473 </span>                :<span class="lineNoCov">          0 :         reinitialize_port__(p);</span>
+<span class="lineNum">     474 </span>                :            :     }
+<span class="lineNum">     475 </span>                :            : 
+<span class="lineNum">     476 </span>                :<span class="lineCov">         28 :     rstp-&gt;ref_cnt = temp.ref_cnt;</span>
+<span class="lineNum">     477 </span>                :<span class="lineCov">         28 : }</span>
+<span class="lineNum">     478 </span>                :            : 
+<a name="479"><span class="lineNum">     479 </span>                :            : /* Sets the force protocol version parameter. */</a>
+<span class="lineNum">     480 </span>                :            : static void
+<span class="lineNum">     481 </span>                :<span class="lineCov">         40 : rstp_set_bridge_force_protocol_version__(struct rstp *rstp,</span>
+<span class="lineNum">     482 </span>                :            :                 enum rstp_force_protocol_version new_force_protocol_version)
+<span class="lineNum">     483 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     484 </span>                :            : {
+<span class="lineNum">     485 </span>[<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchCov" title="Branch 1 was taken 12 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 28 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         40 :     if (new_force_protocol_version != rstp-&gt;force_protocol_version &amp;&amp;</span>
+<span class="lineNum">     486 </span>        [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         28 :             (new_force_protocol_version == FPV_STP_COMPATIBILITY ||</span>
+<span class="lineNum">     487 </span>                :            :              new_force_protocol_version == FPV_DEFAULT)) {
+<span class="lineNum">     488 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 28 times"> + </span>]:<span class="lineCov">         28 :         VLOG_DBG(&quot;%s: set bridge Force Protocol Version to %d&quot;, rstp-&gt;name,</span>
+<span class="lineNum">     489 </span>                :            :                  new_force_protocol_version);
+<span class="lineNum">     490 </span>                :            : 
+<span class="lineNum">     491 </span>                :            :         /* [17.13] The Spanning Tree Protocol Entity shall be reinitialized,
+<span class="lineNum">     492 </span>                :            :          * as specified by the assertion of BEGIN (17.18.1) in the state
+<span class="lineNum">     493 </span>                :            :          * machine specification.
+<span class="lineNum">     494 </span>                :            :          */
+<span class="lineNum">     495 </span>                :<span class="lineCov">         28 :         reinitialize_rstp__(rstp);</span>
+<span class="lineNum">     496 </span>                :<span class="lineCov">         28 :         rstp-&gt;force_protocol_version = new_force_protocol_version;</span>
+<span class="lineNum">     497 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 28 times"> + </span>]:<span class="lineCov">         28 :         if (rstp-&gt;force_protocol_version &lt; 2) {</span>
+<span class="lineNum">     498 </span>                :<span class="lineNoCov">          0 :             rstp-&gt;stp_version = true;</span>
+<span class="lineNum">     499 </span>                :<span class="lineNoCov">          0 :             rstp-&gt;rstp_version = false;</span>
+<span class="lineNum">     500 </span>                :            :         } else {
+<span class="lineNum">     501 </span>                :<span class="lineCov">         28 :             rstp-&gt;stp_version = false;</span>
+<span class="lineNum">     502 </span>                :<span class="lineCov">         28 :             rstp-&gt;rstp_version = true;</span>
+<span class="lineNum">     503 </span>                :            :         }
+<span class="lineNum">     504 </span>                :<span class="lineCov">         28 :         rstp-&gt;changes = true;</span>
+<span class="lineNum">     505 </span>                :<span class="lineCov">         28 :         move_rstp__(rstp);</span>
+<span class="lineNum">     506 </span>                :            :     }
+<span class="lineNum">     507 </span>                :<span class="lineCov">         40 : }</span>
+<a name="508"><span class="lineNum">     508 </span>                :            : </a>
+<span class="lineNum">     509 </span>                :            : void
+<span class="lineNum">     510 </span>                :<span class="lineCov">         12 : rstp_set_bridge_force_protocol_version(struct rstp *rstp,</span>
+<span class="lineNum">     511 </span>                :            :                 enum rstp_force_protocol_version new_force_protocol_version)
+<span class="lineNum">     512 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     513 </span>                :            : {
+<span class="lineNum">     514 </span>                :<span class="lineCov">         12 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     515 </span>                :<span class="lineCov">         12 :     rstp_set_bridge_force_protocol_version__(rstp, new_force_protocol_version);</span>
+<span class="lineNum">     516 </span>                :<span class="lineCov">         12 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     517 </span>                :<span class="lineCov">         12 : }</span>
+<span class="lineNum">     518 </span>                :            : 
+<a name="519"><span class="lineNum">     519 </span>                :            : /* Sets the bridge Hello Time parameter. */</a>
+<span class="lineNum">     520 </span>                :            : static void
+<span class="lineNum">     521 </span>                :<span class="lineCov">         56 : rstp_set_bridge_hello_time__(struct rstp *rstp)</span>
+<span class="lineNum">     522 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     523 </span>                :            : {
+<span class="lineNum">     524 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 56 times"> + </span>]:<span class="lineCov">         56 :     VLOG_DBG(&quot;%s: set RSTP Hello Time to %d&quot;, rstp-&gt;name,</span>
+<span class="lineNum">     525 </span>                :            :              RSTP_BRIDGE_HELLO_TIME);
+<span class="lineNum">     526 </span>                :            :     /* 2 is the only acceptable value. */
+<span class="lineNum">     527 </span>                :<span class="lineCov">         56 :     rstp-&gt;bridge_hello_time = RSTP_BRIDGE_HELLO_TIME;</span>
+<span class="lineNum">     528 </span>                :<span class="lineCov">         56 : }</span>
+<span class="lineNum">     529 </span>                :            : 
+<a name="530"><span class="lineNum">     530 </span>                :            : /* Sets the bridge max age parameter. */</a>
+<span class="lineNum">     531 </span>                :            : static void
+<span class="lineNum">     532 </span>                :<span class="lineCov">         68 : rstp_set_bridge_max_age__(struct rstp *rstp, int new_max_age)</span>
+<span class="lineNum">     533 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     534 </span>                :            : {
+<span class="lineNum">     535 </span>        [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchCov" title="Branch 1 was taken 40 times"> + </span>]:<span class="lineCov">         68 :     if (rstp-&gt;bridge_max_age != new_max_age</span>
+<span class="lineNum">     536 </span>        [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         28 :         &amp;&amp; new_max_age &gt;= RSTP_MIN_BRIDGE_MAX_AGE</span>
+<span class="lineNum">     537 </span>        [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         28 :         &amp;&amp; new_max_age &lt;= RSTP_MAX_BRIDGE_MAX_AGE) {</span>
+<span class="lineNum">     538 </span>                :            :         /* [17.13] */
+<span class="lineNum">     539 </span>        [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         28 :         if ((2 * (rstp-&gt;bridge_forward_delay - 1) &gt;= new_max_age)</span>
+<span class="lineNum">     540 </span>        [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         28 :             &amp;&amp; (new_max_age &gt;= 2 * rstp-&gt;bridge_hello_time)) {</span>
+<span class="lineNum">     541 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 28 times"> + </span>]:<span class="lineCov">         28 :             VLOG_DBG(&quot;%s: set RSTP bridge Max Age to %d&quot;, rstp-&gt;name,</span>
+<span class="lineNum">     542 </span>                :            :                      new_max_age);
+<span class="lineNum">     543 </span>                :            : 
+<span class="lineNum">     544 </span>                :<span class="lineCov">         28 :             rstp-&gt;bridge_max_age = new_max_age;</span>
+<span class="lineNum">     545 </span>                :<span class="lineCov">         28 :             rstp-&gt;bridge_times.max_age = new_max_age;</span>
+<span class="lineNum">     546 </span>                :<span class="lineCov">         28 :             rstp-&gt;changes = true;</span>
+<span class="lineNum">     547 </span>                :<span class="lineCov">         28 :             updt_roles_tree__(rstp);</span>
+<span class="lineNum">     548 </span>                :            :         }
+<span class="lineNum">     549 </span>                :            :     }
+<span class="lineNum">     550 </span>                :<span class="lineCov">         68 : }</span>
+<a name="551"><span class="lineNum">     551 </span>                :            : </a>
+<span class="lineNum">     552 </span>                :            : void
+<span class="lineNum">     553 </span>                :<span class="lineCov">         12 : rstp_set_bridge_max_age(struct rstp *rstp, int new_max_age)</span>
+<span class="lineNum">     554 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     555 </span>                :            : {
+<span class="lineNum">     556 </span>                :<span class="lineCov">         12 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     557 </span>                :<span class="lineCov">         12 :     rstp_set_bridge_max_age__(rstp, new_max_age);</span>
+<span class="lineNum">     558 </span>                :<span class="lineCov">         12 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     559 </span>                :<span class="lineCov">         12 : }</span>
+<span class="lineNum">     560 </span>                :            : 
+<a name="561"><span class="lineNum">     561 </span>                :            : /* Sets the bridge forward delay parameter. */</a>
+<span class="lineNum">     562 </span>                :            : static void
+<span class="lineNum">     563 </span>                :<span class="lineCov">         68 : rstp_set_bridge_forward_delay__(struct rstp *rstp, int new_forward_delay)</span>
+<span class="lineNum">     564 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     565 </span>                :            : {
+<span class="lineNum">     566 </span>        [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchCov" title="Branch 1 was taken 40 times"> + </span>]:<span class="lineCov">         68 :     if (rstp-&gt;bridge_forward_delay != new_forward_delay</span>
+<span class="lineNum">     567 </span>        [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         28 :             &amp;&amp; new_forward_delay &gt;= RSTP_MIN_BRIDGE_FORWARD_DELAY</span>
+<span class="lineNum">     568 </span>        [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         28 :             &amp;&amp; new_forward_delay &lt;= RSTP_MAX_BRIDGE_FORWARD_DELAY) {</span>
+<span class="lineNum">     569 </span>        [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         28 :         if (2 * (new_forward_delay - 1) &gt;= rstp-&gt;bridge_max_age) {</span>
+<span class="lineNum">     570 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 28 times"> + </span>]:<span class="lineCov">         28 :             VLOG_DBG(&quot;%s: set RSTP Forward Delay to %d&quot;, rstp-&gt;name,</span>
+<span class="lineNum">     571 </span>                :            :                      new_forward_delay);
+<span class="lineNum">     572 </span>                :<span class="lineCov">         28 :             rstp-&gt;bridge_forward_delay = new_forward_delay;</span>
+<span class="lineNum">     573 </span>                :<span class="lineCov">         28 :             rstp-&gt;bridge_times.forward_delay = new_forward_delay;</span>
+<span class="lineNum">     574 </span>                :<span class="lineCov">         28 :             rstp-&gt;changes = true;</span>
+<span class="lineNum">     575 </span>                :<span class="lineCov">         28 :             updt_roles_tree__(rstp);</span>
+<span class="lineNum">     576 </span>                :            :         }
+<span class="lineNum">     577 </span>                :            :     }
+<span class="lineNum">     578 </span>                :<span class="lineCov">         68 : }</span>
+<a name="579"><span class="lineNum">     579 </span>                :            : </a>
+<span class="lineNum">     580 </span>                :            : void
+<span class="lineNum">     581 </span>                :<span class="lineCov">         12 : rstp_set_bridge_forward_delay(struct rstp *rstp, int new_forward_delay)</span>
+<span class="lineNum">     582 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     583 </span>                :            : {
+<span class="lineNum">     584 </span>                :<span class="lineCov">         12 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     585 </span>                :<span class="lineCov">         12 :     rstp_set_bridge_forward_delay__(rstp, new_forward_delay);</span>
+<span class="lineNum">     586 </span>                :<span class="lineCov">         12 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     587 </span>                :<span class="lineCov">         12 : }</span>
+<span class="lineNum">     588 </span>                :            : 
+<a name="589"><span class="lineNum">     589 </span>                :            : /* Sets the bridge transmit hold count parameter. */</a>
+<span class="lineNum">     590 </span>                :            : static void
+<span class="lineNum">     591 </span>                :<span class="lineCov">         68 : rstp_set_bridge_transmit_hold_count__(struct rstp *rstp,</span>
+<span class="lineNum">     592 </span>                :            :                                       int new_transmit_hold_count)
+<span class="lineNum">     593 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     594 </span>                :            : {
+<span class="lineNum">     595 </span>        [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchCov" title="Branch 1 was taken 40 times"> + </span>]:<span class="lineCov">         68 :     if (rstp-&gt;transmit_hold_count != new_transmit_hold_count</span>
+<span class="lineNum">     596 </span>        [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         28 :         &amp;&amp; new_transmit_hold_count &gt;= RSTP_MIN_TRANSMIT_HOLD_COUNT</span>
+<span class="lineNum">     597 </span>        [<span class="branchCov" title="Branch 0 was taken 28 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         28 :         &amp;&amp; new_transmit_hold_count &lt;= RSTP_MAX_TRANSMIT_HOLD_COUNT) {</span>
+<span class="lineNum">     598 </span>                :            :         struct rstp_port *p;
+<span class="lineNum">     599 </span>                :            : 
+<span class="lineNum">     600 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 28 times"> + </span>]:<span class="lineCov">         28 :         VLOG_DBG(&quot;%s: set RSTP Transmit Hold Count to %d&quot;, rstp-&gt;name,</span>
+<span class="lineNum">     601 </span>                :            :                  new_transmit_hold_count);
+<span class="lineNum">     602 </span>                :            :         /* Resetting txCount on all ports [17.13]. */
+<span class="lineNum">     603 </span>                :            : 
+<span class="lineNum">     604 </span>                :<span class="lineCov">         28 :         rstp-&gt;transmit_hold_count = new_transmit_hold_count;</span>
+<span class="lineNum">     605 </span>[<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 28 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 28 times"> + </span>]:<span class="lineCov">         28 :         HMAP_FOR_EACH (p, node, &amp;rstp-&gt;ports) {</span>
+<span class="lineNum">     606 </span>                :<span class="lineNoCov">          0 :             p-&gt;tx_count = 0;</span>
+<span class="lineNum">     607 </span>                :            :         }
+<span class="lineNum">     608 </span>                :            :     }
+<span class="lineNum">     609 </span>                :<span class="lineCov">         68 : }</span>
+<a name="610"><span class="lineNum">     610 </span>                :            : </a>
+<span class="lineNum">     611 </span>                :            : void
+<span class="lineNum">     612 </span>                :<span class="lineCov">         12 : rstp_set_bridge_transmit_hold_count(struct rstp *rstp,</span>
+<span class="lineNum">     613 </span>                :            :                                     int new_transmit_hold_count)
+<span class="lineNum">     614 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     615 </span>                :            : {
+<span class="lineNum">     616 </span>                :<span class="lineCov">         12 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     617 </span>                :<span class="lineCov">         12 :     rstp_set_bridge_transmit_hold_count__(rstp, new_transmit_hold_count);</span>
+<span class="lineNum">     618 </span>                :<span class="lineCov">         12 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     619 </span>                :<span class="lineCov">         12 : }</span>
+<span class="lineNum">     620 </span>                :            : 
+<a name="621"><span class="lineNum">     621 </span>                :            : /* Sets the bridge migrate time parameter. */</a>
+<span class="lineNum">     622 </span>                :            : static void
+<span class="lineNum">     623 </span>                :<span class="lineCov">         56 : rstp_set_bridge_migrate_time__(struct rstp *rstp)</span>
+<span class="lineNum">     624 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     625 </span>                :            : {
+<span class="lineNum">     626 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 56 times"> + </span>]:<span class="lineCov">         56 :     VLOG_DBG(&quot;%s: set RSTP Migrate Time to %d&quot;, rstp-&gt;name,</span>
+<span class="lineNum">     627 </span>                :            :              RSTP_MIGRATE_TIME);
+<span class="lineNum">     628 </span>                :            :     /* 3 is the only acceptable value */
+<span class="lineNum">     629 </span>                :<span class="lineCov">         56 :     rstp-&gt;migrate_time = RSTP_MIGRATE_TIME;</span>
+<span class="lineNum">     630 </span>                :<span class="lineCov">         56 : }</span>
+<span class="lineNum">     631 </span>                :            : 
+<a name="632"><span class="lineNum">     632 </span>                :            : /* Sets the bridge times. */</a>
+<span class="lineNum">     633 </span>                :            : static void
+<span class="lineNum">     634 </span>                :<span class="lineCov">         56 : rstp_set_bridge_times__(struct rstp *rstp, int new_forward_delay,</span>
+<span class="lineNum">     635 </span>                :            :                         int new_hello_time, int new_max_age,
+<span class="lineNum">     636 </span>                :            :                         int new_message_age)
+<span class="lineNum">     637 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     638 </span>                :            : {
+<span class="lineNum">     639 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 56 times"> + </span>]:<span class="lineCov">         56 :     VLOG_DBG(&quot;%s: set RSTP times to (%d, %d, %d, %d)&quot;, rstp-&gt;name,</span>
+<span class="lineNum">     640 </span>                :            :              new_forward_delay, new_hello_time, new_max_age, new_message_age);
+<span class="lineNum">     641 </span>        [<span class="branchCov" title="Branch 0 was taken 56 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         56 :     if (new_forward_delay &gt;= RSTP_MIN_BRIDGE_FORWARD_DELAY</span>
+<span class="lineNum">     642 </span>        [<span class="branchCov" title="Branch 0 was taken 56 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         56 :         &amp;&amp; new_forward_delay &lt;= RSTP_MAX_BRIDGE_FORWARD_DELAY) {</span>
+<span class="lineNum">     643 </span>                :<span class="lineCov">         56 :         rstp-&gt;bridge_times.forward_delay = new_forward_delay;</span>
+<span class="lineNum">     644 </span>                :            :     }
+<span class="lineNum">     645 </span>        [<span class="branchCov" title="Branch 0 was taken 56 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         56 :     if (new_hello_time == RSTP_BRIDGE_HELLO_TIME) {</span>
+<span class="lineNum">     646 </span>                :<span class="lineCov">         56 :         rstp-&gt;bridge_times.hello_time = new_hello_time;</span>
+<span class="lineNum">     647 </span>                :            :     }
+<span class="lineNum">     648 </span>        [<span class="branchCov" title="Branch 0 was taken 56 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         56 :     if (new_max_age &gt;= RSTP_MIN_BRIDGE_MAX_AGE</span>
+<span class="lineNum">     649 </span>        [<span class="branchCov" title="Branch 0 was taken 56 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         56 :         &amp;&amp; new_max_age &lt;= RSTP_MAX_BRIDGE_MAX_AGE) {</span>
+<span class="lineNum">     650 </span>                :<span class="lineCov">         56 :         rstp-&gt;bridge_times.max_age = new_max_age;</span>
+<span class="lineNum">     651 </span>                :            :     }
+<span class="lineNum">     652 </span>                :<span class="lineCov">         56 :     rstp-&gt;bridge_times.message_age = new_message_age;</span>
+<span class="lineNum">     653 </span>                :<span class="lineCov">         56 : }</span>
+<span class="lineNum">     654 </span>                :            : 
+<span class="lineNum">     655 </span>                :            : /* Sets the port id, it is called by rstp_port_set_port_number__() or
+<span class="lineNum">     656 </span>                :            :  * rstp_port_set_priority__().
+<a name="657"><span class="lineNum">     657 </span>                :            :  */</a>
+<span class="lineNum">     658 </span>                :            : static void
+<span class="lineNum">     659 </span>                :<span class="lineCov">        473 : set_port_id__(struct rstp_port *p)</span>
+<span class="lineNum">     660 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     661 </span>                :            : {
+<span class="lineNum">     662 </span>                :            :     struct rstp *rstp;
+<span class="lineNum">     663 </span>                :            : 
+<span class="lineNum">     664 </span>                :<span class="lineCov">        473 :     rstp = p-&gt;rstp;</span>
+<span class="lineNum">     665 </span>                :            :     /* [9.2.7] Port identifier. */
+<span class="lineNum">     666 </span>                :<span class="lineCov">        473 :     p-&gt;port_id = p-&gt;port_number | (p-&gt;priority &lt;&lt; 8);</span>
+<span class="lineNum">     667 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 473 times"> + </span>]:<span class="lineCov">        473 :     VLOG_DBG(&quot;%s: new RSTP port id &quot;RSTP_PORT_ID_FMT&quot;&quot;, rstp-&gt;name,</span>
+<span class="lineNum">     668 </span>                :            :              p-&gt;port_id);
+<span class="lineNum">     669 </span>                :<span class="lineCov">        473 : }</span>
+<span class="lineNum">     670 </span>                :            : 
+<a name="671"><span class="lineNum">     671 </span>                :            : /* Sets the port priority. */</a>
+<span class="lineNum">     672 </span>                :            : static void
+<span class="lineNum">     673 </span>                :<span class="lineCov">        246 : rstp_port_set_priority__(struct rstp_port *port, int priority)</span>
+<span class="lineNum">     674 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     675 </span>                :            : {
+<span class="lineNum">     676 </span>        [<span class="branchCov" title="Branch 0 was taken 237 times"> + </span><span class="branchCov" title="Branch 1 was taken 9 times"> + </span>]:<span class="lineCov">        246 :     if (port-&gt;priority != priority</span>
+<span class="lineNum">     677 </span>        [<span class="branchCov" title="Branch 0 was taken 237 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        237 :         &amp;&amp; priority &gt;= RSTP_MIN_PORT_PRIORITY</span>
+<span class="lineNum">     678 </span>        [<span class="branchCov" title="Branch 0 was taken 237 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        237 :         &amp;&amp; priority &lt;= RSTP_MAX_PORT_PRIORITY) {</span>
+<span class="lineNum">     679 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 237 times"> + </span>]:<span class="lineCov">        237 :         VLOG_DBG(&quot;%s, port %u: set RSTP port priority to %d&quot;, port-&gt;rstp-&gt;name,</span>
+<span class="lineNum">     680 </span>                :            :                  port-&gt;port_number, priority);
+<span class="lineNum">     681 </span>                :            : 
+<span class="lineNum">     682 </span>                :<span class="lineCov">        237 :         priority -= priority % RSTP_STEP_PORT_PRIORITY;</span>
+<span class="lineNum">     683 </span>                :<span class="lineCov">        237 :         port-&gt;priority = priority;</span>
+<span class="lineNum">     684 </span>                :<span class="lineCov">        237 :         set_port_id__(port);</span>
+<span class="lineNum">     685 </span>                :<span class="lineCov">        237 :         port-&gt;selected = false;</span>
+<span class="lineNum">     686 </span>                :<span class="lineCov">        237 :         port-&gt;reselect = true;</span>
+<span class="lineNum">     687 </span>                :            :     }
+<span class="lineNum">     688 </span>                :<span class="lineCov">        246 : }</span>
+<span class="lineNum">     689 </span>                :            : 
+<a name="690"><span class="lineNum">     690 </span>                :            : /* Checks if a port number is available. */</a>
+<span class="lineNum">     691 </span>                :            : static bool
+<span class="lineNum">     692 </span>                :<span class="lineCov">       1426 : is_port_number_available__(struct rstp *rstp, int n, struct rstp_port *port)</span>
+<span class="lineNum">     693 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     694 </span>                :            : {
+<span class="lineNum">     695 </span>[<span class="branchCov" title="Branch 0 was taken 1181 times"> + </span><span class="branchCov" title="Branch 1 was taken 245 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 1181 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">       1426 :     if (n &gt;= 1 &amp;&amp; n &lt;= RSTP_MAX_PORTS) {</span>
+<span class="lineNum">     696 </span>                :<span class="lineCov">       1181 :         struct rstp_port *p = rstp_get_port__(rstp, n);</span>
+<span class="lineNum">     697 </span>                :            : 
+<span class="lineNum">     698 </span>[<span class="branchCov" title="Branch 0 was taken 945 times"> + </span><span class="branchCov" title="Branch 1 was taken 236 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 9 times"> + </span><span class="branchCov" title="Branch 3 was taken 936 times"> + </span>]:<span class="lineCov">       1181 :         return p == NULL || p == port;</span>
+<span class="lineNum">     699 </span>                :            :     }
+<span class="lineNum">     700 </span>                :<span class="lineCov">        245 :     return false;</span>
+<span class="lineNum">     701 </span>                :            : }
+<a name="702"><span class="lineNum">     702 </span>                :            : </a>
+<span class="lineNum">     703 </span>                :            : static uint16_t
+<span class="lineNum">     704 </span>                :<span class="lineCov">        245 : rstp_first_free_number__(struct rstp *rstp, struct rstp_port *rstp_port)</span>
+<span class="lineNum">     705 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     706 </span>                :            : {
+<span class="lineNum">     707 </span>                :<span class="lineCov">        245 :     int free_number = 1;</span>
+<span class="lineNum">     708 </span>                :            : 
+<span class="lineNum">     709 </span>        [<span class="branchCov" title="Branch 0 was taken 1181 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       1181 :     while (free_number &lt;= RSTP_MAX_PORTS) {</span>
+<span class="lineNum">     710 </span>        [<span class="branchCov" title="Branch 1 was taken 245 times"> + </span><span class="branchCov" title="Branch 2 was taken 936 times"> + </span>]:<span class="lineCov">       1181 :         if (is_port_number_available__(rstp, free_number, rstp_port)) {</span>
+<span class="lineNum">     711 </span>                :<span class="lineCov">        245 :             return free_number;</span>
+<span class="lineNum">     712 </span>                :            :         }
+<span class="lineNum">     713 </span>                :<span class="lineCov">        936 :         free_number++;</span>
+<span class="lineNum">     714 </span>                :            :     }
+<span class="lineNum">     715 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     VLOG_DBG(&quot;%s, No free port number available.&quot;, rstp-&gt;name);</span>
+<span class="lineNum">     716 </span>                :<span class="lineNoCov">          0 :     return 0;</span>
+<span class="lineNum">     717 </span>                :            : }
+<span class="lineNum">     718 </span>                :            : 
+<a name="719"><span class="lineNum">     719 </span>                :            : /* Sets the port number. */</a>
+<span class="lineNum">     720 </span>                :            : static void
+<span class="lineNum">     721 </span>                :<span class="lineCov">        245 : rstp_port_set_port_number__(struct rstp_port *port, uint16_t port_number)</span>
+<span class="lineNum">     722 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     723 </span>                :            : {
+<span class="lineNum">     724 </span>                :<span class="lineCov">        245 :     int old_port_number = port-&gt;port_number;</span>
+<span class="lineNum">     725 </span>                :            : 
+<span class="lineNum">     726 </span>                :            :     /* If new_port_number is available, use it, otherwise use the first free
+<span class="lineNum">     727 </span>                :            :      * available port number. */
+<span class="lineNum">     728 </span>[<span class="branchCov" title="Branch 0 was taken 236 times"> + </span><span class="branchCov" title="Branch 1 was taken 9 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 236 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        245 :     if (port-&gt;port_number != port_number || port_number == 0) {</span>
+<span class="lineNum">     729 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 245 times"> + </span>]:<span class="lineCov">        245 :         port-&gt;port_number =</span>
+<span class="lineNum">     730 </span>                :<span class="lineCov">        245 :             is_port_number_available__(port-&gt;rstp, port_number, port)</span>
+<span class="lineNum">     731 </span>                :            :             ? port_number
+<span class="lineNum">     732 </span>                :<span class="lineCov">        245 :             : rstp_first_free_number__(port-&gt;rstp, port);</span>
+<span class="lineNum">     733 </span>                :            : 
+<span class="lineNum">     734 </span>        [<span class="branchCov" title="Branch 0 was taken 236 times"> + </span><span class="branchCov" title="Branch 1 was taken 9 times"> + </span>]:<span class="lineCov">        245 :         if (port-&gt;port_number != old_port_number) {</span>
+<span class="lineNum">     735 </span>                :<span class="lineCov">        236 :             set_port_id__(port);</span>
+<span class="lineNum">     736 </span>                :            :             /* [17.13] is not clear. I suppose that a port number change
+<span class="lineNum">     737 </span>                :            :              * should trigger reselection like a port priority change. */
+<span class="lineNum">     738 </span>                :<span class="lineCov">        236 :             port-&gt;selected = false;</span>
+<span class="lineNum">     739 </span>                :<span class="lineCov">        236 :             port-&gt;reselect = true;</span>
+<span class="lineNum">     740 </span>                :            : 
+<span class="lineNum">     741 </span>                :            :             /* Adjust the ports hmap. */
+<span class="lineNum">     742 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 236 times"> + </span>]:<span class="lineCov">        236 :             if (!hmap_node_is_null(&amp;port-&gt;node)) {</span>
+<span class="lineNum">     743 </span>                :<span class="lineNoCov">          0 :                 hmap_remove(&amp;port-&gt;rstp-&gt;ports, &amp;port-&gt;node);</span>
+<span class="lineNum">     744 </span>                :            :             }
+<span class="lineNum">     745 </span>                :<span class="lineCov">        236 :             hmap_insert(&amp;port-&gt;rstp-&gt;ports, &amp;port-&gt;node,</span>
+<span class="lineNum">     746 </span>                :            :                         hash_int(port-&gt;port_number, 0));
+<span class="lineNum">     747 </span>                :            : 
+<span class="lineNum">     748 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 236 times"> + </span>]:<span class="lineCov">        236 :             VLOG_DBG(&quot;%s: set new RSTP port number %d&quot;, port-&gt;rstp-&gt;name,</span>
+<span class="lineNum">     749 </span>                :            :                      port-&gt;port_number);
+<span class="lineNum">     750 </span>                :            :         }
+<span class="lineNum">     751 </span>                :            :     }
+<span class="lineNum">     752 </span>                :<span class="lineCov">        245 : }</span>
+<span class="lineNum">     753 </span>                :            : 
+<a name="754"><span class="lineNum">     754 </span>                :            : /* Converts the link speed to a port path cost [Table 17-3]. */</a>
+<span class="lineNum">     755 </span>                :            : uint32_t
+<span class="lineNum">     756 </span>                :<span class="lineCov">          9 : rstp_convert_speed_to_cost(unsigned int speed)</span>
+<span class="lineNum">     757 </span>                :            : {
+<span class="lineNum">     758 </span>                :            :     uint32_t value;
+<span class="lineNum">     759 </span>                :            : 
+<span class="lineNum">     760 </span>[<span class="branchCov" title="Branch 0 was taken 9 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 9 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">          9 :     value = speed &gt;= 10000000 ? 2 /* 10 Tb/s. */</span>
+<span class="lineNum">         </span>[<span class="branchCov" title="Branch 4 was taken 9 times"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span>][<span class="branchCov" title="Branch 6 was taken 9 times"> + </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span>]
+<span class="lineNum">         </span>[<span class="branchCov" title="Branch 8 was taken 9 times"> + </span><span class="branchNoCov" title="Branch 9 was not taken"> - </span>][<span class="branchNoCov" title="Branch 10 was not taken"> - </span><span class="branchCov" title="Branch 11 was taken 9 times"> + </span>]
+<span class="lineNum">         </span>[<span class="branchNoExec" title="Branch 12 was not executed"> # </span><span class="branchNoExec" title="Branch 13 was not executed"> # </span>][<span class="branchNoExec" title="Branch 14 was not executed"> # </span><span class="branchNoExec" title="Branch 15 was not executed"> # </span>]
+<span class="lineNum">     761 </span>                :            :           : speed &gt;= 1000000 ? 20 /* 1 Tb/s. */
+<span class="lineNum">     762 </span>                :            :           : speed &gt;= 100000 ? 200 /* 100 Gb/s. */
+<span class="lineNum">     763 </span>                :            :           : speed &gt;= 10000 ? 2000 /* 10 Gb/s. */
+<span class="lineNum">     764 </span>                :            :           : speed &gt;= 1000 ? 20000 /* 1 Gb/s. */
+<span class="lineNum">     765 </span>                :            :           : speed &gt;= 100 ? 200000 /* 100 Mb/s. */
+<span class="lineNum">     766 </span>                :            :           : speed &gt;= 10 ? 2000000 /* 10 Mb/s. */
+<span class="lineNum">     767 </span>                :            :           : speed &gt;= 1 ? 20000000 /* 1 Mb/s. */
+<span class="lineNum">     768 </span>                :            :           : RSTP_DEFAULT_PORT_PATH_COST; /* 100 Mb/s. */
+<span class="lineNum">     769 </span>                :            : 
+<span class="lineNum">     770 </span>                :<span class="lineCov">          9 :     return value;</span>
+<span class="lineNum">     771 </span>                :            : }
+<span class="lineNum">     772 </span>                :            : 
+<a name="773"><span class="lineNum">     773 </span>                :            : /* Sets the port path cost. */</a>
+<span class="lineNum">     774 </span>                :            : static void
+<span class="lineNum">     775 </span>                :<span class="lineCov">        641 : rstp_port_set_path_cost__(struct rstp_port *port, uint32_t path_cost)</span>
+<span class="lineNum">     776 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     777 </span>                :            : {
+<span class="lineNum">     778 </span>        [<span class="branchCov" title="Branch 0 was taken 525 times"> + </span><span class="branchCov" title="Branch 1 was taken 116 times"> + </span>]:<span class="lineCov">        641 :     if (port-&gt;port_path_cost != path_cost</span>
+<span class="lineNum">     779 </span>        [<span class="branchCov" title="Branch 0 was taken 525 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        525 :         &amp;&amp; path_cost &gt;= RSTP_MIN_PORT_PATH_COST</span>
+<span class="lineNum">     780 </span>        [<span class="branchCov" title="Branch 0 was taken 525 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        525 :         &amp;&amp; path_cost &lt;= RSTP_MAX_PORT_PATH_COST) {</span>
+<span class="lineNum">     781 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 525 times"> + </span>]:<span class="lineCov">        525 :         VLOG_DBG(&quot;%s, port %u, set RSTP port path cost to %d&quot;,</span>
+<span class="lineNum">     782 </span>                :            :                  port-&gt;rstp-&gt;name, port-&gt;port_number, path_cost);
+<span class="lineNum">     783 </span>                :            : 
+<span class="lineNum">     784 </span>                :<span class="lineCov">        525 :         port-&gt;port_path_cost = path_cost;</span>
+<span class="lineNum">     785 </span>                :<span class="lineCov">        525 :         port-&gt;selected = false;</span>
+<span class="lineNum">     786 </span>                :<span class="lineCov">        525 :         port-&gt;reselect = true;</span>
+<span class="lineNum">     787 </span>                :            :     }
+<span class="lineNum">     788 </span>                :<span class="lineCov">        641 : }</span>
+<span class="lineNum">     789 </span>                :            : 
+<a name="790"><span class="lineNum">     790 </span>                :            : /* Gets the root path cost. */</a>
+<span class="lineNum">     791 </span>                :            : uint32_t
+<span class="lineNum">     792 </span>                :<span class="lineCov">         76 : rstp_get_root_path_cost(const struct rstp *rstp)</span>
+<span class="lineNum">     793 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     794 </span>                :            : {
+<span class="lineNum">     795 </span>                :            :     uint32_t cost;
+<span class="lineNum">     796 </span>                :            : 
+<span class="lineNum">     797 </span>                :<span class="lineCov">         76 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     798 </span>                :<span class="lineCov">         76 :     cost = rstp-&gt;root_priority.root_path_cost;</span>
+<span class="lineNum">     799 </span>                :<span class="lineCov">         76 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     800 </span>                :<span class="lineCov">         76 :     return cost;</span>
+<span class="lineNum">     801 </span>                :            : }
+<span class="lineNum">     802 </span>                :            : 
+<span class="lineNum">     803 </span>                :            : /* Finds a port which needs to flush its own MAC learning table.  A NULL
+<span class="lineNum">     804 </span>                :            :  * pointer is returned if no port needs to flush its MAC learning table.
+<span class="lineNum">     805 </span>                :            :  * '*port' needs to be NULL in the first call to start the iteration.  If
+<span class="lineNum">     806 </span>                :            :  * '*port' is passed as non-NULL, it must be the value set by the last
+<span class="lineNum">     807 </span>                :            :  * invocation of this function.
+<span class="lineNum">     808 </span>                :            :  *
+<span class="lineNum">     809 </span>                :            :  * This function may only be called by the thread that creates and deletes
+<span class="lineNum">     810 </span>                :            :  * ports.  Otherwise this function is not thread safe, as the returned
+<a name="811"><span class="lineNum">     811 </span>                :            :  * '*port' could become stale before it is used in the next invocation. */</a>
+<span class="lineNum">     812 </span>                :            : void *
+<span class="lineNum">     813 </span>                :<span class="lineCov">        188 : rstp_check_and_reset_fdb_flush(struct rstp *rstp, struct rstp_port **port)</span>
+<span class="lineNum">     814 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     815 </span>                :            : {
+<span class="lineNum">     816 </span>                :<span class="lineCov">        188 :     void *aux = NULL;</span>
+<span class="lineNum">     817 </span>                :            : 
+<span class="lineNum">     818 </span>                :<span class="lineCov">        188 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     819 </span>        [<span class="branchCov" title="Branch 0 was taken 186 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">        188 :     if (*port == NULL) {</span>
+<span class="lineNum">     820 </span>                :            :         struct rstp_port *p;
+<span class="lineNum">     821 </span>                :            : 
+<span class="lineNum">     822 </span>[<span class="branchCov" title="Branch 2 was taken 144 times"> + </span><span class="branchCov" title="Branch 3 was taken 184 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 184 times"> + </span>]:<span class="lineCov">        328 :         HMAP_FOR_EACH (p, node, &amp;rstp-&gt;ports) {</span>
+<span class="lineNum">     823 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 142 times"> + </span>]:<span class="lineCov">        144 :             if (p-&gt;fdb_flush) {</span>
+<span class="lineNum">     824 </span>                :<span class="lineCov">          2 :                 aux = p-&gt;aux;</span>
+<span class="lineNum">     825 </span>                :<span class="lineCov">          2 :                 *port = p;</span>
+<span class="lineNum">     826 </span>                :<span class="lineCov">          2 :                 goto out;</span>
+<span class="lineNum">     827 </span>                :            :             }
+<span class="lineNum">     828 </span>                :            :         }
+<span class="lineNum">     829 </span>                :            :     } else { /* continue */
+<span class="lineNum">     830 </span>                :<span class="lineCov">          2 :         struct rstp_port *p = *port;</span>
+<span class="lineNum">     831 </span>                :            : 
+<span class="lineNum">     832 </span>[<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 2 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 2 times"> + </span>]:<span class="lineCov">          2 :         HMAP_FOR_EACH_CONTINUE (p, node, &amp;rstp-&gt;ports) {</span>
+<span class="lineNum">     833 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (p-&gt;fdb_flush) {</span>
+<span class="lineNum">     834 </span>                :<span class="lineNoCov">          0 :                 aux = p-&gt;aux;</span>
+<span class="lineNum">     835 </span>                :<span class="lineNoCov">          0 :                 *port = p;</span>
+<span class="lineNum">     836 </span>                :<span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">     837 </span>                :            :             }
+<span class="lineNum">     838 </span>                :            :         }
+<span class="lineNum">     839 </span>                :            :     }
+<span class="lineNum">     840 </span>                :            :     /* No port needs flushing. */
+<span class="lineNum">     841 </span>                :<span class="lineCov">        186 :     *port = NULL;</span>
+<span class="lineNum">     842 </span>                :            : out:
+<span class="lineNum">     843 </span>                :            :     /* fdb_flush should be reset by the filtering database
+<span class="lineNum">     844 </span>                :            :      * once the entries are removed if rstp_version is TRUE, and
+<span class="lineNum">     845 </span>                :            :      * immediately if stp_version is TRUE.*/
+<span class="lineNum">     846 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 186 times"> + </span>]:<span class="lineCov">        188 :     if (*port != NULL) {</span>
+<span class="lineNum">     847 </span>                :<span class="lineCov">          2 :         (*port)-&gt;fdb_flush = false;</span>
+<span class="lineNum">     848 </span>                :            :     }
+<span class="lineNum">     849 </span>                :<span class="lineCov">        188 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     850 </span>                :            : 
+<span class="lineNum">     851 </span>                :<span class="lineCov">        188 :     return aux;</span>
+<span class="lineNum">     852 </span>                :            : }
+<span class="lineNum">     853 </span>                :            : 
+<span class="lineNum">     854 </span>                :            : /* Finds a port whose state has changed, and returns the aux pointer set for
+<span class="lineNum">     855 </span>                :            :  * the port.  A NULL pointer is returned when no changed port is found.  On
+<span class="lineNum">     856 </span>                :            :  * return '*portp' contains the pointer to the rstp port that changed, or NULL
+<span class="lineNum">     857 </span>                :            :  * if no changed port can be found.
+<span class="lineNum">     858 </span>                :            :  *
+<span class="lineNum">     859 </span>                :            :  * If '*portp' is passed as non-NULL, it must be the value set by the last
+<span class="lineNum">     860 </span>                :            :  * invocation of this function.
+<span class="lineNum">     861 </span>                :            :  *
+<span class="lineNum">     862 </span>                :            :  * This function may only be called by the thread that creates and deletes
+<span class="lineNum">     863 </span>                :            :  * ports.  Otherwise this function is not thread safe, as the returned
+<a name="864"><span class="lineNum">     864 </span>                :            :  * '*portp' could become stale before it is used in the next invocation. */</a>
+<span class="lineNum">     865 </span>                :            : void *
+<span class="lineNum">     866 </span>                :<span class="lineCov">        190 : rstp_get_next_changed_port_aux(struct rstp *rstp, struct rstp_port **portp)</span>
+<span class="lineNum">     867 </span>                :            : {
+<span class="lineNum">     868 </span>                :<span class="lineCov">        190 :     void *aux = NULL;</span>
+<span class="lineNum">     869 </span>                :            : 
+<span class="lineNum">     870 </span>                :<span class="lineCov">        190 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     871 </span>        [<span class="branchCov" title="Branch 0 was taken 186 times"> + </span><span class="branchCov" title="Branch 1 was taken 4 times"> + </span>]:<span class="lineCov">        190 :     if (*portp == NULL) {</span>
+<span class="lineNum">     872 </span>                :            :         struct rstp_port *p;
+<span class="lineNum">     873 </span>                :            : 
+<span class="lineNum">     874 </span>[<span class="branchCov" title="Branch 2 was taken 144 times"> + </span><span class="branchCov" title="Branch 3 was taken 182 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 182 times"> + </span>]:<span class="lineCov">        326 :         HMAP_FOR_EACH (p, node, &amp;rstp-&gt;ports) {</span>
+<span class="lineNum">     875 </span>        [<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchCov" title="Branch 1 was taken 140 times"> + </span>]:<span class="lineCov">        144 :             if (p-&gt;state_changed) {</span>
+<span class="lineNum">     876 </span>                :<span class="lineCov">          4 :                 p-&gt;state_changed = false;</span>
+<span class="lineNum">     877 </span>                :<span class="lineCov">          4 :                 aux = p-&gt;aux;</span>
+<span class="lineNum">     878 </span>                :<span class="lineCov">          4 :                 *portp = p;</span>
+<span class="lineNum">     879 </span>                :<span class="lineCov">          4 :                 goto out;</span>
+<span class="lineNum">     880 </span>                :            :             }
+<span class="lineNum">     881 </span>                :            :         }
+<span class="lineNum">     882 </span>                :            :     } else { /* continue */
+<span class="lineNum">     883 </span>                :<span class="lineCov">          4 :         struct rstp_port *p = *portp;</span>
+<span class="lineNum">     884 </span>                :            : 
+<span class="lineNum">     885 </span>[<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 4 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 4 times"> + </span>]:<span class="lineCov">          4 :         HMAP_FOR_EACH_CONTINUE (p, node, &amp;rstp-&gt;ports) {</span>
+<span class="lineNum">     886 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (p-&gt;state_changed) {</span>
+<span class="lineNum">     887 </span>                :<span class="lineNoCov">          0 :                 p-&gt;state_changed = false;</span>
+<span class="lineNum">     888 </span>                :<span class="lineNoCov">          0 :                 aux = p-&gt;aux;</span>
+<span class="lineNum">     889 </span>                :<span class="lineNoCov">          0 :                 *portp = p;</span>
+<span class="lineNum">     890 </span>                :<span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">     891 </span>                :            :             }
+<span class="lineNum">     892 </span>                :            :         }
+<span class="lineNum">     893 </span>                :            :     }
+<span class="lineNum">     894 </span>                :            :     /* No changed port found. */
+<span class="lineNum">     895 </span>                :<span class="lineCov">        186 :     *portp = NULL;</span>
+<span class="lineNum">     896 </span>                :            : out:
+<span class="lineNum">     897 </span>                :<span class="lineCov">        190 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     898 </span>                :            : 
+<span class="lineNum">     899 </span>                :<span class="lineCov">        190 :     return aux;</span>
+<span class="lineNum">     900 </span>                :            : }
+<a name="901"><span class="lineNum">     901 </span>                :            : </a>
+<span class="lineNum">     902 </span>                :            : bool
+<span class="lineNum">     903 </span>                :<span class="lineCov">        190 : rstp_shift_root_learned_address(struct rstp *rstp)</span>
+<span class="lineNum">     904 </span>                :            : {
+<span class="lineNum">     905 </span>                :            :     bool ret;
+<span class="lineNum">     906 </span>                :            : 
+<span class="lineNum">     907 </span>                :<span class="lineCov">        190 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     908 </span>                :<span class="lineCov">        190 :     ret = rstp-&gt;root_changed;</span>
+<span class="lineNum">     909 </span>                :<span class="lineCov">        190 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     910 </span>                :            : 
+<span class="lineNum">     911 </span>                :<span class="lineCov">        190 :     return ret;</span>
+<span class="lineNum">     912 </span>                :            : }
+<a name="913"><span class="lineNum">     913 </span>                :            : </a>
+<span class="lineNum">     914 </span>                :            : void *
+<span class="lineNum">     915 </span>                :<span class="lineNoCov">          0 : rstp_get_old_root_aux(struct rstp *rstp)</span>
+<span class="lineNum">     916 </span>                :            : {
+<span class="lineNum">     917 </span>                :            :     void *aux;
+<span class="lineNum">     918 </span>                :            : 
+<span class="lineNum">     919 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     920 </span>                :<span class="lineNoCov">          0 :     aux = rstp-&gt;old_root_aux;</span>
+<span class="lineNum">     921 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     922 </span>                :            : 
+<span class="lineNum">     923 </span>                :<span class="lineNoCov">          0 :     return aux;</span>
+<span class="lineNum">     924 </span>                :            : }
+<a name="925"><span class="lineNum">     925 </span>                :            : </a>
+<span class="lineNum">     926 </span>                :            : void *
+<span class="lineNum">     927 </span>                :<span class="lineNoCov">          0 : rstp_get_new_root_aux(struct rstp *rstp)</span>
+<span class="lineNum">     928 </span>                :            : {
+<span class="lineNum">     929 </span>                :            :     void *aux;
+<span class="lineNum">     930 </span>                :            : 
+<span class="lineNum">     931 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     932 </span>                :<span class="lineNoCov">          0 :     aux = rstp-&gt;new_root_aux;</span>
+<span class="lineNum">     933 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     934 </span>                :            : 
+<span class="lineNum">     935 </span>                :<span class="lineNoCov">          0 :     return aux;</span>
+<span class="lineNum">     936 </span>                :            : }
+<a name="937"><span class="lineNum">     937 </span>                :            : </a>
+<span class="lineNum">     938 </span>                :            : void
+<span class="lineNum">     939 </span>                :<span class="lineNoCov">          0 : rstp_reset_root_changed(struct rstp *rstp)</span>
+<span class="lineNum">     940 </span>                :            : {
+<span class="lineNum">     941 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     942 </span>                :<span class="lineNoCov">          0 :     rstp-&gt;root_changed = false;</span>
+<span class="lineNum">     943 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     944 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     945 </span>                :            : 
+<span class="lineNum">     946 </span>                :            : /* Returns the port in 'rstp' with number 'port_number'.
+<span class="lineNum">     947 </span>                :            :  *
+<a name="948"><span class="lineNum">     948 </span>                :            :  * XXX: May only be called while concurrent deletion of ports is excluded. */</a>
+<span class="lineNum">     949 </span>                :            : static struct rstp_port *
+<span class="lineNum">     950 </span>                :<span class="lineCov">       9174 : rstp_get_port__(struct rstp *rstp, uint16_t port_number)</span>
+<span class="lineNum">     951 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     952 </span>                :            : {
+<span class="lineNum">     953 </span>                :            :     struct rstp_port *port;
+<span class="lineNum">     954 </span>                :            : 
+<span class="lineNum">     955 </span>[<span class="branchCov" title="Branch 0 was taken 9174 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 9174 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">       9174 :     ovs_assert(rstp &amp;&amp; port_number &gt; 0 &amp;&amp; port_number &lt;= RSTP_MAX_PORTS);</span>
+<span class="lineNum">         </span>[<span class="branchCov" title="Branch 4 was taken 9174 times"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span>][<span class="branchNoCov" title="Branch 6 was not taken"> - </span><span class="branchCov" title="Branch 7 was taken 9174 times"> + </span>]
+<span class="lineNum">     956 </span>                :            : 
+<span class="lineNum">     957 </span>[<span class="branchCov" title="Branch 3 was taken 8938 times"> + </span><span class="branchCov" title="Branch 4 was taken 236 times"> + </span>][<span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchCov" title="Branch 6 was taken 236 times"> + </span>]:<span class="lineCov">       9174 :     HMAP_FOR_EACH_WITH_HASH (port, node, hash_int(port_number, 0),</span>
+<span class="lineNum">     958 </span>                :            :                              &amp;rstp-&gt;ports) {
+<span class="lineNum">     959 </span>        [<span class="branchCov" title="Branch 0 was taken 8938 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       8938 :         if (port-&gt;port_number == port_number) {</span>
+<span class="lineNum">     960 </span>                :<span class="lineCov">       8938 :             return port;</span>
+<span class="lineNum">     961 </span>                :            :         }
+<span class="lineNum">     962 </span>                :            :     }
+<span class="lineNum">     963 </span>                :<span class="lineCov">        236 :     return NULL;</span>
+<span class="lineNum">     964 </span>                :            : }
+<a name="965"><span class="lineNum">     965 </span>                :            : </a>
+<span class="lineNum">     966 </span>                :            : struct rstp_port *
+<span class="lineNum">     967 </span>                :<span class="lineCov">       7852 : rstp_get_port(struct rstp *rstp, uint16_t port_number)</span>
+<span class="lineNum">     968 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">     969 </span>                :            : {
+<span class="lineNum">     970 </span>                :            :     struct rstp_port *p;
+<span class="lineNum">     971 </span>                :            : 
+<span class="lineNum">     972 </span>                :<span class="lineCov">       7852 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">     973 </span>                :<span class="lineCov">       7852 :     p = rstp_get_port__(rstp, port_number);</span>
+<span class="lineNum">     974 </span>                :<span class="lineCov">       7852 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">     975 </span>                :<span class="lineCov">       7852 :     return p;</span>
+<span class="lineNum">     976 </span>                :            : }
+<a name="977"><span class="lineNum">     977 </span>                :            : </a>
+<span class="lineNum">     978 </span>                :            : void *
+<span class="lineNum">     979 </span>                :<span class="lineCov">        141 : rstp_get_port_aux__(struct rstp *rstp, uint16_t port_number)</span>
+<span class="lineNum">     980 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     981 </span>                :            : {
+<span class="lineNum">     982 </span>                :            :     struct rstp_port *p;
+<span class="lineNum">     983 </span>                :<span class="lineCov">        141 :     p = rstp_get_port__(rstp, port_number);</span>
+<span class="lineNum">     984 </span>        [<span class="branchCov" title="Branch 0 was taken 141 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        141 :     if (p) {</span>
+<span class="lineNum">     985 </span>                :<span class="lineCov">        141 :         return p-&gt;aux;</span>
+<span class="lineNum">     986 </span>                :            :     }
+<span class="lineNum">     987 </span>                :<span class="lineNoCov">          0 :     return NULL;</span>
+<span class="lineNum">     988 </span>                :            : }
+<span class="lineNum">     989 </span>                :            : 
+<a name="990"><span class="lineNum">     990 </span>                :            : /* Updates the port_enabled parameter. */</a>
+<span class="lineNum">     991 </span>                :            : static void
+<span class="lineNum">     992 </span>                :<span class="lineCov">       1394 : update_port_enabled__(struct rstp_port *p)</span>
+<span class="lineNum">     993 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">     994 </span>                :            : {
+<span class="lineNum">     995 </span>[<span class="branchCov" title="Branch 0 was taken 344 times"> + </span><span class="branchCov" title="Branch 1 was taken 1050 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 344 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">       1394 :     if (p-&gt;mac_operational &amp;&amp; p-&gt;is_administrative_bridge_port</span>
+<span class="lineNum">     996 </span>                :            :         == RSTP_ADMIN_BRIDGE_PORT_STATE_ENABLED) {
+<span class="lineNum">     997 </span>                :<span class="lineCov">        344 :         p-&gt;port_enabled = true;</span>
+<span class="lineNum">     998 </span>                :            :     } else {
+<span class="lineNum">     999 </span>                :<span class="lineCov">       1050 :         p-&gt;port_enabled = false;</span>
+<span class="lineNum">    1000 </span>                :            :     }
+<span class="lineNum">    1001 </span>                :<span class="lineCov">       1394 : }</span>
+<span class="lineNum">    1002 </span>                :            : 
+<a name="1003"><span class="lineNum">    1003 </span>                :            : /* Sets the port MAC_Operational parameter [6.4.2]. */</a>
+<span class="lineNum">    1004 </span>                :            : void
+<span class="lineNum">    1005 </span>                :<span class="lineCov">        535 : rstp_port_set_mac_operational(struct rstp_port *p, bool new_mac_operational)</span>
+<span class="lineNum">    1006 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1007 </span>                :            : {
+<span class="lineNum">    1008 </span>                :            :     struct rstp *rstp;
+<span class="lineNum">    1009 </span>                :            : 
+<span class="lineNum">    1010 </span>                :<span class="lineCov">        535 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1011 </span>                :<span class="lineCov">        535 :     rstp = p-&gt;rstp;</span>
+<span class="lineNum">    1012 </span>        [<span class="branchCov" title="Branch 0 was taken 346 times"> + </span><span class="branchCov" title="Branch 1 was taken 189 times"> + </span>]:<span class="lineCov">        535 :     if (p-&gt;mac_operational != new_mac_operational) {</span>
+<span class="lineNum">    1013 </span>                :<span class="lineCov">        346 :         p-&gt;mac_operational = new_mac_operational;</span>
+<span class="lineNum">    1014 </span>                :<span class="lineCov">        346 :         update_port_enabled__(p);</span>
+<span class="lineNum">    1015 </span>                :<span class="lineCov">        346 :         rstp-&gt;changes = true;</span>
+<span class="lineNum">    1016 </span>                :<span class="lineCov">        346 :         move_rstp__(rstp);</span>
+<span class="lineNum">    1017 </span>                :            :     }
+<span class="lineNum">    1018 </span>                :<span class="lineCov">        535 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1019 </span>                :<span class="lineCov">        535 : }</span>
+<span class="lineNum">    1020 </span>                :            : 
+<a name="1021"><span class="lineNum">    1021 </span>                :            : /* Sets the port Administrative Bridge Port parameter. */</a>
+<span class="lineNum">    1022 </span>                :            : static void
+<span class="lineNum">    1023 </span>                :<span class="lineCov">        533 : rstp_port_set_administrative_bridge_port__(struct rstp_port *p,</span>
+<span class="lineNum">    1024 </span>                :            :                                            uint8_t admin_port_state,
+<span class="lineNum">    1025 </span>                :            :                                            bool initializing)
+<span class="lineNum">    1026 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">    1027 </span>                :            : {
+<span class="lineNum">    1028 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 533 times"> + </span>]:<span class="lineCov">        533 :     VLOG_DBG(&quot;%s, port %u: set RSTP port admin-port-state to %d&quot;,</span>
+<span class="lineNum">    1029 </span>                :            :              p-&gt;rstp-&gt;name, p-&gt;port_number, admin_port_state);
+<span class="lineNum">    1030 </span>                :            : 
+<span class="lineNum">    1031 </span>        [<span class="branchCov" title="Branch 0 was taken 524 times"> + </span><span class="branchCov" title="Branch 1 was taken 9 times"> + </span>]:<span class="lineCov">        533 :     if (p-&gt;is_administrative_bridge_port != admin_port_state</span>
+<span class="lineNum">    1032 </span>        [<span class="branchCov" title="Branch 0 was taken 524 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        524 :         &amp;&amp; (admin_port_state == RSTP_ADMIN_BRIDGE_PORT_STATE_DISABLED</span>
+<span class="lineNum">    1033 </span>        [<span class="branchCov" title="Branch 0 was taken 524 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        524 :             || admin_port_state == RSTP_ADMIN_BRIDGE_PORT_STATE_ENABLED)) {</span>
+<span class="lineNum">    1034 </span>                :<span class="lineCov">        524 :         p-&gt;is_administrative_bridge_port = admin_port_state;</span>
+<span class="lineNum">    1035 </span>                :<span class="lineCov">        524 :         update_port_enabled__(p);</span>
+<span class="lineNum">    1036 </span>                :            : 
+<span class="lineNum">    1037 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 524 times"> + </span>]:<span class="lineCov">        524 :         if (!initializing) {</span>
+<span class="lineNum">    1038 </span>                :<span class="lineNoCov">          0 :             struct rstp *rstp = p-&gt;rstp;</span>
+<span class="lineNum">    1039 </span>                :            : 
+<span class="lineNum">    1040 </span>                :<span class="lineNoCov">          0 :             rstp-&gt;changes = true;</span>
+<span class="lineNum">    1041 </span>                :<span class="lineNoCov">          0 :             move_rstp__(rstp);</span>
+<span class="lineNum">    1042 </span>                :            :         }
+<span class="lineNum">    1043 </span>                :            :     }
+<span class="lineNum">    1044 </span>                :<span class="lineCov">        533 : }</span>
+<span class="lineNum">    1045 </span>                :            : 
+<a name="1046"><span class="lineNum">    1046 </span>                :            : /* Sets the port oper_point_to_point_mac parameter. */</a>
+<span class="lineNum">    1047 </span>                :            : static void
+<span class="lineNum">    1048 </span>                :<span class="lineCov">        526 : rstp_port_set_oper_point_to_point_mac__(struct rstp_port *p,</span>
+<span class="lineNum">    1049 </span>                :            :                                         uint8_t new_oper_p2p_mac)
+<span class="lineNum">    1050 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">    1051 </span>                :            : {
+<span class="lineNum">    1052 </span>        [<span class="branchCov" title="Branch 0 was taken 524 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">        526 :     if (p-&gt;oper_point_to_point_mac != new_oper_p2p_mac</span>
+<span class="lineNum">    1053 </span>        [<span class="branchCov" title="Branch 0 was taken 524 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        524 :         &amp;&amp; (new_oper_p2p_mac == RSTP_OPER_P2P_MAC_STATE_DISABLED</span>
+<span class="lineNum">    1054 </span>        [<span class="branchCov" title="Branch 0 was taken 524 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        524 :             || new_oper_p2p_mac == RSTP_OPER_P2P_MAC_STATE_ENABLED)) {</span>
+<span class="lineNum">    1055 </span>                :            : 
+<span class="lineNum">    1056 </span>                :<span class="lineCov">        524 :         p-&gt;oper_point_to_point_mac = new_oper_p2p_mac;</span>
+<span class="lineNum">    1057 </span>                :<span class="lineCov">        524 :         update_port_enabled__(p);</span>
+<span class="lineNum">    1058 </span>                :            :     }
+<span class="lineNum">    1059 </span>                :<span class="lineCov">        526 : }</span>
+<span class="lineNum">    1060 </span>                :            : 
+<a name="1061"><span class="lineNum">    1061 </span>                :            : /* Initializes a port with the defaults values for its parameters. */</a>
+<span class="lineNum">    1062 </span>                :            : static void
+<span class="lineNum">    1063 </span>                :<span class="lineCov">        524 : rstp_initialize_port_defaults__(struct rstp_port *p)</span>
+<span class="lineNum">    1064 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">    1065 </span>                :            : {
+<span class="lineNum">    1066 </span>                :<span class="lineCov">        524 :     rstp_port_set_administrative_bridge_port__(p,</span>
+<span class="lineNum">    1067 </span>                :            :                                                RSTP_ADMIN_BRIDGE_PORT_STATE_ENABLED,
+<span class="lineNum">    1068 </span>                :            :                                                true);
+<span class="lineNum">    1069 </span>                :<span class="lineCov">        524 :     rstp_port_set_oper_point_to_point_mac__(p,</span>
+<span class="lineNum">    1070 </span>                :            :                                          RSTP_OPER_P2P_MAC_STATE_ENABLED);
+<span class="lineNum">    1071 </span>                :<span class="lineCov">        524 :     rstp_port_set_path_cost__(p, RSTP_DEFAULT_PORT_PATH_COST);</span>
+<span class="lineNum">    1072 </span>                :<span class="lineCov">        524 :     rstp_port_set_admin_edge__(p, false);</span>
+<span class="lineNum">    1073 </span>                :<span class="lineCov">        524 :     rstp_port_set_auto_edge__(p, true);</span>
+<span class="lineNum">    1074 </span>                :<span class="lineCov">        524 :     rstp_port_set_mcheck__(p, false);</span>
+<span class="lineNum">    1075 </span>                :            : 
+<span class="lineNum">    1076 </span>                :            :     /* Initialize state machines. */
+<span class="lineNum">    1077 </span>                :<span class="lineCov">        524 :     p-&gt;port_receive_sm_state = PORT_RECEIVE_SM_INIT;</span>
+<span class="lineNum">    1078 </span>                :<span class="lineCov">        524 :     p-&gt;port_protocol_migration_sm_state = PORT_PROTOCOL_MIGRATION_SM_INIT;</span>
+<span class="lineNum">    1079 </span>                :<span class="lineCov">        524 :     p-&gt;bridge_detection_sm_state = BRIDGE_DETECTION_SM_INIT;</span>
+<span class="lineNum">    1080 </span>                :<span class="lineCov">        524 :     p-&gt;port_transmit_sm_state = PORT_TRANSMIT_SM_INIT;</span>
+<span class="lineNum">    1081 </span>                :<span class="lineCov">        524 :     p-&gt;port_information_sm_state = PORT_INFORMATION_SM_INIT;</span>
+<span class="lineNum">    1082 </span>                :<span class="lineCov">        524 :     p-&gt;port_role_transition_sm_state = PORT_ROLE_TRANSITION_SM_INIT;</span>
+<span class="lineNum">    1083 </span>                :<span class="lineCov">        524 :     p-&gt;port_state_transition_sm_state = PORT_STATE_TRANSITION_SM_INIT;</span>
+<span class="lineNum">    1084 </span>                :<span class="lineCov">        524 :     p-&gt;topology_change_sm_state = TOPOLOGY_CHANGE_SM_INIT;</span>
+<span class="lineNum">    1085 </span>                :<span class="lineCov">        524 :     p-&gt;uptime = 0;</span>
+<span class="lineNum">    1086 </span>                :            : 
+<span class="lineNum">    1087 </span>                :<span class="lineCov">        524 : }</span>
+<a name="1088"><span class="lineNum">    1088 </span>                :            : </a>
+<span class="lineNum">    1089 </span>                :            : static void
+<span class="lineNum">    1090 </span>                :<span class="lineCov">        288 : reinitialize_port__(struct rstp_port *p)</span>
+<span class="lineNum">    1091 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">    1092 </span>                :            : {
+<span class="lineNum">    1093 </span>                :            :     struct rstp_port temp_port;
+<span class="lineNum">    1094 </span>                :            :     struct rstp *rstp;
+<span class="lineNum">    1095 </span>                :            : 
+<span class="lineNum">    1096 </span>                :<span class="lineCov">        288 :     rstp = p-&gt;rstp;</span>
+<span class="lineNum">    1097 </span>                :<span class="lineCov">        288 :     temp_port = *p;</span>
+<span class="lineNum">    1098 </span>                :<span class="lineCov">        288 :     memset(p, 0, sizeof(struct rstp_port));</span>
+<span class="lineNum">    1099 </span>                :            : 
+<span class="lineNum">    1100 </span>                :<span class="lineCov">        288 :     p-&gt;ref_cnt = temp_port.ref_cnt;</span>
+<span class="lineNum">    1101 </span>                :<span class="lineCov">        288 :     p-&gt;rstp = rstp;</span>
+<span class="lineNum">    1102 </span>                :<span class="lineCov">        288 :     p-&gt;node = temp_port.node;</span>
+<span class="lineNum">    1103 </span>                :<span class="lineCov">        288 :     p-&gt;aux = temp_port.aux;</span>
+<span class="lineNum">    1104 </span>                :<span class="lineCov">        288 :     p-&gt;port_number = temp_port.port_number;</span>
+<span class="lineNum">    1105 </span>                :<span class="lineCov">        288 :     p-&gt;port_priority = temp_port.port_priority;</span>
+<span class="lineNum">    1106 </span>                :<span class="lineCov">        288 :     p-&gt;port_id = temp_port.port_id;</span>
+<span class="lineNum">    1107 </span>                :<span class="lineCov">        288 :     p-&gt;rstp_state = RSTP_DISCARDING;</span>
+<span class="lineNum">    1108 </span>                :            : 
+<span class="lineNum">    1109 </span>                :<span class="lineCov">        288 :     rstp_initialize_port_defaults__(p);</span>
+<span class="lineNum">    1110 </span>                :            : 
+<span class="lineNum">    1111 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 288 times"> + </span>]:<span class="lineCov">        288 :     VLOG_DBG(&quot;%s: RSTP port &quot;RSTP_PORT_ID_FMT&quot; reinitialized.&quot;, rstp-&gt;name,</span>
+<span class="lineNum">    1112 </span>                :            :              p-&gt;port_id);
+<span class="lineNum">    1113 </span>                :<span class="lineCov">        288 : }</span>
+<a name="1114"><span class="lineNum">    1114 </span>                :            : </a>
+<span class="lineNum">    1115 </span>                :            : void
+<span class="lineNum">    1116 </span>                :<span class="lineCov">        288 : reinitialize_port(struct rstp_port *p)</span>
+<span class="lineNum">    1117 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1118 </span>                :            : {
+<span class="lineNum">    1119 </span>                :<span class="lineCov">        288 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1120 </span>                :<span class="lineCov">        288 :     reinitialize_port__(p);</span>
+<span class="lineNum">    1121 </span>                :<span class="lineCov">        288 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1122 </span>                :<span class="lineCov">        288 : }</span>
+<span class="lineNum">    1123 </span>                :            : 
+<a name="1124"><span class="lineNum">    1124 </span>                :            : /* Sets the port state. */</a>
+<span class="lineNum">    1125 </span>                :            : void
+<span class="lineNum">    1126 </span>                :<span class="lineCov">       1934 : rstp_port_set_state__(struct rstp_port *p, enum rstp_state state)</span>
+<span class="lineNum">    1127 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">    1128 </span>                :            : {
+<span class="lineNum">    1129 </span>                :            :     struct rstp *rstp;
+<span class="lineNum">    1130 </span>                :            : 
+<span class="lineNum">    1131 </span>                :<span class="lineCov">       1934 :     rstp = p-&gt;rstp;</span>
+<span class="lineNum">    1132 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1934 times"> + </span>]:<span class="lineCov">       1934 :     VLOG_DBG(&quot;%s, port %u: set RSTP port state %s -&gt; %s&quot;, rstp-&gt;name,</span>
+<span class="lineNum">    1133 </span>                :            :              p-&gt;port_number,
+<span class="lineNum">    1134 </span>                :            :              rstp_state_name(p-&gt;rstp_state), rstp_state_name(state));
+<span class="lineNum">    1135 </span>                :            : 
+<span class="lineNum">    1136 </span>[<span class="branchCov" title="Branch 0 was taken 976 times"> + </span><span class="branchCov" title="Branch 1 was taken 958 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 526 times"> + </span><span class="branchCov" title="Branch 3 was taken 450 times"> + </span>]:<span class="lineCov">       1934 :     if (state != p-&gt;rstp_state &amp;&amp; !p-&gt;state_changed) {</span>
+<span class="lineNum">    1137 </span>                :<span class="lineCov">        526 :         p-&gt;state_changed = true;</span>
+<span class="lineNum">    1138 </span>                :<span class="lineCov">        526 :         seq_change(connectivity_seq_get());</span>
+<span class="lineNum">    1139 </span>                :            :     }
+<span class="lineNum">    1140 </span>                :<span class="lineCov">       1934 :     p-&gt;rstp_state = state;</span>
+<span class="lineNum">    1141 </span>                :<span class="lineCov">       1934 : }</span>
+<a name="1142"><span class="lineNum">    1142 </span>                :            : </a>
+<span class="lineNum">    1143 </span>                :            : void
+<span class="lineNum">    1144 </span>                :<span class="lineCov">        524 : rstp_port_set_state(struct rstp_port *p, enum rstp_state state)</span>
+<span class="lineNum">    1145 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1146 </span>                :            : {
+<span class="lineNum">    1147 </span>                :<span class="lineCov">        524 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1148 </span>                :<span class="lineCov">        524 :     rstp_port_set_state__(p, state);</span>
+<span class="lineNum">    1149 </span>                :<span class="lineCov">        524 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1150 </span>                :<span class="lineCov">        524 : }</span>
+<span class="lineNum">    1151 </span>                :            : 
+<a name="1152"><span class="lineNum">    1152 </span>                :            : /* Adds a RSTP port. */</a>
+<span class="lineNum">    1153 </span>                :            : struct rstp_port *
+<span class="lineNum">    1154 </span>                :<span class="lineCov">        236 : rstp_add_port(struct rstp *rstp)</span>
+<span class="lineNum">    1155 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1156 </span>                :            : {
+<span class="lineNum">    1157 </span>                :<span class="lineCov">        236 :     struct rstp_port *p = xzalloc(sizeof *p);</span>
+<span class="lineNum">    1158 </span>                :            : 
+<span class="lineNum">    1159 </span>                :<span class="lineCov">        236 :     ovs_refcount_init(&amp;p-&gt;ref_cnt);</span>
+<span class="lineNum">    1160 </span>                :<span class="lineCov">        236 :     hmap_node_nullify(&amp;p-&gt;node);</span>
+<span class="lineNum">    1161 </span>                :            : 
+<span class="lineNum">    1162 </span>                :<span class="lineCov">        236 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1163 </span>                :<span class="lineCov">        236 :     p-&gt;rstp = rstp;</span>
+<span class="lineNum">    1164 </span>                :<span class="lineCov">        236 :     rstp_port_set_priority__(p, RSTP_DEFAULT_PORT_PRIORITY);</span>
+<span class="lineNum">    1165 </span>                :<span class="lineCov">        236 :     rstp_port_set_port_number__(p, 0);</span>
+<span class="lineNum">    1166 </span>                :<span class="lineCov">        236 :     p-&gt;aux = NULL;</span>
+<span class="lineNum">    1167 </span>                :<span class="lineCov">        236 :     rstp_initialize_port_defaults__(p);</span>
+<span class="lineNum">    1168 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 236 times"> + </span>]:<span class="lineCov">        236 :     VLOG_DBG(&quot;%s: RSTP port &quot;RSTP_PORT_ID_FMT&quot; initialized.&quot;, rstp-&gt;name,</span>
+<span class="lineNum">    1169 </span>                :            :              p-&gt;port_id);
+<span class="lineNum">    1170 </span>                :            : 
+<span class="lineNum">    1171 </span>                :<span class="lineCov">        236 :     rstp_port_set_state__(p, RSTP_DISCARDING);</span>
+<span class="lineNum">    1172 </span>                :<span class="lineCov">        236 :     rstp-&gt;changes = true;</span>
+<span class="lineNum">    1173 </span>                :<span class="lineCov">        236 :     move_rstp__(rstp);</span>
+<span class="lineNum">    1174 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 236 times"> + </span>]:<span class="lineCov">        236 :     VLOG_DBG(&quot;%s: added port &quot;RSTP_PORT_ID_FMT&quot;&quot;, rstp-&gt;name, p-&gt;port_id);</span>
+<span class="lineNum">    1175 </span>                :<span class="lineCov">        236 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1176 </span>                :<span class="lineCov">        236 :     return p;</span>
+<span class="lineNum">    1177 </span>                :            : }
+<span class="lineNum">    1178 </span>                :            : 
+<span class="lineNum">    1179 </span>                :            : /* Caller has to hold a reference to prevent 'rstp_port' from being deleted
+<a name="1180"><span class="lineNum">    1180 </span>                :            :  * while taking a new reference. */</a>
+<span class="lineNum">    1181 </span>                :            : struct rstp_port *
+<span class="lineNum">    1182 </span>                :<span class="lineCov">         60 : rstp_port_ref(const struct rstp_port *rp_)</span>
+<span class="lineNum">    1183 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1184 </span>                :            : {
+<span class="lineNum">    1185 </span>                :<span class="lineCov">         60 :     struct rstp_port *rp = CONST_CAST(struct rstp_port *, rp_);</span>
+<span class="lineNum">    1186 </span>                :            : 
+<span class="lineNum">    1187 </span>        [<span class="branchCov" title="Branch 0 was taken 60 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         60 :     if (rp) {</span>
+<span class="lineNum">    1188 </span>                :<span class="lineCov">         60 :         ovs_refcount_ref(&amp;rp-&gt;ref_cnt);</span>
+<span class="lineNum">    1189 </span>                :            :     }
+<span class="lineNum">    1190 </span>                :<span class="lineCov">         60 :     return rp;</span>
+<span class="lineNum">    1191 </span>                :            : }
+<span class="lineNum">    1192 </span>                :            : 
+<a name="1193"><span class="lineNum">    1193 </span>                :            : /* Frees RSTP struct.  This can be caller by any thread. */</a>
+<span class="lineNum">    1194 </span>                :            : void
+<span class="lineNum">    1195 </span>                :<span class="lineCov">     246793 : rstp_port_unref(struct rstp_port *rp)</span>
+<span class="lineNum">    1196 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1197 </span>                :            : {
+<span class="lineNum">    1198 </span>[<span class="branchCov" title="Branch 0 was taken 296 times"> + </span><span class="branchCov" title="Branch 1 was taken 246497 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 236 times"> + </span><span class="branchCov" title="Branch 4 was taken 60 times"> + </span>]:<span class="lineCov">     246793 :     if (rp &amp;&amp; ovs_refcount_unref_relaxed(&amp;rp-&gt;ref_cnt) == 1) {</span>
+<span class="lineNum">    1199 </span>                :            :         struct rstp *rstp;
+<span class="lineNum">    1200 </span>                :            : 
+<span class="lineNum">    1201 </span>                :<span class="lineCov">        236 :         ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1202 </span>                :<span class="lineCov">        236 :         rstp = rp-&gt;rstp;</span>
+<span class="lineNum">    1203 </span>                :<span class="lineCov">        236 :         rstp_port_set_state__(rp, RSTP_DISABLED);</span>
+<span class="lineNum">    1204 </span>                :<span class="lineCov">        236 :         hmap_remove(&amp;rstp-&gt;ports, &amp;rp-&gt;node);</span>
+<span class="lineNum">    1205 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 236 times"> + </span>]:<span class="lineCov">        236 :         VLOG_DBG(&quot;%s: removed port &quot;RSTP_PORT_ID_FMT&quot;&quot;, rstp-&gt;name,</span>
+<span class="lineNum">    1206 </span>                :            :                  rp-&gt;port_id);
+<span class="lineNum">    1207 </span>                :<span class="lineCov">        236 :         ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1208 </span>                :<span class="lineCov">        236 :         free(rp);</span>
+<span class="lineNum">    1209 </span>                :            :     }
+<span class="lineNum">    1210 </span>                :<span class="lineCov">     246793 : }</span>
+<span class="lineNum">    1211 </span>                :            : 
+<a name="1212"><span class="lineNum">    1212 </span>                :            : /* Sets the port Admin Edge parameter. */</a>
+<span class="lineNum">    1213 </span>                :            : static void
+<span class="lineNum">    1214 </span>                :<span class="lineCov">        533 : rstp_port_set_admin_edge__(struct rstp_port *port, bool admin_edge)</span>
+<span class="lineNum">    1215 </span>                :            :      OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">    1216 </span>                :            : {
+<span class="lineNum">    1217 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 533 times"> + </span>]:<span class="lineCov">        533 :     if (port-&gt;admin_edge != admin_edge) {</span>
+<span class="lineNum">    1218 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_DBG(&quot;%s, port %u: set RSTP Admin Edge to %d&quot;, port-&gt;rstp-&gt;name,</span>
+<span class="lineNum">    1219 </span>                :            :                  port-&gt;port_number, admin_edge);
+<span class="lineNum">    1220 </span>                :            : 
+<span class="lineNum">    1221 </span>                :<span class="lineNoCov">          0 :         port-&gt;admin_edge = admin_edge;</span>
+<span class="lineNum">    1222 </span>                :            :     }
+<span class="lineNum">    1223 </span>                :<span class="lineCov">        533 : }</span>
+<span class="lineNum">    1224 </span>                :            : 
+<a name="1225"><span class="lineNum">    1225 </span>                :            : /* Sets the port Auto Edge parameter. */</a>
+<span class="lineNum">    1226 </span>                :            : static void
+<span class="lineNum">    1227 </span>                :<span class="lineCov">        533 : rstp_port_set_auto_edge__(struct rstp_port *port, bool auto_edge)</span>
+<span class="lineNum">    1228 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">    1229 </span>                :            : {
+<span class="lineNum">    1230 </span>        [<span class="branchCov" title="Branch 0 was taken 524 times"> + </span><span class="branchCov" title="Branch 1 was taken 9 times"> + </span>]:<span class="lineCov">        533 :     if (port-&gt;auto_edge != auto_edge) {</span>
+<span class="lineNum">    1231 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 524 times"> + </span>]:<span class="lineCov">        524 :         VLOG_DBG(&quot;%s, port %u: set RSTP Auto Edge to %d&quot;, port-&gt;rstp-&gt;name,</span>
+<span class="lineNum">    1232 </span>                :            :                  port-&gt;port_number, auto_edge);
+<span class="lineNum">    1233 </span>                :            : 
+<span class="lineNum">    1234 </span>                :<span class="lineCov">        524 :         port-&gt;auto_edge = auto_edge;</span>
+<span class="lineNum">    1235 </span>                :            :     }
+<span class="lineNum">    1236 </span>                :<span class="lineCov">        533 : }</span>
+<a name="1237"><span class="lineNum">    1237 </span>                :            : </a>
+<span class="lineNum">    1238 </span>                :            : /* Sets the port admin_point_to_point_mac parameter. */
+<span class="lineNum">    1239 </span>                :<span class="lineCov">          9 : static void rstp_port_set_admin_point_to_point_mac__(struct rstp_port *port,</span>
+<span class="lineNum">    1240 </span>                :            :         enum rstp_admin_point_to_point_mac_state admin_p2p_mac_state)
+<span class="lineNum">    1241 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">    1242 </span>                :            : {
+<span class="lineNum">    1243 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 9 times"> + </span>]:<span class="lineCov">          9 :     VLOG_DBG(&quot;%s, port %u: set RSTP port admin-point-to-point-mac to %d&quot;,</span>
+<span class="lineNum">    1244 </span>                :            :             port-&gt;rstp-&gt;name, port-&gt;port_number, admin_p2p_mac_state);
+<span class="lineNum">    1245 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 7 times"> + </span>]:<span class="lineCov">          9 :     if (port-&gt;admin_point_to_point_mac != admin_p2p_mac_state) {</span>
+<span class="lineNum">    1246 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :         if (admin_p2p_mac_state == RSTP_ADMIN_P2P_MAC_FORCE_TRUE) {</span>
+<span class="lineNum">    1247 </span>                :<span class="lineCov">          2 :             port-&gt;admin_point_to_point_mac = admin_p2p_mac_state;</span>
+<span class="lineNum">    1248 </span>                :<span class="lineCov">          2 :             rstp_port_set_oper_point_to_point_mac__(</span>
+<span class="lineNum">    1249 </span>                :            :                 port, RSTP_OPER_P2P_MAC_STATE_ENABLED);
+<span class="lineNum">    1250 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         } else if (admin_p2p_mac_state == RSTP_ADMIN_P2P_MAC_FORCE_FALSE) {</span>
+<span class="lineNum">    1251 </span>                :<span class="lineNoCov">          0 :             port-&gt;admin_point_to_point_mac = admin_p2p_mac_state;</span>
+<span class="lineNum">    1252 </span>                :<span class="lineNoCov">          0 :             rstp_port_set_oper_point_to_point_mac__(</span>
+<span class="lineNum">    1253 </span>                :            :                 port, RSTP_OPER_P2P_MAC_STATE_DISABLED);
+<span class="lineNum">    1254 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         } else if (admin_p2p_mac_state == RSTP_ADMIN_P2P_MAC_AUTO) {</span>
+<span class="lineNum">    1255 </span>                :            :             /* If adminPointToPointMAC is set to Auto, then the value of
+<span class="lineNum">    1256 </span>                :            :              * operPointToPointMAC is determined in accordance with the
+<span class="lineNum">    1257 </span>                :            :              * specific procedures defined for the MAC entity concerned, as
+<span class="lineNum">    1258 </span>                :            :              * defined in 6.5. If these procedures determine that the MAC
+<span class="lineNum">    1259 </span>                :            :              * entity is connected to a point-to-point LAN, then
+<span class="lineNum">    1260 </span>                :            :              * operPointToPointMAC is set TRUE; otherwise it is set FALSE.
+<span class="lineNum">    1261 </span>                :            :              * In the absence of a specific definition of how to determine
+<span class="lineNum">    1262 </span>                :            :              * whether the MAC is connected to a point-to-point LAN or not,
+<span class="lineNum">    1263 </span>                :            :              * the value of operPointToPointMAC shall be FALSE. */
+<span class="lineNum">    1264 </span>                :<span class="lineNoCov">          0 :             port-&gt;admin_point_to_point_mac = admin_p2p_mac_state;</span>
+<span class="lineNum">    1265 </span>                :<span class="lineNoCov">          0 :             rstp_port_set_oper_point_to_point_mac__(</span>
+<span class="lineNum">    1266 </span>                :            :                 port, RSTP_OPER_P2P_MAC_STATE_DISABLED);
+<span class="lineNum">    1267 </span>                :            :         }
+<span class="lineNum">    1268 </span>                :            :     }
+<span class="lineNum">    1269 </span>                :<span class="lineCov">          9 : }</span>
+<span class="lineNum">    1270 </span>                :            : 
+<span class="lineNum">    1271 </span>                :            : /* Sets the port mcheck parameter.
+<span class="lineNum">    1272 </span>                :            :  * [17.19.13] May be set by management to force the Port Protocol Migration
+<span class="lineNum">    1273 </span>                :            :  * state machine to transmit RST BPDUs for a MigrateTime (17.13.9) period, to
+<span class="lineNum">    1274 </span>                :            :  * test whether all STP Bridges (17.4) on the attached LAN have been removed
+<span class="lineNum">    1275 </span>                :            :  * and the Port can continue to transmit RSTP BPDUs. Setting mcheck has no
+<span class="lineNum">    1276 </span>                :            :  * effect if stpVersion (17.20.12) is TRUE, i.e., the Bridge is operating in
+<span class="lineNum">    1277 </span>                :            :  * STP Compatibility mode.
+<a name="1278"><span class="lineNum">    1278 </span>                :            :  */</a>
+<span class="lineNum">    1279 </span>                :            : static void
+<span class="lineNum">    1280 </span>                :<span class="lineCov">        533 : rstp_port_set_mcheck__(struct rstp_port *port, bool mcheck)</span>
+<span class="lineNum">    1281 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">    1282 </span>                :            : {
+<span class="lineNum">    1283 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 533 times"> + </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">        533 :     if (mcheck == true &amp;&amp; port-&gt;rstp-&gt;force_protocol_version &gt;= 2) {</span>
+<span class="lineNum">    1284 </span>                :<span class="lineNoCov">          0 :         port-&gt;mcheck = true;</span>
+<span class="lineNum">    1285 </span>                :            : 
+<span class="lineNum">    1286 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_DBG(&quot;%s, port %u: set RSTP mcheck to %d&quot;, port-&gt;rstp-&gt;name,</span>
+<span class="lineNum">    1287 </span>                :            :                  port-&gt;port_number, mcheck);
+<span class="lineNum">    1288 </span>                :            :     }
+<span class="lineNum">    1289 </span>                :<span class="lineCov">        533 : }</span>
+<span class="lineNum">    1290 </span>                :            : 
+<a name="1291"><span class="lineNum">    1291 </span>                :            : /* Returns the designated bridge id. */</a>
+<span class="lineNum">    1292 </span>                :            : rstp_identifier
+<span class="lineNum">    1293 </span>                :<span class="lineCov">         25 : rstp_get_designated_id(const struct rstp *rstp)</span>
+<span class="lineNum">    1294 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1295 </span>                :            : {
+<span class="lineNum">    1296 </span>                :            :     rstp_identifier designated_id;
+<span class="lineNum">    1297 </span>                :            : 
+<span class="lineNum">    1298 </span>                :<span class="lineCov">         25 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1299 </span>                :<span class="lineCov">         25 :     designated_id = rstp-&gt;root_priority.designated_bridge_id;</span>
+<span class="lineNum">    1300 </span>                :<span class="lineCov">         25 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1301 </span>                :            : 
+<span class="lineNum">    1302 </span>                :<span class="lineCov">         25 :     return designated_id;</span>
+<span class="lineNum">    1303 </span>                :            : }
+<span class="lineNum">    1304 </span>                :            : 
+<a name="1305"><span class="lineNum">    1305 </span>                :            : /* Returns the root bridge id. */</a>
+<span class="lineNum">    1306 </span>                :            : rstp_identifier
+<span class="lineNum">    1307 </span>                :<span class="lineCov">         25 : rstp_get_root_id(const struct rstp *rstp)</span>
+<span class="lineNum">    1308 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1309 </span>                :            : {
+<span class="lineNum">    1310 </span>                :            :     rstp_identifier root_id;
+<span class="lineNum">    1311 </span>                :            : 
+<span class="lineNum">    1312 </span>                :<span class="lineCov">         25 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1313 </span>                :<span class="lineCov">         25 :     root_id = rstp-&gt;root_priority.root_bridge_id;</span>
+<span class="lineNum">    1314 </span>                :<span class="lineCov">         25 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1315 </span>                :            : 
+<span class="lineNum">    1316 </span>                :<span class="lineCov">         25 :     return root_id;</span>
+<span class="lineNum">    1317 </span>                :            : }
+<span class="lineNum">    1318 </span>                :            : 
+<a name="1319"><span class="lineNum">    1319 </span>                :            : /* Returns the designated port id. */</a>
+<span class="lineNum">    1320 </span>                :            : uint16_t
+<span class="lineNum">    1321 </span>                :<span class="lineCov">         25 : rstp_get_designated_port_id(const struct rstp *rstp)</span>
+<span class="lineNum">    1322 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1323 </span>                :            : {
+<span class="lineNum">    1324 </span>                :            :     uint16_t designated_port_id;
+<span class="lineNum">    1325 </span>                :            : 
+<span class="lineNum">    1326 </span>                :<span class="lineCov">         25 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1327 </span>                :<span class="lineCov">         25 :     designated_port_id = rstp-&gt;root_priority.designated_port_id;</span>
+<span class="lineNum">    1328 </span>                :<span class="lineCov">         25 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1329 </span>                :            : 
+<span class="lineNum">    1330 </span>                :<span class="lineCov">         25 :     return designated_port_id;</span>
+<span class="lineNum">    1331 </span>                :            : }
+<span class="lineNum">    1332 </span>                :            : 
+<a name="1333"><span class="lineNum">    1333 </span>                :            : /* Return the bridge port id. */</a>
+<span class="lineNum">    1334 </span>                :            : uint16_t
+<span class="lineNum">    1335 </span>                :<span class="lineCov">         25 : rstp_get_bridge_port_id(const struct rstp *rstp)</span>
+<span class="lineNum">    1336 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1337 </span>                :            : {
+<span class="lineNum">    1338 </span>                :            :     uint16_t bridge_port_id;
+<span class="lineNum">    1339 </span>                :            : 
+<span class="lineNum">    1340 </span>                :<span class="lineCov">         25 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1341 </span>                :<span class="lineCov">         25 :     bridge_port_id = rstp-&gt;root_priority.bridge_port_id;</span>
+<span class="lineNum">    1342 </span>                :<span class="lineCov">         25 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1343 </span>                :            : 
+<span class="lineNum">    1344 </span>                :<span class="lineCov">         25 :     return bridge_port_id;</span>
+<span class="lineNum">    1345 </span>                :            : }
+<span class="lineNum">    1346 </span>                :            : 
+<span class="lineNum">    1347 </span>                :            : /* Returns true if the bridge believes to the be root of the spanning tree,
+<span class="lineNum">    1348 </span>                :            :  * false otherwise.
+<a name="1349"><span class="lineNum">    1349 </span>                :            :  */</a>
+<span class="lineNum">    1350 </span>                :            : bool
+<span class="lineNum">    1351 </span>                :<span class="lineCov">         11 : rstp_is_root_bridge(const struct rstp *rstp)</span>
+<span class="lineNum">    1352 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1353 </span>                :            : {
+<span class="lineNum">    1354 </span>                :            :     bool is_root;
+<span class="lineNum">    1355 </span>                :            : 
+<span class="lineNum">    1356 </span>                :<span class="lineCov">         11 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1357 </span>                :<span class="lineCov">         22 :     is_root = rstp-&gt;bridge_identifier ==</span>
+<span class="lineNum">    1358 </span>                :<span class="lineCov">         11 :                 rstp-&gt;root_priority.designated_bridge_id;</span>
+<span class="lineNum">    1359 </span>                :<span class="lineCov">         11 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1360 </span>                :            : 
+<span class="lineNum">    1361 </span>                :<span class="lineCov">         11 :     return is_root;</span>
+<span class="lineNum">    1362 </span>                :            : }
+<span class="lineNum">    1363 </span>                :            : 
+<a name="1364"><span class="lineNum">    1364 </span>                :            : /* Returns the bridge ID of the bridge currently believed to be the root. */</a>
+<span class="lineNum">    1365 </span>                :            : rstp_identifier
+<span class="lineNum">    1366 </span>                :<span class="lineNoCov">          0 : rstp_get_designated_root(const struct rstp *rstp)</span>
+<span class="lineNum">    1367 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1368 </span>                :            : {
+<span class="lineNum">    1369 </span>                :            :     rstp_identifier designated_root;
+<span class="lineNum">    1370 </span>                :            : 
+<span class="lineNum">    1371 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1372 </span>                :<span class="lineNoCov">          0 :     designated_root = rstp-&gt;root_priority.designated_bridge_id;</span>
+<span class="lineNum">    1373 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1374 </span>                :            : 
+<span class="lineNum">    1375 </span>                :<span class="lineNoCov">          0 :     return designated_root;</span>
+<span class="lineNum">    1376 </span>                :            : }
+<span class="lineNum">    1377 </span>                :            : 
+<span class="lineNum">    1378 </span>                :            : /* Returns the port connecting 'rstp' to the root bridge, or a null pointer if
+<span class="lineNum">    1379 </span>                :            :  * there is no such port.
+<a name="1380"><span class="lineNum">    1380 </span>                :            :  */</a>
+<span class="lineNum">    1381 </span>                :            : struct rstp_port *
+<span class="lineNum">    1382 </span>                :<span class="lineCov">        124 : rstp_get_root_port(struct rstp *rstp)</span>
+<span class="lineNum">    1383 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1384 </span>                :            : {
+<span class="lineNum">    1385 </span>                :            :     struct rstp_port *p;
+<span class="lineNum">    1386 </span>                :            : 
+<span class="lineNum">    1387 </span>                :<span class="lineCov">        124 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1388 </span>[<span class="branchCov" title="Branch 2 was taken 616 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>][<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]:<span class="lineCov">        616 :     HMAP_FOR_EACH (p, node, &amp;rstp-&gt;ports) {</span>
+<span class="lineNum">    1389 </span>        [<span class="branchCov" title="Branch 0 was taken 124 times"> + </span><span class="branchCov" title="Branch 1 was taken 492 times"> + </span>]:<span class="lineCov">        616 :         if (p-&gt;port_id == rstp-&gt;root_port_id) {</span>
+<span class="lineNum">    1390 </span>                :<span class="lineCov">        124 :             ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1391 </span>                :<span class="lineCov">        124 :             return p;</span>
+<span class="lineNum">    1392 </span>                :            :         }
+<span class="lineNum">    1393 </span>                :            :     }
+<span class="lineNum">    1394 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1395 </span>                :<span class="lineNoCov">          0 :     return NULL;</span>
+<span class="lineNum">    1396 </span>                :            : }
+<span class="lineNum">    1397 </span>                :            : 
+<a name="1398"><span class="lineNum">    1398 </span>                :            : /* Returns the state of port 'p'. */</a>
+<span class="lineNum">    1399 </span>                :            : enum rstp_state
+<span class="lineNum">    1400 </span>                :<span class="lineCov">        193 : rstp_port_get_state(const struct rstp_port *p)</span>
+<span class="lineNum">    1401 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1402 </span>                :            : {
+<span class="lineNum">    1403 </span>                :            :     enum rstp_state state;
+<span class="lineNum">    1404 </span>                :            : 
+<span class="lineNum">    1405 </span>                :<span class="lineCov">        193 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1406 </span>                :<span class="lineCov">        193 :     state = p-&gt;rstp_state;</span>
+<span class="lineNum">    1407 </span>                :<span class="lineCov">        193 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1408 </span>                :            : 
+<span class="lineNum">    1409 </span>                :<span class="lineCov">        193 :     return state;</span>
+<span class="lineNum">    1410 </span>                :            : }
+<span class="lineNum">    1411 </span>                :            : 
+<a name="1412"><span class="lineNum">    1412 </span>                :            : /* Retrieves port status. */</a>
+<span class="lineNum">    1413 </span>                :            : void
+<span class="lineNum">    1414 </span>                :<span class="lineCov">         22 : rstp_port_get_status(const struct rstp_port *p, uint16_t *id,</span>
+<span class="lineNum">    1415 </span>                :            :                      enum rstp_state *state, enum rstp_port_role *role,
+<span class="lineNum">    1416 </span>                :            :                      rstp_identifier *designated_bridge_id,
+<span class="lineNum">    1417 </span>                :            :                      uint16_t *designated_port_id,
+<span class="lineNum">    1418 </span>                :            :                      uint32_t *designated_path_cost, int *tx_count,
+<span class="lineNum">    1419 </span>                :            :                      int *rx_count, int *error_count, int *uptime)
+<span class="lineNum">    1420 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1421 </span>                :            : {
+<span class="lineNum">    1422 </span>                :<span class="lineCov">         22 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1423 </span>                :<span class="lineCov">         22 :     *id = p-&gt;port_id;</span>
+<span class="lineNum">    1424 </span>                :<span class="lineCov">         22 :     *state = p-&gt;rstp_state;</span>
+<span class="lineNum">    1425 </span>                :<span class="lineCov">         22 :     *role = p-&gt;role;</span>
+<span class="lineNum">    1426 </span>                :            : 
+<span class="lineNum">    1427 </span>                :<span class="lineCov">         22 :     *designated_bridge_id = p-&gt;port_priority.designated_bridge_id;</span>
+<span class="lineNum">    1428 </span>                :<span class="lineCov">         22 :     *designated_port_id = p-&gt;port_priority.designated_port_id;</span>
+<span class="lineNum">    1429 </span>                :<span class="lineCov">         22 :     *designated_path_cost = p-&gt;port_priority.root_path_cost;</span>
+<span class="lineNum">    1430 </span>                :            : 
+<span class="lineNum">    1431 </span>                :<span class="lineCov">         22 :     *tx_count = p-&gt;tx_count;</span>
+<span class="lineNum">    1432 </span>                :<span class="lineCov">         22 :     *rx_count = p-&gt;rx_rstp_bpdu_cnt;</span>
+<span class="lineNum">    1433 </span>                :<span class="lineCov">         22 :     *error_count = p-&gt;error_count;</span>
+<span class="lineNum">    1434 </span>                :<span class="lineCov">         22 :     *uptime = p-&gt;uptime;</span>
+<span class="lineNum">    1435 </span>                :<span class="lineCov">         22 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1436 </span>                :<span class="lineCov">         22 : }</span>
+<a name="1437"><span class="lineNum">    1437 </span>                :            : </a>
+<span class="lineNum">    1438 </span>                :            : void
+<span class="lineNum">    1439 </span>                :<span class="lineCov">          9 : rstp_port_set(struct rstp_port *port, uint16_t port_num, int priority,</span>
+<span class="lineNum">    1440 </span>                :            :               uint32_t path_cost, bool is_admin_edge, bool is_auto_edge,
+<span class="lineNum">    1441 </span>                :            :               enum rstp_admin_point_to_point_mac_state admin_p2p_mac_state,
+<span class="lineNum">    1442 </span>                :            :               bool admin_port_state, bool do_mcheck, void *aux)
+<span class="lineNum">    1443 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1444 </span>                :            : {
+<span class="lineNum">    1445 </span>                :<span class="lineCov">          9 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1446 </span>                :<span class="lineCov">          9 :     port-&gt;aux = aux;</span>
+<span class="lineNum">    1447 </span>                :<span class="lineCov">          9 :     rstp_port_set_priority__(port, priority);</span>
+<span class="lineNum">    1448 </span>                :<span class="lineCov">          9 :     rstp_port_set_port_number__(port, port_num);</span>
+<span class="lineNum">    1449 </span>                :<span class="lineCov">          9 :     rstp_port_set_path_cost__(port, path_cost);</span>
+<span class="lineNum">    1450 </span>                :<span class="lineCov">          9 :     rstp_port_set_admin_edge__(port, is_admin_edge);</span>
+<span class="lineNum">    1451 </span>                :<span class="lineCov">          9 :     rstp_port_set_auto_edge__(port, is_auto_edge);</span>
+<span class="lineNum">    1452 </span>                :<span class="lineCov">          9 :     rstp_port_set_admin_point_to_point_mac__(port, admin_p2p_mac_state);</span>
+<span class="lineNum">    1453 </span>                :<span class="lineCov">          9 :     rstp_port_set_administrative_bridge_port__(port, admin_port_state, false);</span>
+<span class="lineNum">    1454 </span>                :<span class="lineCov">          9 :     rstp_port_set_mcheck__(port, do_mcheck);</span>
+<span class="lineNum">    1455 </span>                :<span class="lineCov">          9 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1456 </span>                :<span class="lineCov">          9 : }</span>
+<span class="lineNum">    1457 </span>                :            : 
+<a name="1458"><span class="lineNum">    1458 </span>                :            : /* Individual setters only used by test-rstp.c. */</a>
+<span class="lineNum">    1459 </span>                :            : void
+<span class="lineNum">    1460 </span>                :<span class="lineCov">          1 : rstp_port_set_priority(struct rstp_port *port, int priority)</span>
+<span class="lineNum">    1461 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1462 </span>                :            : {
+<span class="lineNum">    1463 </span>                :<span class="lineCov">          1 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1464 </span>                :<span class="lineCov">          1 :     rstp_port_set_priority__(port, priority);</span>
+<span class="lineNum">    1465 </span>                :<span class="lineCov">          1 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1466 </span>                :<span class="lineCov">          1 : }</span>
+<a name="1467"><span class="lineNum">    1467 </span>                :            : </a>
+<span class="lineNum">    1468 </span>                :            : void
+<span class="lineNum">    1469 </span>                :<span class="lineCov">        108 : rstp_port_set_path_cost(struct rstp_port *port, uint32_t path_cost)</span>
+<span class="lineNum">    1470 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1471 </span>                :            : {
+<span class="lineNum">    1472 </span>                :<span class="lineCov">        108 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1473 </span>                :<span class="lineCov">        108 :     rstp_port_set_path_cost__(port, path_cost);</span>
+<span class="lineNum">    1474 </span>                :<span class="lineCov">        108 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1475 </span>                :<span class="lineCov">        108 : }</span>
+<a name="1476"><span class="lineNum">    1476 </span>                :            : </a>
+<span class="lineNum">    1477 </span>                :            : void
+<span class="lineNum">    1478 </span>                :<span class="lineCov">        236 : rstp_port_set_aux(struct rstp_port *port, void *aux)</span>
+<span class="lineNum">    1479 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1480 </span>                :            : {
+<span class="lineNum">    1481 </span>                :<span class="lineCov">        236 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1482 </span>                :<span class="lineCov">        236 :     port-&gt;aux = aux;</span>
+<span class="lineNum">    1483 </span>                :<span class="lineCov">        236 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1484 </span>                :<span class="lineCov">        236 : }</span>
+<span class="lineNum">    1485 </span>                :            : 
+<a name="1486"><span class="lineNum">    1486 </span>                :            : /* Unixctl. */</a>
+<span class="lineNum">    1487 </span>                :            : static struct rstp *
+<span class="lineNum">    1488 </span>                :<span class="lineNoCov">          0 : rstp_find(const char *name)</span>
+<span class="lineNum">    1489 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">    1490 </span>                :            : {
+<span class="lineNum">    1491 </span>                :            :     struct rstp *rstp;
+<span class="lineNum">    1492 </span>                :            : 
+<span class="lineNum">    1493 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     LIST_FOR_EACH (rstp, node, all_rstps) {</span>
+<span class="lineNum">    1494 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!strcmp(rstp-&gt;name, name)) {</span>
+<span class="lineNum">    1495 </span>                :<span class="lineNoCov">          0 :             return rstp;</span>
+<span class="lineNum">    1496 </span>                :            :         }
+<span class="lineNum">    1497 </span>                :            :     }
+<span class="lineNum">    1498 </span>                :<span class="lineNoCov">          0 :     return NULL;</span>
+<span class="lineNum">    1499 </span>                :            : }
+<a name="1500"><span class="lineNum">    1500 </span>                :            : </a>
+<span class="lineNum">    1501 </span>                :            : static void
+<span class="lineNum">    1502 </span>                :<span class="lineNoCov">          0 : rstp_unixctl_tcn(struct unixctl_conn *conn, int argc,</span>
+<span class="lineNum">    1503 </span>                :            :                  const char *argv[], void *aux OVS_UNUSED)
+<span class="lineNum">    1504 </span>                :            :     OVS_EXCLUDED(rstp_mutex)
+<span class="lineNum">    1505 </span>                :            : {
+<span class="lineNum">    1506 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1507 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (argc &gt; 1) {</span>
+<span class="lineNum">    1508 </span>                :<span class="lineNoCov">          0 :         struct rstp *rstp = rstp_find(argv[1]);</span>
+<span class="lineNum">    1509 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!rstp) {</span>
+<span class="lineNum">    1510 </span>                :<span class="lineNoCov">          0 :             unixctl_command_reply_error(conn, &quot;No such RSTP object&quot;);</span>
+<span class="lineNum">    1511 </span>                :<span class="lineNoCov">          0 :             goto out;</span>
+<span class="lineNum">    1512 </span>                :            :         }
+<span class="lineNum">    1513 </span>                :<span class="lineNoCov">          0 :         rstp-&gt;changes = true;</span>
+<span class="lineNum">    1514 </span>                :<span class="lineNoCov">          0 :         move_rstp__(rstp);</span>
+<span class="lineNum">    1515 </span>                :            :     } else {
+<span class="lineNum">    1516 </span>                :            :         struct rstp *rstp;
+<span class="lineNum">    1517 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         LIST_FOR_EACH (rstp, node, all_rstps) {</span>
+<span class="lineNum">    1518 </span>                :<span class="lineNoCov">          0 :             rstp-&gt;changes = true;</span>
+<span class="lineNum">    1519 </span>                :<span class="lineNoCov">          0 :             move_rstp__(rstp);</span>
+<span class="lineNum">    1520 </span>                :            :         }
+<span class="lineNum">    1521 </span>                :            :     }
+<span class="lineNum">    1522 </span>                :<span class="lineNoCov">          0 :     unixctl_command_reply(conn, &quot;OK&quot;);</span>
+<span class="lineNum">    1523 </span>                :            : 
+<span class="lineNum">    1524 </span>                :            : out:
+<span class="lineNum">    1525 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;rstp_mutex);</span>
+<span class="lineNum">    1526 </span>                :<span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

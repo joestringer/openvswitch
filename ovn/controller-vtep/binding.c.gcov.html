@@ -1,0 +1,361 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ovn/controller-vtep/binding.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">ovn/controller-vtep</a> - binding.c<span style="font-size: 80%;"> (source / <a href="binding.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">89</td>
+            <td class="headerCovTableEntry">90</td>
+            <td class="headerCovTableEntryHi">98.9 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">6</td>
+            <td class="headerCovTableEntry">6</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">64</td>
+            <td class="headerCovTableEntry">74</td>
+            <td class="headerCovTableEntryMed">86.5 %</td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (c) 2015 Nicira, Inc.</a>
+<span class="lineNum">       2 </span>                :            :  *
+<span class="lineNum">       3 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       4 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       5 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       6 </span>                :            :  *
+<span class="lineNum">       7 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       8 </span>                :            :  *
+<span class="lineNum">       9 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      10 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      11 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      12 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      13 </span>                :            :  * limitations under the License.
+<span class="lineNum">      14 </span>                :            :  */
+<span class="lineNum">      15 </span>                :            : 
+<span class="lineNum">      16 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      17 </span>                :            : #include &quot;binding.h&quot;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &quot;openvswitch/shash.h&quot;
+<span class="lineNum">      20 </span>                :            : #include &quot;lib/smap.h&quot;
+<span class="lineNum">      21 </span>                :            : #include &quot;lib/util.h&quot;
+<span class="lineNum">      22 </span>                :            : #include &quot;openvswitch/vlog.h&quot;
+<span class="lineNum">      23 </span>                :            : #include &quot;ovn-controller-vtep.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;ovn/lib/ovn-sb-idl.h&quot;
+<a name="25"><span class="lineNum">      25 </span>                :            : #include &quot;vtep/vtep-idl.h&quot;</a>
+<span class="lineNum">      26 </span>                :            : 
+<span class="lineNum">      27 </span>                :<span class="lineCov">         14 : VLOG_DEFINE_THIS_MODULE(binding);</span>
+<span class="lineNum">      28 </span>                :            : 
+<span class="lineNum">      29 </span>                :            : /*
+<span class="lineNum">      30 </span>                :            :  * This module scans through the Port_Binding table in ovnsb.  If there is a
+<span class="lineNum">      31 </span>                :            :  * logical port binding entry for logical switch in vtep gateway chassis's
+<span class="lineNum">      32 </span>                :            :  * 'vtep_logical_switches' column, sets the binding's chassis column to the
+<span class="lineNum">      33 </span>                :            :  * corresponding vtep gateway chassis.
+<span class="lineNum">      34 </span>                :            :  *
+<span class="lineNum">      35 </span>                :            :  */
+<span class="lineNum">      36 </span>                :            : 
+<span class="lineNum">      37 </span>                :            : 
+<span class="lineNum">      38 </span>                :            : /* Returns true if the 'vtep_lswitch' specified in 'port_binding_rec'
+<span class="lineNum">      39 </span>                :            :  * has already been bound to another port binding entry, and resets
+<span class="lineNum">      40 </span>                :            :  * 'port_binding_rec''s chassis column.  Otherwise, updates 'ls_to_pb'
+<a name="41"><span class="lineNum">      41 </span>                :            :  * and returns false. */</a>
+<span class="lineNum">      42 </span>                :            : static bool
+<span class="lineNum">      43 </span>                :<span class="lineCov">        172 : check_pb_conflict(struct shash *ls_to_pb,</span>
+<span class="lineNum">      44 </span>                :            :                   const struct sbrec_port_binding *port_binding_rec,
+<span class="lineNum">      45 </span>                :            :                   const char *chassis_name,
+<span class="lineNum">      46 </span>                :            :                   const char *vtep_lswitch)
+<span class="lineNum">      47 </span>                :            : {
+<span class="lineNum">      48 </span>                :<span class="lineCov">        172 :     const struct sbrec_port_binding *pb_conflict =</span>
+<span class="lineNum">      49 </span>                :            :         shash_find_data(ls_to_pb, vtep_lswitch);
+<span class="lineNum">      50 </span>                :            : 
+<span class="lineNum">      51 </span>        [<span class="branchCov" title="Branch 0 was taken 5 times"> + </span><span class="branchCov" title="Branch 1 was taken 167 times"> + </span>]:<span class="lineCov">        172 :     if (pb_conflict) {</span>
+<span class="lineNum">      52 </span>        [<span class="branchCov" title="Branch 0 was taken 5 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          5 :         VLOG_WARN(&quot;logical switch (%s), on vtep gateway chassis &quot;</span>
+<span class="lineNum">      53 </span>                :            :                   &quot;(%s) has already been associated with logical &quot;
+<span class="lineNum">      54 </span>                :            :                   &quot;port (%s), ignore logical port (%s)&quot;,
+<span class="lineNum">      55 </span>                :            :                   vtep_lswitch, chassis_name,
+<span class="lineNum">      56 </span>                :            :                   pb_conflict-&gt;logical_port,
+<span class="lineNum">      57 </span>                :            :                   port_binding_rec-&gt;logical_port);
+<span class="lineNum">      58 </span>                :<span class="lineCov">          5 :         sbrec_port_binding_set_chassis(port_binding_rec, NULL);</span>
+<span class="lineNum">      59 </span>                :            : 
+<span class="lineNum">      60 </span>                :<span class="lineCov">          5 :         return true;</span>
+<span class="lineNum">      61 </span>                :            :     }
+<span class="lineNum">      62 </span>                :            : 
+<span class="lineNum">      63 </span>                :<span class="lineCov">        167 :     shash_add(ls_to_pb, vtep_lswitch, port_binding_rec);</span>
+<span class="lineNum">      64 </span>                :<span class="lineCov">        167 :     return false;</span>
+<span class="lineNum">      65 </span>                :            : }
+<span class="lineNum">      66 </span>                :            : 
+<span class="lineNum">      67 </span>                :            : /* Returns true if the 'vtep_lswitch' specified in 'port_binding_rec'
+<span class="lineNum">      68 </span>                :            :  * has already been bound to a different datapath, and resets
+<span class="lineNum">      69 </span>                :            :  * 'port_binding_rec''s chassis column.  Otherwise, updates 'ls_to_db' and
+<a name="70"><span class="lineNum">      70 </span>                :            :  * returns false. */</a>
+<span class="lineNum">      71 </span>                :            : static bool
+<span class="lineNum">      72 </span>                :<span class="lineCov">        172 : check_db_conflict(struct shash *ls_to_db,</span>
+<span class="lineNum">      73 </span>                :            :                   const struct sbrec_port_binding *port_binding_rec,
+<span class="lineNum">      74 </span>                :            :                   const char *chassis_name,
+<span class="lineNum">      75 </span>                :            :                   const char *vtep_lswitch)
+<span class="lineNum">      76 </span>                :            : {
+<span class="lineNum">      77 </span>                :<span class="lineCov">        172 :     const struct sbrec_datapath_binding *db_conflict =</span>
+<span class="lineNum">      78 </span>                :            :         shash_find_data(ls_to_db, vtep_lswitch);
+<span class="lineNum">      79 </span>                :            : 
+<span class="lineNum">      80 </span>[<span class="branchCov" title="Branch 0 was taken 13 times"> + </span><span class="branchCov" title="Branch 1 was taken 159 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 2 times"> + </span><span class="branchCov" title="Branch 3 was taken 11 times"> + </span>]:<span class="lineCov">        172 :     if (db_conflict &amp;&amp; db_conflict != port_binding_rec-&gt;datapath) {</span>
+<span class="lineNum">      81 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :         VLOG_WARN(&quot;logical switch (%s), on vtep gateway chassis &quot;</span>
+<span class="lineNum">      82 </span>                :            :                   &quot;(%s) has already been associated with logical &quot;
+<span class="lineNum">      83 </span>                :            :                   &quot;datapath (with tunnel key %&quot;PRId64&quot;), ignore &quot;
+<span class="lineNum">      84 </span>                :            :                   &quot;logical port (%s) which belongs to logical &quot;
+<span class="lineNum">      85 </span>                :            :                   &quot;datapath (with tunnel key %&quot;PRId64&quot;)&quot;,
+<span class="lineNum">      86 </span>                :            :                   vtep_lswitch, chassis_name,
+<span class="lineNum">      87 </span>                :            :                   db_conflict-&gt;tunnel_key,
+<span class="lineNum">      88 </span>                :            :                   port_binding_rec-&gt;logical_port,
+<span class="lineNum">      89 </span>                :            :                   port_binding_rec-&gt;datapath-&gt;tunnel_key);
+<span class="lineNum">      90 </span>                :<span class="lineCov">          2 :         sbrec_port_binding_set_chassis(port_binding_rec, NULL);</span>
+<span class="lineNum">      91 </span>                :            : 
+<span class="lineNum">      92 </span>                :<span class="lineCov">          2 :         return true;</span>
+<span class="lineNum">      93 </span>                :            :     }
+<span class="lineNum">      94 </span>                :            : 
+<span class="lineNum">      95 </span>                :<span class="lineCov">        170 :     shash_replace(ls_to_db, vtep_lswitch, port_binding_rec-&gt;datapath);</span>
+<span class="lineNum">      96 </span>                :<span class="lineCov">        170 :     return false;</span>
+<span class="lineNum">      97 </span>                :            : }
+<span class="lineNum">      98 </span>                :            : 
+<a name="99"><span class="lineNum">      99 </span>                :            : /* Updates the 'port_binding_rec''s chassis column to 'chassis_rec'. */</a>
+<span class="lineNum">     100 </span>                :            : static void
+<span class="lineNum">     101 </span>                :<span class="lineCov">        174 : update_pb_chassis(const struct sbrec_port_binding *port_binding_rec,</span>
+<span class="lineNum">     102 </span>                :            :                   const struct sbrec_chassis *chassis_rec)
+<span class="lineNum">     103 </span>                :            : {
+<span class="lineNum">     104 </span>        [<span class="branchCov" title="Branch 0 was taken 19 times"> + </span><span class="branchCov" title="Branch 1 was taken 155 times"> + </span>]:<span class="lineCov">        174 :     if (port_binding_rec-&gt;chassis != chassis_rec) {</span>
+<span class="lineNum">     105 </span>[<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchCov" title="Branch 1 was taken 9 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 10 times"> + </span>]:<span class="lineCov">         19 :         if (chassis_rec &amp;&amp; port_binding_rec-&gt;chassis) {</span>
+<span class="lineNum">     106 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_DBG(&quot;Changing chassis association of logical &quot;</span>
+<span class="lineNum">     107 </span>                :            :                      &quot;port (%s) from (%s) to (%s)&quot;,
+<span class="lineNum">     108 </span>                :            :                      port_binding_rec-&gt;logical_port,
+<span class="lineNum">     109 </span>                :            :                      port_binding_rec-&gt;chassis-&gt;name,
+<span class="lineNum">     110 </span>                :            :                      chassis_rec-&gt;name);
+<span class="lineNum">     111 </span>                :            :         }
+<span class="lineNum">     112 </span>                :<span class="lineCov">         19 :         sbrec_port_binding_set_chassis(port_binding_rec, chassis_rec);</span>
+<span class="lineNum">     113 </span>                :            :     }
+<span class="lineNum">     114 </span>                :<span class="lineCov">        174 : }</span>
+<span class="lineNum">     115 </span>                :            : 
+<span class="lineNum">     116 </span>                :            : 
+<span class="lineNum">     117 </span>                :            : /* Checks and updates logical port to vtep logical switch bindings for each
+<a name="118"><span class="lineNum">     118 </span>                :            :  * physical switch in VTEP. */</a>
+<span class="lineNum">     119 </span>                :            : void
+<span class="lineNum">     120 </span>                :<span class="lineCov">        269 : binding_run(struct controller_vtep_ctx *ctx)</span>
+<span class="lineNum">     121 </span>                :            : {
+<span class="lineNum">     122 </span>        [<span class="branchCov" title="Branch 0 was taken 45 times"> + </span><span class="branchCov" title="Branch 1 was taken 224 times"> + </span>]:<span class="lineCov">        269 :     if (!ctx-&gt;ovnsb_idl_txn) {</span>
+<span class="lineNum">     123 </span>                :<span class="lineCov">         45 :         return;</span>
+<span class="lineNum">     124 </span>                :            :     }
+<span class="lineNum">     125 </span>                :            : 
+<span class="lineNum">     126 </span>                :            :     /* 'ls_to_db'
+<span class="lineNum">     127 </span>                :            :      *
+<span class="lineNum">     128 </span>                :            :      * Maps vtep logical switch name to the datapath binding entry.  This is
+<span class="lineNum">     129 </span>                :            :      * used to guarantee that each vtep logical switch is only included
+<span class="lineNum">     130 </span>                :            :      * in only one ovn datapath (ovn logical switch).  See check_db_conflict()
+<span class="lineNum">     131 </span>                :            :      * for details.
+<span class="lineNum">     132 </span>                :            :      *
+<span class="lineNum">     133 </span>                :            :      * 'ls_to_pb'
+<span class="lineNum">     134 </span>                :            :      *
+<span class="lineNum">     135 </span>                :            :      * Maps vtep logical switch name to the port binding entry.  This is used
+<span class="lineNum">     136 </span>                :            :      * to guarantee that each vtep logical switch on a vtep physical switch
+<span class="lineNum">     137 </span>                :            :      * is only bound to one logical port.  See check_pb_conflict() for
+<span class="lineNum">     138 </span>                :            :      * details.
+<span class="lineNum">     139 </span>                :            :      *
+<span class="lineNum">     140 </span>                :            :      */
+<span class="lineNum">     141 </span>                :<span class="lineCov">        224 :     struct shash ls_to_db = SHASH_INITIALIZER(&amp;ls_to_db);</span>
+<span class="lineNum">     142 </span>                :            : 
+<span class="lineNum">     143 </span>                :            :     /* Stores the 'chassis' and the 'ls_to_pb' map related to
+<span class="lineNum">     144 </span>                :            :      * a vtep physcial switch. */
+<span class="lineNum">     145 </span>                :            :     struct ps {
+<span class="lineNum">     146 </span>                :            :         const struct sbrec_chassis *chassis_rec;
+<span class="lineNum">     147 </span>                :            :         struct shash ls_to_pb;
+<span class="lineNum">     148 </span>                :            :     };
+<span class="lineNum">     149 </span>                :<span class="lineCov">        224 :     struct shash ps_map = SHASH_INITIALIZER(&amp;ps_map);</span>
+<span class="lineNum">     150 </span>                :            :     const struct vteprec_physical_switch *pswitch;
+<span class="lineNum">     151 </span>        [<span class="branchCov" title="Branch 2 was taken 238 times"> + </span><span class="branchCov" title="Branch 3 was taken 224 times"> + </span>]:<span class="lineCov">        462 :     VTEPREC_PHYSICAL_SWITCH_FOR_EACH (pswitch, ctx-&gt;vtep_idl) {</span>
+<span class="lineNum">     152 </span>                :<span class="lineCov">        238 :         const struct sbrec_chassis *chassis_rec</span>
+<span class="lineNum">     153 </span>                :<span class="lineCov">        238 :             = get_chassis_by_name(ctx-&gt;ovnsb_idl, pswitch-&gt;name);</span>
+<span class="lineNum">     154 </span>                :<span class="lineCov">        238 :         struct ps *ps = xmalloc(sizeof *ps);</span>
+<span class="lineNum">     155 </span>                :            :         size_t i;
+<span class="lineNum">     156 </span>                :            : 
+<span class="lineNum">     157 </span>                :            :         /* 'chassis_rec' must exist. */
+<span class="lineNum">     158 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 238 times"> + </span>]:<span class="lineCov">        238 :         ovs_assert(chassis_rec);</span>
+<span class="lineNum">     159 </span>                :<span class="lineCov">        238 :         ps-&gt;chassis_rec = chassis_rec;</span>
+<span class="lineNum">     160 </span>                :<span class="lineCov">        238 :         shash_init(&amp;ps-&gt;ls_to_pb);</span>
+<span class="lineNum">     161 </span>        [<span class="branchCov" title="Branch 0 was taken 230 times"> + </span><span class="branchCov" title="Branch 1 was taken 238 times"> + </span>]:<span class="lineCov">        468 :         for (i = 0; i &lt; chassis_rec-&gt;n_vtep_logical_switches; i++) {</span>
+<span class="lineNum">     162 </span>                :<span class="lineCov">        230 :             shash_add(&amp;ps-&gt;ls_to_pb, chassis_rec-&gt;vtep_logical_switches[i],</span>
+<span class="lineNum">     163 </span>                :            :                       NULL);
+<span class="lineNum">     164 </span>                :            :         }
+<span class="lineNum">     165 </span>                :<span class="lineCov">        238 :         shash_add(&amp;ps_map, chassis_rec-&gt;name, ps);</span>
+<span class="lineNum">     166 </span>                :            :     }
+<span class="lineNum">     167 </span>                :            : 
+<span class="lineNum">     168 </span>                :<span class="lineCov">        224 :     ovsdb_idl_txn_add_comment(ctx-&gt;ovnsb_idl_txn,</span>
+<span class="lineNum">     169 </span>                :            :                               &quot;ovn-controller-vtep: updating bindings&quot;);
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>                :            :     const struct sbrec_port_binding *port_binding_rec;
+<span class="lineNum">     172 </span>                :            :     /* Port binding for vtep gateway chassis must have type &quot;vtep&quot;,
+<span class="lineNum">     173 </span>                :            :      * and matched physical switch name and logical switch name. */
+<span class="lineNum">     174 </span>        [<span class="branchCov" title="Branch 2 was taken 423 times"> + </span><span class="branchCov" title="Branch 3 was taken 224 times"> + </span>]:<span class="lineCov">        647 :     SBREC_PORT_BINDING_FOR_EACH(port_binding_rec, ctx-&gt;ovnsb_idl) {</span>
+<span class="lineNum">     175 </span>                :<span class="lineCov">        423 :         const char *type = port_binding_rec-&gt;type;</span>
+<span class="lineNum">     176 </span>                :<span class="lineCov">        423 :         const char *vtep_pswitch = smap_get(&amp;port_binding_rec-&gt;options,</span>
+<span class="lineNum">     177 </span>                :            :                                             &quot;vtep-physical-switch&quot;);
+<span class="lineNum">     178 </span>                :<span class="lineCov">        423 :         const char *vtep_lswitch = smap_get(&amp;port_binding_rec-&gt;options,</span>
+<span class="lineNum">     179 </span>                :            :                                             &quot;vtep-logical-switch&quot;);
+<span class="lineNum">     180 </span>                :<span class="lineCov">        423 :         struct ps *ps</span>
+<span class="lineNum">     181 </span>        [<span class="branchCov" title="Branch 0 was taken 211 times"> + </span><span class="branchCov" title="Branch 1 was taken 212 times"> + </span>]:<span class="lineCov">        423 :             = vtep_pswitch ? shash_find_data(&amp;ps_map, vtep_pswitch) : NULL;</span>
+<span class="lineNum">     182 </span>                :<span class="lineCov">        423 :         bool found_ls</span>
+<span class="lineNum">     183 </span>[<span class="branchCov" title="Branch 0 was taken 206 times"> + </span><span class="branchCov" title="Branch 1 was taken 217 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 206 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        423 :             = ps &amp;&amp; vtep_lswitch &amp;&amp; shash_find(&amp;ps-&gt;ls_to_pb, vtep_lswitch);</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 5 was taken 175 times"> + </span><span class="branchCov" title="Branch 6 was taken 31 times"> + </span>]
+<span class="lineNum">     184 </span>                :            : 
+<span class="lineNum">     185 </span>[<span class="branchCov" title="Branch 0 was taken 219 times"> + </span><span class="branchCov" title="Branch 1 was taken 204 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 172 times"> + </span><span class="branchCov" title="Branch 3 was taken 47 times"> + </span>]:<span class="lineCov">        595 :         if (!strcmp(type, &quot;vtep&quot;) &amp;&amp; found_ls) {</span>
+<span class="lineNum">     186 </span>                :            :             bool pb_conflict, db_conflict;
+<span class="lineNum">     187 </span>                :            : 
+<span class="lineNum">     188 </span>                :<span class="lineCov">        172 :             pb_conflict = check_pb_conflict(&amp;ps-&gt;ls_to_pb, port_binding_rec,</span>
+<span class="lineNum">     189 </span>                :<span class="lineCov">        172 :                                             ps-&gt;chassis_rec-&gt;name,</span>
+<span class="lineNum">     190 </span>                :            :                                             vtep_lswitch);
+<span class="lineNum">     191 </span>                :<span class="lineCov">        172 :             db_conflict = check_db_conflict(&amp;ls_to_db, port_binding_rec,</span>
+<span class="lineNum">     192 </span>                :<span class="lineCov">        172 :                                             ps-&gt;chassis_rec-&gt;name,</span>
+<span class="lineNum">     193 </span>                :            :                                             vtep_lswitch);
+<span class="lineNum">     194 </span>                :            :             /* Updates port binding's chassis column when there
+<span class="lineNum">     195 </span>                :            :              * is no conflict. */
+<span class="lineNum">     196 </span>[<span class="branchCov" title="Branch 0 was taken 167 times"> + </span><span class="branchCov" title="Branch 1 was taken 5 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 165 times"> + </span><span class="branchCov" title="Branch 3 was taken 2 times"> + </span>]:<span class="lineCov">        172 :             if (!pb_conflict &amp;&amp; !db_conflict) {</span>
+<span class="lineNum">     197 </span>                :<span class="lineCov">        165 :                 update_pb_chassis(port_binding_rec, ps-&gt;chassis_rec);</span>
+<span class="lineNum">     198 </span>                :            :             }
+<span class="lineNum">     199 </span>        [<span class="branchCov" title="Branch 0 was taken 163 times"> + </span><span class="branchCov" title="Branch 1 was taken 88 times"> + </span>]:<span class="lineCov">        251 :         } else if (port_binding_rec-&gt;chassis</span>
+<span class="lineNum">     200 </span>        [<span class="branchCov" title="Branch 1 was taken 4 times"> + </span><span class="branchCov" title="Branch 2 was taken 159 times"> + </span>]:<span class="lineCov">        163 :                    &amp;&amp; shash_find(&amp;ps_map, port_binding_rec-&gt;chassis-&gt;name)) {</span>
+<span class="lineNum">     201 </span>                :            :             /* Resets 'port_binding_rec' since it is no longer bound to
+<span class="lineNum">     202 </span>                :            :              * any vtep logical switch. */
+<span class="lineNum">     203 </span>                :<span class="lineCov">          4 :             update_pb_chassis(port_binding_rec, NULL);</span>
+<span class="lineNum">     204 </span>                :            :         }
+<span class="lineNum">     205 </span>                :            :     }
+<span class="lineNum">     206 </span>                :            : 
+<span class="lineNum">     207 </span>                :            :     struct shash_node *iter, *next;
+<span class="lineNum">     208 </span>[<span class="branchCov" title="Branch 1 was taken 224 times"> + </span><span class="branchCov" title="Branch 2 was taken 238 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 224 times"> + </span>]:<span class="lineCov">        462 :     SHASH_FOR_EACH_SAFE (iter, next, &amp;ps_map) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 6 was taken 238 times"> + </span><span class="branchCov" title="Branch 7 was taken 224 times"> + </span>]
+<span class="lineNum">     209 </span>                :<span class="lineCov">        238 :         struct ps *ps = iter-&gt;data;</span>
+<span class="lineNum">     210 </span>                :            :         struct shash_node *node;
+<span class="lineNum">     211 </span>                :            : 
+<span class="lineNum">     212 </span>[<span class="branchCov" title="Branch 2 was taken 397 times"> + </span><span class="branchCov" title="Branch 3 was taken 238 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 238 times"> + </span>]:<span class="lineCov">        635 :         SHASH_FOR_EACH (node, &amp;ps-&gt;ls_to_pb) {</span>
+<span class="lineNum">     213 </span>        [<span class="branchCov" title="Branch 0 was taken 230 times"> + </span><span class="branchCov" title="Branch 1 was taken 167 times"> + </span>]:<span class="lineCov">        397 :             if (!node-&gt;data) {</span>
+<span class="lineNum">     214 </span>                :            :                 static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     215 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 230 times"> + </span>]:<span class="lineCov">        230 :                 VLOG_DBG_RL(&amp;rl, &quot;No port binding entry for logical switch (%s)&quot;</span>
+<span class="lineNum">     216 </span>                :            :                             &quot;on vtep gateway chassis (%s)&quot;, node-&gt;name,
+<span class="lineNum">     217 </span>                :            :                             ps-&gt;chassis_rec-&gt;name);
+<span class="lineNum">     218 </span>                :            :             }
+<span class="lineNum">     219 </span>                :            :         }
+<span class="lineNum">     220 </span>                :<span class="lineCov">        238 :         shash_delete(&amp;ps_map, iter);</span>
+<span class="lineNum">     221 </span>                :<span class="lineCov">        238 :         shash_destroy(&amp;ps-&gt;ls_to_pb);</span>
+<span class="lineNum">     222 </span>                :<span class="lineCov">        238 :         free(ps);</span>
+<span class="lineNum">     223 </span>                :            :     }
+<span class="lineNum">     224 </span>                :<span class="lineCov">        224 :     shash_destroy(&amp;ls_to_db);</span>
+<span class="lineNum">     225 </span>                :<span class="lineCov">        224 :     shash_destroy(&amp;ps_map);</span>
+<span class="lineNum">     226 </span>                :            : }
+<span class="lineNum">     227 </span>                :            : 
+<span class="lineNum">     228 </span>                :            : /* Removes all port binding association with vtep gateway chassis.
+<span class="lineNum">     229 </span>                :            :  * Returns true when done (i.e. there is no change made to 'ctx-&gt;ovnsb_idl'),
+<a name="230"><span class="lineNum">     230 </span>                :            :  * otherwise returns false. */</a>
+<span class="lineNum">     231 </span>                :            : bool
+<span class="lineNum">     232 </span>                :<span class="lineCov">         27 : binding_cleanup(struct controller_vtep_ctx *ctx)</span>
+<span class="lineNum">     233 </span>                :            : {
+<span class="lineNum">     234 </span>        [<span class="branchCov" title="Branch 0 was taken 13 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>]:<span class="lineCov">         27 :     if (!ctx-&gt;ovnsb_idl_txn) {</span>
+<span class="lineNum">     235 </span>                :<span class="lineCov">         13 :         return false;</span>
+<span class="lineNum">     236 </span>                :            :     }
+<span class="lineNum">     237 </span>                :            : 
+<span class="lineNum">     238 </span>                :<span class="lineCov">         14 :     struct shash ch_to_pb = SHASH_INITIALIZER(&amp;ch_to_pb);</span>
+<span class="lineNum">     239 </span>                :            :     const struct sbrec_port_binding *port_binding_rec;
+<span class="lineNum">     240 </span>                :<span class="lineCov">         14 :     bool all_done = true;</span>
+<span class="lineNum">     241 </span>                :            :     /* Hashs all port binding entries using the associated chassis name. */
+<span class="lineNum">     242 </span>        [<span class="branchCov" title="Branch 2 was taken 32 times"> + </span><span class="branchCov" title="Branch 3 was taken 14 times"> + </span>]:<span class="lineCov">         46 :     SBREC_PORT_BINDING_FOR_EACH(port_binding_rec, ctx-&gt;ovnsb_idl) {</span>
+<span class="lineNum">     243 </span>        [<span class="branchCov" title="Branch 0 was taken 13 times"> + </span><span class="branchCov" title="Branch 1 was taken 19 times"> + </span>]:<span class="lineCov">         32 :         if (port_binding_rec-&gt;chassis) {</span>
+<span class="lineNum">     244 </span>                :<span class="lineCov">         13 :             shash_add(&amp;ch_to_pb, port_binding_rec-&gt;chassis-&gt;name,</span>
+<span class="lineNum">     245 </span>                :            :                       port_binding_rec);
+<span class="lineNum">     246 </span>                :            :         }
+<span class="lineNum">     247 </span>                :            :     }
+<span class="lineNum">     248 </span>                :            : 
+<span class="lineNum">     249 </span>                :<span class="lineCov">         14 :     ovsdb_idl_txn_add_comment(ctx-&gt;ovnsb_idl_txn,</span>
+<span class="lineNum">     250 </span>                :            :                               &quot;ovn-controller-vtep: removing bindings&quot;);
+<span class="lineNum">     251 </span>                :            : 
+<span class="lineNum">     252 </span>                :            :     const struct vteprec_physical_switch *pswitch;
+<span class="lineNum">     253 </span>        [<span class="branchCov" title="Branch 2 was taken 14 times"> + </span><span class="branchCov" title="Branch 3 was taken 14 times"> + </span>]:<span class="lineCov">         28 :     VTEPREC_PHYSICAL_SWITCH_FOR_EACH (pswitch, ctx-&gt;vtep_idl) {</span>
+<span class="lineNum">     254 </span>                :<span class="lineCov">         14 :         const struct sbrec_chassis *chassis_rec</span>
+<span class="lineNum">     255 </span>                :<span class="lineCov">         14 :             = get_chassis_by_name(ctx-&gt;ovnsb_idl, pswitch-&gt;name);</span>
+<span class="lineNum">     256 </span>                :            : 
+<span class="lineNum">     257 </span>        [<span class="branchCov" title="Branch 0 was taken 7 times"> + </span><span class="branchCov" title="Branch 1 was taken 7 times"> + </span>]:<span class="lineCov">         14 :         if (!chassis_rec) {</span>
+<span class="lineNum">     258 </span>                :<span class="lineCov">          7 :             continue;</span>
+<span class="lineNum">     259 </span>                :            :         }
+<span class="lineNum">     260 </span>                :            : 
+<span class="lineNum">     261 </span>                :            :         for (;;) {
+<span class="lineNum">     262 </span>                :<span class="lineCov">         12 :             port_binding_rec = shash_find_and_delete(&amp;ch_to_pb,</span>
+<span class="lineNum">     263 </span>                :<span class="lineCov">         12 :                                                      chassis_rec-&gt;name);</span>
+<span class="lineNum">     264 </span>        [<span class="branchCov" title="Branch 0 was taken 7 times"> + </span><span class="branchCov" title="Branch 1 was taken 5 times"> + </span>]:<span class="lineCov">         12 :             if (!port_binding_rec) {</span>
+<span class="lineNum">     265 </span>                :<span class="lineCov">          7 :                 break;</span>
+<span class="lineNum">     266 </span>                :            :             }
+<span class="lineNum">     267 </span>                :<span class="lineCov">          5 :             all_done = false;</span>
+<span class="lineNum">     268 </span>                :<span class="lineCov">          5 :             update_pb_chassis(port_binding_rec, NULL);</span>
+<span class="lineNum">     269 </span>                :<span class="lineCov">          5 :         }</span>
+<span class="lineNum">     270 </span>                :            :     }
+<span class="lineNum">     271 </span>                :<span class="lineCov">         14 :     shash_destroy(&amp;ch_to_pb);</span>
+<span class="lineNum">     272 </span>                :            : 
+<span class="lineNum">     273 </span>                :<span class="lineCov">         27 :     return all_done;</span>
+<span class="lineNum">     274 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

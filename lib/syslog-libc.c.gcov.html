@@ -1,0 +1,161 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/syslog-libc.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - syslog-libc.c<span style="font-size: 80%;"> (source / <a href="syslog-libc.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">12</td>
+            <td class="headerCovTableEntry">12</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">3</td>
+            <td class="headerCovTableEntry">3</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntryHi">-</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2015, 2016 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : #include &quot;syslog-libc.h&quot;
+<span class="lineNum">      17 </span>                :            : 
+<span class="lineNum">      18 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;syslog.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;unistd.h&gt;
+<span class="lineNum">      23 </span>                :            : 
+<span class="lineNum">      24 </span>                :            : #include &quot;compiler.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;openvswitch/dynamic-string.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;socket-util.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;syslog-provider.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      29 </span>                :            : 
+<span class="lineNum">      30 </span>                :            : 
+<span class="lineNum">      31 </span>                :            : static void syslog_libc_open(struct syslogger *this, int facility);
+<span class="lineNum">      32 </span>                :            : static void syslog_libc_log(struct syslogger *this, int pri, const char *msg);
+<span class="lineNum">      33 </span>                :            : 
+<span class="lineNum">      34 </span>                :            : static struct syslog_class syslog_libc_class = {
+<span class="lineNum">      35 </span>                :            :     syslog_libc_open,
+<span class="lineNum">      36 </span>                :            :     syslog_libc_log,
+<span class="lineNum">      37 </span>                :            : };
+<span class="lineNum">      38 </span>                :            : 
+<span class="lineNum">      39 </span>                :            : struct syslog_libc {
+<span class="lineNum">      40 </span>                :            :     struct syslogger parent;
+<span class="lineNum">      41 </span>                :            : };
+<span class="lineNum">      42 </span>                :            : 
+<span class="lineNum">      43 </span>                :            : 
+<span class="lineNum">      44 </span>                :            : /* This function  creates object that delegate all logging to libc's
+<a name="45"><span class="lineNum">      45 </span>                :            :  * syslog implementation. */</a>
+<span class="lineNum">      46 </span>                :            : struct syslogger *
+<span class="lineNum">      47 </span>                :<span class="lineCov">       6684 : syslog_libc_create(void)</span>
+<span class="lineNum">      48 </span>                :            : {
+<span class="lineNum">      49 </span>                :<span class="lineCov">       6684 :     struct syslog_libc *this = xmalloc(sizeof *this);</span>
+<span class="lineNum">      50 </span>                :            : 
+<span class="lineNum">      51 </span>                :<span class="lineCov">       6684 :     this-&gt;parent.class = &amp;syslog_libc_class;</span>
+<span class="lineNum">      52 </span>                :<span class="lineCov">       6684 :     this-&gt;parent.prefix = &quot;&lt;%B&gt; %D{%h %e %T} %E %A:&quot;;</span>
+<span class="lineNum">      53 </span>                :            : 
+<span class="lineNum">      54 </span>                :<span class="lineCov">       6684 :     return &amp;this-&gt;parent;</span>
+<span class="lineNum">      55 </span>                :            : }
+<a name="56"><span class="lineNum">      56 </span>                :            : </a>
+<span class="lineNum">      57 </span>                :            : static void
+<span class="lineNum">      58 </span>                :<span class="lineCov">       6684 : syslog_libc_open(struct syslogger *this OVS_UNUSED, int facility)</span>
+<span class="lineNum">      59 </span>                :            : {
+<span class="lineNum">      60 </span>                :            :     static char *ident;
+<span class="lineNum">      61 </span>                :            : 
+<span class="lineNum">      62 </span>                :            :     /* openlog() is allowed to keep the pointer passed in, without making a
+<span class="lineNum">      63 </span>                :            :      * copy.  The daemonize code sometimes frees and replaces
+<span class="lineNum">      64 </span>                :            :      * 'program_name', so make a private copy just for openlog().  (We keep
+<span class="lineNum">      65 </span>                :            :      * a pointer to the private copy to suppress memory leak warnings in
+<span class="lineNum">      66 </span>                :            :      * case openlog() does make its own copy.) */
+<span class="lineNum">      67 </span>                :<span class="lineCov">       6684 :     ident = nullable_xstrdup(program_name);</span>
+<span class="lineNum">      68 </span>                :            : 
+<span class="lineNum">      69 </span>                :<span class="lineCov">       6684 :     openlog(ident, LOG_NDELAY, facility);</span>
+<span class="lineNum">      70 </span>                :<span class="lineCov">       6684 : }</span>
+<a name="71"><span class="lineNum">      71 </span>                :            : </a>
+<span class="lineNum">      72 </span>                :            : static void
+<span class="lineNum">      73 </span>                :<span class="lineCov">     221115 : syslog_libc_log(struct syslogger *this OVS_UNUSED, int pri, const char *msg)</span>
+<span class="lineNum">      74 </span>                :            : {
+<span class="lineNum">      75 </span>                :<span class="lineCov">     221115 :     syslog(pri, &quot;%s&quot;, msg);</span>
+<span class="lineNum">      76 </span>                :<span class="lineCov">     221115 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

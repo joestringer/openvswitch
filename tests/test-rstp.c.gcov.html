@@ -1,0 +1,800 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - tests/test-rstp.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">tests</a> - test-rstp.c<span style="font-size: 80%;"> (source / <a href="test-rstp.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">240</td>
+            <td class="headerCovTableEntry">356</td>
+            <td class="headerCovTableEntryLo">67.4 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">15</td>
+            <td class="headerCovTableEntry">21</td>
+            <td class="headerCovTableEntryLo">71.4 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">138</td>
+            <td class="headerCovTableEntry">226</td>
+            <td class="headerCovTableEntryLo">61.1 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : #include &lt;config.h&gt;</a>
+<span class="lineNum">       2 </span>                :            : #undef NDEBUG
+<span class="lineNum">       3 </span>                :            : #include &quot;rstp-common.h&quot;
+<span class="lineNum">       4 </span>                :            : #include &lt;assert.h&gt;
+<span class="lineNum">       5 </span>                :            : #include &lt;ctype.h&gt;
+<span class="lineNum">       6 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">       7 </span>                :            : #include &lt;inttypes.h&gt;
+<span class="lineNum">       8 </span>                :            : #include &lt;stdarg.h&gt;
+<span class="lineNum">       9 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      10 </span>                :            : #include &quot;openvswitch/ofpbuf.h&quot;
+<span class="lineNum">      11 </span>                :            : #include &quot;ovstest.h&quot;
+<span class="lineNum">      12 </span>                :            : #include &quot;dp-packet.h&quot;
+<span class="lineNum">      13 </span>                :            : #include &quot;packets.h&quot;
+<span class="lineNum">      14 </span>                :            : #include &quot;openvswitch/vlog.h&quot;
+<span class="lineNum">      15 </span>                :            : 
+<span class="lineNum">      16 </span>                :            : #define MAX_PORTS 10
+<span class="lineNum">      17 </span>                :            : 
+<span class="lineNum">      18 </span>                :            : struct bpdu {
+<span class="lineNum">      19 </span>                :            :     int port_no;
+<span class="lineNum">      20 </span>                :            :     void *data;
+<span class="lineNum">      21 </span>                :            :     size_t size;
+<span class="lineNum">      22 </span>                :            : };
+<span class="lineNum">      23 </span>                :            : 
+<span class="lineNum">      24 </span>                :            : struct bridge {
+<span class="lineNum">      25 </span>                :            :     struct test_case *tc;
+<span class="lineNum">      26 </span>                :            :     int id;
+<span class="lineNum">      27 </span>                :            :     bool reached;
+<span class="lineNum">      28 </span>                :            : 
+<span class="lineNum">      29 </span>                :            :     struct rstp *rstp;
+<span class="lineNum">      30 </span>                :            : 
+<span class="lineNum">      31 </span>                :            :     struct lan *ports[RSTP_MAX_PORTS];
+<span class="lineNum">      32 </span>                :            :     int n_ports;
+<span class="lineNum">      33 </span>                :            :     int n_active_ports;
+<span class="lineNum">      34 </span>                :            : 
+<span class="lineNum">      35 </span>                :            : #define RXQ_SIZE 16
+<span class="lineNum">      36 </span>                :            :     struct bpdu rxq[RXQ_SIZE];
+<span class="lineNum">      37 </span>                :            :     int rxq_head, rxq_tail;
+<span class="lineNum">      38 </span>                :            : };
+<span class="lineNum">      39 </span>                :            : 
+<span class="lineNum">      40 </span>                :            : struct lan_conn {
+<span class="lineNum">      41 </span>                :            :     struct bridge *bridge;
+<span class="lineNum">      42 </span>                :            :     int port_no;
+<span class="lineNum">      43 </span>                :            : };
+<span class="lineNum">      44 </span>                :            : 
+<span class="lineNum">      45 </span>                :            : struct lan {
+<span class="lineNum">      46 </span>                :            :     struct test_case *tc;
+<span class="lineNum">      47 </span>                :            :     const char *name;
+<span class="lineNum">      48 </span>                :            :     bool reached;
+<span class="lineNum">      49 </span>                :            :     struct lan_conn conns[16];
+<span class="lineNum">      50 </span>                :            :     int n_conns;
+<span class="lineNum">      51 </span>                :            : };
+<span class="lineNum">      52 </span>                :            : 
+<span class="lineNum">      53 </span>                :            : struct test_case {
+<span class="lineNum">      54 </span>                :            :     struct bridge *bridges[16];
+<span class="lineNum">      55 </span>                :            :     int n_bridges;
+<span class="lineNum">      56 </span>                :            :     struct lan *lans[26];
+<span class="lineNum">      57 </span>                :            :     int n_lans;
+<span class="lineNum">      58 </span>                :            : };
+<span class="lineNum">      59 </span>                :            : 
+<span class="lineNum">      60 </span>                :            : static const char *file_name;
+<span class="lineNum">      61 </span>                :            : static int line_number;
+<span class="lineNum">      62 </span>                :            : static char line[128];
+<span class="lineNum">      63 </span>                :            : static char *pos, *token;
+<span class="lineNum">      64 </span>                :            : static int n_warnings;
+<a name="65"><span class="lineNum">      65 </span>                :            : </a>
+<span class="lineNum">      66 </span>                :            : static struct test_case *
+<span class="lineNum">      67 </span>                :<span class="lineCov">          6 : new_test_case(void)</span>
+<span class="lineNum">      68 </span>                :            : {
+<span class="lineNum">      69 </span>                :<span class="lineCov">          6 :     struct test_case *tc = xmalloc(sizeof *tc);</span>
+<span class="lineNum">      70 </span>                :            : 
+<span class="lineNum">      71 </span>                :<span class="lineCov">          6 :     tc-&gt;n_bridges = 0;</span>
+<span class="lineNum">      72 </span>                :<span class="lineCov">          6 :     tc-&gt;n_lans = 0;</span>
+<span class="lineNum">      73 </span>                :<span class="lineCov">          6 :     return tc;</span>
+<span class="lineNum">      74 </span>                :            : }
+<span class="lineNum">      75 </span>                :            : 
+<a name="76"><span class="lineNum">      76 </span>                :            : /* This callback is called with rstp_mutex held. */</a>
+<span class="lineNum">      77 </span>                :            : static void
+<span class="lineNum">      78 </span>                :<span class="lineCov">      11223 : send_bpdu(struct dp_packet *pkt, void *port_, void *b_)</span>
+<span class="lineNum">      79 </span>                :            :     OVS_REQUIRES(rstp_mutex)
+<span class="lineNum">      80 </span>                :            : {
+<span class="lineNum">      81 </span>                :<span class="lineCov">      11223 :     struct bridge *b = b_;</span>
+<span class="lineNum">      82 </span>                :            :     struct lan *lan;
+<span class="lineNum">      83 </span>                :<span class="lineCov">      11223 :     const struct rstp_port *port = port_;</span>
+<span class="lineNum">      84 </span>                :<span class="lineCov">      11223 :     uint16_t port_no = port-&gt;port_number;</span>
+<span class="lineNum">      85 </span>                :            : 
+<span class="lineNum">      86 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 11223 times"> + </span>]:<span class="lineCov">      11223 :     assert(port_no &lt; b-&gt;n_ports);</span>
+<span class="lineNum">      87 </span>                :<span class="lineCov">      11223 :     lan = b-&gt;ports[port_no];</span>
+<span class="lineNum">      88 </span>        [<span class="branchCov" title="Branch 0 was taken 9852 times"> + </span><span class="branchCov" title="Branch 1 was taken 1371 times"> + </span>]:<span class="lineCov">      11223 :     if (lan) {</span>
+<span class="lineNum">      89 </span>                :<span class="lineCov">       9852 :         const void *data = dp_packet_l3(pkt);</span>
+<span class="lineNum">      90 </span>                :<span class="lineCov">       9852 :         size_t size = (char *) dp_packet_tail(pkt) - (char *) data;</span>
+<span class="lineNum">      91 </span>                :            :         int i;
+<span class="lineNum">      92 </span>                :            : 
+<span class="lineNum">      93 </span>        [<span class="branchCov" title="Branch 0 was taken 16915 times"> + </span><span class="branchCov" title="Branch 1 was taken 9852 times"> + </span>]:<span class="lineCov">      26767 :         for (i = 0; i &lt; lan-&gt;n_conns; i++) {</span>
+<span class="lineNum">      94 </span>                :<span class="lineCov">      16915 :             struct lan_conn *conn = &amp;lan-&gt;conns[i];</span>
+<span class="lineNum">      95 </span>                :            : 
+<span class="lineNum">      96 </span>[<span class="branchCov" title="Branch 0 was taken 9945 times"> + </span><span class="branchCov" title="Branch 1 was taken 6970 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 93 times"> + </span><span class="branchCov" title="Branch 3 was taken 9852 times"> + </span>]:<span class="lineCov">      16915 :             if (conn-&gt;bridge != b || conn-&gt;port_no != port_no) {</span>
+<span class="lineNum">      97 </span>                :<span class="lineCov">       7063 :                 struct bridge *dst = conn-&gt;bridge;</span>
+<span class="lineNum">      98 </span>                :<span class="lineCov">       7063 :                 struct bpdu *bpdu = &amp;dst-&gt;rxq[dst-&gt;rxq_head++ % RXQ_SIZE];</span>
+<span class="lineNum">      99 </span>                :            : 
+<span class="lineNum">     100 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 7063 times"> + </span>]:<span class="lineCov">       7063 :                 assert(dst-&gt;rxq_head - dst-&gt;rxq_tail &lt;= RXQ_SIZE);</span>
+<span class="lineNum">     101 </span>                :<span class="lineCov">       7063 :                 bpdu-&gt;data = xmemdup(data, size);</span>
+<span class="lineNum">     102 </span>                :<span class="lineCov">       7063 :                 bpdu-&gt;size = size;</span>
+<span class="lineNum">     103 </span>                :<span class="lineCov">       7063 :                 bpdu-&gt;port_no = conn-&gt;port_no;</span>
+<span class="lineNum">     104 </span>                :            :             }
+<span class="lineNum">     105 </span>                :            :         }
+<span class="lineNum">     106 </span>                :            :     }
+<span class="lineNum">     107 </span>                :<span class="lineCov">      11223 :     dp_packet_delete(pkt);</span>
+<span class="lineNum">     108 </span>                :<span class="lineCov">      11223 : }</span>
+<a name="109"><span class="lineNum">     109 </span>                :            : </a>
+<span class="lineNum">     110 </span>                :            : static struct bridge *
+<span class="lineNum">     111 </span>                :<span class="lineCov">         26 : new_bridge(struct test_case *tc, int id)</span>
+<span class="lineNum">     112 </span>                :            : {
+<span class="lineNum">     113 </span>                :<span class="lineCov">         26 :     struct bridge *b = xmalloc(sizeof *b);</span>
+<span class="lineNum">     114 </span>                :            :     char name[16];
+<span class="lineNum">     115 </span>                :            :     struct rstp_port *p;
+<span class="lineNum">     116 </span>                :            :     int i;
+<span class="lineNum">     117 </span>                :            : 
+<span class="lineNum">     118 </span>                :<span class="lineCov">         26 :     b-&gt;tc = tc;</span>
+<span class="lineNum">     119 </span>                :<span class="lineCov">         26 :     b-&gt;id = id;</span>
+<span class="lineNum">     120 </span>                :<span class="lineCov">         26 :     snprintf(name, sizeof name, &quot;rstp%x&quot;, id);</span>
+<span class="lineNum">     121 </span>                :<span class="lineCov">         26 :     b-&gt;rstp = rstp_create(name, id, send_bpdu, b);</span>
+<span class="lineNum">     122 </span>        [<span class="branchCov" title="Branch 0 was taken 234 times"> + </span><span class="branchCov" title="Branch 1 was taken 26 times"> + </span>]:<span class="lineCov">        260 :     for (i = 1; i &lt; MAX_PORTS; i++) {</span>
+<span class="lineNum">     123 </span>                :<span class="lineCov">        234 :         p = rstp_add_port(b-&gt;rstp);</span>
+<span class="lineNum">     124 </span>                :<span class="lineCov">        234 :         rstp_port_set_aux(p, p);</span>
+<span class="lineNum">     125 </span>                :<span class="lineCov">        234 :         rstp_port_set_state(p, RSTP_DISABLED);</span>
+<span class="lineNum">     126 </span>                :<span class="lineCov">        234 :         rstp_port_set_mac_operational(p, true);</span>
+<span class="lineNum">     127 </span>                :            :     }
+<span class="lineNum">     128 </span>                :            : 
+<span class="lineNum">     129 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 26 times"> + </span>]:<span class="lineCov">         26 :     assert(tc-&gt;n_bridges &lt; ARRAY_SIZE(tc-&gt;bridges));</span>
+<span class="lineNum">     130 </span>                :<span class="lineCov">         26 :     b-&gt;n_ports = 1;</span>
+<span class="lineNum">     131 </span>                :<span class="lineCov">         26 :     b-&gt;n_active_ports = 1;</span>
+<span class="lineNum">     132 </span>                :<span class="lineCov">         26 :     b-&gt;rxq_head = b-&gt;rxq_tail = 0;</span>
+<span class="lineNum">     133 </span>                :<span class="lineCov">         26 :     tc-&gt;bridges[tc-&gt;n_bridges++] = b;</span>
+<span class="lineNum">     134 </span>                :<span class="lineCov">         26 :     return b;</span>
+<span class="lineNum">     135 </span>                :            : }
+<a name="136"><span class="lineNum">     136 </span>                :            : </a>
+<span class="lineNum">     137 </span>                :            : static struct lan *
+<span class="lineNum">     138 </span>                :<span class="lineCov">        156 : new_lan(struct test_case *tc, const char *name)</span>
+<span class="lineNum">     139 </span>                :            : {
+<span class="lineNum">     140 </span>                :<span class="lineCov">        156 :     struct lan *lan = xmalloc(sizeof *lan);</span>
+<span class="lineNum">     141 </span>                :<span class="lineCov">        156 :     lan-&gt;tc = tc;</span>
+<span class="lineNum">     142 </span>                :<span class="lineCov">        156 :     lan-&gt;name = xstrdup(name);</span>
+<span class="lineNum">     143 </span>                :<span class="lineCov">        156 :     lan-&gt;n_conns = 0;</span>
+<span class="lineNum">     144 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 156 times"> + </span>]:<span class="lineCov">        156 :     assert(tc-&gt;n_lans &lt; ARRAY_SIZE(tc-&gt;lans));</span>
+<span class="lineNum">     145 </span>                :<span class="lineCov">        156 :     tc-&gt;lans[tc-&gt;n_lans++] = lan;</span>
+<span class="lineNum">     146 </span>                :<span class="lineCov">        156 :     return lan;</span>
+<span class="lineNum">     147 </span>                :            : }
+<a name="148"><span class="lineNum">     148 </span>                :            : </a>
+<span class="lineNum">     149 </span>                :            : static void
+<span class="lineNum">     150 </span>                :<span class="lineCov">        108 : reconnect_port(struct bridge *b, int port_no, struct lan *new_lan)</span>
+<span class="lineNum">     151 </span>                :            : {
+<span class="lineNum">     152 </span>                :            :     struct lan *old_lan;
+<span class="lineNum">     153 </span>                :            :     int j;
+<span class="lineNum">     154 </span>                :            : 
+<span class="lineNum">     155 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 108 times"> + </span>]:<span class="lineCov">        108 :     assert(port_no &lt; b-&gt;n_ports);</span>
+<span class="lineNum">     156 </span>                :<span class="lineCov">        108 :     old_lan = b-&gt;ports[port_no];</span>
+<span class="lineNum">     157 </span>        [<span class="branchCov" title="Branch 0 was taken 23 times"> + </span><span class="branchCov" title="Branch 1 was taken 85 times"> + </span>]:<span class="lineCov">        108 :     if (old_lan == new_lan) {</span>
+<span class="lineNum">     158 </span>                :<span class="lineCov">         23 :         return;</span>
+<span class="lineNum">     159 </span>                :            :     }
+<span class="lineNum">     160 </span>                :            : 
+<span class="lineNum">     161 </span>                :            :     /* Disconnect from old_lan. */
+<span class="lineNum">     162 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 85 times"> + </span>]:<span class="lineCov">         85 :     if (old_lan) {</span>
+<span class="lineNum">     163 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         for (j = 0; j &lt; old_lan-&gt;n_conns; j++) {</span>
+<span class="lineNum">     164 </span>                :<span class="lineNoCov">          0 :             struct lan_conn *c = &amp;old_lan-&gt;conns[j];</span>
+<span class="lineNum">     165 </span>                :            : 
+<span class="lineNum">     166 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (c-&gt;bridge == b &amp;&amp; c-&gt;port_no == port_no) {</span>
+<span class="lineNum">     167 </span>                :<span class="lineNoCov">          0 :                 memmove(c, c + 1, sizeof *c * (old_lan-&gt;n_conns - j - 1));</span>
+<span class="lineNum">     168 </span>                :<span class="lineNoCov">          0 :                 old_lan-&gt;n_conns--;</span>
+<span class="lineNum">     169 </span>                :<span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     170 </span>                :            :             }
+<span class="lineNum">     171 </span>                :            :         }
+<span class="lineNum">     172 </span>                :            :     }
+<span class="lineNum">     173 </span>                :            : 
+<span class="lineNum">     174 </span>                :            :     /* Connect to new_lan. */
+<span class="lineNum">     175 </span>                :<span class="lineCov">         85 :     b-&gt;ports[port_no] = new_lan;</span>
+<span class="lineNum">     176 </span>        [<span class="branchCov" title="Branch 0 was taken 85 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         85 :     if (new_lan) {</span>
+<span class="lineNum">     177 </span>                :<span class="lineCov">         85 :         int conn_no = new_lan-&gt;n_conns++;</span>
+<span class="lineNum">     178 </span>                :            : 
+<span class="lineNum">     179 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 85 times"> + </span>]:<span class="lineCov">         85 :         assert(conn_no &lt; ARRAY_SIZE(new_lan-&gt;conns));</span>
+<span class="lineNum">     180 </span>                :<span class="lineCov">         85 :         new_lan-&gt;conns[conn_no].bridge = b;</span>
+<span class="lineNum">     181 </span>                :<span class="lineCov">         85 :         new_lan-&gt;conns[conn_no].port_no = port_no;</span>
+<span class="lineNum">     182 </span>                :            :     }
+<span class="lineNum">     183 </span>                :            : }
+<a name="184"><span class="lineNum">     184 </span>                :            : </a>
+<span class="lineNum">     185 </span>                :            : static void
+<span class="lineNum">     186 </span>                :<span class="lineCov">         91 : new_port(struct bridge *b, struct lan *lan, uint32_t path_cost)</span>
+<span class="lineNum">     187 </span>                :            : {
+<span class="lineNum">     188 </span>                :<span class="lineCov">         91 :     int port_no = b-&gt;n_ports++;</span>
+<span class="lineNum">     189 </span>                :<span class="lineCov">         91 :     struct rstp_port *p = rstp_get_port(b-&gt;rstp, port_no);</span>
+<span class="lineNum">     190 </span>                :            : 
+<span class="lineNum">     191 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 91 times"> + </span>]:<span class="lineCov">         91 :     assert(port_no &lt; ARRAY_SIZE(b-&gt;ports));</span>
+<span class="lineNum">     192 </span>                :<span class="lineCov">         91 :     b-&gt;ports[port_no] = NULL;</span>
+<span class="lineNum">     193 </span>                :            :     /* Enable port. */
+<span class="lineNum">     194 </span>                :<span class="lineCov">         91 :     reinitialize_port(p);</span>
+<span class="lineNum">     195 </span>                :<span class="lineCov">         91 :     rstp_port_set_path_cost(p, path_cost);</span>
+<span class="lineNum">     196 </span>                :<span class="lineCov">         91 :     rstp_port_set_state(p, RSTP_DISCARDING);</span>
+<span class="lineNum">     197 </span>                :<span class="lineCov">         91 :     rstp_port_set_mac_operational(p, true);</span>
+<span class="lineNum">     198 </span>                :<span class="lineCov">         91 :     reconnect_port(b, port_no, lan);</span>
+<span class="lineNum">     199 </span>                :<span class="lineCov">         91 : }</span>
+<a name="200"><span class="lineNum">     200 </span>                :            : </a>
+<span class="lineNum">     201 </span>                :            : static void
+<span class="lineNum">     202 </span>                :<span class="lineNoCov">          0 : dump(struct test_case *tc)</span>
+<span class="lineNum">     203 </span>                :            : {
+<span class="lineNum">     204 </span>                :            :     int i;
+<span class="lineNum">     205 </span>                :            : 
+<span class="lineNum">     206 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (i = 0; i &lt; tc-&gt;n_bridges; i++) {</span>
+<span class="lineNum">     207 </span>                :<span class="lineNoCov">          0 :         struct bridge *b = tc-&gt;bridges[i];</span>
+<span class="lineNum">     208 </span>                :<span class="lineNoCov">          0 :         struct rstp *rstp = b-&gt;rstp;</span>
+<span class="lineNum">     209 </span>                :            :         int j;
+<span class="lineNum">     210 </span>                :            : 
+<span class="lineNum">     211 </span>                :<span class="lineNoCov">          0 :         printf(&quot;%s:&quot;, rstp_get_name(rstp));</span>
+<span class="lineNum">     212 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (rstp_is_root_bridge(rstp)) {</span>
+<span class="lineNum">     213 </span>                :<span class="lineNoCov">          0 :             printf(&quot; root&quot;);</span>
+<span class="lineNum">     214 </span>                :            :         }
+<span class="lineNum">     215 </span>                :<span class="lineNoCov">          0 :         printf(&quot;\n&quot;);</span>
+<span class="lineNum">     216 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         for (j = 0; j &lt; b-&gt;n_ports; j++) {</span>
+<span class="lineNum">     217 </span>                :<span class="lineNoCov">          0 :             struct rstp_port *p = rstp_get_port(rstp, j);</span>
+<span class="lineNum">     218 </span>                :<span class="lineNoCov">          0 :             enum rstp_state state = rstp_port_get_state(p);</span>
+<span class="lineNum">     219 </span>                :            : 
+<span class="lineNum">     220 </span>                :<span class="lineNoCov">          0 :             printf(&quot;\tport %d&quot;, j);</span>
+<span class="lineNum">     221 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (b-&gt;ports[j]) {</span>
+<span class="lineNum">     222 </span>                :<span class="lineNoCov">          0 :                 printf(&quot; (lan %s)&quot;, b-&gt;ports[j]-&gt;name);</span>
+<span class="lineNum">     223 </span>                :            :             } else {
+<span class="lineNum">     224 </span>                :<span class="lineNoCov">          0 :                 printf(&quot; (disconnected)&quot;);</span>
+<span class="lineNum">     225 </span>                :            :             }
+<span class="lineNum">     226 </span>                :<span class="lineNoCov">          0 :             printf(&quot;: %s&quot;, rstp_state_name(state));</span>
+<span class="lineNum">     227 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (p == rstp_get_root_port(rstp)) {</span>
+<span class="lineNum">     228 </span>                :<span class="lineNoCov">          0 :                 printf(&quot; (root port, root_path_cost=%u)&quot;,</span>
+<span class="lineNum">     229 </span>                :            :                        rstp_get_root_path_cost(rstp));
+<span class="lineNum">     230 </span>                :            :             }
+<span class="lineNum">     231 </span>                :<span class="lineNoCov">          0 :             printf(&quot;\n&quot;);</span>
+<span class="lineNum">     232 </span>                :            :         }
+<span class="lineNum">     233 </span>                :            :     }
+<span class="lineNum">     234 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     235 </span>                :            : 
+<span class="lineNum">     236 </span>                :            : static void dump_lan_tree(struct test_case *, struct lan *, int level);
+<a name="237"><span class="lineNum">     237 </span>                :            : </a>
+<span class="lineNum">     238 </span>                :            : static void
+<span class="lineNum">     239 </span>                :<span class="lineNoCov">          0 : dump_bridge_tree(struct test_case *tc, struct bridge *b, int level)</span>
+<span class="lineNum">     240 </span>                :            : {
+<span class="lineNum">     241 </span>                :            :     int i;
+<span class="lineNum">     242 </span>                :            : 
+<span class="lineNum">     243 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (b-&gt;reached) {</span>
+<span class="lineNum">     244 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     245 </span>                :            :     }
+<span class="lineNum">     246 </span>                :<span class="lineNoCov">          0 :     b-&gt;reached = true;</span>
+<span class="lineNum">     247 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (i = 0; i &lt; level; i++) {</span>
+<span class="lineNum">     248 </span>                :<span class="lineNoCov">          0 :         printf(&quot;\t&quot;);</span>
+<span class="lineNum">     249 </span>                :            :     }
+<span class="lineNum">     250 </span>                :<span class="lineNoCov">          0 :     printf(&quot;%s\n&quot;, rstp_get_name(b-&gt;rstp));</span>
+<span class="lineNum">     251 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (i = 0; i &lt; b-&gt;n_ports; i++) {</span>
+<span class="lineNum">     252 </span>                :<span class="lineNoCov">          0 :         struct lan *lan = b-&gt;ports[i];</span>
+<span class="lineNum">     253 </span>                :<span class="lineNoCov">          0 :         struct rstp_port *p = rstp_get_port(b-&gt;rstp, i);</span>
+<span class="lineNum">     254 </span>                :            : 
+<span class="lineNum">     255 </span>[<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (rstp_port_get_state(p) == RSTP_FORWARDING &amp;&amp; lan) {</span>
+<span class="lineNum">     256 </span>                :<span class="lineNoCov">          0 :             dump_lan_tree(tc, lan, level + 1);</span>
+<span class="lineNum">     257 </span>                :            :         }
+<span class="lineNum">     258 </span>                :            :     }
+<span class="lineNum">     259 </span>                :            : }
+<a name="260"><span class="lineNum">     260 </span>                :            : </a>
+<span class="lineNum">     261 </span>                :            : static void
+<span class="lineNum">     262 </span>                :<span class="lineNoCov">          0 : dump_lan_tree(struct test_case *tc, struct lan *lan, int level)</span>
+<span class="lineNum">     263 </span>                :            : {
+<span class="lineNum">     264 </span>                :            :     int i;
+<span class="lineNum">     265 </span>                :            : 
+<span class="lineNum">     266 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (lan-&gt;reached) {</span>
+<span class="lineNum">     267 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     268 </span>                :            :     }
+<span class="lineNum">     269 </span>                :<span class="lineNoCov">          0 :     lan-&gt;reached = true;</span>
+<span class="lineNum">     270 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (i = 0; i &lt; level; i++) {</span>
+<span class="lineNum">     271 </span>                :<span class="lineNoCov">          0 :         printf(&quot;\t&quot;);</span>
+<span class="lineNum">     272 </span>                :            :     }
+<span class="lineNum">     273 </span>                :<span class="lineNoCov">          0 :     printf(&quot;%s\n&quot;, lan-&gt;name);</span>
+<span class="lineNum">     274 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (i = 0; i &lt; lan-&gt;n_conns; i++) {</span>
+<span class="lineNum">     275 </span>                :<span class="lineNoCov">          0 :         struct bridge *b = lan-&gt;conns[i].bridge;</span>
+<span class="lineNum">     276 </span>                :            : 
+<span class="lineNum">     277 </span>                :<span class="lineNoCov">          0 :         dump_bridge_tree(tc, b, level + 1);</span>
+<span class="lineNum">     278 </span>                :            :     }
+<span class="lineNum">     279 </span>                :            : }
+<a name="280"><span class="lineNum">     280 </span>                :            : </a>
+<span class="lineNum">     281 </span>                :            : static void
+<span class="lineNum">     282 </span>                :<span class="lineNoCov">          0 : tree(struct test_case *tc)</span>
+<span class="lineNum">     283 </span>                :            : {
+<span class="lineNum">     284 </span>                :            :     int i;
+<span class="lineNum">     285 </span>                :            : 
+<span class="lineNum">     286 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (i = 0; i &lt; tc-&gt;n_bridges; i++) {</span>
+<span class="lineNum">     287 </span>                :<span class="lineNoCov">          0 :         struct bridge *b = tc-&gt;bridges[i];</span>
+<span class="lineNum">     288 </span>                :            : 
+<span class="lineNum">     289 </span>                :<span class="lineNoCov">          0 :         b-&gt;reached = false;</span>
+<span class="lineNum">     290 </span>                :            :     }
+<span class="lineNum">     291 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (i = 0; i &lt; tc-&gt;n_lans; i++) {</span>
+<span class="lineNum">     292 </span>                :<span class="lineNoCov">          0 :         struct lan *lan = tc-&gt;lans[i];</span>
+<span class="lineNum">     293 </span>                :            : 
+<span class="lineNum">     294 </span>                :<span class="lineNoCov">          0 :         lan-&gt;reached = false;</span>
+<span class="lineNum">     295 </span>                :            :     }
+<span class="lineNum">     296 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (i = 0; i &lt; tc-&gt;n_bridges; i++) {</span>
+<span class="lineNum">     297 </span>                :<span class="lineNoCov">          0 :         struct bridge *b = tc-&gt;bridges[i];</span>
+<span class="lineNum">     298 </span>                :<span class="lineNoCov">          0 :         struct rstp *rstp = b-&gt;rstp;</span>
+<span class="lineNum">     299 </span>                :            : 
+<span class="lineNum">     300 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (rstp_is_root_bridge(rstp)) {</span>
+<span class="lineNum">     301 </span>                :<span class="lineNoCov">          0 :             dump_bridge_tree(tc, b, 0);</span>
+<span class="lineNum">     302 </span>                :            :         }
+<span class="lineNum">     303 </span>                :            :     }
+<span class="lineNum">     304 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="305"><span class="lineNum">     305 </span>                :            : </a>
+<span class="lineNum">     306 </span>                :            : static void
+<span class="lineNum">     307 </span>                :<span class="lineCov">         13 : simulate(struct test_case *tc, int granularity)</span>
+<span class="lineNum">     308 </span>                :            : {
+<span class="lineNum">     309 </span>                :            :     int time, i, round_trips;
+<span class="lineNum">     310 </span>                :            : 
+<span class="lineNum">     311 </span>        [<span class="branchCov" title="Branch 0 was taken 2340 times"> + </span><span class="branchCov" title="Branch 1 was taken 13 times"> + </span>]:<span class="lineCov">       2353 :     for (time = 0; time &lt; 1000 * 180; time += granularity) {</span>
+<span class="lineNum">     312 </span>                :            : 
+<span class="lineNum">     313 </span>        [<span class="branchCov" title="Branch 0 was taken 10800 times"> + </span><span class="branchCov" title="Branch 1 was taken 2340 times"> + </span>]:<span class="lineCov">      13140 :         for (i = 0; i &lt; tc-&gt;n_bridges; i++) {</span>
+<span class="lineNum">     314 </span>                :<span class="lineCov">      10800 :             rstp_tick_timers(tc-&gt;bridges[i]-&gt;rstp);</span>
+<span class="lineNum">     315 </span>                :            :         }
+<span class="lineNum">     316 </span>        [<span class="branchCov" title="Branch 0 was taken 3441 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       3441 :         for (round_trips = 0; round_trips &lt; granularity; round_trips++) {</span>
+<span class="lineNum">     317 </span>                :<span class="lineCov">       3441 :             bool any = false;</span>
+<span class="lineNum">     318 </span>                :            : 
+<span class="lineNum">     319 </span>        [<span class="branchCov" title="Branch 0 was taken 16210 times"> + </span><span class="branchCov" title="Branch 1 was taken 3441 times"> + </span>]:<span class="lineCov">      19651 :             for (i = 0; i &lt; tc-&gt;n_bridges; i++) {</span>
+<span class="lineNum">     320 </span>                :<span class="lineCov">      16210 :                 struct bridge *b = tc-&gt;bridges[i];</span>
+<span class="lineNum">     321 </span>                :            : 
+<span class="lineNum">     322 </span>        [<span class="branchCov" title="Branch 0 was taken 7063 times"> + </span><span class="branchCov" title="Branch 1 was taken 16210 times"> + </span>]:<span class="lineCov">      23273 :                 for (; b-&gt;rxq_tail != b-&gt;rxq_head; b-&gt;rxq_tail++) {</span>
+<span class="lineNum">     323 </span>                :<span class="lineCov">       7063 :                     struct bpdu *bpdu = &amp;b-&gt;rxq[b-&gt;rxq_tail % RXQ_SIZE];</span>
+<span class="lineNum">     324 </span>                :            : 
+<span class="lineNum">     325 </span>                :<span class="lineCov">       7063 :                     rstp_port_received_bpdu(rstp_get_port(b-&gt;rstp,</span>
+<span class="lineNum">     326 </span>                :<span class="lineCov">       7063 :                                                           bpdu-&gt;port_no),</span>
+<span class="lineNum">     327 </span>                :<span class="lineCov">       7063 :                                             bpdu-&gt;data, bpdu-&gt;size);</span>
+<span class="lineNum">     328 </span>                :<span class="lineCov">       7063 :                     free(bpdu-&gt;data);</span>
+<span class="lineNum">     329 </span>                :<span class="lineCov">       7063 :                     any = true;</span>
+<span class="lineNum">     330 </span>                :            :                 }
+<span class="lineNum">     331 </span>                :            :             }
+<span class="lineNum">     332 </span>        [<span class="branchCov" title="Branch 0 was taken 2340 times"> + </span><span class="branchCov" title="Branch 1 was taken 1101 times"> + </span>]:<span class="lineCov">       3441 :             if (!any) {</span>
+<span class="lineNum">     333 </span>                :<span class="lineCov">       2340 :                 break;</span>
+<span class="lineNum">     334 </span>                :            :             }
+<span class="lineNum">     335 </span>                :            :         }
+<span class="lineNum">     336 </span>                :            :     }
+<span class="lineNum">     337 </span>                :<span class="lineCov">         13 : }</span>
+<span class="lineNum">     338 </span>                :            : 
+<span class="lineNum">     339 </span>                :            : OVS_NO_RETURN static void
+<span class="lineNum">     340 </span>                :            : err(const char *message, ...)
+<span class="lineNum">     341 </span>                :            :     OVS_PRINTF_FORMAT(1, 2);
+<a name="342"><span class="lineNum">     342 </span>                :            : </a>
+<span class="lineNum">     343 </span>                :            : static void
+<span class="lineNum">     344 </span>                :<span class="lineNoCov">          0 : err(const char *message, ...)</span>
+<span class="lineNum">     345 </span>                :            : {
+<span class="lineNum">     346 </span>                :            :     va_list args;
+<span class="lineNum">     347 </span>                :            : 
+<span class="lineNum">     348 </span>                :<span class="lineNoCov">          0 :     fprintf(stderr, &quot;%s:%d:%&quot;PRIdPTR&quot;: &quot;, file_name, line_number, pos - line);</span>
+<span class="lineNum">     349 </span>                :<span class="lineNoCov">          0 :     va_start(args, message);</span>
+<span class="lineNum">     350 </span>                :<span class="lineNoCov">          0 :     vfprintf(stderr, message, args);</span>
+<span class="lineNum">     351 </span>                :<span class="lineNoCov">          0 :     va_end(args);</span>
+<span class="lineNum">     352 </span>                :<span class="lineNoCov">          0 :     putc('\n', stderr);</span>
+<span class="lineNum">     353 </span>                :            : 
+<span class="lineNum">     354 </span>                :<span class="lineNoCov">          0 :     exit(EXIT_FAILURE);</span>
+<span class="lineNum">     355 </span>                :            : }
+<span class="lineNum">     356 </span>                :            : 
+<span class="lineNum">     357 </span>                :            : static void
+<span class="lineNum">     358 </span>                :            : warn(const char *message, ...)
+<span class="lineNum">     359 </span>                :            :     OVS_PRINTF_FORMAT(1, 2);
+<a name="360"><span class="lineNum">     360 </span>                :            : </a>
+<span class="lineNum">     361 </span>                :            : static void
+<span class="lineNum">     362 </span>                :<span class="lineNoCov">          0 : warn(const char *message, ...)</span>
+<span class="lineNum">     363 </span>                :            : {
+<span class="lineNum">     364 </span>                :            :     va_list args;
+<span class="lineNum">     365 </span>                :            : 
+<span class="lineNum">     366 </span>                :<span class="lineNoCov">          0 :     fprintf(stderr, &quot;%s:%d: &quot;, file_name, line_number);</span>
+<span class="lineNum">     367 </span>                :<span class="lineNoCov">          0 :     va_start(args, message);</span>
+<span class="lineNum">     368 </span>                :<span class="lineNoCov">          0 :     vfprintf(stderr, message, args);</span>
+<span class="lineNum">     369 </span>                :<span class="lineNoCov">          0 :     va_end(args);</span>
+<span class="lineNum">     370 </span>                :<span class="lineNoCov">          0 :     putc('\n', stderr);</span>
+<span class="lineNum">     371 </span>                :            : 
+<span class="lineNum">     372 </span>                :<span class="lineNoCov">          0 :     n_warnings++;</span>
+<span class="lineNum">     373 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="374"><span class="lineNum">     374 </span>                :            : </a>
+<span class="lineNum">     375 </span>                :            : static bool
+<span class="lineNum">     376 </span>                :<span class="lineCov">        866 : get_token(void)</span>
+<span class="lineNum">     377 </span>                :            : {
+<span class="lineNum">     378 </span>                :            :     char *start;
+<span class="lineNum">     379 </span>                :            : 
+<span class="lineNum">     380 </span>        [<span class="branchCov" title="Branch 1 was taken 482 times"> + </span><span class="branchCov" title="Branch 2 was taken 866 times"> + </span>]:<span class="lineCov">       1348 :     while (isspace((unsigned char) *pos)) {</span>
+<span class="lineNum">     381 </span>                :<span class="lineCov">        482 :         pos++;</span>
+<span class="lineNum">     382 </span>                :            :     }
+<span class="lineNum">     383 </span>        [<span class="branchCov" title="Branch 0 was taken 203 times"> + </span><span class="branchCov" title="Branch 1 was taken 663 times"> + </span>]:<span class="lineCov">        866 :     if (*pos == '\0') {</span>
+<span class="lineNum">     384 </span>                :<span class="lineCov">        203 :         free(token);</span>
+<span class="lineNum">     385 </span>                :<span class="lineCov">        203 :         token = NULL;</span>
+<span class="lineNum">     386 </span>                :<span class="lineCov">        203 :         return false;</span>
+<span class="lineNum">     387 </span>                :            :     }
+<span class="lineNum">     388 </span>                :            : 
+<span class="lineNum">     389 </span>                :<span class="lineCov">        663 :     start = pos;</span>
+<span class="lineNum">     390 </span>        [<span class="branchCov" title="Branch 1 was taken 363 times"> + </span><span class="branchCov" title="Branch 2 was taken 300 times"> + </span>]:<span class="lineCov">        663 :     if (isalpha((unsigned char) *pos)) {</span>
+<span class="lineNum">     391 </span>        [<span class="branchCov" title="Branch 1 was taken 450 times"> + </span><span class="branchCov" title="Branch 2 was taken 363 times"> + </span>]:<span class="lineCov">        813 :         while (isalpha((unsigned char) *++pos)) {</span>
+<span class="lineNum">     392 </span>                :<span class="lineCov">        450 :             continue;</span>
+<span class="lineNum">     393 </span>                :            :         }
+<span class="lineNum">     394 </span>        [<span class="branchCov" title="Branch 1 was taken 174 times"> + </span><span class="branchCov" title="Branch 2 was taken 126 times"> + </span>]:<span class="lineCov">        300 :     } else if (isdigit((unsigned char) *pos)) {</span>
+<span class="lineNum">     395 </span>[<span class="branchCov" title="Branch 0 was taken 50 times"> + </span><span class="branchCov" title="Branch 1 was taken 124 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 24 times"> + </span><span class="branchCov" title="Branch 3 was taken 26 times"> + </span>]:<span class="lineCov">        200 :         if (*pos == '0' &amp;&amp; (pos[1] == 'x' || pos[1] == 'X')) {</span>
+<span class="lineNum">         </span>        [<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 24 times"> + </span>]
+<span class="lineNum">     396 </span>                :<span class="lineCov">         26 :             pos += 2;</span>
+<span class="lineNum">     397 </span>        [<span class="branchCov" title="Branch 1 was taken 78 times"> + </span><span class="branchCov" title="Branch 2 was taken 26 times"> + </span>]:<span class="lineCov">        104 :             while (isxdigit((unsigned char) *pos)) {</span>
+<span class="lineNum">     398 </span>                :<span class="lineCov">         78 :                 pos++;</span>
+<span class="lineNum">     399 </span>                :            :             }
+<span class="lineNum">     400 </span>                :            :         } else {
+<span class="lineNum">     401 </span>        [<span class="branchCov" title="Branch 1 was taken 250 times"> + </span><span class="branchCov" title="Branch 2 was taken 148 times"> + </span>]:<span class="lineCov">        424 :             while (isdigit((unsigned char) *++pos)) {</span>
+<span class="lineNum">     402 </span>                :<span class="lineCov">        250 :                 continue;</span>
+<span class="lineNum">     403 </span>                :            :             }
+<span class="lineNum">     404 </span>                :            :         }
+<span class="lineNum">     405 </span>                :            :     } else {
+<span class="lineNum">     406 </span>                :<span class="lineCov">        126 :         pos++;</span>
+<span class="lineNum">     407 </span>                :            :     }
+<span class="lineNum">     408 </span>                :            : 
+<span class="lineNum">     409 </span>                :<span class="lineCov">        663 :     free(token);</span>
+<span class="lineNum">     410 </span>                :<span class="lineCov">        663 :     token = xmemdup0(start, pos - start);</span>
+<span class="lineNum">     411 </span>                :<span class="lineCov">        663 :     return true;</span>
+<span class="lineNum">     412 </span>                :            : }
+<a name="413"><span class="lineNum">     413 </span>                :            : </a>
+<span class="lineNum">     414 </span>                :            : static bool
+<span class="lineNum">     415 </span>                :<span class="lineCov">        166 : get_int(int *intp)</span>
+<span class="lineNum">     416 </span>                :            : {
+<span class="lineNum">     417 </span>                :<span class="lineCov">        166 :     char *save_pos = pos;</span>
+<span class="lineNum">     418 </span>                :            : 
+<span class="lineNum">     419 </span>[<span class="branchCov" title="Branch 0 was taken 166 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 3 was taken 166 times"> + </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span>]:<span class="lineCov">        166 :     if (token &amp;&amp; isdigit((unsigned char) *token)) {</span>
+<span class="lineNum">     420 </span>                :<span class="lineCov">        166 :         *intp = strtol(token, NULL, 0);</span>
+<span class="lineNum">     421 </span>                :<span class="lineCov">        166 :         get_token();</span>
+<span class="lineNum">     422 </span>                :<span class="lineCov">        166 :         return true;</span>
+<span class="lineNum">     423 </span>                :            :     } else {
+<span class="lineNum">     424 </span>                :<span class="lineNoCov">          0 :         pos = save_pos;</span>
+<span class="lineNum">     425 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     426 </span>                :            :     }
+<span class="lineNum">     427 </span>                :            : }
+<a name="428"><span class="lineNum">     428 </span>                :            : </a>
+<span class="lineNum">     429 </span>                :            : static bool
+<span class="lineNum">     430 </span>                :<span class="lineCov">       1638 : match(const char *want)</span>
+<span class="lineNum">     431 </span>                :            : {
+<span class="lineNum">     432 </span>[<span class="branchCov" title="Branch 0 was taken 1542 times"> + </span><span class="branchCov" title="Branch 1 was taken 96 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 389 times"> + </span><span class="branchCov" title="Branch 3 was taken 1153 times"> + </span>]:<span class="lineCov">       1638 :     if (token &amp;&amp; !strcmp(want, token)) {</span>
+<span class="lineNum">     433 </span>                :<span class="lineCov">        389 :         get_token();</span>
+<span class="lineNum">     434 </span>                :<span class="lineCov">        389 :         return true;</span>
+<span class="lineNum">     435 </span>                :            :     } else {
+<span class="lineNum">     436 </span>                :<span class="lineCov">       1249 :         return false;</span>
+<span class="lineNum">     437 </span>                :            :     }
+<span class="lineNum">     438 </span>                :            : }
+<a name="439"><span class="lineNum">     439 </span>                :            : </a>
+<span class="lineNum">     440 </span>                :            : static int
+<span class="lineNum">     441 </span>                :<span class="lineCov">        166 : must_get_int(void)</span>
+<span class="lineNum">     442 </span>                :            : {
+<span class="lineNum">     443 </span>                :            :     int x;
+<span class="lineNum">     444 </span>                :            : 
+<span class="lineNum">     445 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 166 times"> + </span>]:<span class="lineCov">        166 :     if (!get_int(&amp;x)) {</span>
+<span class="lineNum">     446 </span>                :<span class="lineNoCov">          0 :         err(&quot;expected integer&quot;);</span>
+<span class="lineNum">     447 </span>                :            :     }
+<span class="lineNum">     448 </span>                :<span class="lineCov">        166 :     return x;</span>
+<span class="lineNum">     449 </span>                :            : }
+<a name="450"><span class="lineNum">     450 </span>                :            : </a>
+<span class="lineNum">     451 </span>                :            : static void
+<span class="lineNum">     452 </span>                :<span class="lineCov">         51 : must_match(const char *want)</span>
+<span class="lineNum">     453 </span>                :            : {
+<span class="lineNum">     454 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 51 times"> + </span>]:<span class="lineCov">         51 :     if (!match(want)) {</span>
+<span class="lineNum">     455 </span>                :<span class="lineNoCov">          0 :         err(&quot;expected \&quot;%s\&quot;&quot;, want);</span>
+<span class="lineNum">     456 </span>                :            :     }
+<span class="lineNum">     457 </span>                :<span class="lineCov">         51 : }</span>
+<a name="458"><span class="lineNum">     458 </span>                :            : </a>
+<span class="lineNum">     459 </span>                :            : static void
+<span class="lineNum">     460 </span>                :<span class="lineCov">          6 : test_rstp_main(int argc, char *argv[])</span>
+<span class="lineNum">     461 </span>                :            : {
+<span class="lineNum">     462 </span>                :            :     struct test_case *tc;
+<span class="lineNum">     463 </span>                :            :     FILE *input_file;
+<span class="lineNum">     464 </span>                :            :     int i;
+<span class="lineNum">     465 </span>                :            : 
+<span class="lineNum">     466 </span>                :<span class="lineCov">          6 :     vlog_set_pattern(VLF_CONSOLE, &quot;%c|%p|%m&quot;);</span>
+<span class="lineNum">     467 </span>                :<span class="lineCov">          6 :     vlog_set_levels(NULL, VLF_SYSLOG, VLL_OFF);</span>
+<span class="lineNum">     468 </span>                :            : 
+<span class="lineNum">     469 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">          6 :     if (argc != 2) {</span>
+<span class="lineNum">     470 </span>                :<span class="lineNoCov">          0 :         ovs_fatal(0, &quot;usage: test-rstp INPUT.RSTP\n&quot;);</span>
+<span class="lineNum">     471 </span>                :            :     }
+<span class="lineNum">     472 </span>                :<span class="lineCov">          6 :     file_name = argv[1];</span>
+<span class="lineNum">     473 </span>                :            : 
+<span class="lineNum">     474 </span>                :<span class="lineCov">          6 :     input_file = fopen(file_name, &quot;r&quot;);</span>
+<span class="lineNum">     475 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">          6 :     if (!input_file) {</span>
+<span class="lineNum">     476 </span>                :<span class="lineNoCov">          0 :         ovs_fatal(errno, &quot;error opening \&quot;%s\&quot;&quot;, file_name);</span>
+<span class="lineNum">     477 </span>                :            :     }
+<span class="lineNum">     478 </span>                :            : 
+<span class="lineNum">     479 </span>                :<span class="lineCov">          6 :     tc = new_test_case();</span>
+<span class="lineNum">     480 </span>        [<span class="branchCov" title="Branch 0 was taken 156 times"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">        162 :     for (i = 0; i &lt; 26; i++) {</span>
+<span class="lineNum">     481 </span>                :            :         char name[2];
+<span class="lineNum">     482 </span>                :            : 
+<span class="lineNum">     483 </span>                :<span class="lineCov">        156 :         name[0] = 'a' + i;</span>
+<span class="lineNum">     484 </span>                :<span class="lineCov">        156 :         name[1] = '\0';</span>
+<span class="lineNum">     485 </span>                :<span class="lineCov">        156 :         new_lan(tc, name);</span>
+<span class="lineNum">     486 </span>                :            :     }
+<span class="lineNum">     487 </span>                :            : 
+<span class="lineNum">     488 </span>        [<span class="branchCov" title="Branch 1 was taken 106 times"> + </span><span class="branchCov" title="Branch 2 was taken 6 times"> + </span>]:<span class="lineCov">        112 :     for (line_number = 1; fgets(line, sizeof line, input_file);</span>
+<span class="lineNum">     489 </span>                :<span class="lineCov">        106 :          line_number++)</span>
+<span class="lineNum">     490 </span>                :            :     {
+<span class="lineNum">     491 </span>                :            :         char *newline, *hash;
+<span class="lineNum">     492 </span>                :            : 
+<span class="lineNum">     493 </span>                :<span class="lineCov">        106 :         newline = strchr(line, '\n');</span>
+<span class="lineNum">     494 </span>        [<span class="branchCov" title="Branch 0 was taken 106 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        106 :         if (newline) {</span>
+<span class="lineNum">     495 </span>                :<span class="lineCov">        106 :             *newline = '\0';</span>
+<span class="lineNum">     496 </span>                :            :         }
+<span class="lineNum">     497 </span>                :<span class="lineCov">        106 :         hash = strchr(line, '#');</span>
+<span class="lineNum">     498 </span>        [<span class="branchCov" title="Branch 0 was taken 8 times"> + </span><span class="branchCov" title="Branch 1 was taken 98 times"> + </span>]:<span class="lineCov">        106 :         if (hash) {</span>
+<span class="lineNum">     499 </span>                :<span class="lineCov">          8 :             *hash = '\0';</span>
+<span class="lineNum">     500 </span>                :            :         }
+<span class="lineNum">     501 </span>                :            : 
+<span class="lineNum">     502 </span>                :<span class="lineCov">        106 :         pos = line;</span>
+<span class="lineNum">     503 </span>        [<span class="branchCov" title="Branch 1 was taken 9 times"> + </span><span class="branchCov" title="Branch 2 was taken 97 times"> + </span>]:<span class="lineCov">        106 :         if (!get_token()) {</span>
+<span class="lineNum">     504 </span>                :<span class="lineCov">          9 :             continue;</span>
+<span class="lineNum">     505 </span>                :            :         }
+<span class="lineNum">     506 </span>        [<span class="branchCov" title="Branch 1 was taken 33 times"> + </span><span class="branchCov" title="Branch 2 was taken 64 times"> + </span>]:<span class="lineCov">         97 :         if (match(&quot;bridge&quot;)) {</span>
+<span class="lineNum">     507 </span>                :            :             struct bridge *bridge;
+<span class="lineNum">     508 </span>                :            :             int bridge_no, port_no;
+<span class="lineNum">     509 </span>                :            : 
+<span class="lineNum">     510 </span>                :<span class="lineCov">         33 :             bridge_no = must_get_int();</span>
+<span class="lineNum">     511 </span>        [<span class="branchCov" title="Branch 0 was taken 7 times"> + </span><span class="branchCov" title="Branch 1 was taken 26 times"> + </span>]:<span class="lineCov">         33 :             if (bridge_no &lt; tc-&gt;n_bridges) {</span>
+<span class="lineNum">     512 </span>                :<span class="lineCov">          7 :                 bridge = tc-&gt;bridges[bridge_no];</span>
+<span class="lineNum">     513 </span>        [<span class="branchCov" title="Branch 0 was taken 26 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         26 :             } else if (bridge_no == tc-&gt;n_bridges) {</span>
+<span class="lineNum">     514 </span>                :<span class="lineCov">         26 :                 bridge = new_bridge(tc, must_get_int());</span>
+<span class="lineNum">     515 </span>                :            :             } else {
+<span class="lineNum">     516 </span>                :<span class="lineNoCov">          0 :                 err(&quot;bridges must be numbered consecutively from 0&quot;);</span>
+<span class="lineNum">     517 </span>                :            :             }
+<span class="lineNum">     518 </span>        [<span class="branchCov" title="Branch 1 was taken 1 time"> + </span><span class="branchCov" title="Branch 2 was taken 32 times"> + </span>]:<span class="lineCov">         33 :             if (match(&quot;^&quot;)) {</span>
+<span class="lineNum">     519 </span>                :<span class="lineCov">          1 :                 rstp_set_bridge_priority(bridge-&gt;rstp, must_get_int());</span>
+<span class="lineNum">     520 </span>                :            :             }
+<span class="lineNum">     521 </span>        [<span class="branchCov" title="Branch 1 was taken 32 times"> + </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">         33 :             if (match(&quot;=&quot;)) {</span>
+<span class="lineNum">     522 </span>        [<span class="branchCov" title="Branch 0 was taken 288 times"> + </span><span class="branchCov" title="Branch 1 was taken 32 times"> + </span>]:<span class="lineCov">        321 :                 for (port_no = 1; port_no &lt; MAX_PORTS; port_no++) {</span>
+<span class="lineNum">     523 </span>                :<span class="lineCov">        288 :                     struct rstp_port *p = rstp_get_port(bridge-&gt;rstp, port_no);</span>
+<span class="lineNum">     524 </span>                :            : 
+<span class="lineNum">     525 </span>[<span class="branchCov" title="Branch 0 was taken 112 times"> + </span><span class="branchCov" title="Branch 1 was taken 176 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 4 times"> + </span><span class="branchCov" title="Branch 4 was taken 108 times"> + </span>]:<span class="lineCov">        288 :                     if (!token || match(&quot;X&quot;)) {</span>
+<span class="lineNum">     526 </span>                :            :                         /* Disable port. */
+<span class="lineNum">     527 </span>                :<span class="lineCov">        180 :                         reinitialize_port(p);</span>
+<span class="lineNum">     528 </span>                :<span class="lineCov">        180 :                         rstp_port_set_state(p, RSTP_DISABLED);</span>
+<span class="lineNum">     529 </span>                :<span class="lineCov">        180 :                         rstp_port_set_mac_operational(p, false);</span>
+<span class="lineNum">     530 </span>        [<span class="branchCov" title="Branch 1 was taken 108 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        108 :                     } else if (match(&quot;_&quot;)) {</span>
+<span class="lineNum">     531 </span>                :            :                         /* Nothing to do. */
+<span class="lineNum">     532 </span>                :            :                     } else {
+<span class="lineNum">     533 </span>                :            :                         struct lan *lan;
+<span class="lineNum">     534 </span>                :            :                         uint32_t path_cost;
+<span class="lineNum">     535 </span>                :            : 
+<span class="lineNum">     536 </span>        [<span class="branchCov" title="Branch 0 was taken 8 times"> + </span><span class="branchCov" title="Branch 1 was taken 100 times"> + </span>]:<span class="lineCov">        108 :                         if (!strcmp(token, &quot;0&quot;)) {</span>
+<span class="lineNum">     537 </span>                :<span class="lineCov">          8 :                             lan = NULL;</span>
+<span class="lineNum">     538 </span>        [<span class="branchCov" title="Branch 0 was taken 100 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        100 :                         } else if (strlen(token) == 1</span>
+<span class="lineNum">     539 </span>        [<span class="branchCov" title="Branch 1 was taken 100 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        100 :                                 &amp;&amp; islower((unsigned char)*token)) {</span>
+<span class="lineNum">     540 </span>                :<span class="lineCov">        100 :                             lan = tc-&gt;lans[*token - 'a'];</span>
+<span class="lineNum">     541 </span>                :            :                         } else {
+<span class="lineNum">     542 </span>                :<span class="lineNoCov">          0 :                             err(&quot;%s is not a valid LAN name &quot;</span>
+<span class="lineNum">     543 </span>                :            :                                 &quot;(0 or a lowercase letter)&quot;, token);
+<span class="lineNum">     544 </span>                :            :                         }
+<span class="lineNum">     545 </span>                :<span class="lineCov">        108 :                         get_token();</span>
+<span class="lineNum">     546 </span>                :            : 
+<span class="lineNum">     547 </span>        [<span class="branchCov" title="Branch 1 was taken 1 time"> + </span><span class="branchCov" title="Branch 2 was taken 107 times"> + </span>]:<span class="lineCov">        108 :                         path_cost = match(&quot;:&quot;) ? must_get_int() :</span>
+<span class="lineNum">     548 </span>                :            :                                                  RSTP_DEFAULT_PORT_PATH_COST;
+<span class="lineNum">     549 </span>        [<span class="branchCov" title="Branch 0 was taken 17 times"> + </span><span class="branchCov" title="Branch 1 was taken 91 times"> + </span>]:<span class="lineCov">        108 :                         if (port_no &lt; bridge-&gt;n_ports) {</span>
+<span class="lineNum">     550 </span>                :            :                             /* Enable port. */
+<span class="lineNum">     551 </span>                :<span class="lineCov">         17 :                             reinitialize_port(p);</span>
+<span class="lineNum">     552 </span>                :<span class="lineCov">         17 :                             rstp_port_set_path_cost(p, path_cost);</span>
+<span class="lineNum">     553 </span>                :<span class="lineCov">         17 :                             rstp_port_set_state(p, RSTP_DISCARDING);</span>
+<span class="lineNum">     554 </span>                :<span class="lineCov">         17 :                             rstp_port_set_mac_operational(p, true);</span>
+<span class="lineNum">     555 </span>                :<span class="lineCov">         17 :                             reconnect_port(bridge, port_no, lan);</span>
+<span class="lineNum">     556 </span>        [<span class="branchCov" title="Branch 0 was taken 91 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         91 :                         } else if (port_no == bridge-&gt;n_ports) {</span>
+<span class="lineNum">     557 </span>                :<span class="lineCov">         91 :                             new_port(bridge, lan, path_cost);</span>
+<span class="lineNum">     558 </span>                :<span class="lineCov">         91 :                             bridge-&gt;n_active_ports++;</span>
+<span class="lineNum">     559 </span>                :            :                         } else {
+<span class="lineNum">     560 </span>                :<span class="lineNoCov">          0 :                             err(&quot;ports must be numbered consecutively&quot;);</span>
+<span class="lineNum">     561 </span>                :            :                         }
+<span class="lineNum">     562 </span>        [<span class="branchCov" title="Branch 1 was taken 1 time"> + </span><span class="branchCov" title="Branch 2 was taken 107 times"> + </span>]:<span class="lineCov">        108 :                         if (match(&quot;^&quot;)) {</span>
+<span class="lineNum">     563 </span>                :<span class="lineCov">          1 :                             rstp_port_set_priority(p, must_get_int());</span>
+<span class="lineNum">     564 </span>                :            :                         }
+<span class="lineNum">     565 </span>                :            :                     }
+<span class="lineNum">     566 </span>                :            :                 }
+<span class="lineNum">     567 </span>                :            :             }
+<span class="lineNum">     568 </span>        [<span class="branchCov" title="Branch 1 was taken 13 times"> + </span><span class="branchCov" title="Branch 2 was taken 51 times"> + </span>]:<span class="lineCov">         64 :         } else if (match(&quot;run&quot;)) {</span>
+<span class="lineNum">     569 </span>                :<span class="lineCov">         13 :             simulate(tc, must_get_int());</span>
+<span class="lineNum">     570 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 51 times"> + </span>]:<span class="lineCov">         51 :         } else if (match(&quot;dump&quot;)) {</span>
+<span class="lineNum">     571 </span>                :<span class="lineNoCov">          0 :             dump(tc);</span>
+<span class="lineNum">     572 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 51 times"> + </span>]:<span class="lineCov">         51 :         } else if (match(&quot;tree&quot;)) {</span>
+<span class="lineNum">     573 </span>                :<span class="lineNoCov">          0 :             tree(tc);</span>
+<span class="lineNum">     574 </span>        [<span class="branchCov" title="Branch 1 was taken 51 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">         51 :         } else if (match(&quot;check&quot;)) {</span>
+<span class="lineNum">     575 </span>                :            :             struct bridge *b;
+<span class="lineNum">     576 </span>                :            :             struct rstp *rstp;
+<span class="lineNum">     577 </span>                :            :             int bridge_no, port_no;
+<span class="lineNum">     578 </span>                :            :             uint32_t cost_value;
+<span class="lineNum">     579 </span>                :            : 
+<span class="lineNum">     580 </span>                :<span class="lineCov">         51 :             bridge_no = must_get_int();</span>
+<span class="lineNum">     581 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 51 times"> + </span>]:<span class="lineCov">         51 :             if (bridge_no &gt;= tc-&gt;n_bridges) {</span>
+<span class="lineNum">     582 </span>                :<span class="lineNoCov">          0 :                 err(&quot;no bridge numbered %d&quot;, bridge_no);</span>
+<span class="lineNum">     583 </span>                :            :             }
+<span class="lineNum">     584 </span>                :<span class="lineCov">         51 :             b = tc-&gt;bridges[bridge_no];</span>
+<span class="lineNum">     585 </span>                :<span class="lineCov">         51 :             rstp = b-&gt;rstp;</span>
+<span class="lineNum">     586 </span>                :            : 
+<span class="lineNum">     587 </span>                :<span class="lineCov">         51 :             must_match(&quot;=&quot;);</span>
+<span class="lineNum">     588 </span>                :            : 
+<span class="lineNum">     589 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 51 times"> + </span>]:<span class="lineCov">         51 :             if (match(&quot;rootid&quot;)) {</span>
+<span class="lineNum">     590 </span>                :            :                 uint64_t rootid;
+<span class="lineNum">     591 </span>                :            : 
+<span class="lineNum">     592 </span>                :<span class="lineNoCov">          0 :                 must_match(&quot;:&quot;);</span>
+<span class="lineNum">     593 </span>                :<span class="lineNoCov">          0 :                 rootid = must_get_int();</span>
+<span class="lineNum">     594 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 if (match(&quot;^&quot;)) {</span>
+<span class="lineNum">     595 </span>                :<span class="lineNoCov">          0 :                     rootid |= (uint64_t) must_get_int() &lt;&lt; 48;</span>
+<span class="lineNum">     596 </span>                :            :                 } else {
+<span class="lineNum">     597 </span>                :<span class="lineNoCov">          0 :                     rootid |= UINT64_C(0x8000) &lt;&lt; 48;</span>
+<span class="lineNum">     598 </span>                :            :                 }
+<span class="lineNum">     599 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 if (rstp_get_designated_root(rstp) != rootid) {</span>
+<span class="lineNum">     600 </span>                :<span class="lineNoCov">          0 :                     warn(&quot;%s: root &quot;RSTP_ID_FMT&quot;, not %&quot;PRIx64,</span>
+<span class="lineNum">     601 </span>                :            :                          rstp_get_name(rstp),
+<span class="lineNum">     602 </span>                :<span class="lineNoCov">          0 :                          RSTP_ID_ARGS(rstp_get_designated_root(rstp)),</span>
+<span class="lineNum">     603 </span>                :            :                          rootid);
+<span class="lineNum">     604 </span>                :            :                 }
+<span class="lineNum">     605 </span>                :            :             }
+<span class="lineNum">     606 </span>                :<span class="lineCov">         51 :             cost_value = rstp_get_root_path_cost(rstp);</span>
+<span class="lineNum">     607 </span>        [<span class="branchCov" title="Branch 1 was taken 11 times"> + </span><span class="branchCov" title="Branch 2 was taken 40 times"> + </span>]:<span class="lineCov">         51 :             if (match(&quot;root&quot;)) {</span>
+<span class="lineNum">     608 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 11 times"> + </span>]:<span class="lineCov">         11 :                 if (cost_value != 0) {</span>
+<span class="lineNum">     609 </span>                :<span class="lineNoCov">          0 :                     warn(&quot;%s: root path cost of root is %d instead of 0 \n&quot;,</span>
+<span class="lineNum">     610 </span>                :            :                          rstp_get_name(rstp), cost_value);
+<span class="lineNum">     611 </span>                :            :                 }
+<span class="lineNum">     612 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 11 times"> + </span>]:<span class="lineCov">         11 :                 if (!rstp_is_root_bridge(rstp)) {</span>
+<span class="lineNum">     613 </span>                :<span class="lineNoCov">          0 :                     warn(&quot;%s: root is &quot;RSTP_ID_FMT&quot;, not &quot;RSTP_ID_FMT&quot;&quot;,</span>
+<span class="lineNum">     614 </span>                :            :                          rstp_get_name(rstp),
+<span class="lineNum">     615 </span>                :<span class="lineNoCov">          0 :                          RSTP_ID_ARGS(rstp_get_designated_root(rstp)),</span>
+<span class="lineNum">     616 </span>                :<span class="lineNoCov">          0 :                          RSTP_ID_ARGS(rstp_get_bridge_id(rstp)));</span>
+<span class="lineNum">     617 </span>                :            :                 }
+<span class="lineNum">     618 </span>        [<span class="branchCov" title="Branch 0 was taken 25 times"> + </span><span class="branchCov" title="Branch 1 was taken 11 times"> + </span>]:<span class="lineCov">         36 :                 for (port_no = 1; port_no &lt; b-&gt;n_active_ports; port_no++) {</span>
+<span class="lineNum">     619 </span>                :<span class="lineCov">         25 :                     struct rstp_port *p = rstp_get_port(rstp, port_no);</span>
+<span class="lineNum">     620 </span>                :<span class="lineCov">         25 :                     enum rstp_state state = rstp_port_get_state(p);</span>
+<span class="lineNum">     621 </span>                :            : 
+<span class="lineNum">     622 </span>[<span class="branchCov" title="Branch 0 was taken 24 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 24 times"> + </span>]:<span class="lineCov">         25 :                     if (state != RSTP_DISABLED &amp;&amp; state != RSTP_FORWARDING) {</span>
+<span class="lineNum">     623 </span>                :<span class="lineNoCov">          0 :                         warn(&quot;%s: root port %d in state %s&quot;,</span>
+<span class="lineNum">     624 </span>                :<span class="lineNoCov">          0 :                              rstp_get_name(b-&gt;rstp), port_no,</span>
+<span class="lineNum">     625 </span>                :            :                              rstp_state_name(state));
+<span class="lineNum">     626 </span>                :            :                     }
+<span class="lineNum">     627 </span>                :            :                 }
+<span class="lineNum">     628 </span>                :            :             } else {
+<span class="lineNum">     629 </span>        [<span class="branchCov" title="Branch 0 was taken 151 times"> + </span><span class="branchCov" title="Branch 1 was taken 40 times"> + </span>]:<span class="lineCov">        191 :                 for (port_no = 1; port_no &lt; b-&gt;n_active_ports; port_no++) {</span>
+<span class="lineNum">     630 </span>                :<span class="lineCov">        151 :                     struct rstp_port *p = rstp_get_port(rstp, port_no);</span>
+<span class="lineNum">     631 </span>                :            :                     enum rstp_state state;
+<span class="lineNum">     632 </span>                :            : 
+<span class="lineNum">     633 </span>[<span class="branchCov" title="Branch 0 was taken 151 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 3 was taken 5 times"> + </span><span class="branchCov" title="Branch 4 was taken 146 times"> + </span>]:<span class="lineCov">        151 :                     if (token == NULL || match(&quot;D&quot;)) {</span>
+<span class="lineNum">     634 </span>                :<span class="lineCov">          5 :                         state = RSTP_DISABLED;</span>
+<span class="lineNum">     635 </span>        [<span class="branchCov" title="Branch 1 was taken 22 times"> + </span><span class="branchCov" title="Branch 2 was taken 124 times"> + </span>]:<span class="lineCov">        146 :                     } else if (match(&quot;Di&quot;)) {</span>
+<span class="lineNum">     636 </span>                :<span class="lineCov">         22 :                         state = RSTP_DISCARDING;</span>
+<span class="lineNum">     637 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 124 times"> + </span>]:<span class="lineCov">        124 :                     } else if (match(&quot;Le&quot;)) {</span>
+<span class="lineNum">     638 </span>                :<span class="lineNoCov">          0 :                         state = RSTP_LEARNING;</span>
+<span class="lineNum">     639 </span>        [<span class="branchCov" title="Branch 1 was taken 124 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        124 :                     } else if (match(&quot;F&quot;)) {</span>
+<span class="lineNum">     640 </span>                :<span class="lineCov">        124 :                         state = RSTP_FORWARDING;</span>
+<span class="lineNum">     641 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :                     } else if (match(&quot;_&quot;)) {</span>
+<span class="lineNum">     642 </span>                :<span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     643 </span>                :            :                     } else {
+<span class="lineNum">     644 </span>                :<span class="lineNoCov">          0 :                         err(&quot;unknown port state %s&quot;, token);</span>
+<span class="lineNum">     645 </span>                :            :                     }
+<span class="lineNum">     646 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 151 times"> + </span>]:<span class="lineCov">        151 :                     if (rstp_port_get_state(p) != state) {</span>
+<span class="lineNum">     647 </span>                :<span class="lineNoCov">          0 :                         warn(&quot;%s port %d: state is %s but should be %s&quot;,</span>
+<span class="lineNum">     648 </span>                :            :                              rstp_get_name(rstp), port_no,
+<span class="lineNum">     649 </span>                :            :                              rstp_state_name(rstp_port_get_state(p)),
+<span class="lineNum">     650 </span>                :            :                              rstp_state_name(state));
+<span class="lineNum">     651 </span>                :            :                     }
+<span class="lineNum">     652 </span>        [<span class="branchCov" title="Branch 0 was taken 124 times"> + </span><span class="branchCov" title="Branch 1 was taken 27 times"> + </span>]:<span class="lineCov">        151 :                     if (state == RSTP_FORWARDING) {</span>
+<span class="lineNum">     653 </span>                :<span class="lineCov">        124 :                         struct rstp_port *root_port = rstp_get_root_port(rstp);</span>
+<span class="lineNum">     654 </span>                :            : 
+<span class="lineNum">     655 </span>        [<span class="branchCov" title="Branch 1 was taken 40 times"> + </span><span class="branchCov" title="Branch 2 was taken 84 times"> + </span>]:<span class="lineCov">        124 :                         if (match(&quot;:&quot;)) {</span>
+<span class="lineNum">     656 </span>                :<span class="lineCov">         40 :                             int root_path_cost = must_get_int();</span>
+<span class="lineNum">     657 </span>                :            : 
+<span class="lineNum">     658 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 40 times"> + </span>]:<span class="lineCov">         40 :                             if (p != root_port) {</span>
+<span class="lineNum">     659 </span>                :<span class="lineNoCov">          0 :                                 warn(&quot;%s: port %d is not the root port&quot;,</span>
+<span class="lineNum">     660 </span>                :            :                                      rstp_get_name(rstp), port_no);
+<span class="lineNum">     661 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                                 if (!root_port) {</span>
+<span class="lineNum">     662 </span>                :<span class="lineNoCov">          0 :                                     warn(&quot;%s: (there is no root port)&quot;,</span>
+<span class="lineNum">     663 </span>                :            :                                          rstp_get_name(rstp));
+<span class="lineNum">     664 </span>                :            :                                 } else {
+<span class="lineNum">     665 </span>                :<span class="lineNoCov">          0 :                                     warn(&quot;%s: (port %d is the root port)&quot;,</span>
+<span class="lineNum">     666 </span>                :            :                                          rstp_get_name(rstp),
+<span class="lineNum">     667 </span>                :            :                                          rstp_port_get_number(root_port));
+<span class="lineNum">     668 </span>                :            :                                 }
+<span class="lineNum">     669 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 40 times"> + </span>]:<span class="lineCov">         40 :                             } else if (cost_value != root_path_cost) {</span>
+<span class="lineNum">     670 </span>                :<span class="lineCov">         40 :                                 warn(&quot;%s: root path cost is %d, should be %d&quot;,</span>
+<span class="lineNum">     671 </span>                :            :                                      rstp_get_name(rstp),
+<span class="lineNum">     672 </span>                :            :                                      cost_value,
+<span class="lineNum">     673 </span>                :            :                                      root_path_cost);
+<span class="lineNum">     674 </span>                :            :                             }
+<span class="lineNum">     675 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 84 times"> + </span>]:<span class="lineCov">         84 :                         } else if (p == root_port) {</span>
+<span class="lineNum">     676 </span>                :<span class="lineNoCov">          0 :                             warn(&quot;%s: port %d is the root port but &quot;</span>
+<span class="lineNum">     677 </span>                :            :                                  &quot;not expected to be&quot;,
+<span class="lineNum">     678 </span>                :            :                                  rstp_get_name(rstp), port_no);
+<span class="lineNum">     679 </span>                :            :                         }
+<span class="lineNum">     680 </span>                :            :                     }
+<span class="lineNum">     681 </span>                :            :                 }
+<span class="lineNum">     682 </span>                :            :             }
+<span class="lineNum">     683 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 51 times"> + </span>]:<span class="lineCov">         51 :             if (n_warnings) {</span>
+<span class="lineNum">     684 </span>                :<span class="lineNoCov">          0 :                 printf(&quot;failing because of %d warnings\n&quot;, n_warnings);</span>
+<span class="lineNum">     685 </span>                :<span class="lineNoCov">          0 :                 exit(EXIT_FAILURE);</span>
+<span class="lineNum">     686 </span>                :            :             }
+<span class="lineNum">     687 </span>                :            :         }
+<span class="lineNum">     688 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 97 times"> + </span>]:<span class="lineCov">         97 :         if (get_token()) {</span>
+<span class="lineNum">     689 </span>                :<span class="lineNoCov">          0 :             printf(&quot;failing because of errors\n&quot;);</span>
+<span class="lineNum">     690 </span>                :<span class="lineNoCov">          0 :             err(&quot;trailing garbage on line&quot;);</span>
+<span class="lineNum">     691 </span>                :            :         }
+<span class="lineNum">     692 </span>                :            :     }
+<span class="lineNum">     693 </span>                :<span class="lineCov">          6 :     free(token);</span>
+<span class="lineNum">     694 </span>                :            : 
+<span class="lineNum">     695 </span>        [<span class="branchCov" title="Branch 0 was taken 156 times"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">        162 :     for (i = 0; i &lt; tc-&gt;n_lans; i++) {</span>
+<span class="lineNum">     696 </span>                :<span class="lineCov">        156 :         struct lan *lan = tc-&gt;lans[i];</span>
+<span class="lineNum">     697 </span>                :            : 
+<span class="lineNum">     698 </span>                :<span class="lineCov">        156 :         free(CONST_CAST(char *, lan-&gt;name));</span>
+<span class="lineNum">     699 </span>                :<span class="lineCov">        156 :         free(lan);</span>
+<span class="lineNum">     700 </span>                :            :     }
+<span class="lineNum">     701 </span>        [<span class="branchCov" title="Branch 0 was taken 26 times"> + </span><span class="branchCov" title="Branch 1 was taken 6 times"> + </span>]:<span class="lineCov">         32 :     for (i = 0; i &lt; tc-&gt;n_bridges; i++) {</span>
+<span class="lineNum">     702 </span>                :<span class="lineCov">         26 :         struct bridge *bridge = tc-&gt;bridges[i];</span>
+<span class="lineNum">     703 </span>                :            :         int j;
+<span class="lineNum">     704 </span>                :            : 
+<span class="lineNum">     705 </span>        [<span class="branchCov" title="Branch 0 was taken 234 times"> + </span><span class="branchCov" title="Branch 1 was taken 26 times"> + </span>]:<span class="lineCov">        260 :         for (j = 1; j &lt; MAX_PORTS; j++) {</span>
+<span class="lineNum">     706 </span>                :<span class="lineCov">        234 :             rstp_port_unref(rstp_get_port(bridge-&gt;rstp, j));</span>
+<span class="lineNum">     707 </span>                :            :         }
+<span class="lineNum">     708 </span>                :<span class="lineCov">         26 :         rstp_unref(bridge-&gt;rstp);</span>
+<span class="lineNum">     709 </span>                :<span class="lineCov">         26 :         free(bridge);</span>
+<span class="lineNum">     710 </span>                :            :     }
+<span class="lineNum">     711 </span>                :<span class="lineCov">          6 :     free(tc);</span>
+<a name="712"><span class="lineNum">     712 </span>                :<span class="lineCov">          6 : }</span></a>
+<span class="lineNum">     713 </span>                :            : 
+<span class="lineNum">     714 </span>                :<span class="lineCov">       1186 : OVSTEST_REGISTER(&quot;test-rstp&quot;, test_rstp_main);</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

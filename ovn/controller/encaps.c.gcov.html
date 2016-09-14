@@ -1,0 +1,341 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ovn/controller/encaps.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">ovn/controller</a> - encaps.c<span style="font-size: 80%;"> (source / <a href="encaps.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">103</td>
+            <td class="headerCovTableEntry">111</td>
+            <td class="headerCovTableEntryHi">92.8 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">7</td>
+            <td class="headerCovTableEntry">7</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">50</td>
+            <td class="headerCovTableEntry">64</td>
+            <td class="headerCovTableEntryMed">78.1 %</td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (c) 2015, 2016 Nicira, Inc.</a>
+<span class="lineNum">       2 </span>                :            :  *
+<span class="lineNum">       3 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       4 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       5 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       6 </span>                :            :  *
+<span class="lineNum">       7 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       8 </span>                :            :  *
+<span class="lineNum">       9 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      10 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      11 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      12 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      13 </span>                :            :  * limitations under the License.
+<span class="lineNum">      14 </span>                :            :  */
+<span class="lineNum">      15 </span>                :            : 
+<span class="lineNum">      16 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      17 </span>                :            : #include &quot;encaps.h&quot;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &quot;lib/hash.h&quot;
+<span class="lineNum">      20 </span>                :            : #include &quot;lib/sset.h&quot;
+<span class="lineNum">      21 </span>                :            : #include &quot;lib/util.h&quot;
+<span class="lineNum">      22 </span>                :            : #include &quot;lib/vswitch-idl.h&quot;
+<span class="lineNum">      23 </span>                :            : #include &quot;openvswitch/vlog.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;ovn/lib/ovn-sb-idl.h&quot;
+<a name="25"><span class="lineNum">      25 </span>                :            : #include &quot;ovn-controller.h&quot;</a>
+<span class="lineNum">      26 </span>                :            : 
+<span class="lineNum">      27 </span>                :<span class="lineCov">         94 : VLOG_DEFINE_THIS_MODULE(encaps);</span>
+<a name="28"><span class="lineNum">      28 </span>                :            : </a>
+<span class="lineNum">      29 </span>                :            : void
+<span class="lineNum">      30 </span>                :<span class="lineCov">         44 : encaps_register_ovs_idl(struct ovsdb_idl *ovs_idl)</span>
+<span class="lineNum">      31 </span>                :            : {
+<span class="lineNum">      32 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_table(ovs_idl, &amp;ovsrec_table_bridge);</span>
+<span class="lineNum">      33 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl, &amp;ovsrec_bridge_col_ports);</span>
+<span class="lineNum">      34 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_table(ovs_idl, &amp;ovsrec_table_port);</span>
+<span class="lineNum">      35 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl, &amp;ovsrec_port_col_name);</span>
+<span class="lineNum">      36 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl, &amp;ovsrec_port_col_interfaces);</span>
+<span class="lineNum">      37 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl, &amp;ovsrec_port_col_external_ids);</span>
+<span class="lineNum">      38 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_table(ovs_idl, &amp;ovsrec_table_interface);</span>
+<span class="lineNum">      39 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl, &amp;ovsrec_interface_col_name);</span>
+<span class="lineNum">      40 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl, &amp;ovsrec_interface_col_type);</span>
+<span class="lineNum">      41 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl, &amp;ovsrec_interface_col_options);</span>
+<span class="lineNum">      42 </span>                :<span class="lineCov">         44 : }</span>
+<span class="lineNum">      43 </span>                :            : 
+<span class="lineNum">      44 </span>                :            : /* Enough context to create a new tunnel, using tunnel_add(). */
+<span class="lineNum">      45 </span>                :            : struct tunnel_ctx {
+<span class="lineNum">      46 </span>                :            :     /* Maps from a chassis name to &quot;struct chassis_node *&quot;. */
+<span class="lineNum">      47 </span>                :            :     struct shash chassis;
+<span class="lineNum">      48 </span>                :            : 
+<span class="lineNum">      49 </span>                :            :     /* Names of all ports in the bridge, to allow checking uniqueness when
+<span class="lineNum">      50 </span>                :            :      * adding a new tunnel. */
+<span class="lineNum">      51 </span>                :            :     struct sset port_names;
+<span class="lineNum">      52 </span>                :            : 
+<span class="lineNum">      53 </span>                :            :     struct ovsdb_idl_txn *ovs_txn;
+<span class="lineNum">      54 </span>                :            :     const struct ovsrec_bridge *br_int;
+<span class="lineNum">      55 </span>                :            : };
+<span class="lineNum">      56 </span>                :            : 
+<span class="lineNum">      57 </span>                :            : struct chassis_node {
+<span class="lineNum">      58 </span>                :            :     const struct ovsrec_port *port;
+<span class="lineNum">      59 </span>                :            :     const struct ovsrec_bridge *bridge;
+<span class="lineNum">      60 </span>                :            : };
+<a name="61"><span class="lineNum">      61 </span>                :            : </a>
+<span class="lineNum">      62 </span>                :            : static char *
+<span class="lineNum">      63 </span>                :<span class="lineCov">         34 : tunnel_create_name(struct tunnel_ctx *tc, const char *chassis_id)</span>
+<span class="lineNum">      64 </span>                :            : {
+<span class="lineNum">      65 </span>                :            :     int i;
+<span class="lineNum">      66 </span>                :            : 
+<span class="lineNum">      67 </span>        [<span class="branchCov" title="Branch 0 was taken 34 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         34 :     for (i = 0; i &lt; UINT16_MAX; i++) {</span>
+<span class="lineNum">      68 </span>                :            :         char *port_name;
+<span class="lineNum">      69 </span>                :<span class="lineCov">         34 :         port_name = xasprintf(&quot;ovn-%.6s-%x&quot;, chassis_id, i);</span>
+<span class="lineNum">      70 </span>                :            : 
+<span class="lineNum">      71 </span>        [<span class="branchCov" title="Branch 1 was taken 34 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">         34 :         if (!sset_contains(&amp;tc-&gt;port_names, port_name)) {</span>
+<span class="lineNum">      72 </span>                :<span class="lineCov">         34 :             return port_name;</span>
+<span class="lineNum">      73 </span>                :            :         }
+<span class="lineNum">      74 </span>                :            : 
+<span class="lineNum">      75 </span>                :<span class="lineNoCov">          0 :         free(port_name);</span>
+<span class="lineNum">      76 </span>                :            :     }
+<span class="lineNum">      77 </span>                :            : 
+<span class="lineNum">      78 </span>                :<span class="lineNoCov">          0 :     return NULL;</span>
+<span class="lineNum">      79 </span>                :            : }
+<a name="80"><span class="lineNum">      80 </span>                :            : </a>
+<span class="lineNum">      81 </span>                :            : static void
+<span class="lineNum">      82 </span>                :<span class="lineCov">       3330 : tunnel_add(struct tunnel_ctx *tc, const char *new_chassis_id,</span>
+<span class="lineNum">      83 </span>                :            :            const struct sbrec_encap *encap)
+<span class="lineNum">      84 </span>                :            : {
+<span class="lineNum">      85 </span>                :<span class="lineCov">       3330 :     struct smap options = SMAP_INITIALIZER(&amp;options);</span>
+<span class="lineNum">      86 </span>                :<span class="lineCov">       3330 :     smap_add(&amp;options, &quot;remote_ip&quot;, encap-&gt;ip);</span>
+<span class="lineNum">      87 </span>                :<span class="lineCov">       3330 :     smap_add(&amp;options, &quot;key&quot;, &quot;flow&quot;);</span>
+<span class="lineNum">      88 </span>                :<span class="lineCov">       3330 :     const char *csum = smap_get(&amp;encap-&gt;options, &quot;csum&quot;);</span>
+<span class="lineNum">      89 </span>[<span class="branchCov" title="Branch 0 was taken 3304 times"> + </span><span class="branchCov" title="Branch 1 was taken 26 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 22 times"> + </span><span class="branchCov" title="Branch 3 was taken 3282 times"> + </span>]:<span class="lineCov">       3330 :     if (csum &amp;&amp; (!strcmp(csum, &quot;true&quot;) || !strcmp(csum, &quot;false&quot;))) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 4 was taken 22 times"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span>]
+<span class="lineNum">      90 </span>                :<span class="lineCov">       3304 :         smap_add(&amp;options, &quot;csum&quot;, csum);</span>
+<span class="lineNum">      91 </span>                :            :     }
+<span class="lineNum">      92 </span>                :            : 
+<span class="lineNum">      93 </span>                :            :     /* If there's an existing chassis record that does not need any change,
+<span class="lineNum">      94 </span>                :            :      * keep it.  Otherwise, create a new record (if there was an existing
+<span class="lineNum">      95 </span>                :            :      * record, the new record will supplant it and encaps_run() will delete
+<span class="lineNum">      96 </span>                :            :      * it). */
+<span class="lineNum">      97 </span>                :<span class="lineCov">       3330 :     struct chassis_node *chassis = shash_find_data(&amp;tc-&gt;chassis,</span>
+<span class="lineNum">      98 </span>                :            :                                                    new_chassis_id);
+<span class="lineNum">      99 </span>        [<span class="branchCov" title="Branch 0 was taken 3296 times"> + </span><span class="branchCov" title="Branch 1 was taken 34 times"> + </span>]:<span class="lineCov">       3330 :     if (chassis</span>
+<span class="lineNum">     100 </span>        [<span class="branchCov" title="Branch 0 was taken 3296 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       3296 :         &amp;&amp; chassis-&gt;port-&gt;n_interfaces == 1</span>
+<span class="lineNum">     101 </span>        [<span class="branchCov" title="Branch 0 was taken 3294 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">       3296 :         &amp;&amp; !strcmp(chassis-&gt;port-&gt;interfaces[0]-&gt;type, encap-&gt;type)</span>
+<span class="lineNum">     102 </span>        [<span class="branchCov" title="Branch 1 was taken 3293 times"> + </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">       3294 :         &amp;&amp; smap_equal(&amp;chassis-&gt;port-&gt;interfaces[0]-&gt;options, &amp;options)) {</span>
+<span class="lineNum">     103 </span>                :<span class="lineCov">       3293 :         shash_find_and_delete(&amp;tc-&gt;chassis, new_chassis_id);</span>
+<span class="lineNum">     104 </span>                :<span class="lineCov">       3293 :         free(chassis);</span>
+<span class="lineNum">     105 </span>                :<span class="lineCov">       3293 :         goto exit;</span>
+<span class="lineNum">     106 </span>                :            :     }
+<span class="lineNum">     107 </span>                :            : 
+<span class="lineNum">     108 </span>                :            :     /* Choose a name for the new port.  If we're replacing an old port, reuse
+<span class="lineNum">     109 </span>                :            :      * its name, otherwise generate a new, unique name. */
+<span class="lineNum">     110 </span>                :<span class="lineCov">         37 :     char *port_name = (chassis</span>
+<span class="lineNum">     111 </span>                :<span class="lineCov">          3 :                        ? xstrdup(chassis-&gt;port-&gt;name)</span>
+<span class="lineNum">     112 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 34 times"> + </span>]:<span class="lineCov">         37 :                        : tunnel_create_name(tc, new_chassis_id));</span>
+<span class="lineNum">     113 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 37 times"> + </span>]:<span class="lineCov">         37 :     if (!port_name) {</span>
+<span class="lineNum">     114 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN(&quot;Unable to allocate unique name for '%s' tunnel&quot;,</span>
+<span class="lineNum">     115 </span>                :            :                   new_chassis_id);
+<span class="lineNum">     116 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     117 </span>                :            :     }
+<span class="lineNum">     118 </span>                :            : 
+<span class="lineNum">     119 </span>                :<span class="lineCov">         37 :     struct ovsrec_interface *iface = ovsrec_interface_insert(tc-&gt;ovs_txn);</span>
+<span class="lineNum">     120 </span>                :<span class="lineCov">         37 :     ovsrec_interface_set_name(iface, port_name);</span>
+<span class="lineNum">     121 </span>                :<span class="lineCov">         37 :     ovsrec_interface_set_type(iface, encap-&gt;type);</span>
+<span class="lineNum">     122 </span>                :<span class="lineCov">         37 :     ovsrec_interface_set_options(iface, &amp;options);</span>
+<span class="lineNum">     123 </span>                :            : 
+<span class="lineNum">     124 </span>                :<span class="lineCov">         37 :     struct ovsrec_port *port = ovsrec_port_insert(tc-&gt;ovs_txn);</span>
+<span class="lineNum">     125 </span>                :<span class="lineCov">         37 :     ovsrec_port_set_name(port, port_name);</span>
+<span class="lineNum">     126 </span>                :<span class="lineCov">         37 :     ovsrec_port_set_interfaces(port, &amp;iface, 1);</span>
+<span class="lineNum">     127 </span>                :<span class="lineCov">         37 :     const struct smap id = SMAP_CONST1(&amp;id, &quot;ovn-chassis-id&quot;, new_chassis_id);</span>
+<span class="lineNum">     128 </span>                :<span class="lineCov">         37 :     ovsrec_port_set_external_ids(port, &amp;id);</span>
+<span class="lineNum">     129 </span>                :            : 
+<span class="lineNum">     130 </span>                :<span class="lineCov">         37 :     ovsrec_bridge_update_ports_addvalue(tc-&gt;br_int, port);</span>
+<span class="lineNum">     131 </span>                :            : 
+<span class="lineNum">     132 </span>                :<span class="lineCov">         37 :     sset_add_and_free(&amp;tc-&gt;port_names, port_name);</span>
+<span class="lineNum">     133 </span>                :            : 
+<span class="lineNum">     134 </span>                :            : exit:
+<span class="lineNum">     135 </span>                :<span class="lineCov">       3330 :     smap_destroy(&amp;options);</span>
+<span class="lineNum">     136 </span>                :<span class="lineCov">       3330 : }</span>
+<a name="137"><span class="lineNum">     137 </span>                :            : </a>
+<span class="lineNum">     138 </span>                :            : static struct sbrec_encap *
+<span class="lineNum">     139 </span>                :<span class="lineCov">       3330 : preferred_encap(const struct sbrec_chassis *chassis_rec)</span>
+<span class="lineNum">     140 </span>                :            : {
+<span class="lineNum">     141 </span>                :<span class="lineCov">       3330 :     struct sbrec_encap *best_encap = NULL;</span>
+<span class="lineNum">     142 </span>                :<span class="lineCov">       3330 :     uint32_t best_type = 0;</span>
+<span class="lineNum">     143 </span>                :            : 
+<span class="lineNum">     144 </span>        [<span class="branchCov" title="Branch 0 was taken 6632 times"> + </span><span class="branchCov" title="Branch 1 was taken 3330 times"> + </span>]:<span class="lineCov">       9962 :     for (int i = 0; i &lt; chassis_rec-&gt;n_encaps; i++) {</span>
+<span class="lineNum">     145 </span>                :<span class="lineCov">       6632 :         uint32_t tun_type = get_tunnel_type(chassis_rec-&gt;encaps[i]-&gt;type);</span>
+<span class="lineNum">     146 </span>        [<span class="branchCov" title="Branch 0 was taken 4707 times"> + </span><span class="branchCov" title="Branch 1 was taken 1925 times"> + </span>]:<span class="lineCov">       6632 :         if (tun_type &gt; best_type) {</span>
+<span class="lineNum">     147 </span>                :<span class="lineCov">       4707 :             best_type = tun_type;</span>
+<span class="lineNum">     148 </span>                :<span class="lineCov">       4707 :             best_encap = chassis_rec-&gt;encaps[i];</span>
+<span class="lineNum">     149 </span>                :            :         }
+<span class="lineNum">     150 </span>                :            :     }
+<span class="lineNum">     151 </span>                :            : 
+<span class="lineNum">     152 </span>                :<span class="lineCov">       3330 :     return best_encap;</span>
+<span class="lineNum">     153 </span>                :            : }
+<a name="154"><span class="lineNum">     154 </span>                :            : </a>
+<span class="lineNum">     155 </span>                :            : void
+<span class="lineNum">     156 </span>                :<span class="lineCov">       3167 : encaps_run(struct controller_ctx *ctx, const struct ovsrec_bridge *br_int,</span>
+<span class="lineNum">     157 </span>                :            :            const char *chassis_id)
+<span class="lineNum">     158 </span>                :            : {
+<span class="lineNum">     159 </span>[<span class="branchCov" title="Branch 0 was taken 2993 times"> + </span><span class="branchCov" title="Branch 1 was taken 174 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 2993 times"> + </span>]:<span class="lineCov">       3167 :     if (!ctx-&gt;ovs_idl_txn || !br_int) {</span>
+<span class="lineNum">     160 </span>                :<span class="lineCov">        174 :         return;</span>
+<span class="lineNum">     161 </span>                :            :     }
+<span class="lineNum">     162 </span>                :            : 
+<span class="lineNum">     163 </span>                :            :     const struct sbrec_chassis *chassis_rec;
+<span class="lineNum">     164 </span>                :            :     const struct ovsrec_bridge *br;
+<span class="lineNum">     165 </span>                :            : 
+<span class="lineNum">     166 </span>                :<span class="lineCov">       2993 :     struct tunnel_ctx tc = {</span>
+<span class="lineNum">     167 </span>                :            :         .chassis = SHASH_INITIALIZER(&amp;tc.chassis),
+<span class="lineNum">     168 </span>                :            :         .port_names = SSET_INITIALIZER(&amp;tc.port_names),
+<span class="lineNum">     169 </span>                :            :         .br_int = br_int
+<span class="lineNum">     170 </span>                :            :     };
+<span class="lineNum">     171 </span>                :            : 
+<span class="lineNum">     172 </span>                :<span class="lineCov">       2993 :     tc.ovs_txn = ctx-&gt;ovs_idl_txn;</span>
+<span class="lineNum">     173 </span>                :<span class="lineCov">       2993 :     ovsdb_idl_txn_add_comment(tc.ovs_txn,</span>
+<span class="lineNum">     174 </span>                :            :                               &quot;ovn-controller: modifying OVS tunnels '%s'&quot;,
+<span class="lineNum">     175 </span>                :            :                               chassis_id);
+<span class="lineNum">     176 </span>                :            : 
+<span class="lineNum">     177 </span>                :            :     /* Collect all port names into tc.port_names.
+<span class="lineNum">     178 </span>                :            :      *
+<span class="lineNum">     179 </span>                :            :      * Collect all the OVN-created tunnels into tc.tunnel_hmap. */
+<span class="lineNum">     180 </span>        [<span class="branchCov" title="Branch 2 was taken 6423 times"> + </span><span class="branchCov" title="Branch 3 was taken 2993 times"> + </span>]:<span class="lineCov">       9416 :     OVSREC_BRIDGE_FOR_EACH(br, ctx-&gt;ovs_idl) {</span>
+<span class="lineNum">     181 </span>        [<span class="branchCov" title="Branch 0 was taken 49611 times"> + </span><span class="branchCov" title="Branch 1 was taken 6423 times"> + </span>]:<span class="lineCov">      56034 :         for (size_t i = 0; i &lt; br-&gt;n_ports; i++) {</span>
+<span class="lineNum">     182 </span>                :<span class="lineCov">      49611 :             const struct ovsrec_port *port = br-&gt;ports[i];</span>
+<span class="lineNum">     183 </span>                :<span class="lineCov">      49611 :             sset_add(&amp;tc.port_names, port-&gt;name);</span>
+<span class="lineNum">     184 </span>                :            : 
+<span class="lineNum">     185 </span>                :<span class="lineCov">      49611 :             const char *id = smap_get(&amp;port-&gt;external_ids, &quot;ovn-chassis-id&quot;);</span>
+<span class="lineNum">     186 </span>        [<span class="branchCov" title="Branch 0 was taken 3311 times"> + </span><span class="branchCov" title="Branch 1 was taken 46300 times"> + </span>]:<span class="lineCov">      49611 :             if (id) {</span>
+<span class="lineNum">     187 </span>        [<span class="branchCov" title="Branch 1 was taken 3311 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">       3311 :                 if (!shash_find(&amp;tc.chassis, id)) {</span>
+<span class="lineNum">     188 </span>                :<span class="lineCov">       3311 :                     struct chassis_node *chassis = xzalloc(sizeof *chassis);</span>
+<span class="lineNum">     189 </span>                :<span class="lineCov">       3311 :                     chassis-&gt;bridge = br;</span>
+<span class="lineNum">     190 </span>                :<span class="lineCov">       3311 :                     chassis-&gt;port = port;</span>
+<span class="lineNum">     191 </span>                :<span class="lineCov">       3311 :                     shash_add_assert(&amp;tc.chassis, id, chassis);</span>
+<span class="lineNum">     192 </span>                :            :                 } else {
+<span class="lineNum">     193 </span>                :            :                     /* Duplicate port for ovn-chassis-id.  Arbitrarily choose
+<span class="lineNum">     194 </span>                :            :                      * to delete this one. */
+<span class="lineNum">     195 </span>                :<span class="lineNoCov">          0 :                     ovsrec_bridge_update_ports_delvalue(br, port);</span>
+<span class="lineNum">     196 </span>                :            :                 }
+<span class="lineNum">     197 </span>                :            :             }
+<span class="lineNum">     198 </span>                :            :         }
+<span class="lineNum">     199 </span>                :            :     }
+<span class="lineNum">     200 </span>                :            : 
+<span class="lineNum">     201 </span>        [<span class="branchCov" title="Branch 2 was taken 6321 times"> + </span><span class="branchCov" title="Branch 3 was taken 2993 times"> + </span>]:<span class="lineCov">       9314 :     SBREC_CHASSIS_FOR_EACH(chassis_rec, ctx-&gt;ovnsb_idl) {</span>
+<span class="lineNum">     202 </span>        [<span class="branchCov" title="Branch 0 was taken 3330 times"> + </span><span class="branchCov" title="Branch 1 was taken 2991 times"> + </span>]:<span class="lineCov">       6321 :         if (strcmp(chassis_rec-&gt;name, chassis_id)) {</span>
+<span class="lineNum">     203 </span>                :            :             /* Create tunnels to the other chassis. */
+<span class="lineNum">     204 </span>                :<span class="lineCov">       3330 :             const struct sbrec_encap *encap = preferred_encap(chassis_rec);</span>
+<span class="lineNum">     205 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3330 times"> + </span>]:<span class="lineCov">       3330 :             if (!encap) {</span>
+<span class="lineNum">     206 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_INFO(&quot;No supported encaps for '%s'&quot;, chassis_rec-&gt;name);</span>
+<span class="lineNum">     207 </span>                :<span class="lineNoCov">          0 :                 continue;</span>
+<span class="lineNum">     208 </span>                :            :             }
+<span class="lineNum">     209 </span>                :<span class="lineCov">       3330 :             tunnel_add(&amp;tc, chassis_rec-&gt;name, encap);</span>
+<span class="lineNum">     210 </span>                :            :         }
+<span class="lineNum">     211 </span>                :            :     }
+<span class="lineNum">     212 </span>                :            : 
+<span class="lineNum">     213 </span>                :            :     /* Delete any existing OVN tunnels that were not still around. */
+<span class="lineNum">     214 </span>                :            :     struct shash_node *node, *next_node;
+<span class="lineNum">     215 </span>[<span class="branchCov" title="Branch 1 was taken 2993 times"> + </span><span class="branchCov" title="Branch 2 was taken 18 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 2993 times"> + </span>]:<span class="lineCov">       3011 :     SHASH_FOR_EACH_SAFE (node, next_node, &amp;tc.chassis) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 6 was taken 18 times"> + </span><span class="branchCov" title="Branch 7 was taken 2993 times"> + </span>]
+<span class="lineNum">     216 </span>                :<span class="lineCov">         18 :         struct chassis_node *chassis = node-&gt;data;</span>
+<span class="lineNum">     217 </span>                :<span class="lineCov">         18 :         ovsrec_bridge_update_ports_delvalue(chassis-&gt;bridge, chassis-&gt;port);</span>
+<span class="lineNum">     218 </span>                :<span class="lineCov">         18 :         shash_delete(&amp;tc.chassis, node);</span>
+<span class="lineNum">     219 </span>                :<span class="lineCov">         18 :         free(chassis);</span>
+<span class="lineNum">     220 </span>                :            :     }
+<span class="lineNum">     221 </span>                :<span class="lineCov">       2993 :     shash_destroy(&amp;tc.chassis);</span>
+<span class="lineNum">     222 </span>                :<span class="lineCov">       2993 :     sset_destroy(&amp;tc.port_names);</span>
+<span class="lineNum">     223 </span>                :            : }
+<span class="lineNum">     224 </span>                :            : 
+<span class="lineNum">     225 </span>                :            : /* Returns true if the database is all cleaned up, false if more work is
+<a name="226"><span class="lineNum">     226 </span>                :            :  * required. */</a>
+<span class="lineNum">     227 </span>                :            : bool
+<span class="lineNum">     228 </span>                :<span class="lineCov">        138 : encaps_cleanup(struct controller_ctx *ctx, const struct ovsrec_bridge *br_int)</span>
+<span class="lineNum">     229 </span>                :            : {
+<span class="lineNum">     230 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 138 times"> + </span>]:<span class="lineCov">        138 :     if (!br_int) {</span>
+<span class="lineNum">     231 </span>                :<span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">     232 </span>                :            :     }
+<span class="lineNum">     233 </span>                :            : 
+<span class="lineNum">     234 </span>                :            :     /* Delete all the OVS-created tunnels from the integration bridge. */
+<span class="lineNum">     235 </span>                :<span class="lineCov">        138 :     struct ovsrec_port **ports</span>
+<span class="lineNum">     236 </span>                :<span class="lineCov">        138 :         = xmalloc(sizeof *br_int-&gt;ports * br_int-&gt;n_ports);</span>
+<span class="lineNum">     237 </span>                :<span class="lineCov">        138 :     size_t n = 0;</span>
+<span class="lineNum">     238 </span>        [<span class="branchCov" title="Branch 0 was taken 1085 times"> + </span><span class="branchCov" title="Branch 1 was taken 138 times"> + </span>]:<span class="lineCov">       1223 :     for (size_t i = 0; i &lt; br_int-&gt;n_ports; i++) {</span>
+<span class="lineNum">     239 </span>        [<span class="branchCov" title="Branch 1 was taken 1049 times"> + </span><span class="branchCov" title="Branch 2 was taken 36 times"> + </span>]:<span class="lineCov">       1085 :         if (!smap_get(&amp;br_int-&gt;ports[i]-&gt;external_ids, &quot;ovn-chassis-id&quot;)) {</span>
+<span class="lineNum">     240 </span>                :<span class="lineCov">       1049 :             ports[n++] = br_int-&gt;ports[i];</span>
+<span class="lineNum">     241 </span>                :            :         }
+<span class="lineNum">     242 </span>                :            :     }
+<span class="lineNum">     243 </span>                :            : 
+<span class="lineNum">     244 </span>                :<span class="lineCov">        138 :     bool any_changes = n != br_int-&gt;n_ports;</span>
+<span class="lineNum">     245 </span>[<span class="branchCov" title="Branch 0 was taken 26 times"> + </span><span class="branchCov" title="Branch 1 was taken 112 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 14 times"> + </span><span class="branchCov" title="Branch 3 was taken 12 times"> + </span>]:<span class="lineCov">        138 :     if (any_changes &amp;&amp; ctx-&gt;ovs_idl_txn) {</span>
+<span class="lineNum">     246 </span>                :<span class="lineCov">         14 :         ovsdb_idl_txn_add_comment(ctx-&gt;ovs_idl_txn,</span>
+<span class="lineNum">     247 </span>                :            :                                   &quot;ovn-controller: destroying tunnels&quot;);
+<span class="lineNum">     248 </span>                :<span class="lineCov">         14 :         ovsrec_bridge_verify_ports(br_int);</span>
+<span class="lineNum">     249 </span>                :<span class="lineCov">         14 :         ovsrec_bridge_set_ports(br_int, ports, n);</span>
+<span class="lineNum">     250 </span>                :            :     }
+<span class="lineNum">     251 </span>                :<span class="lineCov">        138 :     free(ports);</span>
+<span class="lineNum">     252 </span>                :            : 
+<span class="lineNum">     253 </span>                :<span class="lineCov">        138 :     return !any_changes;</span>
+<span class="lineNum">     254 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

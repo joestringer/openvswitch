@@ -1,0 +1,569 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - include/ovn/expr.h</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">include/ovn</a> - expr.h<span style="font-size: 80%;"> (source / <a href="expr.h.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">2</td>
+            <td class="headerCovTableEntry">2</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">1</td>
+            <td class="headerCovTableEntry">1</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntryHi">-</td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2015, 2016 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #ifndef OVN_EXPR_H
+<span class="lineNum">      18 </span>                :            : #define OVN_EXPR_H 1
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : /* OVN matching expression tree
+<span class="lineNum">      21 </span>                :            :  * ============================
+<span class="lineNum">      22 </span>                :            :  *
+<span class="lineNum">      23 </span>                :            :  * The data structures here form an abstract expression tree for matching
+<span class="lineNum">      24 </span>                :            :  * expressions in OVN.
+<span class="lineNum">      25 </span>                :            :  *
+<span class="lineNum">      26 </span>                :            :  * The abstract syntax tree representation of a matching expression is one of:
+<span class="lineNum">      27 </span>                :            :  *
+<span class="lineNum">      28 </span>                :            :  *    - A Boolean literal (&quot;true&quot; or &quot;false&quot;).
+<span class="lineNum">      29 </span>                :            :  *
+<span class="lineNum">      30 </span>                :            :  *    - A comparison of a field (or part of a field) against a constant
+<span class="lineNum">      31 </span>                :            :  *      with one of the operators == != &lt; &lt;= &gt; &gt;=.
+<span class="lineNum">      32 </span>                :            :  *
+<span class="lineNum">      33 </span>                :            :  *    - The logical AND or OR of two or more matching expressions.
+<span class="lineNum">      34 </span>                :            :  *
+<span class="lineNum">      35 </span>                :            :  * Literals and comparisons are called &quot;terminal&quot; nodes, logical AND and OR
+<span class="lineNum">      36 </span>                :            :  * nodes are &quot;nonterminal&quot; nodes.
+<span class="lineNum">      37 </span>                :            :  *
+<span class="lineNum">      38 </span>                :            :  * The syntax for expressions includes a few other concepts that are not part
+<span class="lineNum">      39 </span>                :            :  * of the abstract syntax tree.  In these examples, x is a field, a, b, and c
+<span class="lineNum">      40 </span>                :            :  * are constants, and e1 and e2 are arbitrary expressions:
+<span class="lineNum">      41 </span>                :            :  *
+<span class="lineNum">      42 </span>                :            :  *    - Logical NOT.  The parser implements NOT by inverting the sense of the
+<span class="lineNum">      43 </span>                :            :  *      operand: !(x == a) becomes x != a, !(e1 &amp;&amp; e2) becomes !e1 || !e2, and
+<span class="lineNum">      44 </span>                :            :  *      so on.
+<span class="lineNum">      45 </span>                :            :  *
+<span class="lineNum">      46 </span>                :            :  *    - Set membership.  The parser translates x == {a, b, c} into
+<span class="lineNum">      47 </span>                :            :  *      x == a || x == b || x == c.
+<span class="lineNum">      48 </span>                :            :  *
+<span class="lineNum">      49 </span>                :            :  *    - Reversed comparisons.  The parser translates a &lt; x into x &gt; a.
+<span class="lineNum">      50 </span>                :            :  *
+<span class="lineNum">      51 </span>                :            :  *    - Range expressions.  The parser translates a &lt; x &lt; b into
+<span class="lineNum">      52 </span>                :            :  *      x &gt; a &amp;&amp; x &lt; b.
+<span class="lineNum">      53 </span>                :            :  */
+<span class="lineNum">      54 </span>                :            : 
+<span class="lineNum">      55 </span>                :            : #include &quot;classifier.h&quot;
+<span class="lineNum">      56 </span>                :            : #include &quot;lex.h&quot;
+<span class="lineNum">      57 </span>                :            : #include &quot;openvswitch/hmap.h&quot;
+<span class="lineNum">      58 </span>                :            : #include &quot;openvswitch/list.h&quot;
+<span class="lineNum">      59 </span>                :            : #include &quot;openvswitch/match.h&quot;
+<span class="lineNum">      60 </span>                :            : #include &quot;openvswitch/meta-flow.h&quot;
+<span class="lineNum">      61 </span>                :            : 
+<span class="lineNum">      62 </span>                :            : struct ds;
+<span class="lineNum">      63 </span>                :            : struct expr;
+<span class="lineNum">      64 </span>                :            : struct flow;
+<span class="lineNum">      65 </span>                :            : struct ofpbuf;
+<span class="lineNum">      66 </span>                :            : struct shash;
+<span class="lineNum">      67 </span>                :            : struct simap;
+<span class="lineNum">      68 </span>                :            : 
+<span class="lineNum">      69 </span>                :            : /* &quot;Measurement level&quot; of a field.  See &quot;Level of Measurement&quot; in the large
+<span class="lineNum">      70 </span>                :            :  * comment on struct expr_symbol below for more information. */
+<span class="lineNum">      71 </span>                :            : enum expr_level {
+<span class="lineNum">      72 </span>                :            :     EXPR_L_NOMINAL,
+<span class="lineNum">      73 </span>                :            : 
+<span class="lineNum">      74 </span>                :            :     /* Boolean values are nominal, however because of their simple nature OVN
+<span class="lineNum">      75 </span>                :            :      * can allow both equality and inequality tests on them. */
+<span class="lineNum">      76 </span>                :            :     EXPR_L_BOOLEAN,
+<span class="lineNum">      77 </span>                :            : 
+<span class="lineNum">      78 </span>                :            :     /* Ordinal values can at least be ordered on a scale.  OVN allows equality
+<span class="lineNum">      79 </span>                :            :      * and inequality and relational tests on ordinal values.  These are the
+<span class="lineNum">      80 </span>                :            :      * fields on which OVS allows bitwise matching. */
+<span class="lineNum">      81 </span>                :            :     EXPR_L_ORDINAL
+<span class="lineNum">      82 </span>                :            : };
+<span class="lineNum">      83 </span>                :            : 
+<span class="lineNum">      84 </span>                :            : const char *expr_level_to_string(enum expr_level);
+<span class="lineNum">      85 </span>                :            : 
+<span class="lineNum">      86 </span>                :            : /* A symbol.
+<span class="lineNum">      87 </span>                :            :  *
+<span class="lineNum">      88 </span>                :            :  *
+<span class="lineNum">      89 </span>                :            :  * Name
+<span class="lineNum">      90 </span>                :            :  * ====
+<span class="lineNum">      91 </span>                :            :  *
+<span class="lineNum">      92 </span>                :            :  * Every symbol must have a name.  To be useful, the name must satisfy the
+<span class="lineNum">      93 </span>                :            :  * lexer's syntax for an identifier.
+<span class="lineNum">      94 </span>                :            :  *
+<span class="lineNum">      95 </span>                :            :  *
+<span class="lineNum">      96 </span>                :            :  * Width
+<span class="lineNum">      97 </span>                :            :  * =====
+<span class="lineNum">      98 </span>                :            :  *
+<span class="lineNum">      99 </span>                :            :  * Every symbol has a width.  For integer symbols, this is the number of bits
+<span class="lineNum">     100 </span>                :            :  * in the value; for string symbols, this is 0.
+<span class="lineNum">     101 </span>                :            :  *
+<span class="lineNum">     102 </span>                :            :  *
+<span class="lineNum">     103 </span>                :            :  * Types
+<span class="lineNum">     104 </span>                :            :  * =====
+<span class="lineNum">     105 </span>                :            :  *
+<span class="lineNum">     106 </span>                :            :  * There are three kinds of symbols:
+<span class="lineNum">     107 </span>                :            :  *
+<span class="lineNum">     108 </span>                :            :  *   Fields:
+<span class="lineNum">     109 </span>                :            :  *
+<span class="lineNum">     110 </span>                :            :  *     One might, for example, define a field named &quot;vlan.tci&quot; to refer to
+<span class="lineNum">     111 </span>                :            :  *     MFF_VLAN_TCI.  'field' specifies the field.
+<span class="lineNum">     112 </span>                :            :  *
+<span class="lineNum">     113 </span>                :            :  *     'parent' and 'predicate' are NULL, and 'parent_ofs' is 0.
+<span class="lineNum">     114 </span>                :            :  *
+<span class="lineNum">     115 </span>                :            :  *     Integer fields can be nominal or ordinal (see below).  String fields are
+<span class="lineNum">     116 </span>                :            :  *     always nominal.
+<span class="lineNum">     117 </span>                :            :  *
+<span class="lineNum">     118 </span>                :            :  *   Subfields:
+<span class="lineNum">     119 </span>                :            :  *
+<span class="lineNum">     120 </span>                :            :  *     'parent' specifies the field (which may itself be a subfield,
+<span class="lineNum">     121 </span>                :            :  *     recursively) in which the subfield is embedded, and 'parent_ofs' a
+<span class="lineNum">     122 </span>                :            :  *     bitwise offset from the least-significant bit of the parent.  The
+<span class="lineNum">     123 </span>                :            :  *     subfield can contain a subset of the bits of the parent or all of them
+<span class="lineNum">     124 </span>                :            :  *     (in the latter case the subfield is really just a synonym for the
+<span class="lineNum">     125 </span>                :            :  *     parent).
+<span class="lineNum">     126 </span>                :            :  *
+<span class="lineNum">     127 </span>                :            :  *     'field' and 'predicate' are NULL.
+<span class="lineNum">     128 </span>                :            :  *
+<span class="lineNum">     129 </span>                :            :  *     Only ordinal fields (see below) may have subfields, and subfields are
+<span class="lineNum">     130 </span>                :            :  *     always ordinal.
+<span class="lineNum">     131 </span>                :            :  *
+<span class="lineNum">     132 </span>                :            :  *   Predicates:
+<span class="lineNum">     133 </span>                :            :  *
+<span class="lineNum">     134 </span>                :            :  *     A predicate is an arbitrary Boolean expression that can be used in an
+<span class="lineNum">     135 </span>                :            :  *     expression much like a 1-bit field.  'predicate' specifies the Boolean
+<span class="lineNum">     136 </span>                :            :  *     expression, e.g. &quot;ip4&quot; might expand to &quot;eth.type == 0x800&quot;.  The
+<span class="lineNum">     137 </span>                :            :  *     epxression might refer to other predicates, e.g. &quot;icmp4&quot; might expand to
+<span class="lineNum">     138 </span>                :            :  *     &quot;ip4 &amp;&amp; ip4.proto == 1&quot;.
+<span class="lineNum">     139 </span>                :            :  *
+<span class="lineNum">     140 </span>                :            :  *     'field' and 'parent' are NULL, and 'parent_ofs' is 0.
+<span class="lineNum">     141 </span>                :            :  *
+<span class="lineNum">     142 </span>                :            :  *     A predicate that refers to any nominal field or predicate (see below) is
+<span class="lineNum">     143 </span>                :            :  *     nominal; other predicates have Boolean level of measurement.
+<span class="lineNum">     144 </span>                :            :  *
+<span class="lineNum">     145 </span>                :            :  *
+<span class="lineNum">     146 </span>                :            :  * Level of Measurement
+<span class="lineNum">     147 </span>                :            :  * ====================
+<span class="lineNum">     148 </span>                :            :  *
+<span class="lineNum">     149 </span>                :            :  * See http://en.wikipedia.org/wiki/Level_of_measurement for the statistical
+<span class="lineNum">     150 </span>                :            :  * concept on which this classification is based.  There are three levels:
+<span class="lineNum">     151 </span>                :            :  *
+<span class="lineNum">     152 </span>                :            :  *   Ordinal:
+<span class="lineNum">     153 </span>                :            :  *
+<span class="lineNum">     154 </span>                :            :  *     In statistics, ordinal values can be ordered on a scale.  Here, we
+<span class="lineNum">     155 </span>                :            :  *     consider a field (or subfield) to be ordinal if its bits can be examined
+<span class="lineNum">     156 </span>                :            :  *     individually.  This is true for the OpenFlow fields that OpenFlow or
+<span class="lineNum">     157 </span>                :            :  *     Open vSwitch makes &quot;maskable&quot;.
+<span class="lineNum">     158 </span>                :            :  *
+<span class="lineNum">     159 </span>                :            :  *     OVN supports all the usual arithmetic relations (== != &lt; &lt;= &gt; &gt;=) on
+<span class="lineNum">     160 </span>                :            :  *     ordinal fields and their subfields, because all of these can be
+<span class="lineNum">     161 </span>                :            :  *     implemented as collections of bitwise tests.
+<span class="lineNum">     162 </span>                :            :  *
+<span class="lineNum">     163 </span>                :            :  *   Nominal:
+<span class="lineNum">     164 </span>                :            :  *
+<span class="lineNum">     165 </span>                :            :  *     In statistics, nominal values cannot be usefully compared except for
+<span class="lineNum">     166 </span>                :            :  *     equality.  This is true of OpenFlow port numbers, Ethernet types, and IP
+<span class="lineNum">     167 </span>                :            :  *     protocols are examples: all of these are just identifiers assigned
+<span class="lineNum">     168 </span>                :            :  *     arbitrarily with no deeper meaning.  In OpenFlow and Open vSwitch, bits
+<span class="lineNum">     169 </span>                :            :  *     in these fields generally aren't individually addressable.
+<span class="lineNum">     170 </span>                :            :  *
+<span class="lineNum">     171 </span>                :            :  *     OVN only supports arithmetic tests for equality on nominal fields,
+<span class="lineNum">     172 </span>                :            :  *     because OpenFlow and Open vSwitch provide no way for a flow to
+<span class="lineNum">     173 </span>                :            :  *     efficiently implement other comparisons on them.  (A test for inequality
+<span class="lineNum">     174 </span>                :            :  *     can be sort of built out of two flows with different priorities, but OVN
+<span class="lineNum">     175 </span>                :            :  *     matching expressions always generate flows with a single priority.)
+<span class="lineNum">     176 </span>                :            :  *
+<span class="lineNum">     177 </span>                :            :  *     String fields are always nominal.
+<span class="lineNum">     178 </span>                :            :  *
+<span class="lineNum">     179 </span>                :            :  *   Boolean:
+<span class="lineNum">     180 </span>                :            :  *
+<span class="lineNum">     181 </span>                :            :  *     A nominal field that has only two values, 0 and 1, is somewhat
+<span class="lineNum">     182 </span>                :            :  *     exceptional, since it is easy to support both equality and inequality
+<span class="lineNum">     183 </span>                :            :  *     tests on such a field: either one can be implemented as a test for 0 or
+<span class="lineNum">     184 </span>                :            :  *     1.
+<span class="lineNum">     185 </span>                :            :  *
+<span class="lineNum">     186 </span>                :            :  *     Only predicates (see above) have a Boolean level of measurement.
+<span class="lineNum">     187 </span>                :            :  *
+<span class="lineNum">     188 </span>                :            :  *     This isn't a standard level of measurement.
+<span class="lineNum">     189 </span>                :            :  *
+<span class="lineNum">     190 </span>                :            :  *
+<span class="lineNum">     191 </span>                :            :  * Prerequisites
+<span class="lineNum">     192 </span>                :            :  * =============
+<span class="lineNum">     193 </span>                :            :  *
+<span class="lineNum">     194 </span>                :            :  * Any symbol can have prerequisites, which are specified as a string giving an
+<span class="lineNum">     195 </span>                :            :  * additional expression that must be true whenever the symbol is referenced.
+<span class="lineNum">     196 </span>                :            :  * For example, the &quot;icmp4.type&quot; symbol might have prerequisite &quot;icmp4&quot;, which
+<span class="lineNum">     197 </span>                :            :  * would cause an expression &quot;icmp4.type == 0&quot; to be interpreted as &quot;icmp4.type
+<span class="lineNum">     198 </span>                :            :  * == 0 &amp;&amp; icmp4&quot;, which would in turn expand to &quot;icmp4.type == 0 &amp;&amp; eth.type
+<span class="lineNum">     199 </span>                :            :  * == 0x800 &amp;&amp; ip4.proto == 1&quot; (assuming &quot;icmp4&quot; is a predicate defined as
+<span class="lineNum">     200 </span>                :            :  * suggested under &quot;Types&quot; above).
+<span class="lineNum">     201 </span>                :            :  *
+<span class="lineNum">     202 </span>                :            :  *
+<span class="lineNum">     203 </span>                :            :  * Crossproducting
+<span class="lineNum">     204 </span>                :            :  * ===============
+<span class="lineNum">     205 </span>                :            :  *
+<span class="lineNum">     206 </span>                :            :  * Ordinarily OVN is willing to consider using any field as a dimension in the
+<span class="lineNum">     207 </span>                :            :  * Open vSwitch &quot;conjunctive match&quot; extension (see ovs-ofctl(8)).  However,
+<span class="lineNum">     208 </span>                :            :  * some fields can't actually be used that way because they are necessary as
+<span class="lineNum">     209 </span>                :            :  * prerequisites.  For example, from an expression like &quot;tcp.src == {1,2,3}
+<span class="lineNum">     210 </span>                :            :  * &amp;&amp; tcp.dst == {4,5,6}&quot;, OVN might naturally generate flows like this:
+<span class="lineNum">     211 </span>                :            :  *
+<span class="lineNum">     212 </span>                :            :  *     conj_id=1,actions=...
+<span class="lineNum">     213 </span>                :            :  *     ip,actions=conjunction(1,1/3)
+<span class="lineNum">     214 </span>                :            :  *     ip6,actions=conjunction(1,1/3)
+<span class="lineNum">     215 </span>                :            :  *     tp_src=1,actions=conjunction(1,2/3)
+<span class="lineNum">     216 </span>                :            :  *     tp_src=2,actions=conjunction(1,2/3)
+<span class="lineNum">     217 </span>                :            :  *     tp_src=3,actions=conjunction(1,2/3)
+<span class="lineNum">     218 </span>                :            :  *     tp_dst=4,actions=conjunction(1,3/3)
+<span class="lineNum">     219 </span>                :            :  *     tp_dst=5,actions=conjunction(1,3/3)
+<span class="lineNum">     220 </span>                :            :  *     tp_dst=6,actions=conjunction(1,3/3)
+<span class="lineNum">     221 </span>                :            :  *
+<span class="lineNum">     222 </span>                :            :  * but that's not valid because any flow that matches on tp_src or tp_dst must
+<span class="lineNum">     223 </span>                :            :  * also match on either ip or ip6.  Thus, one would mark eth.type as &quot;must
+<span class="lineNum">     224 </span>                :            :  * crossproduct&quot;, to force generating flows like this:
+<span class="lineNum">     225 </span>                :            :  *
+<span class="lineNum">     226 </span>                :            :  *     conj_id=1,actions=...
+<span class="lineNum">     227 </span>                :            :  *     ip,tp_src=1,actions=conjunction(1,1/2)
+<span class="lineNum">     228 </span>                :            :  *     ip,tp_src=2,actions=conjunction(1,1/2)
+<span class="lineNum">     229 </span>                :            :  *     ip,tp_src=3,actions=conjunction(1,1/2)
+<span class="lineNum">     230 </span>                :            :  *     ip6,tp_src=1,actions=conjunction(1,1/2)
+<span class="lineNum">     231 </span>                :            :  *     ip6,tp_src=2,actions=conjunction(1,1/2)
+<span class="lineNum">     232 </span>                :            :  *     ip6,tp_src=3,actions=conjunction(1,1/2)
+<span class="lineNum">     233 </span>                :            :  *     ip,tp_dst=4,actions=conjunction(1,2/2)
+<span class="lineNum">     234 </span>                :            :  *     ip,tp_dst=5,actions=conjunction(1,2/2)
+<span class="lineNum">     235 </span>                :            :  *     ip,tp_dst=6,actions=conjunction(1,2/2)
+<span class="lineNum">     236 </span>                :            :  *     ip6,tp_dst=4,actions=conjunction(1,2/2)
+<span class="lineNum">     237 </span>                :            :  *     ip6,tp_dst=5,actions=conjunction(1,2/2)
+<span class="lineNum">     238 </span>                :            :  *     ip6,tp_dst=6,actions=conjunction(1,2/2)
+<span class="lineNum">     239 </span>                :            :  *
+<span class="lineNum">     240 </span>                :            :  * which are acceptable.
+<span class="lineNum">     241 </span>                :            :  */
+<span class="lineNum">     242 </span>                :            : struct expr_symbol {
+<span class="lineNum">     243 </span>                :            :     char *name;
+<span class="lineNum">     244 </span>                :            :     int width;
+<span class="lineNum">     245 </span>                :            : 
+<span class="lineNum">     246 </span>                :            :     const struct mf_field *field;     /* Fields only, otherwise NULL. */
+<span class="lineNum">     247 </span>                :            :     const struct expr_symbol *parent; /* Subfields only, otherwise NULL. */
+<span class="lineNum">     248 </span>                :            :     int parent_ofs;                   /* Subfields only, otherwise 0. */
+<span class="lineNum">     249 </span>                :            :     char *predicate;                  /* Predicates only, otherwise NULL. */
+<span class="lineNum">     250 </span>                :            : 
+<span class="lineNum">     251 </span>                :            :     enum expr_level level;
+<span class="lineNum">     252 </span>                :            : 
+<span class="lineNum">     253 </span>                :            :     char *prereqs;
+<span class="lineNum">     254 </span>                :            :     bool must_crossproduct;
+<span class="lineNum">     255 </span>                :            :     bool rw;
+<span class="lineNum">     256 </span>                :            : };
+<span class="lineNum">     257 </span>                :            : 
+<span class="lineNum">     258 </span>                :            : void expr_symbol_format(const struct expr_symbol *, struct ds *);
+<span class="lineNum">     259 </span>                :            : 
+<span class="lineNum">     260 </span>                :            : /* A reference to a symbol or a subfield of a symbol.
+<span class="lineNum">     261 </span>                :            :  *
+<span class="lineNum">     262 </span>                :            :  * For string fields, ofs and n_bits are 0. */
+<span class="lineNum">     263 </span>                :            : struct expr_field {
+<span class="lineNum">     264 </span>                :            :     const struct expr_symbol *symbol; /* The symbol. */
+<span class="lineNum">     265 </span>                :            :     int ofs;                          /* Starting bit offset. */
+<span class="lineNum">     266 </span>                :            :     int n_bits;                       /* Number of bits. */
+<span class="lineNum">     267 </span>                :            : };
+<span class="lineNum">     268 </span>                :            : 
+<span class="lineNum">     269 </span>                :            : bool expr_field_parse(struct lexer *, const struct shash *symtab,
+<span class="lineNum">     270 </span>                :            :                       struct expr_field *, struct expr **prereqsp);
+<span class="lineNum">     271 </span>                :            : void expr_field_format(const struct expr_field *, struct ds *);
+<span class="lineNum">     272 </span>                :            : 
+<span class="lineNum">     273 </span>                :            : struct expr_symbol *expr_symtab_add_field(struct shash *symtab,
+<span class="lineNum">     274 </span>                :            :                                           const char *name, enum mf_field_id,
+<span class="lineNum">     275 </span>                :            :                                           const char *prereqs,
+<span class="lineNum">     276 </span>                :            :                                           bool must_crossproduct);
+<span class="lineNum">     277 </span>                :            : struct expr_symbol *expr_symtab_add_subfield(struct shash *symtab,
+<span class="lineNum">     278 </span>                :            :                                              const char *name,
+<span class="lineNum">     279 </span>                :            :                                              const char *prereqs,
+<span class="lineNum">     280 </span>                :            :                                              const char *subfield);
+<span class="lineNum">     281 </span>                :            : struct expr_symbol *expr_symtab_add_string(struct shash *symtab,
+<span class="lineNum">     282 </span>                :            :                                            const char *name, enum mf_field_id,
+<span class="lineNum">     283 </span>                :            :                                            const char *prereqs);
+<span class="lineNum">     284 </span>                :            : struct expr_symbol *expr_symtab_add_predicate(struct shash *symtab,
+<span class="lineNum">     285 </span>                :            :                                               const char *name,
+<span class="lineNum">     286 </span>                :            :                                               const char *expansion);
+<span class="lineNum">     287 </span>                :            : void expr_symtab_destroy(struct shash *symtab);
+<span class="lineNum">     288 </span>                :            : 
+<span class="lineNum">     289 </span>                :            : /* Expression type. */
+<span class="lineNum">     290 </span>                :            : enum expr_type {
+<span class="lineNum">     291 </span>                :            :     EXPR_T_CMP,                 /* Compare symbol with constant. */
+<span class="lineNum">     292 </span>                :            :     EXPR_T_AND,                 /* Logical AND of 2 or more subexpressions. */
+<span class="lineNum">     293 </span>                :            :     EXPR_T_OR,                  /* Logical OR of 2 or more subexpressions. */
+<span class="lineNum">     294 </span>                :            :     EXPR_T_BOOLEAN,             /* True or false constant. */
+<span class="lineNum">     295 </span>                :            : };
+<span class="lineNum">     296 </span>                :            : 
+<span class="lineNum">     297 </span>                :            : /* Relational operator. */
+<span class="lineNum">     298 </span>                :            : enum expr_relop {
+<span class="lineNum">     299 </span>                :            :     EXPR_R_EQ,                  /* == */
+<span class="lineNum">     300 </span>                :            :     EXPR_R_NE,                  /* != */
+<span class="lineNum">     301 </span>                :            :     EXPR_R_LT,                  /* &lt; */
+<span class="lineNum">     302 </span>                :            :     EXPR_R_LE,                  /* &lt;= */
+<span class="lineNum">     303 </span>                :            :     EXPR_R_GT,                  /* &gt; */
+<span class="lineNum">     304 </span>                :            :     EXPR_R_GE,                  /* &gt;= */
+<span class="lineNum">     305 </span>                :            : };
+<span class="lineNum">     306 </span>                :            : const char *expr_relop_to_string(enum expr_relop);
+<span class="lineNum">     307 </span>                :            : bool expr_relop_from_token(enum lex_type type, enum expr_relop *relop);
+<span class="lineNum">     308 </span>                :            : 
+<span class="lineNum">     309 </span>                :            : /* An abstract syntax tree for a matching expression.
+<span class="lineNum">     310 </span>                :            :  *
+<span class="lineNum">     311 </span>                :            :  * The expression code maintains and relies on a few important invariants:
+<span class="lineNum">     312 </span>                :            :  *
+<span class="lineNum">     313 </span>                :            :  *     - An EXPR_T_AND or EXPR_T_OR node never has a child of the same type.
+<span class="lineNum">     314 </span>                :            :  *       (Any such children could be merged into their parent.)  A node may
+<span class="lineNum">     315 </span>                :            :  *       have grandchildren of its own type.
+<span class="lineNum">     316 </span>                :            :  *
+<span class="lineNum">     317 </span>                :            :  *       As a consequence, every nonterminal node at the same distance from the
+<span class="lineNum">     318 </span>                :            :  *       root has the same type.
+<span class="lineNum">     319 </span>                :            :  *
+<span class="lineNum">     320 </span>                :            :  *     - EXPR_T_AND and EXPR_T_OR nodes must have at least two children.
+<span class="lineNum">     321 </span>                :            :  *
+<span class="lineNum">     322 </span>                :            :  *     - An EXPR_T_CMP node always has a nonzero mask, and never has a 1-bit
+<span class="lineNum">     323 </span>                :            :  *       in its value in a position where the mask is a 0-bit.
+<span class="lineNum">     324 </span>                :            :  *
+<span class="lineNum">     325 </span>                :            :  * The expr_honors_invariants() function can check invariants. */
+<span class="lineNum">     326 </span>                :            : struct expr {
+<span class="lineNum">     327 </span>                :            :     struct ovs_list node;       /* In parent EXPR_T_AND or EXPR_T_OR if any. */
+<span class="lineNum">     328 </span>                :            :     enum expr_type type;        /* Expression type. */
+<span class="lineNum">     329 </span>                :            : 
+<span class="lineNum">     330 </span>                :            :     union {
+<span class="lineNum">     331 </span>                :            :         /* EXPR_T_CMP.
+<span class="lineNum">     332 </span>                :            :          *
+<span class="lineNum">     333 </span>                :            :          * The symbol is on the left, e.g. &quot;field &lt; constant&quot;. */
+<span class="lineNum">     334 </span>                :            :         struct {
+<span class="lineNum">     335 </span>                :            :             const struct expr_symbol *symbol;
+<span class="lineNum">     336 </span>                :            :             enum expr_relop relop;
+<span class="lineNum">     337 </span>                :            : 
+<span class="lineNum">     338 </span>                :            :             union {
+<span class="lineNum">     339 </span>                :            :                 char *string;
+<span class="lineNum">     340 </span>                :            :                 struct {
+<span class="lineNum">     341 </span>                :            :                     union mf_subvalue value;
+<span class="lineNum">     342 </span>                :            :                     union mf_subvalue mask;
+<span class="lineNum">     343 </span>                :            :                 };
+<span class="lineNum">     344 </span>                :            :             };
+<span class="lineNum">     345 </span>                :            :         } cmp;
+<span class="lineNum">     346 </span>                :            : 
+<span class="lineNum">     347 </span>                :            :         /* EXPR_T_AND, EXPR_T_OR. */
+<span class="lineNum">     348 </span>                :            :         struct ovs_list andor;
+<span class="lineNum">     349 </span>                :            : 
+<span class="lineNum">     350 </span>                :            :         /* EXPR_T_BOOLEAN. */
+<span class="lineNum">     351 </span>                :            :         bool boolean;
+<span class="lineNum">     352 </span>                :            :     };
+<span class="lineNum">     353 </span>                :            : };
+<span class="lineNum">     354 </span>                :            : 
+<span class="lineNum">     355 </span>                :            : struct expr *expr_create_boolean(bool b);
+<span class="lineNum">     356 </span>                :            : struct expr *expr_create_andor(enum expr_type);
+<span class="lineNum">     357 </span>                :            : struct expr *expr_combine(enum expr_type, struct expr *a, struct expr *b);
+<a name="358"><span class="lineNum">     358 </span>                :            : </a>
+<span class="lineNum">     359 </span>                :            : static inline struct expr *
+<span class="lineNum">     360 </span>                :<span class="lineCov">    5652471 : expr_from_node(const struct ovs_list *node)</span>
+<span class="lineNum">     361 </span>                :            : {
+<span class="lineNum">     362 </span>                :<span class="lineCov">    5652471 :     return CONTAINER_OF(node, struct expr, node);</span>
+<span class="lineNum">     363 </span>                :            : }
+<span class="lineNum">     364 </span>                :            : 
+<span class="lineNum">     365 </span>                :            : void expr_format(const struct expr *, struct ds *);
+<span class="lineNum">     366 </span>                :            : void expr_print(const struct expr *);
+<span class="lineNum">     367 </span>                :            : struct expr *expr_parse(struct lexer *, const struct shash *symtab,
+<span class="lineNum">     368 </span>                :            :                         const struct shash *macros);
+<span class="lineNum">     369 </span>                :            : struct expr *expr_parse_string(const char *, const struct shash *symtab,
+<span class="lineNum">     370 </span>                :            :                                const struct shash *macros,
+<span class="lineNum">     371 </span>                :            :                                char **errorp);
+<span class="lineNum">     372 </span>                :            : 
+<span class="lineNum">     373 </span>                :            : struct expr *expr_clone(struct expr *);
+<span class="lineNum">     374 </span>                :            : void expr_destroy(struct expr *);
+<span class="lineNum">     375 </span>                :            : 
+<span class="lineNum">     376 </span>                :            : struct expr *expr_annotate(struct expr *, const struct shash *symtab,
+<span class="lineNum">     377 </span>                :            :                            char **errorp);
+<span class="lineNum">     378 </span>                :            : struct expr *expr_simplify(struct expr *);
+<span class="lineNum">     379 </span>                :            : struct expr *expr_normalize(struct expr *);
+<span class="lineNum">     380 </span>                :            : 
+<span class="lineNum">     381 </span>                :            : bool expr_honors_invariants(const struct expr *);
+<span class="lineNum">     382 </span>                :            : bool expr_is_simplified(const struct expr *);
+<span class="lineNum">     383 </span>                :            : bool expr_is_normalized(const struct expr *);
+<span class="lineNum">     384 </span>                :            : 
+<span class="lineNum">     385 </span>                :            : char *expr_parse_microflow(const char *, const struct shash *symtab,
+<span class="lineNum">     386 </span>                :            :                            const struct shash *macros,
+<span class="lineNum">     387 </span>                :            :                            bool (*lookup_port)(const void *aux,
+<span class="lineNum">     388 </span>                :            :                                                const char *port_name,
+<span class="lineNum">     389 </span>                :            :                                                unsigned int *portp),
+<span class="lineNum">     390 </span>                :            :                            const void *aux, struct flow *uflow)
+<span class="lineNum">     391 </span>                :            :     OVS_WARN_UNUSED_RESULT;
+<span class="lineNum">     392 </span>                :            : 
+<span class="lineNum">     393 </span>                :            : bool expr_evaluate(const struct expr *, const struct flow *uflow,
+<span class="lineNum">     394 </span>                :            :                    bool (*lookup_port)(const void *aux, const char *port_name,
+<span class="lineNum">     395 </span>                :            :                                        unsigned int *portp),
+<span class="lineNum">     396 </span>                :            :                    const void *aux);
+<span class="lineNum">     397 </span>                :            : 
+<span class="lineNum">     398 </span>                :            : /* Converting expressions to OpenFlow flows. */
+<span class="lineNum">     399 </span>                :            : 
+<span class="lineNum">     400 </span>                :            : /* An OpenFlow match generated from a Boolean expression.  See
+<span class="lineNum">     401 </span>                :            :  * expr_to_matches() for more information. */
+<span class="lineNum">     402 </span>                :            : struct expr_match {
+<span class="lineNum">     403 </span>                :            :     struct hmap_node hmap_node;
+<span class="lineNum">     404 </span>                :            :     struct match match;
+<span class="lineNum">     405 </span>                :            :     struct cls_conjunction *conjunctions;
+<span class="lineNum">     406 </span>                :            :     size_t n, allocated;
+<span class="lineNum">     407 </span>                :            : };
+<span class="lineNum">     408 </span>                :            : 
+<span class="lineNum">     409 </span>                :            : uint32_t expr_to_matches(const struct expr *,
+<span class="lineNum">     410 </span>                :            :                          bool (*lookup_port)(const void *aux,
+<span class="lineNum">     411 </span>                :            :                                              const char *port_name,
+<span class="lineNum">     412 </span>                :            :                                              unsigned int *portp),
+<span class="lineNum">     413 </span>                :            :                          const void *aux,
+<span class="lineNum">     414 </span>                :            :                          struct hmap *matches);
+<span class="lineNum">     415 </span>                :            : void expr_matches_destroy(struct hmap *matches);
+<span class="lineNum">     416 </span>                :            : void expr_matches_print(const struct hmap *matches, FILE *);
+<span class="lineNum">     417 </span>                :            : 
+<span class="lineNum">     418 </span>                :            : /* Action parsing helper. */
+<span class="lineNum">     419 </span>                :            : 
+<span class="lineNum">     420 </span>                :            : char *expr_type_check(const struct expr_field *, int n_bits, bool rw)
+<span class="lineNum">     421 </span>                :            :     OVS_WARN_UNUSED_RESULT;
+<span class="lineNum">     422 </span>                :            : struct mf_subfield expr_resolve_field(const struct expr_field *);
+<span class="lineNum">     423 </span>                :            : 
+<span class="lineNum">     424 </span>                :            : /* Type of a &quot;union expr_constant&quot; or &quot;struct expr_constant_set&quot;. */
+<span class="lineNum">     425 </span>                :            : enum expr_constant_type {
+<span class="lineNum">     426 </span>                :            :     EXPR_C_INTEGER,
+<span class="lineNum">     427 </span>                :            :     EXPR_C_STRING
+<span class="lineNum">     428 </span>                :            : };
+<span class="lineNum">     429 </span>                :            : 
+<span class="lineNum">     430 </span>                :            : /* A string or integer constant (one must know which from context). */
+<span class="lineNum">     431 </span>                :            : union expr_constant {
+<span class="lineNum">     432 </span>                :            :     /* Integer constant.
+<span class="lineNum">     433 </span>                :            :      *
+<span class="lineNum">     434 </span>                :            :      * The width of a constant isn't always clear, e.g. if you write &quot;1&quot;,
+<span class="lineNum">     435 </span>                :            :      * there's no way to tell whether you mean for that to be a 1-bit constant
+<span class="lineNum">     436 </span>                :            :      * or a 128-bit constant or somewhere in between. */
+<span class="lineNum">     437 </span>                :            :     struct {
+<span class="lineNum">     438 </span>                :            :         union mf_subvalue value;
+<span class="lineNum">     439 </span>                :            :         union mf_subvalue mask; /* Only initialized if 'masked'. */
+<span class="lineNum">     440 </span>                :            :         bool masked;
+<span class="lineNum">     441 </span>                :            : 
+<span class="lineNum">     442 </span>                :            :         enum lex_format format; /* From the constant's lex_token. */
+<span class="lineNum">     443 </span>                :            :     };
+<span class="lineNum">     444 </span>                :            : 
+<span class="lineNum">     445 </span>                :            :     /* Null-terminated string constant. */
+<span class="lineNum">     446 </span>                :            :     char *string;
+<span class="lineNum">     447 </span>                :            : };
+<span class="lineNum">     448 </span>                :            : 
+<span class="lineNum">     449 </span>                :            : bool expr_constant_parse(struct lexer *, const struct expr_field *,
+<span class="lineNum">     450 </span>                :            :                          union expr_constant *);
+<span class="lineNum">     451 </span>                :            : void expr_constant_format(const union expr_constant *,
+<span class="lineNum">     452 </span>                :            :                           enum expr_constant_type, struct ds *);
+<span class="lineNum">     453 </span>                :            : void expr_constant_destroy(const union expr_constant *,
+<span class="lineNum">     454 </span>                :            :                            enum expr_constant_type);
+<span class="lineNum">     455 </span>                :            : 
+<span class="lineNum">     456 </span>                :            : /* A collection of &quot;union expr_constant&quot;s of the same type. */
+<span class="lineNum">     457 </span>                :            : struct expr_constant_set {
+<span class="lineNum">     458 </span>                :            :     union expr_constant *values;  /* Constants. */
+<span class="lineNum">     459 </span>                :            :     size_t n_values;              /* Number of constants. */
+<span class="lineNum">     460 </span>                :            :     enum expr_constant_type type; /* Type of the constants. */
+<span class="lineNum">     461 </span>                :            :     bool in_curlies;              /* Whether the constants were in {}. */
+<span class="lineNum">     462 </span>                :            : };
+<span class="lineNum">     463 </span>                :            : 
+<span class="lineNum">     464 </span>                :            : bool expr_constant_set_parse(struct lexer *, struct expr_constant_set *);
+<span class="lineNum">     465 </span>                :            : void expr_constant_set_format(const struct expr_constant_set *, struct ds *);
+<span class="lineNum">     466 </span>                :            : void expr_constant_set_destroy(struct expr_constant_set *cs);
+<span class="lineNum">     467 </span>                :            : 
+<span class="lineNum">     468 </span>                :            : 
+<span class="lineNum">     469 </span>                :            : /* Address sets, aka &quot;macros&quot;.
+<span class="lineNum">     470 </span>                :            :  *
+<span class="lineNum">     471 </span>                :            :  * Instead of referring to a set of value as:
+<span class="lineNum">     472 </span>                :            :  *    {addr1, addr2, ..., addrN}
+<span class="lineNum">     473 </span>                :            :  * You can register a set of values and refer to them as:
+<span class="lineNum">     474 </span>                :            :  *    $name
+<span class="lineNum">     475 </span>                :            :  * The macros should all have integer/masked-integer values.
+<span class="lineNum">     476 </span>                :            :  * The values that don't qualify are ignored.
+<span class="lineNum">     477 </span>                :            :  */
+<span class="lineNum">     478 </span>                :            : 
+<span class="lineNum">     479 </span>                :            : void expr_macros_add(struct shash *macros, const char *name,
+<span class="lineNum">     480 </span>                :            :                      const char * const *values, size_t n_values);
+<span class="lineNum">     481 </span>                :            : void expr_macros_remove(struct shash *macros, const char *name);
+<span class="lineNum">     482 </span>                :            : void expr_macros_destroy(struct shash *macros);
+<span class="lineNum">     483 </span>                :            : 
+<span class="lineNum">     484 </span>                :            : #endif /* ovn/expr.h */
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

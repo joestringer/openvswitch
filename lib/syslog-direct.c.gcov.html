@@ -1,0 +1,195 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/syslog-direct.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - syslog-direct.c<span style="font-size: 80%;"> (source / <a href="syslog-direct.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">28</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">3</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">14</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2015 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : #include &quot;syslog-direct.h&quot;
+<span class="lineNum">      17 </span>                :            : 
+<span class="lineNum">      18 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;unistd.h&gt;
+<span class="lineNum">      22 </span>                :            : 
+<span class="lineNum">      23 </span>                :            : #include &quot;compiler.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;openvswitch/dynamic-string.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;socket-util.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;syslog-provider.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      28 </span>                :            : 
+<span class="lineNum">      29 </span>                :            : #define FACILITY_MASK 0x03f8
+<span class="lineNum">      30 </span>                :            : 
+<span class="lineNum">      31 </span>                :            : static void syslog_direct_open(struct syslogger *this, int facility);
+<span class="lineNum">      32 </span>                :            : static void syslog_direct_log(struct syslogger *this, int pri,
+<span class="lineNum">      33 </span>                :            :                               const char *msg);
+<span class="lineNum">      34 </span>                :            : 
+<span class="lineNum">      35 </span>                :            : static struct syslog_class syslog_direct_class = {
+<span class="lineNum">      36 </span>                :            :     syslog_direct_open,
+<span class="lineNum">      37 </span>                :            :     syslog_direct_log,
+<span class="lineNum">      38 </span>                :            : };
+<span class="lineNum">      39 </span>                :            : 
+<span class="lineNum">      40 </span>                :            : struct syslog_direct {
+<span class="lineNum">      41 </span>                :            :     struct syslogger parent;
+<span class="lineNum">      42 </span>                :            :     int fd;  /* Negative number in error case.  Otherwise, socket. */
+<span class="lineNum">      43 </span>                :            :     int facility;
+<span class="lineNum">      44 </span>                :            : };
+<span class="lineNum">      45 </span>                :            : 
+<span class="lineNum">      46 </span>                :            : 
+<span class="lineNum">      47 </span>                :            : /* This function creates object that directly interacts with syslog over
+<a name="48"><span class="lineNum">      48 </span>                :            :  * UDP or Unix domain socket specified in 'method'. */</a>
+<span class="lineNum">      49 </span>                :            : struct syslogger *
+<span class="lineNum">      50 </span>                :<span class="lineNoCov">          0 : syslog_direct_create(const char *method)</span>
+<span class="lineNum">      51 </span>                :            : {
+<span class="lineNum">      52 </span>                :<span class="lineNoCov">          0 :     struct syslog_direct *this = xmalloc(sizeof *this);</span>
+<span class="lineNum">      53 </span>                :            : 
+<span class="lineNum">      54 </span>                :<span class="lineNoCov">          0 :     this-&gt;parent.class = &amp;syslog_direct_class;</span>
+<span class="lineNum">      55 </span>                :<span class="lineNoCov">          0 :     this-&gt;parent.prefix = &quot;&lt;%B&gt;&quot;;</span>
+<span class="lineNum">      56 </span>                :            : 
+<span class="lineNum">      57 </span>                :            :     /* socket is created from here (opposed to syslog_direct_open())
+<span class="lineNum">      58 </span>                :            :      * so that deadlocks would be avoided.  The problem is that these
+<span class="lineNum">      59 </span>                :            :      * functions that create socket might call VLOG() */
+<span class="lineNum">      60 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!strncmp(method, &quot;udp:&quot;, 4)) {</span>
+<span class="lineNum">      61 </span>                :<span class="lineNoCov">          0 :         inet_open_active(SOCK_DGRAM, &amp;method[4], 514, NULL, &amp;this-&gt;fd, 0);</span>
+<span class="lineNum">      62 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     } else if (!strncmp(method, &quot;unix:&quot;, 5)) {</span>
+<span class="lineNum">      63 </span>                :<span class="lineNoCov">          0 :         this-&gt;fd = make_unix_socket(SOCK_DGRAM, true, NULL, &amp;method[5]);</span>
+<span class="lineNum">      64 </span>                :            :     } else {
+<span class="lineNum">      65 </span>                :<span class="lineNoCov">          0 :         this-&gt;fd = -1;</span>
+<span class="lineNum">      66 </span>                :            :     }
+<span class="lineNum">      67 </span>                :            : 
+<span class="lineNum">      68 </span>                :<span class="lineNoCov">          0 :     return &amp;this-&gt;parent;</span>
+<span class="lineNum">      69 </span>                :            : }
+<a name="70"><span class="lineNum">      70 </span>                :            : </a>
+<span class="lineNum">      71 </span>                :            : static void
+<span class="lineNum">      72 </span>                :<span class="lineNoCov">          0 : syslog_direct_open(struct syslogger *this, int facility)</span>
+<span class="lineNum">      73 </span>                :            : {
+<span class="lineNum">      74 </span>                :<span class="lineNoCov">          0 :     struct syslog_direct *this_ = (struct syslog_direct*) this;</span>
+<span class="lineNum">      75 </span>                :            : 
+<span class="lineNum">      76 </span>                :<span class="lineNoCov">          0 :     this_-&gt;facility = facility;</span>
+<span class="lineNum">      77 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="78"><span class="lineNum">      78 </span>                :            : </a>
+<span class="lineNum">      79 </span>                :            : static void
+<span class="lineNum">      80 </span>                :<span class="lineNoCov">          0 : syslog_direct_log(struct syslogger *this, int pri, const char *msg)</span>
+<span class="lineNum">      81 </span>                :            : {
+<span class="lineNum">      82 </span>                :            :     static size_t max_len = SIZE_MAX; /* max message size we have discovered
+<span class="lineNum">      83 </span>                :            :                                        * to be able to send() without failing
+<span class="lineNum">      84 </span>                :            :                                        * with EMSGSIZE. */
+<span class="lineNum">      85 </span>                :            : 
+<span class="lineNum">      86 </span>                :<span class="lineNoCov">          0 :     struct syslog_direct *this_ = (struct syslog_direct*) this;</span>
+<span class="lineNum">      87 </span>                :<span class="lineNoCov">          0 :     struct ds ds = DS_EMPTY_INITIALIZER;</span>
+<span class="lineNum">      88 </span>                :            :     const char *wire_msg;
+<span class="lineNum">      89 </span>                :            :     size_t send_len;
+<span class="lineNum">      90 </span>                :            : 
+<span class="lineNum">      91 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (this_-&gt;fd &lt; 0) {</span>
+<span class="lineNum">      92 </span>                :            :         /* Failed to open socket for logging. */
+<span class="lineNum">      93 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">      94 </span>                :            :     }
+<span class="lineNum">      95 </span>                :            : 
+<span class="lineNum">      96 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!(pri &amp; FACILITY_MASK)) {</span>
+<span class="lineNum">      97 </span>                :<span class="lineNoCov">          0 :         pri |= this_-&gt;facility;</span>
+<span class="lineNum">      98 </span>                :            :     }
+<span class="lineNum">      99 </span>                :<span class="lineNoCov">          0 :     ds_put_format(&amp;ds, &quot;&lt;%u&gt;%s&quot;, pri, msg);</span>
+<span class="lineNum">     100 </span>                :<span class="lineNoCov">          0 :     wire_msg = ds_cstr(&amp;ds);</span>
+<span class="lineNum">     101 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     send_len = MIN(strlen(wire_msg), max_len);</span>
+<span class="lineNum">     102 </span>[<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>][<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]:<span class="lineNoCov">          0 :     while (send(this_-&gt;fd, wire_msg, send_len, 0) &lt; 0 &amp;&amp; errno == EMSGSIZE) {</span>
+<span class="lineNum">     103 </span>                :            :         /* If message was too large for send() function then try to discover
+<span class="lineNum">     104 </span>                :            :          * max_len supported for this particular socket and retry sending a
+<span class="lineNum">     105 </span>                :            :          * truncated version of the same message. */
+<span class="lineNum">     106 </span>                :<span class="lineNoCov">          0 :         send_len -= send_len / 20;</span>
+<span class="lineNum">     107 </span>                :<span class="lineNoCov">          0 :         max_len = send_len;</span>
+<span class="lineNum">     108 </span>                :            :     }
+<span class="lineNum">     109 </span>                :<span class="lineNoCov">          0 :     ds_destroy(&amp;ds);</span>
+<span class="lineNum">     110 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

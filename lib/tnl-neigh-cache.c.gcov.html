@@ -1,0 +1,411 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/tnl-neigh-cache.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - tnl-neigh-cache.c<span style="font-size: 80%;"> (source / <a href="tnl-neigh-cache.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">107</td>
+            <td class="headerCovTableEntry">139</td>
+            <td class="headerCovTableEntryMed">77.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">13</td>
+            <td class="headerCovTableEntry">16</td>
+            <td class="headerCovTableEntryMed">81.2 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">37</td>
+            <td class="headerCovTableEntry">56</td>
+            <td class="headerCovTableEntryLo">66.1 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2014, 2015, 2016 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &quot;tnl-neigh-cache.h&quot;
+<span class="lineNum">      20 </span>                :            : 
+<span class="lineNum">      21 </span>                :            : #include &lt;inttypes.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;sys/types.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &lt;netinet/icmp6.h&gt;
+<span class="lineNum">      25 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      26 </span>                :            : 
+<span class="lineNum">      27 </span>                :            : #include &quot;bitmap.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;cmap.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;coverage.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;dpif-netdev.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;openvswitch/dynamic-string.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;errno.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;flow.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;netdev.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;ovs-thread.h&quot;
+<span class="lineNum">      36 </span>                :            : #include &quot;packets.h&quot;
+<span class="lineNum">      37 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      38 </span>                :            : #include &quot;seq.h&quot;
+<span class="lineNum">      39 </span>                :            : #include &quot;socket-util.h&quot;
+<span class="lineNum">      40 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      41 </span>                :            : #include &quot;unaligned.h&quot;
+<span class="lineNum">      42 </span>                :            : #include &quot;unixctl.h&quot;
+<span class="lineNum">      43 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      44 </span>                :            : #include &quot;openvswitch/vlog.h&quot;
+<span class="lineNum">      45 </span>                :            : 
+<span class="lineNum">      46 </span>                :            : 
+<span class="lineNum">      47 </span>                :            : /* In seconds */
+<span class="lineNum">      48 </span>                :            : #define NEIGH_ENTRY_DEFAULT_IDLE_TIME  (15 * 60)
+<span class="lineNum">      49 </span>                :            : 
+<span class="lineNum">      50 </span>                :            : struct tnl_neigh_entry {
+<span class="lineNum">      51 </span>                :            :     struct cmap_node cmap_node;
+<span class="lineNum">      52 </span>                :            :     struct in6_addr ip;
+<span class="lineNum">      53 </span>                :            :     struct eth_addr mac;
+<span class="lineNum">      54 </span>                :            :     time_t expires;             /* Expiration time. */
+<span class="lineNum">      55 </span>                :            :     char br_name[IFNAMSIZ];
+<span class="lineNum">      56 </span>                :            : };
+<span class="lineNum">      57 </span>                :            : 
+<span class="lineNum">      58 </span>                :            : static struct cmap table = CMAP_INITIALIZER;
+<span class="lineNum">      59 </span>                :            : static struct ovs_mutex mutex = OVS_MUTEX_INITIALIZER;
+<a name="60"><span class="lineNum">      60 </span>                :            : </a>
+<span class="lineNum">      61 </span>                :            : static uint32_t
+<span class="lineNum">      62 </span>                :<span class="lineCov">     777945 : tnl_neigh_hash(const struct in6_addr *ip)</span>
+<span class="lineNum">      63 </span>                :            : {
+<span class="lineNum">      64 </span>                :<span class="lineCov">     777945 :     return hash_bytes(ip-&gt;s6_addr, 16, 0);</span>
+<span class="lineNum">      65 </span>                :            : }
+<a name="66"><span class="lineNum">      66 </span>                :            : </a>
+<span class="lineNum">      67 </span>                :            : static struct tnl_neigh_entry *
+<span class="lineNum">      68 </span>                :<span class="lineCov">     777626 : tnl_neigh_lookup__(const char br_name[IFNAMSIZ], const struct in6_addr *dst)</span>
+<span class="lineNum">      69 </span>                :            : {
+<span class="lineNum">      70 </span>                :            :     struct tnl_neigh_entry *neigh;
+<span class="lineNum">      71 </span>                :            :     uint32_t hash;
+<span class="lineNum">      72 </span>                :            : 
+<span class="lineNum">      73 </span>                :<span class="lineCov">     777626 :     hash = tnl_neigh_hash(dst);</span>
+<span class="lineNum">      74 </span>        [<span class="branchCov" title="Branch 2 was taken 777296 times"> + </span><span class="branchCov" title="Branch 3 was taken 330 times"> + </span>]:<span class="lineCov">     777626 :     CMAP_FOR_EACH_WITH_HASH (neigh, cmap_node, hash, &amp;table) {</span>
+<span class="lineNum">      75 </span>[<span class="branchCov" title="Branch 1 was taken 777296 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>][<span class="branchCov" title="Branch 3 was taken 777296 times"> + </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span>]:<span class="lineCov">     777296 :         if (ipv6_addr_equals(&amp;neigh-&gt;ip, dst) &amp;&amp; !strcmp(neigh-&gt;br_name, br_name)) {</span>
+<span class="lineNum">      76 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 777296 times"> + </span>]:<span class="lineCov">     777296 :             if (neigh-&gt;expires &lt;= time_now()) {</span>
+<span class="lineNum">      77 </span>                :<span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">      78 </span>                :            :             }
+<span class="lineNum">      79 </span>                :            : 
+<span class="lineNum">      80 </span>                :<span class="lineCov">     777296 :             neigh-&gt;expires = time_now() + NEIGH_ENTRY_DEFAULT_IDLE_TIME;</span>
+<span class="lineNum">      81 </span>                :<span class="lineCov">     777296 :             return neigh;</span>
+<span class="lineNum">      82 </span>                :            :         }
+<span class="lineNum">      83 </span>                :            :     }
+<span class="lineNum">      84 </span>                :<span class="lineCov">        330 :     return NULL;</span>
+<span class="lineNum">      85 </span>                :            : }
+<a name="86"><span class="lineNum">      86 </span>                :            : </a>
+<span class="lineNum">      87 </span>                :            : int
+<span class="lineNum">      88 </span>                :<span class="lineCov">       2538 : tnl_neigh_lookup(const char br_name[IFNAMSIZ], const struct in6_addr *dst,</span>
+<span class="lineNum">      89 </span>                :            :                  struct eth_addr *mac)
+<span class="lineNum">      90 </span>                :            : {
+<span class="lineNum">      91 </span>                :            :     struct tnl_neigh_entry *neigh;
+<span class="lineNum">      92 </span>                :<span class="lineCov">       2538 :     int res = ENOENT;</span>
+<span class="lineNum">      93 </span>                :            : 
+<span class="lineNum">      94 </span>                :<span class="lineCov">       2538 :     neigh = tnl_neigh_lookup__(br_name, dst);</span>
+<span class="lineNum">      95 </span>        [<span class="branchCov" title="Branch 0 was taken 2527 times"> + </span><span class="branchCov" title="Branch 1 was taken 11 times"> + </span>]:<span class="lineCov">       2538 :     if (neigh) {</span>
+<span class="lineNum">      96 </span>                :<span class="lineCov">       2527 :         *mac = neigh-&gt;mac;</span>
+<span class="lineNum">      97 </span>                :<span class="lineCov">       2527 :         res = 0;</span>
+<span class="lineNum">      98 </span>                :            :     }
+<span class="lineNum">      99 </span>                :<span class="lineCov">       2538 :     return res;</span>
+<span class="lineNum">     100 </span>                :            : }
+<a name="101"><span class="lineNum">     101 </span>                :            : </a>
+<span class="lineNum">     102 </span>                :            : static void
+<span class="lineNum">     103 </span>                :<span class="lineNoCov">          0 : neigh_entry_free(struct tnl_neigh_entry *neigh)</span>
+<span class="lineNum">     104 </span>                :            : {
+<span class="lineNum">     105 </span>                :<span class="lineNoCov">          0 :     free(neigh);</span>
+<span class="lineNum">     106 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="107"><span class="lineNum">     107 </span>                :            : </a>
+<span class="lineNum">     108 </span>                :            : static void
+<span class="lineNum">     109 </span>                :<span class="lineNoCov">          0 : tnl_neigh_delete(struct tnl_neigh_entry *neigh)</span>
+<span class="lineNum">     110 </span>                :            : {
+<span class="lineNum">     111 </span>                :<span class="lineNoCov">          0 :     uint32_t hash = tnl_neigh_hash(&amp;neigh-&gt;ip);</span>
+<span class="lineNum">     112 </span>                :<span class="lineNoCov">          0 :     cmap_remove(&amp;table, &amp;neigh-&gt;cmap_node, hash);</span>
+<span class="lineNum">     113 </span>                :<span class="lineNoCov">          0 :     ovsrcu_postpone(neigh_entry_free, neigh);</span>
+<span class="lineNum">     114 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="115"><span class="lineNum">     115 </span>                :            : </a>
+<span class="lineNum">     116 </span>                :            : static void
+<span class="lineNum">     117 </span>                :<span class="lineCov">     775088 : tnl_neigh_set__(const char name[IFNAMSIZ], const struct in6_addr *dst,</span>
+<span class="lineNum">     118 </span>                :            :               const struct eth_addr mac)
+<span class="lineNum">     119 </span>                :            : {
+<span class="lineNum">     120 </span>                :<span class="lineCov">     775088 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     121 </span>                :<span class="lineCov">     775088 :     struct tnl_neigh_entry *neigh = tnl_neigh_lookup__(name, dst);</span>
+<span class="lineNum">     122 </span>        [<span class="branchCov" title="Branch 0 was taken 774769 times"> + </span><span class="branchCov" title="Branch 1 was taken 319 times"> + </span>]:<span class="lineCov">     775088 :     if (neigh) {</span>
+<span class="lineNum">     123 </span>        [<span class="branchCov" title="Branch 1 was taken 774769 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">     774769 :         if (eth_addr_equals(neigh-&gt;mac, mac)) {</span>
+<span class="lineNum">     124 </span>                :<span class="lineCov">     774769 :             neigh-&gt;expires = time_now() + NEIGH_ENTRY_DEFAULT_IDLE_TIME;</span>
+<span class="lineNum">     125 </span>                :<span class="lineCov">     774769 :             ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     126 </span>                :<span class="lineCov">     774769 :             return;</span>
+<span class="lineNum">     127 </span>                :            :         }
+<span class="lineNum">     128 </span>                :<span class="lineNoCov">          0 :         tnl_neigh_delete(neigh);</span>
+<span class="lineNum">     129 </span>                :<span class="lineNoCov">          0 :         seq_change(tnl_conf_seq);</span>
+<span class="lineNum">     130 </span>                :            :     }
+<span class="lineNum">     131 </span>                :            : 
+<span class="lineNum">     132 </span>                :<span class="lineCov">        319 :     neigh = xmalloc(sizeof *neigh);</span>
+<span class="lineNum">     133 </span>                :            : 
+<span class="lineNum">     134 </span>                :<span class="lineCov">        319 :     neigh-&gt;ip = *dst;</span>
+<span class="lineNum">     135 </span>                :<span class="lineCov">        319 :     neigh-&gt;mac = mac;</span>
+<span class="lineNum">     136 </span>                :<span class="lineCov">        319 :     neigh-&gt;expires = time_now() + NEIGH_ENTRY_DEFAULT_IDLE_TIME;</span>
+<span class="lineNum">     137 </span>                :<span class="lineCov">        319 :     ovs_strlcpy(neigh-&gt;br_name, name, sizeof neigh-&gt;br_name);</span>
+<span class="lineNum">     138 </span>                :<span class="lineCov">        319 :     cmap_insert(&amp;table, &amp;neigh-&gt;cmap_node, tnl_neigh_hash(&amp;neigh-&gt;ip));</span>
+<span class="lineNum">     139 </span>                :<span class="lineCov">        319 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     140 </span>                :            : }
+<a name="141"><span class="lineNum">     141 </span>                :            : </a>
+<span class="lineNum">     142 </span>                :            : static void
+<span class="lineNum">     143 </span>                :<span class="lineCov">     775046 : tnl_arp_set(const char name[IFNAMSIZ], ovs_be32 dst,</span>
+<span class="lineNum">     144 </span>                :            :             const struct eth_addr mac)
+<span class="lineNum">     145 </span>                :            : {
+<span class="lineNum">     146 </span>                :<span class="lineCov">     775046 :     struct in6_addr dst6 = in6_addr_mapped_ipv4(dst);</span>
+<span class="lineNum">     147 </span>                :<span class="lineCov">     775046 :     tnl_neigh_set__(name, &amp;dst6, mac);</span>
+<span class="lineNum">     148 </span>                :<span class="lineCov">     775046 : }</span>
+<a name="149"><span class="lineNum">     149 </span>                :            : </a>
+<span class="lineNum">     150 </span>                :            : static int
+<span class="lineNum">     151 </span>                :<span class="lineCov">    1282070 : tnl_arp_snoop(const struct flow *flow, struct flow_wildcards *wc,</span>
+<span class="lineNum">     152 </span>                :            :               const char name[IFNAMSIZ])
+<span class="lineNum">     153 </span>                :            : {
+<span class="lineNum">     154 </span>[<span class="branchCov" title="Branch 1 was taken 1044576 times"> + </span><span class="branchCov" title="Branch 2 was taken 237497 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 775046 times"> + </span><span class="branchCov" title="Branch 4 was taken 269530 times"> + </span>]:<span class="lineCov">    1282070 :     if (flow-&gt;dl_type != htons(ETH_TYPE_ARP) ||</span>
+<span class="lineNum">     155 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 775046 times"> + </span>]:<span class="lineCov">     775046 :         flow-&gt;nw_proto != ARP_OP_REPLY ||</span>
+<span class="lineNum">     156 </span>                :<span class="lineCov">     775046 :         eth_addr_is_zero(flow-&gt;arp_sha)) {</span>
+<span class="lineNum">     157 </span>                :<span class="lineCov">     507027 :         return EINVAL;</span>
+<span class="lineNum">     158 </span>                :            :     }
+<span class="lineNum">     159 </span>                :            : 
+<span class="lineNum">     160 </span>                :            :     /* Exact Match on all ARP flows. */
+<span class="lineNum">     161 </span>                :<span class="lineCov">     775046 :     memset(&amp;wc-&gt;masks.nw_proto, 0xff, sizeof wc-&gt;masks.nw_proto);</span>
+<span class="lineNum">     162 </span>                :<span class="lineCov">     775046 :     memset(&amp;wc-&gt;masks.nw_src, 0xff, sizeof wc-&gt;masks.nw_src);</span>
+<span class="lineNum">     163 </span>                :<span class="lineCov">     775046 :     memset(&amp;wc-&gt;masks.arp_sha, 0xff, sizeof wc-&gt;masks.arp_sha);</span>
+<span class="lineNum">     164 </span>                :            : 
+<span class="lineNum">     165 </span>                :<span class="lineCov">     775046 :     tnl_arp_set(name, flow-&gt;nw_src, flow-&gt;arp_sha);</span>
+<span class="lineNum">     166 </span>                :<span class="lineCov">     775046 :     return 0;</span>
+<span class="lineNum">     167 </span>                :            : }
+<a name="168"><span class="lineNum">     168 </span>                :            : </a>
+<span class="lineNum">     169 </span>                :            : static int
+<span class="lineNum">     170 </span>                :<span class="lineCov">     507027 : tnl_nd_snoop(const struct flow *flow, struct flow_wildcards *wc,</span>
+<span class="lineNum">     171 </span>                :            :               const char name[IFNAMSIZ])
+<span class="lineNum">     172 </span>                :            : {
+<span class="lineNum">     173 </span>[<span class="branchCov" title="Branch 1 was taken 632 times"> + </span><span class="branchCov" title="Branch 2 was taken 506395 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 624 times"> + </span><span class="branchCov" title="Branch 5 was taken 8 times"> + </span>]:<span class="lineCov">     507027 :     if (!is_nd(flow, NULL) || flow-&gt;tp_src != htons(ND_NEIGHBOR_ADVERT)) {</span>
+<span class="lineNum">     174 </span>                :<span class="lineCov">     507019 :         return EINVAL;</span>
+<span class="lineNum">     175 </span>                :            :     }
+<span class="lineNum">     176 </span>                :            :     /* - RFC4861 says Neighbor Advertisements sent in response to unicast Neighbor
+<span class="lineNum">     177 </span>                :            :      *   Solicitations SHOULD include the Target link-layer address. However, Linux
+<span class="lineNum">     178 </span>                :            :      *   doesn't. So, the response to Solicitations sent by OVS will include the
+<span class="lineNum">     179 </span>                :            :      *   TLL address and other Advertisements not including it can be ignored.
+<span class="lineNum">     180 </span>                :            :      * - OVS flow extract can set this field to zero in case of packet parsing errors.
+<span class="lineNum">     181 </span>                :            :      *   For details refer miniflow_extract()*/
+<span class="lineNum">     182 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 8 times"> + </span>]:<span class="lineCov">          8 :     if (eth_addr_is_zero(flow-&gt;arp_tha)) {</span>
+<span class="lineNum">     183 </span>                :<span class="lineNoCov">          0 :         return EINVAL;</span>
+<span class="lineNum">     184 </span>                :            :     }
+<span class="lineNum">     185 </span>                :            : 
+<span class="lineNum">     186 </span>                :<span class="lineCov">          8 :     memset(&amp;wc-&gt;masks.ipv6_src, 0xff, sizeof wc-&gt;masks.ipv6_src);</span>
+<span class="lineNum">     187 </span>                :<span class="lineCov">          8 :     memset(&amp;wc-&gt;masks.ipv6_dst, 0xff, sizeof wc-&gt;masks.ipv6_dst);</span>
+<span class="lineNum">     188 </span>                :<span class="lineCov">          8 :     memset(&amp;wc-&gt;masks.nd_target, 0xff, sizeof wc-&gt;masks.nd_target);</span>
+<span class="lineNum">     189 </span>                :<span class="lineCov">          8 :     memset(&amp;wc-&gt;masks.arp_tha, 0xff, sizeof wc-&gt;masks.arp_tha);</span>
+<span class="lineNum">     190 </span>                :            : 
+<span class="lineNum">     191 </span>                :<span class="lineCov">          8 :     tnl_neigh_set__(name, &amp;flow-&gt;nd_target, flow-&gt;arp_tha);</span>
+<span class="lineNum">     192 </span>                :<span class="lineCov">          8 :     return 0;</span>
+<span class="lineNum">     193 </span>                :            : }
+<a name="194"><span class="lineNum">     194 </span>                :            : </a>
+<span class="lineNum">     195 </span>                :            : int
+<span class="lineNum">     196 </span>                :<span class="lineCov">    1282070 : tnl_neigh_snoop(const struct flow *flow, struct flow_wildcards *wc,</span>
+<span class="lineNum">     197 </span>                :            :                 const char name[IFNAMSIZ])
+<span class="lineNum">     198 </span>                :            : {
+<span class="lineNum">     199 </span>                :            :     int res;
+<span class="lineNum">     200 </span>                :<span class="lineCov">    1282070 :     res = tnl_arp_snoop(flow, wc, name);</span>
+<span class="lineNum">     201 </span>        [<span class="branchCov" title="Branch 0 was taken 775046 times"> + </span><span class="branchCov" title="Branch 1 was taken 507027 times"> + </span>]:<span class="lineCov">    1282073 :     if (res != EINVAL) {</span>
+<span class="lineNum">     202 </span>                :<span class="lineCov">     775046 :         return res;</span>
+<span class="lineNum">     203 </span>                :            :     }
+<span class="lineNum">     204 </span>                :<span class="lineCov">     507027 :     return tnl_nd_snoop(flow, wc, name);</span>
+<span class="lineNum">     205 </span>                :            : }
+<a name="206"><span class="lineNum">     206 </span>                :            : </a>
+<span class="lineNum">     207 </span>                :            : void
+<span class="lineNum">     208 </span>                :<span class="lineCov">      99708 : tnl_neigh_cache_run(void)</span>
+<span class="lineNum">     209 </span>                :            : {
+<span class="lineNum">     210 </span>                :            :     struct tnl_neigh_entry *neigh;
+<span class="lineNum">     211 </span>                :<span class="lineCov">      99708 :     bool changed = false;</span>
+<span class="lineNum">     212 </span>                :            : 
+<span class="lineNum">     213 </span>                :<span class="lineCov">      99708 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     214 </span>[<span class="branchCov" title="Branch 1 was taken 350223 times"> + </span><span class="branchCov" title="Branch 2 was taken 99708 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 350223 times"> + </span><span class="branchCov" title="Branch 5 was taken 99708 times"> + </span>]:<span class="lineCov">     449931 :     CMAP_FOR_EACH(neigh, cmap_node, &amp;table) {</span>
+<span class="lineNum">     215 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 350223 times"> + </span>]:<span class="lineCov">     350223 :         if (neigh-&gt;expires &lt;= time_now()) {</span>
+<span class="lineNum">     216 </span>                :<span class="lineNoCov">          0 :             tnl_neigh_delete(neigh);</span>
+<span class="lineNum">     217 </span>                :<span class="lineNoCov">          0 :             changed = true;</span>
+<span class="lineNum">     218 </span>                :            :         }
+<span class="lineNum">     219 </span>                :            :     }
+<span class="lineNum">     220 </span>                :<span class="lineCov">      99708 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     221 </span>                :            : 
+<span class="lineNum">     222 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 99708 times"> + </span>]:<span class="lineCov">      99708 :     if (changed) {</span>
+<span class="lineNum">     223 </span>                :<span class="lineNoCov">          0 :         seq_change(tnl_conf_seq);</span>
+<span class="lineNum">     224 </span>                :            :     }
+<span class="lineNum">     225 </span>                :<span class="lineCov">      99708 : }</span>
+<a name="226"><span class="lineNum">     226 </span>                :            : </a>
+<span class="lineNum">     227 </span>                :            : static void
+<span class="lineNum">     228 </span>                :<span class="lineNoCov">          0 : tnl_neigh_cache_flush(struct unixctl_conn *conn, int argc OVS_UNUSED,</span>
+<span class="lineNum">     229 </span>                :            :                     const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+<span class="lineNum">     230 </span>                :            : {
+<span class="lineNum">     231 </span>                :            :     struct tnl_neigh_entry *neigh;
+<span class="lineNum">     232 </span>                :<span class="lineNoCov">          0 :     bool changed = false;</span>
+<span class="lineNum">     233 </span>                :            : 
+<span class="lineNum">     234 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     235 </span>[<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>][<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]:<span class="lineNoCov">          0 :     CMAP_FOR_EACH(neigh, cmap_node, &amp;table) {</span>
+<span class="lineNum">     236 </span>                :<span class="lineNoCov">          0 :         tnl_neigh_delete(neigh);</span>
+<span class="lineNum">     237 </span>                :<span class="lineNoCov">          0 :         changed = true;</span>
+<span class="lineNum">     238 </span>                :            :     }
+<span class="lineNum">     239 </span>                :<span class="lineNoCov">          0 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     240 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (changed) {</span>
+<span class="lineNum">     241 </span>                :<span class="lineNoCov">          0 :         seq_change(tnl_conf_seq);</span>
+<span class="lineNum">     242 </span>                :            :     }
+<span class="lineNum">     243 </span>                :<span class="lineNoCov">          0 :     unixctl_command_reply(conn, &quot;OK&quot;);</span>
+<span class="lineNum">     244 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="245"><span class="lineNum">     245 </span>                :            : </a>
+<span class="lineNum">     246 </span>                :            : static int
+<span class="lineNum">     247 </span>                :<span class="lineCov">         34 : lookup_any(const char *host_name, struct in6_addr *address)</span>
+<span class="lineNum">     248 </span>                :            : {
+<span class="lineNum">     249 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 34 times"> + </span>]:<span class="lineCov">         34 :     if (addr_is_ipv6(host_name)) {</span>
+<span class="lineNum">     250 </span>                :<span class="lineNoCov">          0 :         return lookup_ipv6(host_name, address);</span>
+<span class="lineNum">     251 </span>                :            :     } else {
+<span class="lineNum">     252 </span>                :            :         int r;
+<span class="lineNum">     253 </span>                :            :         struct in_addr ip;
+<span class="lineNum">     254 </span>                :<span class="lineCov">         34 :         r = lookup_ip(host_name, &amp;ip);</span>
+<span class="lineNum">     255 </span>        [<span class="branchCov" title="Branch 0 was taken 34 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         34 :         if (r == 0) {</span>
+<span class="lineNum">     256 </span>                :<span class="lineCov">         34 :             in6_addr_set_mapped_ipv4(address, ip.s_addr);</span>
+<span class="lineNum">     257 </span>                :            :         }
+<span class="lineNum">     258 </span>                :<span class="lineCov">         34 :         return r;</span>
+<span class="lineNum">     259 </span>                :            :     }
+<span class="lineNum">     260 </span>                :            :     return ENOENT;
+<span class="lineNum">     261 </span>                :            : }
+<a name="262"><span class="lineNum">     262 </span>                :            : </a>
+<span class="lineNum">     263 </span>                :            : static void
+<span class="lineNum">     264 </span>                :<span class="lineCov">         34 : tnl_neigh_cache_add(struct unixctl_conn *conn, int argc OVS_UNUSED,</span>
+<span class="lineNum">     265 </span>                :            :                     const char *argv[], void *aux OVS_UNUSED)
+<span class="lineNum">     266 </span>                :            : {
+<span class="lineNum">     267 </span>                :<span class="lineCov">         34 :     const char *br_name = argv[1];</span>
+<span class="lineNum">     268 </span>                :            :     struct eth_addr mac;
+<span class="lineNum">     269 </span>                :            :     struct in6_addr ip6;
+<span class="lineNum">     270 </span>                :            : 
+<span class="lineNum">     271 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 34 times"> + </span>]:<span class="lineCov">         34 :     if (lookup_any(argv[2], &amp;ip6) != 0) {</span>
+<span class="lineNum">     272 </span>                :<span class="lineNoCov">          0 :         unixctl_command_reply_error(conn, &quot;bad IP address&quot;);</span>
+<span class="lineNum">     273 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     274 </span>                :            :     }
+<span class="lineNum">     275 </span>                :            : 
+<span class="lineNum">     276 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 34 times"> + </span>]:<span class="lineCov">         34 :     if (!eth_addr_from_string(argv[3], &amp;mac)) {</span>
+<span class="lineNum">     277 </span>                :<span class="lineNoCov">          0 :         unixctl_command_reply_error(conn, &quot;bad MAC address&quot;);</span>
+<span class="lineNum">     278 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     279 </span>                :            :     }
+<span class="lineNum">     280 </span>                :            : 
+<span class="lineNum">     281 </span>                :<span class="lineCov">         34 :     tnl_neigh_set__(br_name, &amp;ip6, mac);</span>
+<span class="lineNum">     282 </span>                :<span class="lineCov">         34 :     unixctl_command_reply(conn, &quot;OK&quot;);</span>
+<span class="lineNum">     283 </span>                :            : }
+<a name="284"><span class="lineNum">     284 </span>                :            : </a>
+<span class="lineNum">     285 </span>                :            : static void
+<span class="lineNum">     286 </span>                :<span class="lineCov">          2 : tnl_neigh_cache_show(struct unixctl_conn *conn, int argc OVS_UNUSED,</span>
+<span class="lineNum">     287 </span>                :            :                      const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+<span class="lineNum">     288 </span>                :            : {
+<span class="lineNum">     289 </span>                :<span class="lineCov">          2 :     struct ds ds = DS_EMPTY_INITIALIZER;</span>
+<span class="lineNum">     290 </span>                :            :     struct tnl_neigh_entry *neigh;
+<span class="lineNum">     291 </span>                :            : 
+<span class="lineNum">     292 </span>                :<span class="lineCov">          2 :     ds_put_cstr(&amp;ds, &quot;IP                                            MAC                 Bridge\n&quot;);</span>
+<span class="lineNum">     293 </span>                :<span class="lineCov">          2 :     ds_put_cstr(&amp;ds, &quot;==========================================================================\n&quot;);</span>
+<span class="lineNum">     294 </span>                :<span class="lineCov">          2 :     ovs_mutex_lock(&amp;mutex);</span>
+<span class="lineNum">     295 </span>[<span class="branchCov" title="Branch 1 was taken 4 times"> + </span><span class="branchCov" title="Branch 2 was taken 2 times"> + </span>][<span class="branchCov" title="Branch 4 was taken 4 times"> + </span><span class="branchCov" title="Branch 5 was taken 2 times"> + </span>]:<span class="lineCov">          6 :     CMAP_FOR_EACH(neigh, cmap_node, &amp;table) {</span>
+<span class="lineNum">     296 </span>                :            :         int start_len, need_ws;
+<span class="lineNum">     297 </span>                :            : 
+<span class="lineNum">     298 </span>                :<span class="lineCov">          4 :         start_len = ds.length;</span>
+<span class="lineNum">     299 </span>                :<span class="lineCov">          4 :         ipv6_format_mapped(&amp;neigh-&gt;ip, &amp;ds);</span>
+<span class="lineNum">     300 </span>                :            : 
+<span class="lineNum">     301 </span>                :<span class="lineCov">          4 :         need_ws = INET6_ADDRSTRLEN - (ds.length - start_len);</span>
+<span class="lineNum">     302 </span>                :<span class="lineCov">          4 :         ds_put_char_multiple(&amp;ds, ' ', need_ws);</span>
+<span class="lineNum">     303 </span>                :            : 
+<span class="lineNum">     304 </span>                :<span class="lineCov">          4 :         ds_put_format(&amp;ds, ETH_ADDR_FMT&quot;   %s&quot;,</span>
+<span class="lineNum">     305 </span>                :<span class="lineCov">         24 :                       ETH_ADDR_ARGS(neigh-&gt;mac), neigh-&gt;br_name);</span>
+<span class="lineNum">     306 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 4 times"> + </span>]:<span class="lineCov">          4 :         if (neigh-&gt;expires &lt;= time_now()) {</span>
+<span class="lineNum">     307 </span>                :<span class="lineNoCov">          0 :             ds_put_format(&amp;ds, &quot; STALE&quot;);</span>
+<span class="lineNum">     308 </span>                :            :         }
+<span class="lineNum">     309 </span>                :<span class="lineCov">          4 :         ds_put_char(&amp;ds, '\n');</span>
+<span class="lineNum">     310 </span>                :            : 
+<span class="lineNum">     311 </span>                :            :     }
+<span class="lineNum">     312 </span>                :<span class="lineCov">          2 :     ovs_mutex_unlock(&amp;mutex);</span>
+<span class="lineNum">     313 </span>                :<span class="lineCov">          2 :     unixctl_command_reply(conn, ds_cstr(&amp;ds));</span>
+<span class="lineNum">     314 </span>                :<span class="lineCov">          2 :     ds_destroy(&amp;ds);</span>
+<span class="lineNum">     315 </span>                :<span class="lineCov">          2 : }</span>
+<a name="316"><span class="lineNum">     316 </span>                :            : </a>
+<span class="lineNum">     317 </span>                :            : void
+<span class="lineNum">     318 </span>                :<span class="lineCov">        684 : tnl_neigh_cache_init(void)</span>
+<span class="lineNum">     319 </span>                :            : {
+<span class="lineNum">     320 </span>                :<span class="lineCov">        684 :     unixctl_command_register(&quot;tnl/arp/show&quot;, &quot;&quot;, 0, 0, tnl_neigh_cache_show, NULL);</span>
+<span class="lineNum">     321 </span>                :<span class="lineCov">        684 :     unixctl_command_register(&quot;tnl/arp/set&quot;, &quot;BRIDGE IP MAC&quot;, 3, 3, tnl_neigh_cache_add, NULL);</span>
+<span class="lineNum">     322 </span>                :<span class="lineCov">        684 :     unixctl_command_register(&quot;tnl/arp/flush&quot;, &quot;&quot;, 0, 0, tnl_neigh_cache_flush, NULL);</span>
+<span class="lineNum">     323 </span>                :<span class="lineCov">        684 :     unixctl_command_register(&quot;tnl/neigh/show&quot;, &quot;&quot;, 0, 0, tnl_neigh_cache_show, NULL);</span>
+<span class="lineNum">     324 </span>                :<span class="lineCov">        684 :     unixctl_command_register(&quot;tnl/neigh/set&quot;, &quot;BRIDGE IP MAC&quot;, 3, 3, tnl_neigh_cache_add, NULL);</span>
+<span class="lineNum">     325 </span>                :<span class="lineCov">        684 :     unixctl_command_register(&quot;tnl/neigh/flush&quot;, &quot;&quot;, 0, 0, tnl_neigh_cache_flush, NULL);</span>
+<span class="lineNum">     326 </span>                :<span class="lineCov">        684 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

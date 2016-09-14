@@ -1,0 +1,951 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/netlink-conntrack.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - netlink-conntrack.c<span style="font-size: 80%;"> (source / <a href="netlink-conntrack.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">173</td>
+            <td class="headerCovTableEntry">289</td>
+            <td class="headerCovTableEntryLo">59.9 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">17</td>
+            <td class="headerCovTableEntry">22</td>
+            <td class="headerCovTableEntryMed">77.3 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">73</td>
+            <td class="headerCovTableEntry">202</td>
+            <td class="headerCovTableEntryLo">36.1 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2015 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &quot;netlink-conntrack.h&quot;
+<span class="lineNum">      20 </span>                :            : 
+<span class="lineNum">      21 </span>                :            : #include &lt;linux/netfilter/nfnetlink.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;linux/netfilter/nfnetlink_conntrack.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;linux/netfilter/nf_conntrack_common.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &lt;linux/netfilter/nf_conntrack_tcp.h&gt;
+<span class="lineNum">      25 </span>                :            : #include &lt;linux/netfilter/nf_conntrack_ftp.h&gt;
+<span class="lineNum">      26 </span>                :            : #include &lt;linux/netfilter/nf_conntrack_sctp.h&gt;
+<span class="lineNum">      27 </span>                :            : 
+<span class="lineNum">      28 </span>                :            : #include &quot;byte-order.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;compiler.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;openvswitch/dynamic-string.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;netlink.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;netlink-socket.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;openvswitch/ofpbuf.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;openvswitch/vlog.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      36 </span>                :            : #include &quot;timeval.h&quot;
+<span class="lineNum">      37 </span>                :            : #include &quot;unixctl.h&quot;
+<a name="38"><span class="lineNum">      38 </span>                :            : #include &quot;util.h&quot;</a>
+<span class="lineNum">      39 </span>                :            : 
+<span class="lineNum">      40 </span>                :<span class="lineCov">      20190 : VLOG_DEFINE_THIS_MODULE(netlink_conntrack);</span>
+<span class="lineNum">      41 </span>                :            : static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">      42 </span>                :            : 
+<span class="lineNum">      43 </span>                :            : /* This module works only if conntrack modules and features are enabled in the
+<span class="lineNum">      44 </span>                :            :  * Linux kernel.  This can be done from a root shell like this:
+<span class="lineNum">      45 </span>                :            :  *
+<span class="lineNum">      46 </span>                :            :  * $ modprobe ip_conntrack
+<span class="lineNum">      47 </span>                :            :  * $ sysctl -w net.netfilter.nf_conntrack_acct=1
+<span class="lineNum">      48 </span>                :            :  * $ sysctl -w net.netfilter.nf_conntrack_timestamp=1
+<span class="lineNum">      49 </span>                :            :  *
+<span class="lineNum">      50 </span>                :            :  * Also, if testing conntrack label feature without conntrack-aware OVS kernel
+<span class="lineNum">      51 </span>                :            :  * module, there must be a connlabel rule in iptables for space to be reserved
+<span class="lineNum">      52 </span>                :            :  * for the labels (see kernel source connlabel_mt_check()).  Such a rule can be
+<span class="lineNum">      53 </span>                :            :  * inserted from a root shell like this:
+<span class="lineNum">      54 </span>                :            :  *
+<span class="lineNum">      55 </span>                :            :  * $ iptables -A INPUT -m conntrack -m connlabel \
+<span class="lineNum">      56 </span>                :            :  *   --ctstate NEW,ESTABLISHED,RELATED --label 127 -j ACCEPT
+<span class="lineNum">      57 </span>                :            :  */
+<span class="lineNum">      58 </span>                :            : 
+<span class="lineNum">      59 </span>                :            : /* Some attributes were introduced in later kernels: with these definitions
+<span class="lineNum">      60 </span>                :            :  * we should be able to compile userspace against Linux 2.6.32+. */
+<span class="lineNum">      61 </span>                :            : 
+<span class="lineNum">      62 </span>                :            : #define CTA_ZONE          (CTA_SECMARK + 1)
+<span class="lineNum">      63 </span>                :            : #define CTA_SECCTX        (CTA_SECMARK + 2)
+<span class="lineNum">      64 </span>                :            : #define CTA_TIMESTAMP     (CTA_SECMARK + 3)
+<span class="lineNum">      65 </span>                :            : #define CTA_MARK_MASK     (CTA_SECMARK + 4)
+<span class="lineNum">      66 </span>                :            : #define CTA_LABELS        (CTA_SECMARK + 5)
+<span class="lineNum">      67 </span>                :            : #define CTA_LABELS_MASK   (CTA_SECMARK + 6)
+<span class="lineNum">      68 </span>                :            : 
+<span class="lineNum">      69 </span>                :            : #define CTA_TIMESTAMP_START 1
+<span class="lineNum">      70 </span>                :            : #define CTA_TIMESTAMP_STOP  2
+<span class="lineNum">      71 </span>                :            : 
+<span class="lineNum">      72 </span>                :            : #define IPS_TEMPLATE_BIT 11
+<span class="lineNum">      73 </span>                :            : #define IPS_TEMPLATE (1 &lt;&lt; IPS_TEMPLATE_BIT)
+<span class="lineNum">      74 </span>                :            : 
+<span class="lineNum">      75 </span>                :            : #define IPS_UNTRACKED_BIT 12
+<span class="lineNum">      76 </span>                :            : #define IPS_UNTRACKED (1 &lt;&lt; IPS_UNTRACKED_BIT)
+<span class="lineNum">      77 </span>                :            : 
+<span class="lineNum">      78 </span>                :            : static const struct nl_policy nfnlgrp_conntrack_policy[] = {
+<span class="lineNum">      79 </span>                :            :     [CTA_TUPLE_ORIG] = { .type = NL_A_NESTED, .optional = false },
+<span class="lineNum">      80 </span>                :            :     [CTA_TUPLE_REPLY] = { .type = NL_A_NESTED, .optional = false },
+<span class="lineNum">      81 </span>                :            :     [CTA_ZONE] = { .type = NL_A_BE16, .optional = true },
+<span class="lineNum">      82 </span>                :            :     [CTA_STATUS] = { .type = NL_A_BE32, .optional = false },
+<span class="lineNum">      83 </span>                :            :     [CTA_TIMESTAMP] = { .type = NL_A_NESTED, .optional = true },
+<span class="lineNum">      84 </span>                :            :     [CTA_TIMEOUT] = { .type = NL_A_BE32, .optional = true },
+<span class="lineNum">      85 </span>                :            :     [CTA_COUNTERS_ORIG] = { .type = NL_A_NESTED, .optional = true },
+<span class="lineNum">      86 </span>                :            :     [CTA_COUNTERS_REPLY] = { .type = NL_A_NESTED, .optional = true },
+<span class="lineNum">      87 </span>                :            :     [CTA_PROTOINFO] = { .type = NL_A_NESTED, .optional = true },
+<span class="lineNum">      88 </span>                :            :     [CTA_HELP] = { .type = NL_A_NESTED, .optional = true },
+<span class="lineNum">      89 </span>                :            :     [CTA_MARK] = { .type = NL_A_BE32, .optional = true },
+<span class="lineNum">      90 </span>                :            :     [CTA_SECCTX] = { .type = NL_A_NESTED, .optional = true },
+<span class="lineNum">      91 </span>                :            :     [CTA_ID] = { .type = NL_A_BE32, .optional = false },
+<span class="lineNum">      92 </span>                :            :     [CTA_USE] = { .type = NL_A_BE32, .optional = true },
+<span class="lineNum">      93 </span>                :            :     [CTA_TUPLE_MASTER] = { .type = NL_A_NESTED, .optional = true },
+<span class="lineNum">      94 </span>                :            :     [CTA_NAT_SEQ_ADJ_ORIG] = { .type = NL_A_NESTED, .optional = true },
+<span class="lineNum">      95 </span>                :            :     [CTA_NAT_SEQ_ADJ_REPLY] = { .type = NL_A_NESTED, .optional = true },
+<span class="lineNum">      96 </span>                :            :     [CTA_LABELS] = { .type = NL_A_UNSPEC, .optional = true },
+<span class="lineNum">      97 </span>                :            :     /* CTA_NAT_SRC, CTA_NAT_DST, CTA_TIMESTAMP, CTA_MARK_MASK, and
+<span class="lineNum">      98 </span>                :            :      * CTA_LABELS_MASK are not received from kernel. */
+<span class="lineNum">      99 </span>                :            : };
+<span class="lineNum">     100 </span>                :            : 
+<span class="lineNum">     101 </span>                :            : /* Declarations for conntrack netlink dumping. */
+<span class="lineNum">     102 </span>                :            : static void nl_msg_put_nfgenmsg(struct ofpbuf *msg, size_t expected_payload,
+<span class="lineNum">     103 </span>                :            :                                 int family, uint8_t subsystem, uint8_t cmd,
+<span class="lineNum">     104 </span>                :            :                                 uint32_t flags);
+<span class="lineNum">     105 </span>                :            : 
+<span class="lineNum">     106 </span>                :            : static bool nl_ct_parse_header_policy(struct ofpbuf *buf,
+<span class="lineNum">     107 </span>                :            :         enum nl_ct_event_type *event_type,
+<span class="lineNum">     108 </span>                :            :         uint8_t *nfgen_family,
+<span class="lineNum">     109 </span>                :            :         struct nlattr *attrs[ARRAY_SIZE(nfnlgrp_conntrack_policy)]);
+<span class="lineNum">     110 </span>                :            : 
+<span class="lineNum">     111 </span>                :            : static bool nl_ct_attrs_to_ct_dpif_entry(struct ct_dpif_entry *entry,
+<span class="lineNum">     112 </span>                :            :         struct nlattr *attrs[ARRAY_SIZE(nfnlgrp_conntrack_policy)],
+<span class="lineNum">     113 </span>                :            :         uint8_t nfgen_family);
+<span class="lineNum">     114 </span>                :            : 
+<span class="lineNum">     115 </span>                :            : struct nl_ct_dump_state {
+<span class="lineNum">     116 </span>                :            :     struct nl_dump dump;
+<span class="lineNum">     117 </span>                :            :     struct ofpbuf buf;
+<span class="lineNum">     118 </span>                :            :     bool filter_zone;
+<span class="lineNum">     119 </span>                :            :     uint16_t zone;
+<span class="lineNum">     120 </span>                :            : };
+<span class="lineNum">     121 </span>                :            : 
+<span class="lineNum">     122 </span>                :            : /* Conntrack netlink dumping. */
+<span class="lineNum">     123 </span>                :            : 
+<a name="124"><span class="lineNum">     124 </span>                :            : /* Initialize a conntrack netlink dump. */</a>
+<span class="lineNum">     125 </span>                :            : int
+<span class="lineNum">     126 </span>                :<span class="lineCov">         53 : nl_ct_dump_start(struct nl_ct_dump_state **statep, const uint16_t *zone)</span>
+<span class="lineNum">     127 </span>                :            : {
+<span class="lineNum">     128 </span>                :            :     struct nl_ct_dump_state *state;
+<span class="lineNum">     129 </span>                :            : 
+<span class="lineNum">     130 </span>                :<span class="lineCov">         53 :     *statep = state = xzalloc(sizeof *state);</span>
+<span class="lineNum">     131 </span>                :<span class="lineCov">         53 :     ofpbuf_init(&amp;state-&gt;buf, NL_DUMP_BUFSIZE);</span>
+<span class="lineNum">     132 </span>                :            : 
+<span class="lineNum">     133 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 53 times"> + </span>]:<span class="lineCov">         53 :     if (zone) {</span>
+<span class="lineNum">     134 </span>                :<span class="lineNoCov">          0 :         state-&gt;filter_zone = true;</span>
+<span class="lineNum">     135 </span>                :<span class="lineNoCov">          0 :         state-&gt;zone = *zone;</span>
+<span class="lineNum">     136 </span>                :            :     }
+<span class="lineNum">     137 </span>                :            : 
+<span class="lineNum">     138 </span>                :<span class="lineCov">         53 :     nl_msg_put_nfgenmsg(&amp;state-&gt;buf, 0, AF_UNSPEC, NFNL_SUBSYS_CTNETLINK,</span>
+<span class="lineNum">     139 </span>                :            :                         IPCTNL_MSG_CT_GET, NLM_F_REQUEST);
+<span class="lineNum">     140 </span>                :<span class="lineCov">         53 :     nl_dump_start(&amp;state-&gt;dump, NETLINK_NETFILTER, &amp;state-&gt;buf);</span>
+<span class="lineNum">     141 </span>                :<span class="lineCov">         53 :     ofpbuf_clear(&amp;state-&gt;buf);</span>
+<span class="lineNum">     142 </span>                :            : 
+<span class="lineNum">     143 </span>                :<span class="lineCov">         53 :     return 0;</span>
+<span class="lineNum">     144 </span>                :            : }
+<span class="lineNum">     145 </span>                :            : 
+<span class="lineNum">     146 </span>                :            : /* Receive the next 'entry' from the conntrack netlink dump with 'state'.
+<span class="lineNum">     147 </span>                :            :  * Returns 'EOF' when no more entries are available, 0 otherwise.  'entry' may
+<span class="lineNum">     148 </span>                :            :  * be uninitilized memory on entry, and must be uninitialized with
+<span class="lineNum">     149 </span>                :            :  * ct_dpif_entry_uninit() afterwards by the caller.  In case the same 'entry' is
+<span class="lineNum">     150 </span>                :            :  * passed to this function again, the entry must also be uninitialized before
+<a name="151"><span class="lineNum">     151 </span>                :            :  * the next call. */</a>
+<span class="lineNum">     152 </span>                :            : int
+<span class="lineNum">     153 </span>                :<span class="lineCov">        439 : nl_ct_dump_next(struct nl_ct_dump_state *state, struct ct_dpif_entry *entry)</span>
+<span class="lineNum">     154 </span>                :            : {
+<span class="lineNum">     155 </span>                :            :     struct ofpbuf buf;
+<span class="lineNum">     156 </span>                :            : 
+<span class="lineNum">     157 </span>                :<span class="lineCov">        439 :     memset(entry, 0, sizeof *entry);</span>
+<span class="lineNum">     158 </span>                :            :     for (;;) {
+<span class="lineNum">     159 </span>                :            :         struct nlattr *attrs[ARRAY_SIZE(nfnlgrp_conntrack_policy)];
+<span class="lineNum">     160 </span>                :            :         enum nl_ct_event_type type;
+<span class="lineNum">     161 </span>                :            :         uint8_t nfgen_family;
+<span class="lineNum">     162 </span>                :            : 
+<span class="lineNum">     163 </span>        [<span class="branchCov" title="Branch 1 was taken 53 times"> + </span><span class="branchCov" title="Branch 2 was taken 386 times"> + </span>]:<span class="lineCov">        439 :         if (!nl_dump_next(&amp;state-&gt;dump, &amp;buf, &amp;state-&gt;buf)) {</span>
+<span class="lineNum">     164 </span>                :<span class="lineCov">         53 :             return EOF;</span>
+<span class="lineNum">     165 </span>                :            :         }
+<span class="lineNum">     166 </span>                :            : 
+<span class="lineNum">     167 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 386 times"> + </span>]:<span class="lineCov">        386 :         if (!nl_ct_parse_header_policy(&amp;buf, &amp;type, &amp;nfgen_family, attrs)) {</span>
+<span class="lineNum">     168 </span>                :<span class="lineNoCov">          0 :             continue;</span>
+<span class="lineNum">     169 </span>                :            :         };
+<span class="lineNum">     170 </span>                :            : 
+<span class="lineNum">     171 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 386 times"> + </span>]:<span class="lineCov">        386 :         if (state-&gt;filter_zone) {</span>
+<span class="lineNum">     172 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             uint16_t entry_zone = attrs[CTA_ZONE]</span>
+<span class="lineNum">     173 </span>                :<span class="lineNoCov">          0 :                                   ? ntohs(nl_attr_get_be16(attrs[CTA_ZONE]))</span>
+<span class="lineNum">     174 </span>                :            :                                   : 0;
+<span class="lineNum">     175 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (entry_zone != state-&gt;zone) {</span>
+<span class="lineNum">     176 </span>                :<span class="lineNoCov">          0 :                 continue;</span>
+<span class="lineNum">     177 </span>                :            :             }
+<span class="lineNum">     178 </span>                :            :         }
+<span class="lineNum">     179 </span>                :            : 
+<span class="lineNum">     180 </span>        [<span class="branchCov" title="Branch 1 was taken 386 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        386 :         if (nl_ct_attrs_to_ct_dpif_entry(entry, attrs, nfgen_family)) {</span>
+<span class="lineNum">     181 </span>                :<span class="lineCov">        386 :             break;</span>
+<span class="lineNum">     182 </span>                :            :         }
+<span class="lineNum">     183 </span>                :            : 
+<span class="lineNum">     184 </span>                :<span class="lineNoCov">          0 :         ct_dpif_entry_uninit(entry);</span>
+<span class="lineNum">     185 </span>                :<span class="lineNoCov">          0 :         memset(entry, 0, sizeof *entry);</span>
+<span class="lineNum">     186 </span>                :            :         /* Ignore the failed entry and get the next one. */
+<span class="lineNum">     187 </span>                :<span class="lineCov">        439 :     }</span>
+<span class="lineNum">     188 </span>                :            : 
+<span class="lineNum">     189 </span>                :<span class="lineCov">        386 :     ofpbuf_uninit(&amp;buf);</span>
+<span class="lineNum">     190 </span>                :<span class="lineCov">        386 :     return 0;</span>
+<span class="lineNum">     191 </span>                :            : }
+<span class="lineNum">     192 </span>                :            : 
+<a name="193"><span class="lineNum">     193 </span>                :            : /* End a conntrack netlink dump. */</a>
+<span class="lineNum">     194 </span>                :            : int
+<span class="lineNum">     195 </span>                :<span class="lineCov">         53 : nl_ct_dump_done(struct nl_ct_dump_state *state)</span>
+<span class="lineNum">     196 </span>                :            : {
+<span class="lineNum">     197 </span>                :<span class="lineCov">         53 :     int error = nl_dump_done(&amp;state-&gt;dump);</span>
+<span class="lineNum">     198 </span>                :            : 
+<span class="lineNum">     199 </span>                :<span class="lineCov">         53 :     ofpbuf_uninit(&amp;state-&gt;buf);</span>
+<span class="lineNum">     200 </span>                :<span class="lineCov">         53 :     free(state);</span>
+<span class="lineNum">     201 </span>                :<span class="lineCov">         53 :     return error;</span>
+<span class="lineNum">     202 </span>                :            : }
+<span class="lineNum">     203 </span>                :            : 
+<a name="204"><span class="lineNum">     204 </span>                :            : /* Format conntrack event 'entry' of 'type' to 'ds'. */</a>
+<span class="lineNum">     205 </span>                :            : void
+<span class="lineNum">     206 </span>                :<span class="lineNoCov">          0 : nl_ct_format_event_entry(const struct ct_dpif_entry *entry,</span>
+<span class="lineNum">     207 </span>                :            :                          enum nl_ct_event_type type, struct ds *ds,
+<span class="lineNum">     208 </span>                :            :                          bool verbose, bool print_stats)
+<span class="lineNum">     209 </span>                :            : {
+<span class="lineNum">     210 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     ds_put_format(ds, &quot;%s &quot;,</span>
+<span class="lineNum">     211 </span>                :            :                   type == NL_CT_EVENT_NEW ? &quot;NEW&quot;
+<span class="lineNum">     212 </span>                :            :                   : type == NL_CT_EVENT_UPDATE ? &quot;UPDATE&quot;
+<span class="lineNum">     213 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                   : type == NL_CT_EVENT_DELETE ? &quot;DELETE&quot;</span>
+<span class="lineNum">     214 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                   : &quot;UNKNOWN&quot;);</span>
+<span class="lineNum">     215 </span>                :<span class="lineNoCov">          0 :     ct_dpif_format_entry(entry, ds, verbose, print_stats);</span>
+<span class="lineNum">     216 </span>                :<span class="lineNoCov">          0 : }</span>
+<a name="217"><span class="lineNum">     217 </span>                :            : </a>
+<span class="lineNum">     218 </span>                :            : int
+<span class="lineNum">     219 </span>                :<span class="lineCov">         60 : nl_ct_flush(void)</span>
+<span class="lineNum">     220 </span>                :            : {
+<span class="lineNum">     221 </span>                :            :     struct ofpbuf buf;
+<span class="lineNum">     222 </span>                :            :     int err;
+<span class="lineNum">     223 </span>                :            : 
+<span class="lineNum">     224 </span>                :<span class="lineCov">         60 :     ofpbuf_init(&amp;buf, NL_DUMP_BUFSIZE);</span>
+<span class="lineNum">     225 </span>                :            : 
+<span class="lineNum">     226 </span>                :<span class="lineCov">         60 :     nl_msg_put_nfgenmsg(&amp;buf, 0, AF_UNSPEC, NFNL_SUBSYS_CTNETLINK,</span>
+<span class="lineNum">     227 </span>                :            :                         IPCTNL_MSG_CT_DELETE, NLM_F_REQUEST);
+<span class="lineNum">     228 </span>                :            : 
+<span class="lineNum">     229 </span>                :<span class="lineCov">         60 :     err = nl_transact(NETLINK_NETFILTER, &amp;buf, NULL);</span>
+<span class="lineNum">     230 </span>                :<span class="lineCov">         60 :     ofpbuf_uninit(&amp;buf);</span>
+<span class="lineNum">     231 </span>                :            : 
+<span class="lineNum">     232 </span>                :            :     /* Expectations are flushed automatically, because they do not
+<span class="lineNum">     233 </span>                :            :      * have a master connection anymore */
+<span class="lineNum">     234 </span>                :            : 
+<span class="lineNum">     235 </span>                :<span class="lineCov">         60 :     return err;</span>
+<span class="lineNum">     236 </span>                :            : }
+<span class="lineNum">     237 </span>                :            : 
+<span class="lineNum">     238 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     239 </span>                :            : int
+<span class="lineNum">     240 </span>                :            : nl_ct_flush_zone(uint16_t flush_zone)
+<span class="lineNum">     241 </span>                :            : {
+<span class="lineNum">     242 </span>                :            :     /* Windows can flush a specific zone */
+<span class="lineNum">     243 </span>                :            :     struct ofpbuf buf;
+<span class="lineNum">     244 </span>                :            :     int err;
+<span class="lineNum">     245 </span>                :            : 
+<span class="lineNum">     246 </span>                :            :     ofpbuf_init(&amp;buf, NL_DUMP_BUFSIZE);
+<span class="lineNum">     247 </span>                :            : 
+<span class="lineNum">     248 </span>                :            :     nl_msg_put_nfgenmsg(&amp;buf, 0, AF_UNSPEC, NFNL_SUBSYS_CTNETLINK,
+<span class="lineNum">     249 </span>                :            :                         IPCTNL_MSG_CT_DELETE, NLM_F_REQUEST);
+<span class="lineNum">     250 </span>                :            :     nl_msg_put_be16(&amp;buf, CTA_ZONE, flush_zone);
+<span class="lineNum">     251 </span>                :            : 
+<span class="lineNum">     252 </span>                :            :     err = nl_transact(NETLINK_NETFILTER, &amp;buf, NULL);
+<span class="lineNum">     253 </span>                :            :     ofpbuf_uninit(&amp;buf);
+<span class="lineNum">     254 </span>                :            : 
+<span class="lineNum">     255 </span>                :            :     return err;
+<span class="lineNum">     256 </span>                :            : }
+<a name="257"><span class="lineNum">     257 </span>                :            : #else</a>
+<span class="lineNum">     258 </span>                :            : int
+<span class="lineNum">     259 </span>                :<span class="lineNoCov">          0 : nl_ct_flush_zone(uint16_t flush_zone)</span>
+<span class="lineNum">     260 </span>                :            : {
+<span class="lineNum">     261 </span>                :            :     /* Apparently, there's no netlink interface to flush a specific zone.
+<span class="lineNum">     262 </span>                :            :      * This code dumps every connection, checks the zone and eventually
+<span class="lineNum">     263 </span>                :            :      * delete the entry.
+<span class="lineNum">     264 </span>                :            :      *
+<span class="lineNum">     265 </span>                :            :      * This is race-prone, but it is better than using shell scripts. */
+<span class="lineNum">     266 </span>                :            : 
+<span class="lineNum">     267 </span>                :            :     struct nl_dump dump;
+<span class="lineNum">     268 </span>                :            :     struct ofpbuf buf, reply, delete;
+<span class="lineNum">     269 </span>                :            : 
+<span class="lineNum">     270 </span>                :<span class="lineNoCov">          0 :     ofpbuf_init(&amp;buf, NL_DUMP_BUFSIZE);</span>
+<span class="lineNum">     271 </span>                :<span class="lineNoCov">          0 :     ofpbuf_init(&amp;delete, NL_DUMP_BUFSIZE);</span>
+<span class="lineNum">     272 </span>                :            : 
+<span class="lineNum">     273 </span>                :<span class="lineNoCov">          0 :     nl_msg_put_nfgenmsg(&amp;buf, 0, AF_UNSPEC, NFNL_SUBSYS_CTNETLINK,</span>
+<span class="lineNum">     274 </span>                :            :                         IPCTNL_MSG_CT_GET, NLM_F_REQUEST);
+<span class="lineNum">     275 </span>                :<span class="lineNoCov">          0 :     nl_dump_start(&amp;dump, NETLINK_NETFILTER, &amp;buf);</span>
+<span class="lineNum">     276 </span>                :<span class="lineNoCov">          0 :     ofpbuf_clear(&amp;buf);</span>
+<span class="lineNum">     277 </span>                :            : 
+<span class="lineNum">     278 </span>                :            :     for (;;) {
+<span class="lineNum">     279 </span>                :            :         struct nlattr *attrs[ARRAY_SIZE(nfnlgrp_conntrack_policy)];
+<span class="lineNum">     280 </span>                :            :         enum nl_ct_event_type event_type;
+<span class="lineNum">     281 </span>                :            :         uint8_t nfgen_family;
+<span class="lineNum">     282 </span>                :<span class="lineNoCov">          0 :         uint16_t zone = 0;</span>
+<span class="lineNum">     283 </span>                :            : 
+<span class="lineNum">     284 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!nl_dump_next(&amp;dump, &amp;reply, &amp;buf)) {</span>
+<span class="lineNum">     285 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     286 </span>                :            :         }
+<span class="lineNum">     287 </span>                :            : 
+<span class="lineNum">     288 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (!nl_ct_parse_header_policy(&amp;reply, &amp;event_type, &amp;nfgen_family,</span>
+<span class="lineNum">     289 </span>                :            :                                        attrs)) {
+<span class="lineNum">     290 </span>                :<span class="lineNoCov">          0 :             continue;</span>
+<span class="lineNum">     291 </span>                :            :         };
+<span class="lineNum">     292 </span>                :            : 
+<span class="lineNum">     293 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (attrs[CTA_ZONE]) {</span>
+<span class="lineNum">     294 </span>                :<span class="lineNoCov">          0 :             zone = ntohs(nl_attr_get_be16(attrs[CTA_ZONE]));</span>
+<span class="lineNum">     295 </span>                :            :         }
+<span class="lineNum">     296 </span>                :            : 
+<span class="lineNum">     297 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (zone != flush_zone) {</span>
+<span class="lineNum">     298 </span>                :            :             /* The entry is not in the zone we're flushing. */
+<span class="lineNum">     299 </span>                :<span class="lineNoCov">          0 :             continue;</span>
+<span class="lineNum">     300 </span>                :            :         }
+<span class="lineNum">     301 </span>                :<span class="lineNoCov">          0 :         nl_msg_put_nfgenmsg(&amp;delete, 0, nfgen_family, NFNL_SUBSYS_CTNETLINK,</span>
+<span class="lineNum">     302 </span>                :            :                             IPCTNL_MSG_CT_DELETE, NLM_F_REQUEST);
+<span class="lineNum">     303 </span>                :            : 
+<span class="lineNum">     304 </span>                :<span class="lineNoCov">          0 :         nl_msg_put_be16(&amp;delete, CTA_ZONE, htons(zone));</span>
+<span class="lineNum">     305 </span>                :<span class="lineNoCov">          0 :         nl_msg_put_unspec(&amp;delete, CTA_TUPLE_ORIG, attrs[CTA_TUPLE_ORIG] + 1,</span>
+<span class="lineNum">     306 </span>                :<span class="lineNoCov">          0 :                           attrs[CTA_TUPLE_ORIG]-&gt;nla_len - NLA_HDRLEN);</span>
+<span class="lineNum">     307 </span>                :<span class="lineNoCov">          0 :         nl_msg_put_unspec(&amp;delete, CTA_ID, attrs[CTA_ID] + 1,</span>
+<span class="lineNum">     308 </span>                :<span class="lineNoCov">          0 :                           attrs[CTA_ID]-&gt;nla_len - NLA_HDRLEN);</span>
+<span class="lineNum">     309 </span>                :<span class="lineNoCov">          0 :         nl_transact(NETLINK_NETFILTER, &amp;delete, NULL);</span>
+<span class="lineNum">     310 </span>                :<span class="lineNoCov">          0 :         ofpbuf_clear(&amp;delete);</span>
+<span class="lineNum">     311 </span>                :<span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     312 </span>                :            : 
+<span class="lineNum">     313 </span>                :<span class="lineNoCov">          0 :     nl_dump_done(&amp;dump);</span>
+<span class="lineNum">     314 </span>                :            : 
+<span class="lineNum">     315 </span>                :<span class="lineNoCov">          0 :     ofpbuf_uninit(&amp;delete);</span>
+<span class="lineNum">     316 </span>                :<span class="lineNoCov">          0 :     ofpbuf_uninit(&amp;buf);</span>
+<span class="lineNum">     317 </span>                :            : 
+<span class="lineNum">     318 </span>                :            :     /* Expectations are flushed automatically, because they do not
+<span class="lineNum">     319 </span>                :            :      * have a master connection anymore */
+<span class="lineNum">     320 </span>                :<span class="lineNoCov">          0 :     return 0;</span>
+<span class="lineNum">     321 </span>                :            : }
+<span class="lineNum">     322 </span>                :            : #endif
+<span class="lineNum">     323 </span>                :            : 
+<span class="lineNum">     324 </span>                :            : /* Conntrack netlink parsing. */
+<a name="325"><span class="lineNum">     325 </span>                :            : </a>
+<span class="lineNum">     326 </span>                :            : static bool
+<span class="lineNum">     327 </span>                :<span class="lineNoCov">          0 : nl_ct_parse_counters(struct nlattr *nla, struct ct_dpif_counters *counters)</span>
+<span class="lineNum">     328 </span>                :            : {
+<span class="lineNum">     329 </span>                :            :     static const struct nl_policy policy[] = {
+<span class="lineNum">     330 </span>                :            :         [CTA_COUNTERS_PACKETS] = { .type = NL_A_BE64, .optional = false },
+<span class="lineNum">     331 </span>                :            :         [CTA_COUNTERS_BYTES] = { .type = NL_A_BE64, .optional = false },
+<span class="lineNum">     332 </span>                :            :     };
+<span class="lineNum">     333 </span>                :            :     struct nlattr *attrs[ARRAY_SIZE(policy)];
+<span class="lineNum">     334 </span>                :            :     bool parsed;
+<span class="lineNum">     335 </span>                :            : 
+<span class="lineNum">     336 </span>                :<span class="lineNoCov">          0 :     parsed = nl_parse_nested(nla, policy, attrs, ARRAY_SIZE(policy));</span>
+<span class="lineNum">     337 </span>                :            : 
+<span class="lineNum">     338 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (parsed) {</span>
+<span class="lineNum">     339 </span>                :            :         counters-&gt;packets
+<span class="lineNum">     340 </span>                :<span class="lineNoCov">          0 :             = ntohll(nl_attr_get_be64(attrs[CTA_COUNTERS_PACKETS]));</span>
+<span class="lineNum">     341 </span>                :<span class="lineNoCov">          0 :         counters-&gt;bytes = ntohll(nl_attr_get_be64(attrs[CTA_COUNTERS_BYTES]));</span>
+<span class="lineNum">     342 </span>                :            :     } else {
+<span class="lineNum">     343 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;Could not parse nested counters. &quot;</span>
+<span class="lineNum">     344 </span>                :            :                     &quot;Possibly incompatible Linux kernel version.&quot;);
+<span class="lineNum">     345 </span>                :            :     }
+<span class="lineNum">     346 </span>                :            : 
+<span class="lineNum">     347 </span>                :<span class="lineNoCov">          0 :     return parsed;</span>
+<span class="lineNum">     348 </span>                :            : }
+<a name="349"><span class="lineNum">     349 </span>                :            : </a>
+<span class="lineNum">     350 </span>                :            : static bool
+<span class="lineNum">     351 </span>                :<span class="lineNoCov">          0 : nl_ct_parse_timestamp(struct nlattr *nla, struct ct_dpif_timestamp *timestamp)</span>
+<span class="lineNum">     352 </span>                :            : {
+<span class="lineNum">     353 </span>                :            :     static const struct nl_policy policy[] = {
+<span class="lineNum">     354 </span>                :            :         [CTA_TIMESTAMP_START] = { .type = NL_A_BE64, .optional = false },
+<span class="lineNum">     355 </span>                :            :         [CTA_TIMESTAMP_STOP] = { .type = NL_A_BE64, .optional = true },
+<span class="lineNum">     356 </span>                :            :     };
+<span class="lineNum">     357 </span>                :            :     struct nlattr *attrs[ARRAY_SIZE(policy)];
+<span class="lineNum">     358 </span>                :            :     bool parsed;
+<span class="lineNum">     359 </span>                :            : 
+<span class="lineNum">     360 </span>                :<span class="lineNoCov">          0 :     parsed = nl_parse_nested(nla, policy, attrs, ARRAY_SIZE(policy));</span>
+<span class="lineNum">     361 </span>                :            : 
+<span class="lineNum">     362 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (parsed) {</span>
+<span class="lineNum">     363 </span>                :            :         timestamp-&gt;start
+<span class="lineNum">     364 </span>                :<span class="lineNoCov">          0 :             = ntohll(nl_attr_get_be64(attrs[CTA_TIMESTAMP_START]));</span>
+<span class="lineNum">     365 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (attrs[CTA_TIMESTAMP_STOP]) {</span>
+<span class="lineNum">     366 </span>                :            :             timestamp-&gt;stop
+<span class="lineNum">     367 </span>                :<span class="lineNoCov">          0 :                 = ntohll(nl_attr_get_be64(attrs[CTA_TIMESTAMP_STOP]));</span>
+<span class="lineNum">     368 </span>                :            :         }
+<span class="lineNum">     369 </span>                :            :     } else {
+<span class="lineNum">     370 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;Could not parse nested timestamp. &quot;</span>
+<span class="lineNum">     371 </span>                :            :                     &quot;Possibly incompatible Linux kernel version.&quot;);
+<span class="lineNum">     372 </span>                :            :     }
+<span class="lineNum">     373 </span>                :            : 
+<span class="lineNum">     374 </span>                :<span class="lineNoCov">          0 :     return parsed;</span>
+<span class="lineNum">     375 </span>                :            : }
+<a name="376"><span class="lineNum">     376 </span>                :            : </a>
+<span class="lineNum">     377 </span>                :            : static bool
+<span class="lineNum">     378 </span>                :<span class="lineCov">        783 : nl_ct_parse_tuple_ip(struct nlattr *nla, struct ct_dpif_tuple *tuple)</span>
+<span class="lineNum">     379 </span>                :            : {
+<span class="lineNum">     380 </span>                :            :     static const struct nl_policy policy[] = {
+<span class="lineNum">     381 </span>                :            :         [CTA_IP_V4_SRC] = { .type = NL_A_BE32, .optional = true },
+<span class="lineNum">     382 </span>                :            :         [CTA_IP_V4_DST] = { .type = NL_A_BE32, .optional = true },
+<span class="lineNum">     383 </span>                :            :         [CTA_IP_V6_SRC] = { NL_POLICY_FOR(struct in6_addr), .optional = true },
+<span class="lineNum">     384 </span>                :            :         [CTA_IP_V6_DST] = { NL_POLICY_FOR(struct in6_addr), .optional = true },
+<span class="lineNum">     385 </span>                :            :     };
+<span class="lineNum">     386 </span>                :            :     struct nlattr *attrs[ARRAY_SIZE(policy)];
+<span class="lineNum">     387 </span>                :            :     bool parsed;
+<span class="lineNum">     388 </span>                :            : 
+<span class="lineNum">     389 </span>                :<span class="lineCov">        783 :     parsed = nl_parse_nested(nla, policy, attrs, ARRAY_SIZE(policy));</span>
+<span class="lineNum">     390 </span>                :            : 
+<span class="lineNum">     391 </span>        [<span class="branchCov" title="Branch 0 was taken 783 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        783 :     if (parsed) {</span>
+<span class="lineNum">     392 </span>        [<span class="branchCov" title="Branch 0 was taken 769 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>]:<span class="lineCov">        783 :         if (tuple-&gt;l3_type == AF_INET) {</span>
+<span class="lineNum">     393 </span>        [<span class="branchCov" title="Branch 0 was taken 769 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        769 :             if (attrs[CTA_IP_V4_SRC]) {</span>
+<span class="lineNum">     394 </span>                :<span class="lineCov">        769 :                 tuple-&gt;src.ip = nl_attr_get_be32(attrs[CTA_IP_V4_SRC]);</span>
+<span class="lineNum">     395 </span>                :            :             }
+<span class="lineNum">     396 </span>        [<span class="branchCov" title="Branch 0 was taken 769 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        769 :             if (attrs[CTA_IP_V4_DST]) {</span>
+<span class="lineNum">     397 </span>                :<span class="lineCov">        769 :                 tuple-&gt;dst.ip = nl_attr_get_be32(attrs[CTA_IP_V4_DST]);</span>
+<span class="lineNum">     398 </span>                :            :             }
+<span class="lineNum">     399 </span>        [<span class="branchCov" title="Branch 0 was taken 14 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         14 :         } else if (tuple-&gt;l3_type == AF_INET6) {</span>
+<span class="lineNum">     400 </span>        [<span class="branchCov" title="Branch 0 was taken 14 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         14 :             if (attrs[CTA_IP_V6_SRC]) {</span>
+<span class="lineNum">     401 </span>                :<span class="lineCov">         14 :                 memcpy(&amp;tuple-&gt;src.in6, nl_attr_get(attrs[CTA_IP_V6_SRC]),</span>
+<span class="lineNum">     402 </span>                :            :                        sizeof tuple-&gt;src.in6);
+<span class="lineNum">     403 </span>                :            :             }
+<span class="lineNum">     404 </span>        [<span class="branchCov" title="Branch 0 was taken 14 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         14 :             if (attrs[CTA_IP_V6_DST]) {</span>
+<span class="lineNum">     405 </span>                :<span class="lineCov">         14 :                 memcpy(&amp;tuple-&gt;dst.in6, nl_attr_get(attrs[CTA_IP_V6_DST]),</span>
+<span class="lineNum">     406 </span>                :            :                        sizeof tuple-&gt;dst.in6);
+<span class="lineNum">     407 </span>                :            :             }
+<span class="lineNum">     408 </span>                :            :         } else {
+<span class="lineNum">     409 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN_RL(&amp;rl, &quot;Unsupported IP protocol: %u.&quot;, tuple-&gt;l3_type);</span>
+<span class="lineNum">     410 </span>                :<span class="lineNoCov">          0 :             return false;</span>
+<span class="lineNum">     411 </span>                :            :         }
+<span class="lineNum">     412 </span>                :            :     } else {
+<span class="lineNum">     413 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;Could not parse nested tuple IP options. &quot;</span>
+<span class="lineNum">     414 </span>                :            :                     &quot;Possibly incompatible Linux kernel version.&quot;);
+<span class="lineNum">     415 </span>                :            :     }
+<span class="lineNum">     416 </span>                :            : 
+<span class="lineNum">     417 </span>                :<span class="lineCov">        783 :     return parsed;</span>
+<span class="lineNum">     418 </span>                :            : }
+<a name="419"><span class="lineNum">     419 </span>                :            : </a>
+<span class="lineNum">     420 </span>                :            : static bool
+<span class="lineNum">     421 </span>                :<span class="lineCov">        783 : nl_ct_parse_tuple_proto(struct nlattr *nla, struct ct_dpif_tuple *tuple)</span>
+<span class="lineNum">     422 </span>                :            : {
+<span class="lineNum">     423 </span>                :            :     static const struct nl_policy policy[] = {
+<span class="lineNum">     424 </span>                :            :         [CTA_PROTO_NUM] = { .type = NL_A_U8, .optional = false },
+<span class="lineNum">     425 </span>                :            :         [CTA_PROTO_SRC_PORT] = { .type = NL_A_BE16, .optional = true },
+<span class="lineNum">     426 </span>                :            :         [CTA_PROTO_DST_PORT] = { .type = NL_A_BE16, .optional = true },
+<span class="lineNum">     427 </span>                :            :         [CTA_PROTO_ICMP_ID] = { .type = NL_A_BE16, .optional = true },
+<span class="lineNum">     428 </span>                :            :         [CTA_PROTO_ICMP_TYPE] = { .type = NL_A_U8, .optional = true },
+<span class="lineNum">     429 </span>                :            :         [CTA_PROTO_ICMP_CODE] = { .type = NL_A_U8, .optional = true },
+<span class="lineNum">     430 </span>                :            :         [CTA_PROTO_ICMPV6_ID] = { .type = NL_A_BE16, .optional = true },
+<span class="lineNum">     431 </span>                :            :         [CTA_PROTO_ICMPV6_TYPE] = { .type = NL_A_U8, .optional = true },
+<span class="lineNum">     432 </span>                :            :         [CTA_PROTO_ICMPV6_CODE] = { .type = NL_A_U8, .optional = true },
+<span class="lineNum">     433 </span>                :            :     };
+<span class="lineNum">     434 </span>                :            :     struct nlattr *attrs[ARRAY_SIZE(policy)];
+<span class="lineNum">     435 </span>                :            :     bool parsed;
+<span class="lineNum">     436 </span>                :            : 
+<span class="lineNum">     437 </span>                :<span class="lineCov">        783 :     parsed = nl_parse_nested(nla, policy, attrs, ARRAY_SIZE(policy));</span>
+<span class="lineNum">     438 </span>                :            : 
+<span class="lineNum">     439 </span>        [<span class="branchCov" title="Branch 0 was taken 783 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        783 :     if (parsed) {</span>
+<span class="lineNum">     440 </span>                :<span class="lineCov">        783 :         tuple-&gt;ip_proto = nl_attr_get_u8(attrs[CTA_PROTO_NUM]);</span>
+<span class="lineNum">     441 </span>                :            : 
+<span class="lineNum">     442 </span>[<span class="branchCov" title="Branch 0 was taken 769 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 30 times"> + </span><span class="branchCov" title="Branch 3 was taken 739 times"> + </span>]:<span class="lineCov">        783 :         if (tuple-&gt;l3_type == AF_INET &amp;&amp; tuple-&gt;ip_proto == IPPROTO_ICMP) {</span>
+<span class="lineNum">     443 </span>[<span class="branchCov" title="Branch 0 was taken 30 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 30 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         30 :             if (!attrs[CTA_PROTO_ICMP_ID] || !attrs[CTA_PROTO_ICMP_TYPE]</span>
+<span class="lineNum">     444 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 30 times"> + </span>]:<span class="lineCov">         30 :                 || !attrs[CTA_PROTO_ICMP_CODE]) {</span>
+<span class="lineNum">     445 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_ERR_RL(&amp;rl, &quot;Tuple ICMP data missing.&quot;);</span>
+<span class="lineNum">     446 </span>                :<span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     447 </span>                :            :             }
+<span class="lineNum">     448 </span>                :<span class="lineCov">         30 :             tuple-&gt;icmp_id = nl_attr_get_be16(attrs[CTA_PROTO_ICMP_ID]);</span>
+<span class="lineNum">     449 </span>                :<span class="lineCov">         30 :             tuple-&gt;icmp_type = nl_attr_get_u8(attrs[CTA_PROTO_ICMP_TYPE]);</span>
+<span class="lineNum">     450 </span>                :<span class="lineCov">         30 :             tuple-&gt;icmp_code = nl_attr_get_u8(attrs[CTA_PROTO_ICMP_CODE]);</span>
+<span class="lineNum">     451 </span>[<span class="branchCov" title="Branch 0 was taken 14 times"> + </span><span class="branchCov" title="Branch 1 was taken 739 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 2 times"> + </span><span class="branchCov" title="Branch 3 was taken 12 times"> + </span>]:<span class="lineCov">        753 :         } else if (tuple-&gt;l3_type == AF_INET6 &amp;&amp;</span>
+<span class="lineNum">     452 </span>                :<span class="lineCov">         14 :                    tuple-&gt;ip_proto == IPPROTO_ICMPV6) {</span>
+<span class="lineNum">     453 </span>[<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">          2 :             if (!attrs[CTA_PROTO_ICMPV6_ID] || !attrs[CTA_PROTO_ICMPV6_TYPE]</span>
+<span class="lineNum">     454 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :                 || !attrs[CTA_PROTO_ICMPV6_CODE]) {</span>
+<span class="lineNum">     455 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_ERR_RL(&amp;rl, &quot;Tuple ICMPv6 data missing.&quot;);</span>
+<span class="lineNum">     456 </span>                :<span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     457 </span>                :            :             }
+<span class="lineNum">     458 </span>                :<span class="lineCov">          2 :             tuple-&gt;icmp_id = nl_attr_get_be16(attrs[CTA_PROTO_ICMPV6_ID]);</span>
+<span class="lineNum">     459 </span>                :<span class="lineCov">          2 :             tuple-&gt;icmp_type = nl_attr_get_u8(attrs[CTA_PROTO_ICMPV6_TYPE]);</span>
+<span class="lineNum">     460 </span>                :<span class="lineCov">          2 :             tuple-&gt;icmp_code = nl_attr_get_u8(attrs[CTA_PROTO_ICMPV6_CODE]);</span>
+<span class="lineNum">     461 </span>[<span class="branchCov" title="Branch 0 was taken 751 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 751 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        751 :         } else if (attrs[CTA_PROTO_SRC_PORT] &amp;&amp; attrs[CTA_PROTO_DST_PORT]) {</span>
+<span class="lineNum">     462 </span>                :<span class="lineCov">        751 :             tuple-&gt;src_port = nl_attr_get_be16(attrs[CTA_PROTO_SRC_PORT]);</span>
+<span class="lineNum">     463 </span>                :<span class="lineCov">        751 :             tuple-&gt;dst_port = nl_attr_get_be16(attrs[CTA_PROTO_DST_PORT]);</span>
+<span class="lineNum">     464 </span>                :            :         } else {
+<span class="lineNum">     465 </span>                :            :             /* Unsupported IPPROTO and no ports, leave them zeroed.
+<span class="lineNum">     466 </span>                :            :              * We have parsed the ip_proto, so this is not a total failure. */
+<span class="lineNum">     467 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineCov">        783 :             VLOG_INFO_RL(&amp;rl, &quot;Unsupported L4 protocol: %u.&quot;, tuple-&gt;ip_proto);</span>
+<span class="lineNum">     468 </span>                :            :         }
+<span class="lineNum">     469 </span>                :            :     } else {
+<span class="lineNum">     470 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;Could not parse nested tuple protocol options. &quot;</span>
+<span class="lineNum">     471 </span>                :            :                     &quot;Possibly incompatible Linux kernel version.&quot;);
+<span class="lineNum">     472 </span>                :            :     }
+<span class="lineNum">     473 </span>                :            : 
+<span class="lineNum">     474 </span>                :<span class="lineCov">        783 :     return parsed;</span>
+<span class="lineNum">     475 </span>                :            : }
+<a name="476"><span class="lineNum">     476 </span>                :            : </a>
+<span class="lineNum">     477 </span>                :            : static bool
+<span class="lineNum">     478 </span>                :<span class="lineCov">        783 : nl_ct_parse_tuple(struct nlattr *nla, struct ct_dpif_tuple *tuple,</span>
+<span class="lineNum">     479 </span>                :            :                   uint16_t l3_type)
+<span class="lineNum">     480 </span>                :            : {
+<span class="lineNum">     481 </span>                :            :     static const struct nl_policy policy[] = {
+<span class="lineNum">     482 </span>                :            :         [CTA_TUPLE_IP] = { .type = NL_A_NESTED, .optional = false },
+<span class="lineNum">     483 </span>                :            :         [CTA_TUPLE_PROTO] = { .type = NL_A_NESTED, .optional = false },
+<span class="lineNum">     484 </span>                :            :     };
+<span class="lineNum">     485 </span>                :            :     struct nlattr *attrs[ARRAY_SIZE(policy)];
+<span class="lineNum">     486 </span>                :            :     bool parsed;
+<span class="lineNum">     487 </span>                :            : 
+<span class="lineNum">     488 </span>                :<span class="lineCov">        783 :     parsed = nl_parse_nested(nla, policy, attrs, ARRAY_SIZE(policy));</span>
+<span class="lineNum">     489 </span>                :            : 
+<span class="lineNum">     490 </span>                :<span class="lineCov">        783 :     memset(tuple, 0, sizeof *tuple);</span>
+<span class="lineNum">     491 </span>                :            : 
+<span class="lineNum">     492 </span>        [<span class="branchCov" title="Branch 0 was taken 783 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        783 :     if (parsed) {</span>
+<span class="lineNum">     493 </span>                :<span class="lineCov">        783 :         tuple-&gt;l3_type = l3_type;</span>
+<span class="lineNum">     494 </span>                :            : 
+<span class="lineNum">     495 </span>        [<span class="branchCov" title="Branch 1 was taken 783 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        783 :         if (!nl_ct_parse_tuple_ip(attrs[CTA_TUPLE_IP], tuple)</span>
+<span class="lineNum">     496 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 783 times"> + </span>]:<span class="lineCov">        783 :             || !nl_ct_parse_tuple_proto(attrs[CTA_TUPLE_PROTO], tuple)) {</span>
+<span class="lineNum">     497 </span>                :            :             struct ds ds;
+<span class="lineNum">     498 </span>                :            : 
+<span class="lineNum">     499 </span>                :<span class="lineNoCov">          0 :             ds_init(&amp;ds);</span>
+<span class="lineNum">     500 </span>                :<span class="lineNoCov">          0 :             ct_dpif_format_tuple(&amp;ds, tuple);</span>
+<span class="lineNum">     501 </span>                :            : 
+<span class="lineNum">     502 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_ERR_RL(&amp;rl, &quot;Failed to parse tuple: %s&quot;, ds_cstr(&amp;ds));</span>
+<span class="lineNum">     503 </span>                :<span class="lineNoCov">          0 :             ds_destroy(&amp;ds);</span>
+<span class="lineNum">     504 </span>                :            : 
+<span class="lineNum">     505 </span>                :<span class="lineNoCov">          0 :             memset(tuple, 0, sizeof *tuple);</span>
+<span class="lineNum">     506 </span>                :<span class="lineNoCov">          0 :             return false;</span>
+<span class="lineNum">     507 </span>                :            :         }
+<span class="lineNum">     508 </span>                :            :     } else {
+<span class="lineNum">     509 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;Could not parse nested tuple options. &quot;</span>
+<span class="lineNum">     510 </span>                :            :                     &quot;Possibly incompatible Linux kernel version.&quot;);
+<span class="lineNum">     511 </span>                :            :     }
+<span class="lineNum">     512 </span>                :            : 
+<span class="lineNum">     513 </span>                :<span class="lineCov">        783 :     return parsed;</span>
+<span class="lineNum">     514 </span>                :            : }
+<span class="lineNum">     515 </span>                :            : 
+<a name="516"><span class="lineNum">     516 </span>                :            : /* Translate netlink TCP state to CT_DPIF_TCP state. */</a>
+<span class="lineNum">     517 </span>                :            : static uint8_t
+<span class="lineNum">     518 </span>                :<span class="lineCov">        368 : nl_ct_tcp_state_to_dpif(uint8_t state)</span>
+<span class="lineNum">     519 </span>                :            : {
+<span class="lineNum">     520 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     521 </span>                :            :     /* Windows currently sends up CT_DPIF_TCP state */
+<span class="lineNum">     522 </span>                :            :     return state;
+<span class="lineNum">     523 </span>                :            : #else
+<span class="lineNum">     524 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 8 times"> + </span> :<span class="lineCov">        368 :     switch (state) {</span>
+<span class="lineNum">         </span><span class="branchCov" title="Branch 4 was taken 42 times"> + </span><span class="branchCov" title="Branch 5 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 6 was not taken"> - </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span><span class="branchCov" title="Branch 8 was taken 314 times"> + </span> 
+<span class="lineNum">         </span>         <span class="branchNoCov" title="Branch 9 was not taken"> - </span><span class="branchNoCov" title="Branch 10 was not taken"> - </span>]
+<span class="lineNum">     525 </span>                :            :     case TCP_CONNTRACK_NONE:
+<span class="lineNum">     526 </span>                :<span class="lineNoCov">          0 :         return CT_DPIF_TCPS_CLOSED;</span>
+<span class="lineNum">     527 </span>                :            :     case TCP_CONNTRACK_SYN_SENT:
+<span class="lineNum">     528 </span>                :<span class="lineCov">          3 :         return CT_DPIF_TCPS_SYN_SENT;</span>
+<span class="lineNum">     529 </span>                :            :     case TCP_CONNTRACK_SYN_SENT2:
+<span class="lineNum">     530 </span>                :<span class="lineNoCov">          0 :         return CT_DPIF_TCPS_SYN_SENT;</span>
+<span class="lineNum">     531 </span>                :            :     case TCP_CONNTRACK_SYN_RECV:
+<span class="lineNum">     532 </span>                :<span class="lineCov">          8 :         return CT_DPIF_TCPS_SYN_RECV;</span>
+<span class="lineNum">     533 </span>                :            :     case TCP_CONNTRACK_ESTABLISHED:
+<span class="lineNum">     534 </span>                :<span class="lineCov">         42 :         return CT_DPIF_TCPS_ESTABLISHED;</span>
+<span class="lineNum">     535 </span>                :            :     case TCP_CONNTRACK_FIN_WAIT:
+<span class="lineNum">     536 </span>                :<span class="lineCov">          1 :         return CT_DPIF_TCPS_FIN_WAIT_1;</span>
+<span class="lineNum">     537 </span>                :            :     case TCP_CONNTRACK_CLOSE_WAIT:
+<span class="lineNum">     538 </span>                :<span class="lineNoCov">          0 :         return CT_DPIF_TCPS_CLOSE_WAIT;</span>
+<span class="lineNum">     539 </span>                :            :     case TCP_CONNTRACK_LAST_ACK:
+<span class="lineNum">     540 </span>                :<span class="lineNoCov">          0 :         return CT_DPIF_TCPS_LAST_ACK;</span>
+<span class="lineNum">     541 </span>                :            :     case TCP_CONNTRACK_TIME_WAIT:
+<span class="lineNum">     542 </span>                :<span class="lineCov">        314 :         return CT_DPIF_TCPS_TIME_WAIT;</span>
+<span class="lineNum">     543 </span>                :            :     case TCP_CONNTRACK_CLOSE:
+<span class="lineNum">     544 </span>                :<span class="lineNoCov">          0 :         return CT_DPIF_TCPS_CLOSING;</span>
+<span class="lineNum">     545 </span>                :            :     default:
+<span class="lineNum">     546 </span>                :<span class="lineNoCov">          0 :         return CT_DPIF_TCPS_CLOSED;</span>
+<span class="lineNum">     547 </span>                :            :     }
+<span class="lineNum">     548 </span>                :            : #endif
+<span class="lineNum">     549 </span>                :            : }
+<a name="550"><span class="lineNum">     550 </span>                :            : </a>
+<span class="lineNum">     551 </span>                :            : static uint8_t
+<span class="lineNum">     552 </span>                :<span class="lineCov">        736 : ip_ct_tcp_flags_to_dpif(uint8_t flags)</span>
+<span class="lineNum">     553 </span>                :            : {
+<span class="lineNum">     554 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     555 </span>                :            :     /* Windows currently sends up CT_DPIF_TCP flags */
+<span class="lineNum">     556 </span>                :            :     return flags;
+<span class="lineNum">     557 </span>                :            : #else
+<span class="lineNum">     558 </span>                :<span class="lineCov">        736 :     uint8_t ret = 0;</span>
+<span class="lineNum">     559 </span>                :            : #define CT_DPIF_TCP_FLAG(FLAG) \
+<span class="lineNum">     560 </span>                :            :         ret |= (flags &amp; IP_CT_TCP_FLAG_##FLAG) ? CT_DPIF_TCPF_##FLAG : 0;
+<span class="lineNum">     561 </span>                :<span class="lineCov">        736 :     CT_DPIF_TCP_FLAGS</span>
+<span class="lineNum">     562 </span>                :            : #undef CT_DPIF_STATUS_FLAG
+<span class="lineNum">     563 </span>                :<span class="lineCov">        736 :     return ret;</span>
+<span class="lineNum">     564 </span>                :            : #endif
+<span class="lineNum">     565 </span>                :            : }
+<a name="566"><span class="lineNum">     566 </span>                :            : </a>
+<span class="lineNum">     567 </span>                :            : static bool
+<span class="lineNum">     568 </span>                :<span class="lineCov">        368 : nl_ct_parse_protoinfo_tcp(struct nlattr *nla,</span>
+<span class="lineNum">     569 </span>                :            :                           struct ct_dpif_protoinfo *protoinfo)
+<span class="lineNum">     570 </span>                :            : {
+<span class="lineNum">     571 </span>                :            :     static const struct nl_policy policy[] = {
+<span class="lineNum">     572 </span>                :            :         [CTA_PROTOINFO_TCP_STATE] = { .type = NL_A_U8, .optional = false },
+<span class="lineNum">     573 </span>                :            :         [CTA_PROTOINFO_TCP_WSCALE_ORIGINAL] = { .type = NL_A_U8,
+<span class="lineNum">     574 </span>                :            :                                                 .optional = false },
+<span class="lineNum">     575 </span>                :            :         [CTA_PROTOINFO_TCP_WSCALE_REPLY] = { .type = NL_A_U8,
+<span class="lineNum">     576 </span>                :            :                                              .optional = false },
+<span class="lineNum">     577 </span>                :            :         [CTA_PROTOINFO_TCP_FLAGS_ORIGINAL] = { .type = NL_A_U16,
+<span class="lineNum">     578 </span>                :            :                                                .optional = false },
+<span class="lineNum">     579 </span>                :            :         [CTA_PROTOINFO_TCP_FLAGS_REPLY] = { .type = NL_A_U16,
+<span class="lineNum">     580 </span>                :            :                                             .optional = false },
+<span class="lineNum">     581 </span>                :            :     };
+<span class="lineNum">     582 </span>                :            :     struct nlattr *attrs[ARRAY_SIZE(policy)];
+<span class="lineNum">     583 </span>                :            :     bool parsed;
+<span class="lineNum">     584 </span>                :            : 
+<span class="lineNum">     585 </span>                :<span class="lineCov">        368 :     parsed = nl_parse_nested(nla, policy, attrs, ARRAY_SIZE(policy));</span>
+<span class="lineNum">     586 </span>                :            : 
+<span class="lineNum">     587 </span>        [<span class="branchCov" title="Branch 0 was taken 368 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        368 :     if (parsed) {</span>
+<span class="lineNum">     588 </span>                :            :         const struct nf_ct_tcp_flags *flags_orig, *flags_reply;
+<span class="lineNum">     589 </span>                :            :         uint8_t state;
+<span class="lineNum">     590 </span>                :<span class="lineCov">        368 :         protoinfo-&gt;proto = IPPROTO_TCP;</span>
+<span class="lineNum">     591 </span>                :<span class="lineCov">        368 :         state = nl_ct_tcp_state_to_dpif(</span>
+<span class="lineNum">     592 </span>                :<span class="lineCov">        368 :             nl_attr_get_u8(attrs[CTA_PROTOINFO_TCP_STATE]));</span>
+<span class="lineNum">     593 </span>                :            :         /* The connection tracker keeps only one tcp state for the
+<span class="lineNum">     594 </span>                :            :          * connection, but our structures store a separate state for
+<span class="lineNum">     595 </span>                :            :          * each endpoint.  Here we duplicate the state. */
+<span class="lineNum">     596 </span>                :<span class="lineCov">        368 :         protoinfo-&gt;tcp.state_orig = protoinfo-&gt;tcp.state_reply = state;</span>
+<span class="lineNum">     597 </span>                :<span class="lineCov">        368 :         protoinfo-&gt;tcp.wscale_orig = nl_attr_get_u8(</span>
+<span class="lineNum">     598 </span>                :<span class="lineCov">        368 :             attrs[CTA_PROTOINFO_TCP_WSCALE_ORIGINAL]);</span>
+<span class="lineNum">     599 </span>                :<span class="lineCov">        368 :         protoinfo-&gt;tcp.wscale_reply = nl_attr_get_u8(</span>
+<span class="lineNum">     600 </span>                :<span class="lineCov">        368 :             attrs[CTA_PROTOINFO_TCP_WSCALE_REPLY]);</span>
+<span class="lineNum">     601 </span>                :<span class="lineCov">        368 :         flags_orig =</span>
+<span class="lineNum">     602 </span>                :<span class="lineCov">        368 :             nl_attr_get_unspec(attrs[CTA_PROTOINFO_TCP_FLAGS_ORIGINAL],</span>
+<span class="lineNum">     603 </span>                :            :                                sizeof *flags_orig);
+<span class="lineNum">     604 </span>                :<span class="lineCov">        368 :         protoinfo-&gt;tcp.flags_orig =</span>
+<span class="lineNum">     605 </span>                :<span class="lineCov">        368 :             ip_ct_tcp_flags_to_dpif(flags_orig-&gt;flags);</span>
+<span class="lineNum">     606 </span>                :<span class="lineCov">        368 :         flags_reply =</span>
+<span class="lineNum">     607 </span>                :<span class="lineCov">        368 :             nl_attr_get_unspec(attrs[CTA_PROTOINFO_TCP_FLAGS_REPLY],</span>
+<span class="lineNum">     608 </span>                :            :                                sizeof *flags_reply);
+<span class="lineNum">     609 </span>                :<span class="lineCov">        368 :         protoinfo-&gt;tcp.flags_reply =</span>
+<span class="lineNum">     610 </span>                :<span class="lineCov">        368 :             ip_ct_tcp_flags_to_dpif(flags_reply-&gt;flags);</span>
+<span class="lineNum">     611 </span>                :            :     } else {
+<span class="lineNum">     612 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;Could not parse nested TCP protoinfo options. &quot;</span>
+<span class="lineNum">     613 </span>                :            :                     &quot;Possibly incompatible Linux kernel version.&quot;);
+<span class="lineNum">     614 </span>                :            :     }
+<span class="lineNum">     615 </span>                :            : 
+<span class="lineNum">     616 </span>                :<span class="lineCov">        368 :     return parsed;</span>
+<span class="lineNum">     617 </span>                :            : }
+<a name="618"><span class="lineNum">     618 </span>                :            : </a>
+<span class="lineNum">     619 </span>                :            : static bool
+<span class="lineNum">     620 </span>                :<span class="lineCov">        368 : nl_ct_parse_protoinfo(struct nlattr *nla, struct ct_dpif_protoinfo *protoinfo)</span>
+<span class="lineNum">     621 </span>                :            : {
+<span class="lineNum">     622 </span>                :            :     /* These are mutually exclusive. */
+<span class="lineNum">     623 </span>                :            :     static const struct nl_policy policy[] = {
+<span class="lineNum">     624 </span>                :            :         [CTA_PROTOINFO_TCP] = { .type = NL_A_NESTED, .optional = true },
+<span class="lineNum">     625 </span>                :            :         [CTA_PROTOINFO_SCTP] = { .type = NL_A_NESTED, .optional = true },
+<span class="lineNum">     626 </span>                :            :     };
+<span class="lineNum">     627 </span>                :            :     struct nlattr *attrs[ARRAY_SIZE(policy)];
+<span class="lineNum">     628 </span>                :            :     bool parsed;
+<span class="lineNum">     629 </span>                :            : 
+<span class="lineNum">     630 </span>                :<span class="lineCov">        368 :     parsed = nl_parse_nested(nla, policy, attrs, ARRAY_SIZE(policy));</span>
+<span class="lineNum">     631 </span>                :            : 
+<span class="lineNum">     632 </span>                :<span class="lineCov">        368 :     memset(protoinfo, 0, sizeof *protoinfo);</span>
+<span class="lineNum">     633 </span>                :            : 
+<span class="lineNum">     634 </span>        [<span class="branchCov" title="Branch 0 was taken 368 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        368 :     if (parsed) {</span>
+<span class="lineNum">     635 </span>        [<span class="branchCov" title="Branch 0 was taken 368 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        368 :         if (attrs[CTA_PROTOINFO_TCP]) {</span>
+<span class="lineNum">     636 </span>                :<span class="lineCov">        368 :             parsed = nl_ct_parse_protoinfo_tcp(attrs[CTA_PROTOINFO_TCP],</span>
+<span class="lineNum">     637 </span>                :            :                                                protoinfo);
+<span class="lineNum">     638 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         } else if (attrs[CTA_PROTOINFO_SCTP]) {</span>
+<span class="lineNum">     639 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN_RL(&amp;rl, &quot;SCTP protoinfo not yet supported!&quot;);</span>
+<span class="lineNum">     640 </span>                :            :         } else {
+<span class="lineNum">     641 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineCov">        368 :             VLOG_WARN_RL(&amp;rl, &quot;Empty protoinfo!&quot;);</span>
+<span class="lineNum">     642 </span>                :            :         }
+<span class="lineNum">     643 </span>                :            :     } else {
+<span class="lineNum">     644 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;Could not parse nested protoinfo options. &quot;</span>
+<span class="lineNum">     645 </span>                :            :                     &quot;Possibly incompatible Linux kernel version.&quot;);
+<span class="lineNum">     646 </span>                :            :     }
+<span class="lineNum">     647 </span>                :            : 
+<span class="lineNum">     648 </span>                :<span class="lineCov">        368 :     return parsed;</span>
+<span class="lineNum">     649 </span>                :            : }
+<a name="650"><span class="lineNum">     650 </span>                :            : </a>
+<span class="lineNum">     651 </span>                :            : static bool
+<span class="lineNum">     652 </span>                :<span class="lineCov">         14 : nl_ct_parse_helper(struct nlattr *nla, struct ct_dpif_helper *helper)</span>
+<span class="lineNum">     653 </span>                :            : {
+<span class="lineNum">     654 </span>                :            :     static const struct nl_policy policy[] = {
+<span class="lineNum">     655 </span>                :            :         [CTA_HELP_NAME] = { .type = NL_A_STRING, .optional = false },
+<span class="lineNum">     656 </span>                :            :     };
+<span class="lineNum">     657 </span>                :            :     struct nlattr *attrs[ARRAY_SIZE(policy)];
+<span class="lineNum">     658 </span>                :            :     bool parsed;
+<span class="lineNum">     659 </span>                :            : 
+<span class="lineNum">     660 </span>                :<span class="lineCov">         14 :     parsed = nl_parse_nested(nla, policy, attrs, ARRAY_SIZE(policy));</span>
+<span class="lineNum">     661 </span>                :            : 
+<span class="lineNum">     662 </span>                :<span class="lineCov">         14 :     memset(helper, 0, sizeof *helper);</span>
+<span class="lineNum">     663 </span>                :            : 
+<span class="lineNum">     664 </span>        [<span class="branchCov" title="Branch 0 was taken 14 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         14 :     if (parsed) {</span>
+<span class="lineNum">     665 </span>                :<span class="lineCov">         14 :         helper-&gt;name = xstrdup(nl_attr_get_string(attrs[CTA_HELP_NAME]));</span>
+<span class="lineNum">     666 </span>                :            :     } else {
+<span class="lineNum">     667 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;Could not parse nested helper options. &quot;</span>
+<span class="lineNum">     668 </span>                :            :                     &quot;Possibly incompatible Linux kernel version.&quot;);
+<span class="lineNum">     669 </span>                :            :     }
+<span class="lineNum">     670 </span>                :            : 
+<span class="lineNum">     671 </span>                :<span class="lineCov">         14 :     return parsed;</span>
+<span class="lineNum">     672 </span>                :            : }
+<span class="lineNum">     673 </span>                :            : 
+<a name="674"><span class="lineNum">     674 </span>                :            : /* Translate netlink entry status flags to CT_DPIF_TCP status flags. */</a>
+<span class="lineNum">     675 </span>                :            : static uint32_t
+<span class="lineNum">     676 </span>                :<span class="lineCov">        386 : ips_status_to_dpif_flags(uint32_t status)</span>
+<span class="lineNum">     677 </span>                :            : {
+<span class="lineNum">     678 </span>                :<span class="lineCov">        386 :     uint32_t ret = 0;</span>
+<span class="lineNum">     679 </span>                :            : #define CT_DPIF_STATUS_FLAG(FLAG) \
+<span class="lineNum">     680 </span>                :            :         ret |= (status &amp; IPS_##FLAG) ? CT_DPIF_STATUS_##FLAG : 0;
+<span class="lineNum">     681 </span>                :<span class="lineCov">        386 :     CT_DPIF_STATUS_FLAGS</span>
+<span class="lineNum">     682 </span>                :            : #undef CT_DPIF_STATUS_FLAG
+<span class="lineNum">     683 </span>                :<span class="lineCov">        386 :     return ret;</span>
+<span class="lineNum">     684 </span>                :            : }
+<a name="685"><span class="lineNum">     685 </span>                :            : </a>
+<span class="lineNum">     686 </span>                :            : static bool
+<span class="lineNum">     687 </span>                :<span class="lineCov">        386 : nl_ct_parse_header_policy(struct ofpbuf *buf,</span>
+<span class="lineNum">     688 </span>                :            :         enum nl_ct_event_type *event_type,
+<span class="lineNum">     689 </span>                :            :         uint8_t *nfgen_family,
+<span class="lineNum">     690 </span>                :            :         struct nlattr *attrs[ARRAY_SIZE(nfnlgrp_conntrack_policy)])
+<span class="lineNum">     691 </span>                :            : {
+<span class="lineNum">     692 </span>                :            :     struct nlmsghdr *nlh;
+<span class="lineNum">     693 </span>                :            :     struct nfgenmsg *nfm;
+<span class="lineNum">     694 </span>                :            :     uint8_t type;
+<span class="lineNum">     695 </span>                :            : 
+<span class="lineNum">     696 </span>                :<span class="lineCov">        386 :     nlh = ofpbuf_at(buf, 0, NLMSG_HDRLEN);</span>
+<span class="lineNum">     697 </span>                :<span class="lineCov">        386 :     nfm = ofpbuf_at(buf, NLMSG_HDRLEN, sizeof *nfm);</span>
+<span class="lineNum">     698 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 386 times"> + </span>]:<span class="lineCov">        386 :     if (!nfm) {</span>
+<span class="lineNum">     699 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;Received bad nfnl message (no nfgenmsg).&quot;);</span>
+<span class="lineNum">     700 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     701 </span>                :            :     }
+<span class="lineNum">     702 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 386 times"> + </span>]:<span class="lineCov">        386 :     if (NFNL_SUBSYS_ID(nlh-&gt;nlmsg_type) != NFNL_SUBSYS_CTNETLINK) {</span>
+<span class="lineNum">     703 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;Received non-conntrack message (subsystem: %u).&quot;,</span>
+<span class="lineNum">     704 </span>                :            :                  NFNL_SUBSYS_ID(nlh-&gt;nlmsg_type));
+<span class="lineNum">     705 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     706 </span>                :            :     }
+<span class="lineNum">     707 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 386 times"> + </span>]:<span class="lineCov">        386 :     if (nfm-&gt;version != NFNETLINK_V0) {</span>
+<span class="lineNum">     708 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;Received unsupported nfnetlink version (%u).&quot;,</span>
+<span class="lineNum">     709 </span>                :            :                  NFNL_MSG_TYPE(nfm-&gt;version));
+<span class="lineNum">     710 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     711 </span>                :            :     }
+<span class="lineNum">     712 </span>                :            : 
+<span class="lineNum">     713 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 386 times"> + </span>]:<span class="lineCov">        386 :     if (!nl_policy_parse(buf, NLMSG_HDRLEN + sizeof *nfm,</span>
+<span class="lineNum">     714 </span>                :            :                          nfnlgrp_conntrack_policy, attrs,
+<span class="lineNum">     715 </span>                :            :                          ARRAY_SIZE(nfnlgrp_conntrack_policy))) {
+<span class="lineNum">     716 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;Received bad nfnl message (policy).&quot;);</span>
+<span class="lineNum">     717 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     718 </span>                :            :     }
+<span class="lineNum">     719 </span>                :            : 
+<span class="lineNum">     720 </span>                :<span class="lineCov">        386 :     type = NFNL_MSG_TYPE(nlh-&gt;nlmsg_type);</span>
+<span class="lineNum">     721 </span>                :<span class="lineCov">        386 :     *nfgen_family = nfm-&gt;nfgen_family;</span>
+<span class="lineNum">     722 </span>                :            : 
+<span class="lineNum">     723 </span>     [<span class="branchCov" title="Branch 0 was taken 386 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        386 :     switch (type) {</span>
+<span class="lineNum">     724 </span>                :            :     case IPCTNL_MSG_CT_NEW:
+<span class="lineNum">     725 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 386 times"> + </span>]:<span class="lineCov">        386 :         *event_type = nlh-&gt;nlmsg_flags &amp; NLM_F_CREATE</span>
+<span class="lineNum">     726 </span>                :            :             ? NL_CT_EVENT_NEW : NL_CT_EVENT_UPDATE;
+<span class="lineNum">     727 </span>                :<span class="lineCov">        386 :         break;</span>
+<span class="lineNum">     728 </span>                :            :     case IPCTNL_MSG_CT_DELETE:
+<span class="lineNum">     729 </span>                :<span class="lineNoCov">          0 :         *event_type = NL_CT_EVENT_DELETE;</span>
+<span class="lineNum">     730 </span>                :<span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">     731 </span>                :            :     default:
+<span class="lineNum">     732 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR_RL(&amp;rl, &quot;Can't parse conntrack event type.&quot;);</span>
+<span class="lineNum">     733 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     734 </span>                :            :     }
+<span class="lineNum">     735 </span>                :            : 
+<span class="lineNum">     736 </span>                :<span class="lineCov">        386 :     return true;</span>
+<span class="lineNum">     737 </span>                :            : }
+<a name="738"><span class="lineNum">     738 </span>                :            : </a>
+<span class="lineNum">     739 </span>                :            : static bool
+<span class="lineNum">     740 </span>                :<span class="lineCov">        386 : nl_ct_attrs_to_ct_dpif_entry(struct ct_dpif_entry *entry,</span>
+<span class="lineNum">     741 </span>                :            :         struct nlattr *attrs[ARRAY_SIZE(nfnlgrp_conntrack_policy)],
+<span class="lineNum">     742 </span>                :            :         uint8_t nfgen_family)
+<span class="lineNum">     743 </span>                :            : {
+<span class="lineNum">     744 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 386 times"> + </span>]:<span class="lineCov">        386 :     if (!nl_ct_parse_tuple(attrs[CTA_TUPLE_ORIG], &amp;entry-&gt;tuple_orig,</span>
+<span class="lineNum">     745 </span>                :            :                            nfgen_family)) {
+<span class="lineNum">     746 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     747 </span>                :            :     }
+<span class="lineNum">     748 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 386 times"> + </span>]:<span class="lineCov">        386 :     if (!nl_ct_parse_tuple(attrs[CTA_TUPLE_REPLY], &amp;entry-&gt;tuple_reply,</span>
+<span class="lineNum">     749 </span>                :            :                            nfgen_family)) {
+<span class="lineNum">     750 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     751 </span>                :            :     }
+<span class="lineNum">     752 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 386 times"> + </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">        386 :     if (attrs[CTA_COUNTERS_ORIG] &amp;&amp;</span>
+<span class="lineNum">     753 </span>                :<span class="lineNoCov">          0 :         !nl_ct_parse_counters(attrs[CTA_COUNTERS_ORIG],</span>
+<span class="lineNum">     754 </span>                :            :                               &amp;entry-&gt;counters_orig)) {
+<span class="lineNum">     755 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     756 </span>                :            :     }
+<span class="lineNum">     757 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 386 times"> + </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">        386 :     if (attrs[CTA_COUNTERS_REPLY] &amp;&amp;</span>
+<span class="lineNum">     758 </span>                :<span class="lineNoCov">          0 :         !nl_ct_parse_counters(attrs[CTA_COUNTERS_REPLY],</span>
+<span class="lineNum">     759 </span>                :            :                               &amp;entry-&gt;counters_reply)) {
+<span class="lineNum">     760 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     761 </span>                :            :     }
+<span class="lineNum">     762 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 386 times"> + </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">        386 :     if (attrs[CTA_TIMESTAMP] &amp;&amp;</span>
+<span class="lineNum">     763 </span>                :<span class="lineNoCov">          0 :         !nl_ct_parse_timestamp(attrs[CTA_TIMESTAMP], &amp;entry-&gt;timestamp)) {</span>
+<span class="lineNum">     764 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     765 </span>                :            :     }
+<span class="lineNum">     766 </span>        [<span class="branchCov" title="Branch 0 was taken 386 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        386 :     if (attrs[CTA_ID]) {</span>
+<span class="lineNum">     767 </span>                :<span class="lineCov">        386 :         entry-&gt;id = ntohl(nl_attr_get_be32(attrs[CTA_ID]));</span>
+<span class="lineNum">     768 </span>                :            :     }
+<span class="lineNum">     769 </span>        [<span class="branchCov" title="Branch 0 was taken 294 times"> + </span><span class="branchCov" title="Branch 1 was taken 92 times"> + </span>]:<span class="lineCov">        386 :     if (attrs[CTA_ZONE]) {</span>
+<span class="lineNum">     770 </span>                :<span class="lineCov">        294 :         entry-&gt;zone = ntohs(nl_attr_get_be16(attrs[CTA_ZONE]));</span>
+<span class="lineNum">     771 </span>                :            :     }
+<span class="lineNum">     772 </span>        [<span class="branchCov" title="Branch 0 was taken 386 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        386 :     if (attrs[CTA_STATUS]) {</span>
+<span class="lineNum">     773 </span>                :<span class="lineCov">        386 :         entry-&gt;status = ips_status_to_dpif_flags(</span>
+<span class="lineNum">     774 </span>                :<span class="lineCov">        386 :             ntohl(nl_attr_get_be32(attrs[CTA_STATUS])));</span>
+<span class="lineNum">     775 </span>                :            :     }
+<span class="lineNum">     776 </span>        [<span class="branchCov" title="Branch 0 was taken 386 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        386 :     if (attrs[CTA_TIMEOUT]) {</span>
+<span class="lineNum">     777 </span>                :<span class="lineCov">        386 :         entry-&gt;timeout = ntohl(nl_attr_get_be32(attrs[CTA_TIMEOUT]));</span>
+<span class="lineNum">     778 </span>                :            :     }
+<span class="lineNum">     779 </span>        [<span class="branchCov" title="Branch 0 was taken 386 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        386 :     if (attrs[CTA_MARK]) {</span>
+<span class="lineNum">     780 </span>                :<span class="lineCov">        386 :         entry-&gt;mark = ntohl(nl_attr_get_be32(attrs[CTA_MARK]));</span>
+<span class="lineNum">     781 </span>                :            :     }
+<span class="lineNum">     782 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 384 times"> + </span>]:<span class="lineCov">        386 :     if (attrs[CTA_LABELS]) {</span>
+<span class="lineNum">     783 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :         memcpy(&amp;entry-&gt;labels, nl_attr_get(attrs[CTA_LABELS]),</span>
+<span class="lineNum">     784 </span>                :<span class="lineCov">          2 :                MIN(sizeof entry-&gt;labels, nl_attr_get_size(attrs[CTA_LABELS])));</span>
+<span class="lineNum">     785 </span>                :            :     }
+<span class="lineNum">     786 </span>  [<span class="branchCov" title="Branch 0 was taken 368 times"> + </span><span class="branchCov" title="Branch 1 was taken 18 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 368 times"> + </span>]:<span class="lineCov">        754 :     if (attrs[CTA_PROTOINFO] &amp;&amp;</span>
+<span class="lineNum">     787 </span>                :<span class="lineCov">        368 :         !nl_ct_parse_protoinfo(attrs[CTA_PROTOINFO], &amp;entry-&gt;protoinfo)) {</span>
+<span class="lineNum">     788 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     789 </span>                :            :     }
+<span class="lineNum">     790 </span>  [<span class="branchCov" title="Branch 0 was taken 14 times"> + </span><span class="branchCov" title="Branch 1 was taken 372 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 14 times"> + </span>]:<span class="lineCov">        400 :     if (attrs[CTA_HELP] &amp;&amp;</span>
+<span class="lineNum">     791 </span>                :<span class="lineCov">         14 :         !nl_ct_parse_helper(attrs[CTA_HELP], &amp;entry-&gt;helper)) {</span>
+<span class="lineNum">     792 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     793 </span>                :            :     }
+<span class="lineNum">     794 </span>  [<span class="branchCov" title="Branch 0 was taken 11 times"> + </span><span class="branchCov" title="Branch 1 was taken 375 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 11 times"> + </span>]:<span class="lineCov">        397 :     if (attrs[CTA_TUPLE_MASTER] &amp;&amp;</span>
+<span class="lineNum">     795 </span>                :<span class="lineCov">         11 :         !nl_ct_parse_tuple(attrs[CTA_TUPLE_MASTER], &amp;entry-&gt;tuple_master,</span>
+<span class="lineNum">     796 </span>                :            :                            nfgen_family)) {
+<span class="lineNum">     797 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     798 </span>                :            :     }
+<span class="lineNum">     799 </span>                :<span class="lineCov">        386 :     return true;</span>
+<span class="lineNum">     800 </span>                :            : }
+<a name="801"><span class="lineNum">     801 </span>                :            : </a>
+<span class="lineNum">     802 </span>                :            : bool
+<span class="lineNum">     803 </span>                :<span class="lineNoCov">          0 : nl_ct_parse_entry(struct ofpbuf *buf, struct ct_dpif_entry *entry,</span>
+<span class="lineNum">     804 </span>                :            :                   enum nl_ct_event_type *event_type)
+<span class="lineNum">     805 </span>                :            : {
+<span class="lineNum">     806 </span>                :            :     struct nlattr *attrs[ARRAY_SIZE(nfnlgrp_conntrack_policy)];
+<span class="lineNum">     807 </span>                :            :     uint8_t nfgen_family;
+<span class="lineNum">     808 </span>                :            : 
+<span class="lineNum">     809 </span>                :<span class="lineNoCov">          0 :     memset(entry, 0, sizeof *entry);</span>
+<span class="lineNum">     810 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!nl_ct_parse_header_policy(buf, event_type, &amp;nfgen_family, attrs)) {</span>
+<span class="lineNum">     811 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     812 </span>                :            :     };
+<span class="lineNum">     813 </span>                :            : 
+<span class="lineNum">     814 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!nl_ct_attrs_to_ct_dpif_entry(entry, attrs, nfgen_family)) {</span>
+<span class="lineNum">     815 </span>                :<span class="lineNoCov">          0 :         ct_dpif_entry_uninit(entry);</span>
+<span class="lineNum">     816 </span>                :<span class="lineNoCov">          0 :         memset(entry, 0, sizeof *entry);</span>
+<span class="lineNum">     817 </span>                :<span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     818 </span>                :            :     }
+<span class="lineNum">     819 </span>                :            : 
+<span class="lineNum">     820 </span>                :<span class="lineNoCov">          0 :     return true;</span>
+<span class="lineNum">     821 </span>                :            : }
+<span class="lineNum">     822 </span>                :            : 
+<span class="lineNum">     823 </span>                :            : /* NetFilter utility functions. */
+<span class="lineNum">     824 </span>                :            : 
+<span class="lineNum">     825 </span>                :            : /* Puts a nlmsghdr and nfgenmsg at the beginning of 'msg', which must be
+<span class="lineNum">     826 </span>                :            :  * initially empty.  'expected_payload' should be an estimate of the number of
+<span class="lineNum">     827 </span>                :            :  * payload bytes to be supplied; if the size of the payload is unknown a value
+<span class="lineNum">     828 </span>                :            :  * of 0 is acceptable.
+<span class="lineNum">     829 </span>                :            :  *
+<span class="lineNum">     830 </span>                :            :  * Non-zero 'family' is the address family of items to get (e.g. AF_INET).
+<span class="lineNum">     831 </span>                :            :  *
+<span class="lineNum">     832 </span>                :            :  * 'flags' is a bit-mask that indicates what kind of request is being made.  It
+<span class="lineNum">     833 </span>                :            :  * is often NLM_F_REQUEST indicating that a request is being made, commonly
+<span class="lineNum">     834 </span>                :            :  * or'd with NLM_F_ACK to request an acknowledgement.  NLM_F_DUMP flag reguests
+<span class="lineNum">     835 </span>                :            :  * a dump of the table.
+<span class="lineNum">     836 </span>                :            :  *
+<span class="lineNum">     837 </span>                :            :  * 'subsystem' is a netfilter subsystem id, e.g., NFNL_SUBSYS_CTNETLINK.
+<span class="lineNum">     838 </span>                :            :  *
+<span class="lineNum">     839 </span>                :            :  * 'cmd' is an enumerated value specific to the 'subsystem'.
+<span class="lineNum">     840 </span>                :            :  *
+<span class="lineNum">     841 </span>                :            :  * Sets the new nlmsghdr's nlmsg_pid field to 0 for now.  nl_sock_send() will
+<span class="lineNum">     842 </span>                :            :  * fill it in just before sending the message.
+<span class="lineNum">     843 </span>                :            :  *
+<span class="lineNum">     844 </span>                :            :  * nl_msg_put_nlmsghdr() should be used to compose Netlink messages that are
+<a name="845"><span class="lineNum">     845 </span>                :            :  * not NetFilter Netlink messages. */</a>
+<span class="lineNum">     846 </span>                :            : static void
+<span class="lineNum">     847 </span>                :<span class="lineCov">        113 : nl_msg_put_nfgenmsg(struct ofpbuf *msg, size_t expected_payload,</span>
+<span class="lineNum">     848 </span>                :            :                     int family, uint8_t subsystem, uint8_t cmd,
+<span class="lineNum">     849 </span>                :            :                     uint32_t flags)
+<span class="lineNum">     850 </span>                :            : {
+<span class="lineNum">     851 </span>                :            :     struct nfgenmsg *nfm;
+<span class="lineNum">     852 </span>                :            : 
+<span class="lineNum">     853 </span>                :<span class="lineCov">        113 :     nl_msg_put_nlmsghdr(msg, sizeof *nfm + expected_payload,</span>
+<span class="lineNum">     854 </span>                :<span class="lineCov">        113 :                         subsystem &lt;&lt; 8 | cmd, flags);</span>
+<span class="lineNum">     855 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 113 times"> + </span>]:<span class="lineCov">        113 :     ovs_assert(msg-&gt;size == NLMSG_HDRLEN);</span>
+<span class="lineNum">     856 </span>                :<span class="lineCov">        113 :     nfm = nl_msg_put_uninit(msg, sizeof *nfm);</span>
+<span class="lineNum">     857 </span>                :<span class="lineCov">        113 :     nfm-&gt;nfgen_family = family;</span>
+<span class="lineNum">     858 </span>                :<span class="lineCov">        113 :     nfm-&gt;version = NFNETLINK_V0;</span>
+<span class="lineNum">     859 </span>                :<span class="lineCov">        113 :     nfm-&gt;res_id = 0;</span>
+<span class="lineNum">     860 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     861 </span>                :            :     /* nfgenmsg contains ovsHdr padding in windows */
+<span class="lineNum">     862 </span>                :            :     nfm-&gt;ovsHdr.dp_ifindex = 0;
+<span class="lineNum">     863 </span>                :            : #endif
+<span class="lineNum">     864 </span>                :<span class="lineCov">        113 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

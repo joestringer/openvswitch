@@ -1,0 +1,592 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/ofp-prop.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - ofp-prop.c<span style="font-size: 80%;"> (source / <a href="ofp-prop.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">148</td>
+            <td class="headerCovTableEntry">177</td>
+            <td class="headerCovTableEntryMed">83.6 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">28</td>
+            <td class="headerCovTableEntry">30</td>
+            <td class="headerCovTableEntryHi">93.3 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">29</td>
+            <td class="headerCovTableEntry">50</td>
+            <td class="headerCovTableEntryLo">58.0 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2014, 2015, 2016 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &quot;byte-order.h&quot;
+<span class="lineNum">      20 </span>                :            : #include &quot;openvswitch/ofpbuf.h&quot;
+<span class="lineNum">      21 </span>                :            : #include &quot;openvswitch/ofp-errors.h&quot;
+<span class="lineNum">      22 </span>                :            : #include &quot;openvswitch/ofp-prop.h&quot;
+<span class="lineNum">      23 </span>                :            : #include &quot;openvswitch/vlog.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;uuid.h&quot;
+<span class="lineNum">      26 </span>                :            : 
+<span class="lineNum">      27 </span>                :            : struct ofp_prop_be16 {
+<span class="lineNum">      28 </span>                :            :     ovs_be16 type;
+<span class="lineNum">      29 </span>                :            :     ovs_be16 len;
+<span class="lineNum">      30 </span>                :            :     ovs_be16 value;
+<span class="lineNum">      31 </span>                :            :     uint8_t pad[2];
+<span class="lineNum">      32 </span>                :            : };
+<span class="lineNum">      33 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ofp_prop_be16) == 8);
+<span class="lineNum">      34 </span>                :            : 
+<span class="lineNum">      35 </span>                :            : struct ofp_prop_be32 {
+<span class="lineNum">      36 </span>                :            :     ovs_be16 type;
+<span class="lineNum">      37 </span>                :            :     ovs_be16 len;
+<span class="lineNum">      38 </span>                :            :     ovs_be32 value;
+<span class="lineNum">      39 </span>                :            : };
+<span class="lineNum">      40 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ofp_prop_be32) == 8);
+<a name="41"><span class="lineNum">      41 </span>                :            : </a>
+<span class="lineNum">      42 </span>                :            : static uint32_t
+<span class="lineNum">      43 </span>                :<span class="lineCov">          1 : ofpprop_type_to_exp_id(uint64_t type)</span>
+<span class="lineNum">      44 </span>                :            : {
+<span class="lineNum">      45 </span>                :<span class="lineCov">          1 :     return type &gt;&gt; 32;</span>
+<span class="lineNum">      46 </span>                :            : }
+<a name="47"><span class="lineNum">      47 </span>                :            : </a>
+<span class="lineNum">      48 </span>                :            : static uint32_t
+<span class="lineNum">      49 </span>                :<span class="lineCov">          1 : ofpprop_type_to_exp_type(uint64_t type)</span>
+<span class="lineNum">      50 </span>                :            : {
+<span class="lineNum">      51 </span>                :<span class="lineCov">          1 :     return type &amp; UINT32_MAX;</span>
+<span class="lineNum">      52 </span>                :            : }
+<span class="lineNum">      53 </span>                :            : 
+<span class="lineNum">      54 </span>                :            : /* Pulls a property, beginning with struct ofp_prop_header, from the beginning
+<span class="lineNum">      55 </span>                :            :  * of 'msg'.  Stores the type of the property in '*typep' and, if 'property' is
+<span class="lineNum">      56 </span>                :            :  * nonnull, the entire property, including the header, in '*property'.  Points
+<span class="lineNum">      57 </span>                :            :  * 'property-&gt;header' to the property header (which could be ofp_prop_header or
+<span class="lineNum">      58 </span>                :            :  * ofp_prop_experimenter) and 'property-&gt;msg' to just past it.  Returns 0 if
+<span class="lineNum">      59 </span>                :            :  * successful, otherwise an OpenFlow error code.
+<span class="lineNum">      60 </span>                :            :  *
+<span class="lineNum">      61 </span>                :            :  * This function treats property types 'min_exp' and larger as introducing
+<span class="lineNum">      62 </span>                :            :  * experimenter properties.  For most kinds of properties, 0xffff is the
+<span class="lineNum">      63 </span>                :            :  * appropriate value for 'min_exp', because 0xffff is the only property type
+<span class="lineNum">      64 </span>                :            :  * used for experimenters, but async config properties also use 0xfffe.  Use
+<span class="lineNum">      65 </span>                :            :  * 0x10000 (or higher) if experimenter properties are not supported.
+<span class="lineNum">      66 </span>                :            :  *
+<span class="lineNum">      67 </span>                :            :  * This function pulls the property's stated size padded out to a multiple of
+<span class="lineNum">      68 </span>                :            :  * 'alignment' bytes.  The common case in OpenFlow is an 'alignment' of 8, so
+<a name="69"><span class="lineNum">      69 </span>                :            :  * you can use ofpprop_pull() for that case. */</a>
+<span class="lineNum">      70 </span>                :            : enum ofperr
+<span class="lineNum">      71 </span>                :<span class="lineCov">     101750 : ofpprop_pull__(struct ofpbuf *msg, struct ofpbuf *property,</span>
+<span class="lineNum">      72 </span>                :            :                unsigned int alignment, unsigned int min_exp,
+<span class="lineNum">      73 </span>                :            :                uint64_t *typep)
+<span class="lineNum">      74 </span>                :            : {
+<span class="lineNum">      75 </span>                :            :     struct ofp_prop_header *oph;
+<span class="lineNum">      76 </span>                :            :     unsigned int padded_len;
+<span class="lineNum">      77 </span>                :            :     unsigned int len;
+<span class="lineNum">      78 </span>                :            : 
+<span class="lineNum">      79 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 101750 times"> + </span>]:<span class="lineCov">     101750 :     if (msg-&gt;size &lt; sizeof *oph) {</span>
+<span class="lineNum">      80 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBPC_BAD_LEN;</span>
+<span class="lineNum">      81 </span>                :            :     }
+<span class="lineNum">      82 </span>                :            : 
+<span class="lineNum">      83 </span>                :<span class="lineCov">     101750 :     oph = msg-&gt;data;</span>
+<span class="lineNum">      84 </span>                :<span class="lineCov">     101750 :     len = ntohs(oph-&gt;len);</span>
+<span class="lineNum">      85 </span>                :<span class="lineCov">     101750 :     padded_len = ROUND_UP(len, alignment);</span>
+<span class="lineNum">      86 </span>[<span class="branchCov" title="Branch 0 was taken 101750 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 101750 times"> + </span>]:<span class="lineCov">     101750 :     if (len &lt; sizeof *oph || padded_len &gt; msg-&gt;size) {</span>
+<span class="lineNum">      87 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBPC_BAD_LEN;</span>
+<span class="lineNum">      88 </span>                :            :     }
+<span class="lineNum">      89 </span>                :            : 
+<span class="lineNum">      90 </span>                :<span class="lineCov">     101750 :     uint16_t type = ntohs(oph-&gt;type);</span>
+<span class="lineNum">      91 </span>        [<span class="branchCov" title="Branch 0 was taken 101724 times"> + </span><span class="branchCov" title="Branch 1 was taken 26 times"> + </span>]:<span class="lineCov">     101750 :     if (type &lt; min_exp) {</span>
+<span class="lineNum">      92 </span>                :<span class="lineCov">     101724 :         *typep = type;</span>
+<span class="lineNum">      93 </span>                :            :     } else {
+<span class="lineNum">      94 </span>                :<span class="lineCov">         26 :         struct ofp_prop_experimenter *ope = msg-&gt;data;</span>
+<span class="lineNum">      95 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 26 times"> + </span>]:<span class="lineCov">         26 :         if (len &lt; sizeof *ope) {</span>
+<span class="lineNum">      96 </span>                :<span class="lineNoCov">          0 :             return OFPERR_OFPBPC_BAD_LEN;</span>
+<span class="lineNum">      97 </span>                :            :         }
+<span class="lineNum">      98 </span>                :            : 
+<span class="lineNum">      99 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 26 times"> + </span>]:<span class="lineCov">         26 :         if (!ope-&gt;experimenter) {</span>
+<span class="lineNum">     100 </span>                :            :             /* Reject experimenter 0 because it yields ambiguity with standard
+<span class="lineNum">     101 </span>                :            :              * property types. */
+<span class="lineNum">     102 </span>                :<span class="lineNoCov">          0 :             return OFPERR_OFPBPC_BAD_EXPERIMENTER;</span>
+<span class="lineNum">     103 </span>                :            :         }
+<span class="lineNum">     104 </span>                :            : 
+<span class="lineNum">     105 </span>                :<span class="lineCov">         26 :         *typep = OFPPROP_EXP(ntohl(ope-&gt;experimenter), ntohl(ope-&gt;exp_type));</span>
+<span class="lineNum">     106 </span>                :            :     }
+<span class="lineNum">     107 </span>                :            : 
+<span class="lineNum">     108 </span>        [<span class="branchCov" title="Branch 0 was taken 40724 times"> + </span><span class="branchCov" title="Branch 1 was taken 61026 times"> + </span>]:<span class="lineCov">     101750 :     if (property) {</span>
+<span class="lineNum">     109 </span>                :<span class="lineCov">      40724 :         ofpbuf_use_const(property, msg-&gt;data, len);</span>
+<span class="lineNum">     110 </span>                :<span class="lineCov">      40724 :         property-&gt;header = property-&gt;data;</span>
+<span class="lineNum">     111 </span>                :<span class="lineCov">      40724 :         property-&gt;msg = ((uint8_t *) property-&gt;data</span>
+<span class="lineNum">     112 </span>        [<span class="branchCov" title="Branch 0 was taken 40698 times"> + </span><span class="branchCov" title="Branch 1 was taken 26 times"> + </span>]:<span class="lineCov">      40724 :                          + (type &lt; min_exp</span>
+<span class="lineNum">     113 </span>                :            :                             ? sizeof(struct ofp_prop_header)
+<span class="lineNum">     114 </span>                :            :                             : sizeof(struct ofp_prop_experimenter)));
+<span class="lineNum">     115 </span>                :            :     }
+<span class="lineNum">     116 </span>                :<span class="lineCov">     101750 :     ofpbuf_pull(msg, padded_len);</span>
+<span class="lineNum">     117 </span>                :<span class="lineCov">     101750 :     return 0;</span>
+<span class="lineNum">     118 </span>                :            : }
+<span class="lineNum">     119 </span>                :            : 
+<span class="lineNum">     120 </span>                :            : /* Pulls a property, beginning with struct ofp_prop_header, from the beginning
+<span class="lineNum">     121 </span>                :            :  * of 'msg'.  Stores the type of the property in '*typep' and, if 'property' is
+<span class="lineNum">     122 </span>                :            :  * nonnull, the entire property, including the header, in '*property'.  Points
+<span class="lineNum">     123 </span>                :            :  * 'property-&gt;header' to the property header (which could be ofp_prop_header or
+<span class="lineNum">     124 </span>                :            :  * ofp_prop_experimenter) and 'property-&gt;msg' to just past it.  Returns 0 if
+<span class="lineNum">     125 </span>                :            :  * successful, otherwise an error code.
+<span class="lineNum">     126 </span>                :            :  *
+<span class="lineNum">     127 </span>                :            :  * This function treats property type 0xffff as introducing an experimenter
+<span class="lineNum">     128 </span>                :            :  * property.  Use ofpprop_pull__() instead if some other behavior is needed.
+<span class="lineNum">     129 </span>                :            :  *
+<span class="lineNum">     130 </span>                :            :  * This function pulls the property's stated size padded out to a multiple of 8
+<span class="lineNum">     131 </span>                :            :  * bytes, which is the common case for OpenFlow properties.  Use
+<a name="132"><span class="lineNum">     132 </span>                :            :  * ofpprop_pull__() instead if some other behavior is needed.*/</a>
+<span class="lineNum">     133 </span>                :            : enum ofperr
+<span class="lineNum">     134 </span>                :<span class="lineCov">      40658 : ofpprop_pull(struct ofpbuf *msg, struct ofpbuf *property, uint64_t *typep)</span>
+<span class="lineNum">     135 </span>                :            : {
+<span class="lineNum">     136 </span>                :<span class="lineCov">      40658 :     return ofpprop_pull__(msg, property, 8, 0xffff, typep);</span>
+<span class="lineNum">     137 </span>                :            : }
+<span class="lineNum">     138 </span>                :            : 
+<span class="lineNum">     139 </span>                :            : /* Attempts to parse 'property' as a property containing a 16-bit value.  If
+<span class="lineNum">     140 </span>                :            :  * successful, stores the value into '*value' and returns 0; otherwise returns
+<a name="141"><span class="lineNum">     141 </span>                :            :  * an OpenFlow error. */</a>
+<span class="lineNum">     142 </span>                :            : enum ofperr
+<span class="lineNum">     143 </span>                :<span class="lineCov">         63 : ofpprop_parse_be16(const struct ofpbuf *property, ovs_be16 *value)</span>
+<span class="lineNum">     144 </span>                :            : {
+<span class="lineNum">     145 </span>                :            :     /* OpenFlow uses 8-byte properties for 16-bit values, which doesn't really
+<span class="lineNum">     146 </span>                :            :      * make sense.  Be forgiving by allowing any size payload as long as it's
+<span class="lineNum">     147 </span>                :            :      * at least big enough.  */
+<span class="lineNum">     148 </span>                :<span class="lineCov">         63 :     ovs_be16 *p = property-&gt;msg;</span>
+<span class="lineNum">     149 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 63 times"> + </span>]:<span class="lineCov">         63 :     if (ofpbuf_msgsize(property) &lt; sizeof *p) {</span>
+<span class="lineNum">     150 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBPC_BAD_LEN;</span>
+<span class="lineNum">     151 </span>                :            :     }
+<span class="lineNum">     152 </span>                :<span class="lineCov">         63 :     *value = *p;</span>
+<span class="lineNum">     153 </span>                :<span class="lineCov">         63 :     return 0;</span>
+<span class="lineNum">     154 </span>                :            : }
+<span class="lineNum">     155 </span>                :            : 
+<span class="lineNum">     156 </span>                :            : /* Attempts to parse 'property' as a property containing a 32-bit value.  If
+<span class="lineNum">     157 </span>                :            :  * successful, stores the value into '*value' and returns 0; otherwise returns
+<a name="158"><span class="lineNum">     158 </span>                :            :  * an OpenFlow error. */</a>
+<span class="lineNum">     159 </span>                :            : enum ofperr
+<span class="lineNum">     160 </span>                :<span class="lineCov">         76 : ofpprop_parse_be32(const struct ofpbuf *property, ovs_be32 *value)</span>
+<span class="lineNum">     161 </span>                :            : {
+<span class="lineNum">     162 </span>                :<span class="lineCov">         76 :     ovs_be32 *p = property-&gt;msg;</span>
+<span class="lineNum">     163 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 76 times"> + </span>]:<span class="lineCov">         76 :     if (ofpbuf_msgsize(property) != sizeof *p) {</span>
+<span class="lineNum">     164 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBPC_BAD_LEN;</span>
+<span class="lineNum">     165 </span>                :            :     }
+<span class="lineNum">     166 </span>                :<span class="lineCov">         76 :     *value = *p;</span>
+<span class="lineNum">     167 </span>                :<span class="lineCov">         76 :     return 0;</span>
+<span class="lineNum">     168 </span>                :            : }
+<span class="lineNum">     169 </span>                :            : 
+<span class="lineNum">     170 </span>                :            : /* Attempts to parse 'property' as a property containing a 64-bit value.  If
+<span class="lineNum">     171 </span>                :            :  * successful, stores the value into '*value' and returns 0; otherwise returns
+<a name="172"><span class="lineNum">     172 </span>                :            :  * an OpenFlow error. */</a>
+<span class="lineNum">     173 </span>                :            : enum ofperr
+<span class="lineNum">     174 </span>                :<span class="lineCov">       2117 : ofpprop_parse_be64(const struct ofpbuf *property, ovs_be64 *value)</span>
+<span class="lineNum">     175 </span>                :            : {
+<span class="lineNum">     176 </span>                :            :     ovs_be64 *p;
+<span class="lineNum">     177 </span>                :<span class="lineCov">       2117 :     size_t be64_offset = ROUND_UP(ofpbuf_headersize(property), 8);</span>
+<span class="lineNum">     178 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2117 times"> + </span>]:<span class="lineCov">       2117 :     if (property-&gt;size != be64_offset + sizeof *p) {</span>
+<span class="lineNum">     179 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBPC_BAD_LEN;</span>
+<span class="lineNum">     180 </span>                :            :     }
+<span class="lineNum">     181 </span>                :            : 
+<span class="lineNum">     182 </span>                :<span class="lineCov">       2117 :     p = ALIGNED_CAST(ovs_be64 *, (char *) property-&gt;data + be64_offset);</span>
+<span class="lineNum">     183 </span>                :<span class="lineCov">       2117 :     *value = *p;</span>
+<span class="lineNum">     184 </span>                :<span class="lineCov">       2117 :     return 0;</span>
+<span class="lineNum">     185 </span>                :            : }
+<span class="lineNum">     186 </span>                :            : 
+<span class="lineNum">     187 </span>                :            : /* Attempts to parse 'property' as a property containing a 8-bit value.  If
+<span class="lineNum">     188 </span>                :            :  * successful, stores the value into '*value' and returns 0; otherwise returns
+<a name="189"><span class="lineNum">     189 </span>                :            :  * an OpenFlow error. */</a>
+<span class="lineNum">     190 </span>                :            : enum ofperr
+<span class="lineNum">     191 </span>                :<span class="lineCov">       6022 : ofpprop_parse_u8(const struct ofpbuf *property, uint8_t *value)</span>
+<span class="lineNum">     192 </span>                :            : {
+<span class="lineNum">     193 </span>                :            :     /* OpenFlow 1.5 and earlier don't have any 8-bit properties, but it uses
+<span class="lineNum">     194 </span>                :            :      * 8-byte properties for 16-bit values, which doesn't really make sense.
+<span class="lineNum">     195 </span>                :            :      * Be forgiving by allowing any size payload as long as it's at least big
+<span class="lineNum">     196 </span>                :            :      * enough. */
+<span class="lineNum">     197 </span>                :<span class="lineCov">       6022 :     uint8_t *p = property-&gt;msg;</span>
+<span class="lineNum">     198 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 6022 times"> + </span>]:<span class="lineCov">       6022 :     if (ofpbuf_msgsize(property) &lt; sizeof *p) {</span>
+<span class="lineNum">     199 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBPC_BAD_LEN;</span>
+<span class="lineNum">     200 </span>                :            :     }
+<span class="lineNum">     201 </span>                :<span class="lineCov">       6022 :     *value = *p;</span>
+<span class="lineNum">     202 </span>                :<span class="lineCov">       6022 :     return 0;</span>
+<span class="lineNum">     203 </span>                :            : }
+<span class="lineNum">     204 </span>                :            : 
+<span class="lineNum">     205 </span>                :            : /* Attempts to parse 'property' as a property containing a 16-bit value.  If
+<span class="lineNum">     206 </span>                :            :  * successful, stores the value into '*value' and returns 0; otherwise returns
+<a name="207"><span class="lineNum">     207 </span>                :            :  * an OpenFlow error. */</a>
+<span class="lineNum">     208 </span>                :            : enum ofperr
+<span class="lineNum">     209 </span>                :<span class="lineCov">          5 : ofpprop_parse_u16(const struct ofpbuf *property, uint16_t *value)</span>
+<span class="lineNum">     210 </span>                :            : {
+<span class="lineNum">     211 </span>                :            :     /* OpenFlow uses 8-byte properties for 16-bit values, which doesn't really
+<span class="lineNum">     212 </span>                :            :      * make sense.  Be forgiving by allowing any size payload as long as it's
+<span class="lineNum">     213 </span>                :            :      * at least big enough.  */
+<span class="lineNum">     214 </span>                :<span class="lineCov">          5 :     ovs_be16 *p = property-&gt;msg;</span>
+<span class="lineNum">     215 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 5 times"> + </span>]:<span class="lineCov">          5 :     if (ofpbuf_msgsize(property) &lt; sizeof *p) {</span>
+<span class="lineNum">     216 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBPC_BAD_LEN;</span>
+<span class="lineNum">     217 </span>                :            :     }
+<span class="lineNum">     218 </span>                :<span class="lineCov">          5 :     *value = ntohs(*p);</span>
+<span class="lineNum">     219 </span>                :<span class="lineCov">          5 :     return 0;</span>
+<span class="lineNum">     220 </span>                :            : }
+<span class="lineNum">     221 </span>                :            : 
+<span class="lineNum">     222 </span>                :            : /* Attempts to parse 'property' as a property containing a 32-bit value.  If
+<span class="lineNum">     223 </span>                :            :  * successful, stores the value into '*value' and returns 0; otherwise returns
+<a name="224"><span class="lineNum">     224 </span>                :            :  * an OpenFlow error. */</a>
+<span class="lineNum">     225 </span>                :            : enum ofperr
+<span class="lineNum">     226 </span>                :<span class="lineCov">       3373 : ofpprop_parse_u32(const struct ofpbuf *property, uint32_t *value)</span>
+<span class="lineNum">     227 </span>                :            : {
+<span class="lineNum">     228 </span>                :<span class="lineCov">       3373 :     ovs_be32 *p = property-&gt;msg;</span>
+<span class="lineNum">     229 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 3373 times"> + </span>]:<span class="lineCov">       3373 :     if (ofpbuf_msgsize(property) != sizeof *p) {</span>
+<span class="lineNum">     230 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBPC_BAD_LEN;</span>
+<span class="lineNum">     231 </span>                :            :     }
+<span class="lineNum">     232 </span>                :<span class="lineCov">       3373 :     *value = ntohl(*p);</span>
+<span class="lineNum">     233 </span>                :<span class="lineCov">       3373 :     return 0;</span>
+<span class="lineNum">     234 </span>                :            : }
+<span class="lineNum">     235 </span>                :            : 
+<span class="lineNum">     236 </span>                :            : /* Attempts to parse 'property' as a property containing a 64-bit value.  If
+<span class="lineNum">     237 </span>                :            :  * successful, stores the value into '*value' and returns 0; otherwise returns
+<a name="238"><span class="lineNum">     238 </span>                :            :  * an OpenFlow error. */</a>
+<span class="lineNum">     239 </span>                :            : enum ofperr
+<span class="lineNum">     240 </span>                :<span class="lineNoCov">          0 : ofpprop_parse_u64(const struct ofpbuf *property, uint64_t *value)</span>
+<span class="lineNum">     241 </span>                :            : {
+<span class="lineNum">     242 </span>                :            :     ovs_be64 *p;
+<span class="lineNum">     243 </span>                :<span class="lineNoCov">          0 :     size_t be64_offset = ROUND_UP(ofpbuf_headersize(property), 8);</span>
+<span class="lineNum">     244 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (property-&gt;size != be64_offset + sizeof *p) {</span>
+<span class="lineNum">     245 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBPC_BAD_LEN;</span>
+<span class="lineNum">     246 </span>                :            :     }
+<span class="lineNum">     247 </span>                :            : 
+<span class="lineNum">     248 </span>                :<span class="lineNoCov">          0 :     p = ALIGNED_CAST(ovs_be64 *, (char *) property-&gt;data + be64_offset);</span>
+<span class="lineNum">     249 </span>                :<span class="lineNoCov">          0 :     *value = ntohll(*p);</span>
+<span class="lineNum">     250 </span>                :<span class="lineNoCov">          0 :     return 0;</span>
+<span class="lineNum">     251 </span>                :            : }
+<span class="lineNum">     252 </span>                :            : 
+<span class="lineNum">     253 </span>                :            : /* Attempts to parse 'property' as a property containing a UUID.  If
+<span class="lineNum">     254 </span>                :            :  * successful, stores the value into '*uuid' and returns 0; otherwise returns
+<a name="255"><span class="lineNum">     255 </span>                :            :  * an OpenFlow error. */</a>
+<span class="lineNum">     256 </span>                :            : enum ofperr
+<span class="lineNum">     257 </span>                :<span class="lineCov">        985 : ofpprop_parse_uuid(const struct ofpbuf *property, struct uuid *uuid)</span>
+<span class="lineNum">     258 </span>                :            : {
+<span class="lineNum">     259 </span>                :<span class="lineCov">        985 :     struct uuid *p = property-&gt;msg;</span>
+<span class="lineNum">     260 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 985 times"> + </span>]:<span class="lineCov">        985 :     if (ofpbuf_msgsize(property) != sizeof *p) {</span>
+<span class="lineNum">     261 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBPC_BAD_LEN;</span>
+<span class="lineNum">     262 </span>                :            :     }
+<span class="lineNum">     263 </span>                :<span class="lineCov">        985 :     *uuid = *p;</span>
+<span class="lineNum">     264 </span>                :<span class="lineCov">        985 :     return 0;</span>
+<span class="lineNum">     265 </span>                :            : }
+<span class="lineNum">     266 </span>                :            : 
+<span class="lineNum">     267 </span>                :            : /* Attempts to parse 'property' as a property that contains nested properties.
+<span class="lineNum">     268 </span>                :            :  * If successful, stores the nested data into '*nested' and returns 0;
+<span class="lineNum">     269 </span>                :            :  * otherwise returns an OpenFlow error.
+<span class="lineNum">     270 </span>                :            :  *
+<span class="lineNum">     271 </span>                :            :  * The only thing special about nested properties is that the property header
+<span class="lineNum">     272 </span>                :            :  * is followed by 4 bytes of padding, so that the nested properties begin at an
+<span class="lineNum">     273 </span>                :            :  * 8-byte aligned offset.  This function can be used in other situations where
+<a name="274"><span class="lineNum">     274 </span>                :            :  * this is the case. */</a>
+<span class="lineNum">     275 </span>                :            : enum ofperr
+<span class="lineNum">     276 </span>                :<span class="lineCov">       1184 : ofpprop_parse_nested(const struct ofpbuf *property, struct ofpbuf *nested)</span>
+<span class="lineNum">     277 </span>                :            : {
+<span class="lineNum">     278 </span>                :<span class="lineCov">       1184 :     size_t nested_offset = ROUND_UP(ofpbuf_headersize(property), 8);</span>
+<span class="lineNum">     279 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1184 times"> + </span>]:<span class="lineCov">       1184 :     if (property-&gt;size &lt; nested_offset) {</span>
+<span class="lineNum">     280 </span>                :<span class="lineNoCov">          0 :         return OFPERR_OFPBPC_BAD_LEN;</span>
+<span class="lineNum">     281 </span>                :            :     }
+<span class="lineNum">     282 </span>                :            : 
+<span class="lineNum">     283 </span>                :<span class="lineCov">       1184 :     ofpbuf_use_const(nested, property-&gt;data, property-&gt;size);</span>
+<span class="lineNum">     284 </span>                :<span class="lineCov">       1184 :     ofpbuf_pull(nested, nested_offset);</span>
+<span class="lineNum">     285 </span>                :<span class="lineCov">       1184 :     return 0;</span>
+<span class="lineNum">     286 </span>                :            : }
+<span class="lineNum">     287 </span>                :            : 
+<span class="lineNum">     288 </span>                :            : /* Adds a property with the given 'type' and 'len'-byte contents 'value' to
+<a name="289"><span class="lineNum">     289 </span>                :            :  * 'msg', padding the property out to a multiple of 8 bytes. */</a>
+<span class="lineNum">     290 </span>                :            : void
+<span class="lineNum">     291 </span>                :<span class="lineCov">       7257 : ofpprop_put(struct ofpbuf *msg, uint64_t type, const void *value, size_t len)</span>
+<span class="lineNum">     292 </span>                :            : {
+<span class="lineNum">     293 </span>                :<span class="lineCov">       7257 :     size_t start_ofs = ofpprop_start(msg, type);</span>
+<span class="lineNum">     294 </span>                :<span class="lineCov">       7257 :     ofpbuf_put(msg, value, len);</span>
+<span class="lineNum">     295 </span>                :<span class="lineCov">       7257 :     ofpprop_end(msg, start_ofs);</span>
+<span class="lineNum">     296 </span>                :<span class="lineCov">       7257 : }</span>
+<span class="lineNum">     297 </span>                :            : 
+<span class="lineNum">     298 </span>                :            : /* Adds a property with the given 'type' to 'msg', consisting of a struct
+<span class="lineNum">     299 </span>                :            :  * ofp_prop_header or ofp_prop_experimenter followed by enough zero bytes to
+<span class="lineNum">     300 </span>                :            :  * total 'len' bytes, followed by padding to bring the property up to a
+<a name="301"><span class="lineNum">     301 </span>                :            :  * multiple of 8 bytes.  Returns the property header. */</a>
+<span class="lineNum">     302 </span>                :            : void *
+<span class="lineNum">     303 </span>                :<span class="lineCov">         63 : ofpprop_put_zeros(struct ofpbuf *msg, uint64_t type, size_t len)</span>
+<span class="lineNum">     304 </span>                :            : {
+<span class="lineNum">     305 </span>                :<span class="lineCov">         63 :     void *header = ofpbuf_put_zeros(msg, ROUND_UP(len, 8));</span>
+<span class="lineNum">     306 </span>        [<span class="branchCov" title="Branch 1 was taken 62 times"> + </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">         63 :     if (!ofpprop_is_experimenter(type)) {</span>
+<span class="lineNum">     307 </span>                :<span class="lineCov">         62 :         struct ofp_prop_header *oph = header;</span>
+<span class="lineNum">     308 </span>                :<span class="lineCov">         62 :         oph-&gt;type = htons(type);</span>
+<span class="lineNum">     309 </span>                :<span class="lineCov">         62 :         oph-&gt;len = htons(len);</span>
+<span class="lineNum">     310 </span>                :            :     } else {
+<span class="lineNum">     311 </span>                :<span class="lineCov">          1 :         struct ofp_prop_experimenter *ope = header;</span>
+<span class="lineNum">     312 </span>                :<span class="lineCov">          1 :         ope-&gt;type = htons(0xffff);</span>
+<span class="lineNum">     313 </span>                :<span class="lineCov">          1 :         ope-&gt;len = htons(len);</span>
+<span class="lineNum">     314 </span>                :<span class="lineCov">          1 :         ope-&gt;experimenter = htonl(ofpprop_type_to_exp_id(type));</span>
+<span class="lineNum">     315 </span>                :<span class="lineCov">          1 :         ope-&gt;exp_type = htonl(ofpprop_type_to_exp_type(type));</span>
+<span class="lineNum">     316 </span>                :            :     }
+<span class="lineNum">     317 </span>                :<span class="lineCov">         63 :     return header;</span>
+<span class="lineNum">     318 </span>                :            : }
+<span class="lineNum">     319 </span>                :            : 
+<a name="320"><span class="lineNum">     320 </span>                :            : /* Adds a property with the given 'type' and 16-bit 'value' to 'msg'. */</a>
+<span class="lineNum">     321 </span>                :            : void
+<span class="lineNum">     322 </span>                :<span class="lineCov">         34 : ofpprop_put_be16(struct ofpbuf *msg, uint64_t type, ovs_be16 value)</span>
+<span class="lineNum">     323 </span>                :            : {
+<span class="lineNum">     324 </span>        [<span class="branchCov" title="Branch 1 was taken 34 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">         34 :     if (!ofpprop_is_experimenter(type)) {</span>
+<span class="lineNum">     325 </span>                :            :         /* The OpenFlow specs consistently (at least they're consistent!)  give
+<span class="lineNum">     326 </span>                :            :          * properties with a 16-bit integer value a length of 8, not 6, so add
+<span class="lineNum">     327 </span>                :            :          * two bytes of padding.  */
+<span class="lineNum">     328 </span>                :<span class="lineCov">         34 :         ovs_be16 padded_value[2] = { value, 0 };</span>
+<span class="lineNum">     329 </span>                :<span class="lineCov">         34 :         ofpprop_put(msg, type, padded_value, sizeof padded_value);</span>
+<span class="lineNum">     330 </span>                :            :     } else {
+<span class="lineNum">     331 </span>                :            :         /* There's no precedent but let's assume that this is generally done
+<span class="lineNum">     332 </span>                :            :          * sanely. */
+<span class="lineNum">     333 </span>                :<span class="lineNoCov">          0 :         ofpprop_put(msg, type, &amp;value, sizeof value);</span>
+<span class="lineNum">     334 </span>                :            :     }
+<span class="lineNum">     335 </span>                :<span class="lineCov">         34 : }</span>
+<span class="lineNum">     336 </span>                :            : 
+<a name="337"><span class="lineNum">     337 </span>                :            : /* Adds a property with the given 'type' and 32-bit 'value' to 'msg'. */</a>
+<span class="lineNum">     338 </span>                :            : void
+<span class="lineNum">     339 </span>                :<span class="lineCov">       2556 : ofpprop_put_be32(struct ofpbuf *msg, uint64_t type, ovs_be32 value)</span>
+<span class="lineNum">     340 </span>                :            : {
+<span class="lineNum">     341 </span>                :<span class="lineCov">       2556 :     ofpprop_put(msg, type, &amp;value, sizeof value);</span>
+<span class="lineNum">     342 </span>                :<span class="lineCov">       2556 : }</span>
+<span class="lineNum">     343 </span>                :            : 
+<a name="344"><span class="lineNum">     344 </span>                :            : /* Adds a property with the given 'type' and 64-bit 'value' to 'msg'. */</a>
+<span class="lineNum">     345 </span>                :            : void
+<span class="lineNum">     346 </span>                :<span class="lineCov">        864 : ofpprop_put_be64(struct ofpbuf *msg, uint64_t type, ovs_be64 value)</span>
+<span class="lineNum">     347 </span>                :            : {
+<span class="lineNum">     348 </span>                :<span class="lineCov">        864 :     size_t start = ofpprop_start(msg, type);</span>
+<span class="lineNum">     349 </span>                :<span class="lineCov">        864 :     ofpbuf_put_zeros(msg, 4);</span>
+<span class="lineNum">     350 </span>                :<span class="lineCov">        864 :     ofpbuf_put(msg, &amp;value, sizeof value);</span>
+<span class="lineNum">     351 </span>                :<span class="lineCov">        864 :     ofpprop_end(msg, start);</span>
+<span class="lineNum">     352 </span>                :<span class="lineCov">        864 : }</span>
+<span class="lineNum">     353 </span>                :            : 
+<a name="354"><span class="lineNum">     354 </span>                :            : /* Adds a property with the given 'type' and 8-bit 'value' to 'msg'. */</a>
+<span class="lineNum">     355 </span>                :            : void
+<span class="lineNum">     356 </span>                :<span class="lineCov">       2090 : ofpprop_put_u8(struct ofpbuf *msg, uint64_t type, uint8_t value)</span>
+<span class="lineNum">     357 </span>                :            : {
+<span class="lineNum">     358 </span>                :            :     /* There's no precedent for 8-bit properties in OpenFlow 1.5 and earlier
+<span class="lineNum">     359 </span>                :            :      * but let's assume they're done sanely. */
+<span class="lineNum">     360 </span>                :<span class="lineCov">       2090 :     ofpprop_put(msg, type, &amp;value, 1);</span>
+<span class="lineNum">     361 </span>                :<span class="lineCov">       2090 : }</span>
+<span class="lineNum">     362 </span>                :            : 
+<a name="363"><span class="lineNum">     363 </span>                :            : /* Adds a property with the given 'type' and 16-bit 'value' to 'msg'. */</a>
+<span class="lineNum">     364 </span>                :            : void
+<span class="lineNum">     365 </span>                :<span class="lineCov">         34 : ofpprop_put_u16(struct ofpbuf *msg, uint64_t type, uint16_t value)</span>
+<span class="lineNum">     366 </span>                :            : {
+<span class="lineNum">     367 </span>                :<span class="lineCov">         34 :     ofpprop_put_be16(msg, type, htons(value));</span>
+<span class="lineNum">     368 </span>                :<span class="lineCov">         34 : }</span>
+<span class="lineNum">     369 </span>                :            : 
+<a name="370"><span class="lineNum">     370 </span>                :            : /* Adds a property with the given 'type' and 32-bit 'value' to 'msg'. */</a>
+<span class="lineNum">     371 </span>                :            : void
+<span class="lineNum">     372 </span>                :<span class="lineCov">       2556 : ofpprop_put_u32(struct ofpbuf *msg, uint64_t type, uint32_t value)</span>
+<span class="lineNum">     373 </span>                :            : {
+<span class="lineNum">     374 </span>                :<span class="lineCov">       2556 :     ofpprop_put_be32(msg, type, htonl(value));</span>
+<span class="lineNum">     375 </span>                :<span class="lineCov">       2556 : }</span>
+<span class="lineNum">     376 </span>                :            : 
+<a name="377"><span class="lineNum">     377 </span>                :            : /* Adds a property with the given 'type' and 64-bit 'value' to 'msg'. */</a>
+<span class="lineNum">     378 </span>                :            : void
+<span class="lineNum">     379 </span>                :<span class="lineNoCov">          0 : ofpprop_put_u64(struct ofpbuf *msg, uint64_t type, uint64_t value)</span>
+<span class="lineNum">     380 </span>                :            : {
+<span class="lineNum">     381 </span>                :<span class="lineNoCov">          0 :     ofpprop_put_be64(msg, type, htonll(value));</span>
+<span class="lineNum">     382 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     383 </span>                :            : 
+<span class="lineNum">     384 </span>                :            : /* Appends a property to 'msg' whose type is 'type' and whose contents is a
+<a name="385"><span class="lineNum">     385 </span>                :            :  * series of property headers, one for each 1-bit in 'bitmap'. */</a>
+<span class="lineNum">     386 </span>                :            : void
+<span class="lineNum">     387 </span>                :<span class="lineCov">       3048 : ofpprop_put_bitmap(struct ofpbuf *msg, uint64_t type, uint64_t bitmap)</span>
+<span class="lineNum">     388 </span>                :            : {
+<span class="lineNum">     389 </span>                :<span class="lineCov">       3048 :     size_t start_ofs = ofpprop_start(msg, type);</span>
+<span class="lineNum">     390 </span>                :            : 
+<span class="lineNum">     391 </span>        [<span class="branchCov" title="Branch 1 was taken 30476 times"> + </span><span class="branchCov" title="Branch 2 was taken 3048 times"> + </span>]:<span class="lineCov">      33524 :     for (; bitmap; bitmap = zero_rightmost_1bit(bitmap)) {</span>
+<span class="lineNum">     392 </span>                :<span class="lineCov">      30476 :         ofpprop_start(msg, rightmost_1bit_idx(bitmap));</span>
+<span class="lineNum">     393 </span>                :            :     }
+<span class="lineNum">     394 </span>                :<span class="lineCov">       3048 :     ofpprop_end(msg, start_ofs);</span>
+<span class="lineNum">     395 </span>                :<span class="lineCov">       3048 : }</span>
+<span class="lineNum">     396 </span>                :            : 
+<span class="lineNum">     397 </span>                :            : /* Appends a content-free property with the given 'type' to 'msg'.
+<span class="lineNum">     398 </span>                :            :  *
+<a name="399"><span class="lineNum">     399 </span>                :            :  * (The idea is that the presence of the property acts as a flag.) */</a>
+<span class="lineNum">     400 </span>                :            : void
+<span class="lineNum">     401 </span>                :<span class="lineCov">        713 : ofpprop_put_flag(struct ofpbuf *msg, uint64_t type)</span>
+<span class="lineNum">     402 </span>                :            : {
+<span class="lineNum">     403 </span>                :<span class="lineCov">        713 :     size_t start = ofpprop_start(msg, type);</span>
+<span class="lineNum">     404 </span>                :<span class="lineCov">        713 :     ofpprop_end(msg, start);</span>
+<span class="lineNum">     405 </span>                :<span class="lineCov">        713 : }</span>
+<span class="lineNum">     406 </span>                :            : 
+<span class="lineNum">     407 </span>                :            : /* Appends a property to 'msg' with the given 'type' and 'uuid' as its
+<a name="408"><span class="lineNum">     408 </span>                :            :  * value. */</a>
+<span class="lineNum">     409 </span>                :            : void
+<span class="lineNum">     410 </span>                :<span class="lineCov">        199 : ofpprop_put_uuid(struct ofpbuf *msg, uint64_t type, const struct uuid *uuid)</span>
+<span class="lineNum">     411 </span>                :            : {
+<span class="lineNum">     412 </span>                :<span class="lineCov">        199 :     ofpprop_put(msg, type, uuid, sizeof *uuid);</span>
+<span class="lineNum">     413 </span>                :<span class="lineCov">        199 : }</span>
+<span class="lineNum">     414 </span>                :            : 
+<span class="lineNum">     415 </span>                :            : /* Appends a property of type 'type' to 'msg' whose contents are padding to
+<span class="lineNum">     416 </span>                :            :  * 8-byte alignment followed by 'nested'.  This is a suitable way to add nested
+<a name="417"><span class="lineNum">     417 </span>                :            :  * properties to 'msg'. */</a>
+<span class="lineNum">     418 </span>                :            : void
+<span class="lineNum">     419 </span>                :<span class="lineCov">        199 : ofpprop_put_nested(struct ofpbuf *msg, uint64_t type,</span>
+<span class="lineNum">     420 </span>                :            :                    const struct ofpbuf *nested)
+<span class="lineNum">     421 </span>                :            : {
+<span class="lineNum">     422 </span>                :<span class="lineCov">        199 :     size_t start = ofpprop_start_nested(msg, type);</span>
+<span class="lineNum">     423 </span>                :<span class="lineCov">        199 :     ofpbuf_put(msg, nested-&gt;data, nested-&gt;size);</span>
+<span class="lineNum">     424 </span>                :<span class="lineCov">        199 :     ofpprop_end(msg, start);</span>
+<span class="lineNum">     425 </span>                :<span class="lineCov">        199 : }</span>
+<span class="lineNum">     426 </span>                :            : 
+<span class="lineNum">     427 </span>                :            : /* Appends a header for a property of type 'type' to 'msg'.  The caller should
+<span class="lineNum">     428 </span>                :            :  * add the contents of the property to 'msg', then finish it by calling
+<span class="lineNum">     429 </span>                :            :  * ofpprop_end().  Returns the offset of the beginning of the property (to pass
+<a name="430"><span class="lineNum">     430 </span>                :            :  * to ofpprop_end() later). */</a>
+<span class="lineNum">     431 </span>                :            : size_t
+<span class="lineNum">     432 </span>                :<span class="lineCov">      48609 : ofpprop_start(struct ofpbuf *msg, uint64_t type)</span>
+<span class="lineNum">     433 </span>                :            : {
+<span class="lineNum">     434 </span>                :<span class="lineCov">      48609 :     size_t start_ofs = msg-&gt;size;</span>
+<span class="lineNum">     435 </span>        [<span class="branchCov" title="Branch 1 was taken 48609 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">      48609 :     if (!ofpprop_is_experimenter(type)) {</span>
+<span class="lineNum">     436 </span>                :<span class="lineCov">      48609 :         struct ofp_prop_header *oph = ofpbuf_put_uninit(msg, sizeof *oph);</span>
+<span class="lineNum">     437 </span>                :<span class="lineCov">      48609 :         oph-&gt;type = htons(type);</span>
+<span class="lineNum">     438 </span>                :<span class="lineCov">      48609 :         oph-&gt;len = htons(4);</span>
+<span class="lineNum">     439 </span>                :            :     } else {
+<span class="lineNum">     440 </span>                :<span class="lineNoCov">          0 :         struct ofp_prop_experimenter *ope</span>
+<span class="lineNum">     441 </span>                :            :             = ofpbuf_put_uninit(msg, sizeof *ope);
+<span class="lineNum">     442 </span>                :<span class="lineNoCov">          0 :         ope-&gt;type = htons(0xffff);</span>
+<span class="lineNum">     443 </span>                :<span class="lineNoCov">          0 :         ope-&gt;len = htons(12);</span>
+<span class="lineNum">     444 </span>                :<span class="lineNoCov">          0 :         ope-&gt;experimenter = htonl(ofpprop_type_to_exp_id(type));</span>
+<span class="lineNum">     445 </span>                :<span class="lineNoCov">          0 :         ope-&gt;exp_type = htonl(ofpprop_type_to_exp_type(type));</span>
+<span class="lineNum">     446 </span>                :            :     }
+<span class="lineNum">     447 </span>                :<span class="lineCov">      48609 :     return start_ofs;</span>
+<span class="lineNum">     448 </span>                :            : }
+<span class="lineNum">     449 </span>                :            : 
+<span class="lineNum">     450 </span>                :            : /* Finishes serializing a property that was begun with ofpprop_start(), by
+<span class="lineNum">     451 </span>                :            :  * padding 'msg' to a multiple of 8 bytes and updating the property's length.
+<span class="lineNum">     452 </span>                :            :  * 'start_ofs' should be the offset of the beginning of the property, as
+<a name="453"><span class="lineNum">     453 </span>                :            :  * returned by ofpprop_start(). */</a>
+<span class="lineNum">     454 </span>                :            : void
+<span class="lineNum">     455 </span>                :<span class="lineCov">      17675 : ofpprop_end(struct ofpbuf *msg, size_t start_ofs)</span>
+<span class="lineNum">     456 </span>                :            : {
+<span class="lineNum">     457 </span>                :            :     struct ofp_prop_header *oph;
+<span class="lineNum">     458 </span>                :            : 
+<span class="lineNum">     459 </span>                :<span class="lineCov">      17675 :     oph = ofpbuf_at_assert(msg, start_ofs, sizeof *oph);</span>
+<span class="lineNum">     460 </span>                :<span class="lineCov">      17675 :     oph-&gt;len = htons(msg-&gt;size - start_ofs);</span>
+<span class="lineNum">     461 </span>                :<span class="lineCov">      17675 :     ofpbuf_padto(msg, ROUND_UP(msg-&gt;size, 8));</span>
+<span class="lineNum">     462 </span>                :<span class="lineCov">      17675 : }</span>
+<span class="lineNum">     463 </span>                :            : 
+<span class="lineNum">     464 </span>                :            : /* Appends a header for a property of type 'type' to 'msg', followed by padding
+<span class="lineNum">     465 </span>                :            :  * suitable for putting nested properties into the property; that is, padding
+<span class="lineNum">     466 </span>                :            :  * to an 8-byte alignment.
+<span class="lineNum">     467 </span>                :            :  *
+<span class="lineNum">     468 </span>                :            :  * This otherwise works like ofpprop_start().
+<span class="lineNum">     469 </span>                :            :  *
+<span class="lineNum">     470 </span>                :            :  * There's no need for ofpprop_end_nested(), because ofpprop_end() works fine
+<a name="471"><span class="lineNum">     471 </span>                :            :  * for this case. */</a>
+<span class="lineNum">     472 </span>                :            : size_t
+<span class="lineNum">     473 </span>                :<span class="lineCov">       1320 : ofpprop_start_nested(struct ofpbuf *msg, uint64_t type)</span>
+<span class="lineNum">     474 </span>                :            : {
+<span class="lineNum">     475 </span>                :<span class="lineCov">       1320 :     size_t start_ofs = ofpprop_start(msg, type);</span>
+<span class="lineNum">     476 </span>                :<span class="lineCov">       1320 :     ofpbuf_padto(msg, ROUND_UP(msg-&gt;size, 8));</span>
+<span class="lineNum">     477 </span>                :<span class="lineCov">       1320 :     return start_ofs;</span>
+<span class="lineNum">     478 </span>                :            : }
+<a name="479"><span class="lineNum">     479 </span>                :            : </a>
+<span class="lineNum">     480 </span>                :            : enum ofperr
+<span class="lineNum">     481 </span>                :<span class="lineCov">          1 : ofpprop_unknown(struct vlog_module *module, bool loose, const char *msg,</span>
+<span class="lineNum">     482 </span>                :            :                 uint64_t type)
+<span class="lineNum">     483 </span>                :            : {
+<span class="lineNum">     484 </span>                :<span class="lineCov">          1 :     bool is_experimenter = ofpprop_is_experimenter(type);</span>
+<span class="lineNum">     485 </span>                :            : 
+<span class="lineNum">     486 </span>                :            :     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 5);
+<span class="lineNum">     487 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     enum vlog_level level = loose ? VLL_DBG : VLL_WARN;</span>
+<span class="lineNum">     488 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          1 :     if (!is_experimenter) {</span>
+<span class="lineNum">     489 </span>                :<span class="lineCov">          1 :         vlog_rate_limit(module, level, &amp;rl, &quot;unknown %s property type %&quot;PRId64,</span>
+<span class="lineNum">     490 </span>                :            :                         msg, type);
+<span class="lineNum">     491 </span>                :            :     } else {
+<span class="lineNum">     492 </span>                :<span class="lineNoCov">          0 :         vlog_rate_limit(module, level, &amp;rl,</span>
+<span class="lineNum">     493 </span>                :            :                         &quot;unknown %s property type for exp_id 0x%&quot;PRIx32&quot;, &quot;
+<span class="lineNum">     494 </span>                :            :                         &quot;exp_type %&quot;PRId32, msg,
+<span class="lineNum">     495 </span>                :            :                         ofpprop_type_to_exp_id(type),
+<span class="lineNum">     496 </span>                :            :                         ofpprop_type_to_exp_type(type));
+<span class="lineNum">     497 </span>                :            :     }
+<span class="lineNum">     498 </span>                :            : 
+<span class="lineNum">     499 </span>                :            :     /* There's an error OFPBPC_BAD_EXPERIMENTER that we could use for
+<span class="lineNum">     500 </span>                :            :      * experimenter IDs that we don't know at all, but that seems like a
+<span class="lineNum">     501 </span>                :            :      * difficult distinction and OFPERR_OFPBPC_BAD_EXP_TYPE communicates the
+<span class="lineNum">     502 </span>                :            :      * problem quite well. */
+<span class="lineNum">     503 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     return (loose ? 0</span>
+<span class="lineNum">     504 </span>                :            :             : is_experimenter ? OFPERR_OFPBPC_BAD_EXP_TYPE
+<span class="lineNum">     505 </span>                :            :             : OFPERR_OFPBPC_BAD_TYPE);
+<span class="lineNum">     506 </span>                :            : }
+<span class="lineNum">     507 </span>                :            : 
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

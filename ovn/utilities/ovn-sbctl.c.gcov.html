@@ -1,0 +1,1147 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ovn/utilities/ovn-sbctl.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">ovn/utilities</a> - ovn-sbctl.c<span style="font-size: 80%;"> (source / <a href="ovn-sbctl.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">287</td>
+            <td class="headerCovTableEntry">390</td>
+            <td class="headerCovTableEntryLo">73.6 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">24</td>
+            <td class="headerCovTableEntry">27</td>
+            <td class="headerCovTableEntryMed">88.9 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">109</td>
+            <td class="headerCovTableEntry">208</td>
+            <td class="headerCovTableEntryLo">52.4 %</td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2015, 2016 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &lt;ctype.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;float.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;getopt.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;inttypes.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &lt;signal.h&gt;
+<span class="lineNum">      25 </span>                :            : #include &lt;stdarg.h&gt;
+<span class="lineNum">      26 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      27 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      28 </span>                :            : #include &lt;unistd.h&gt;
+<span class="lineNum">      29 </span>                :            : 
+<span class="lineNum">      30 </span>                :            : #include &quot;command-line.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;compiler.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;db-ctl-base.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;dirs.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;fatal-signal.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;openvswitch/dynamic-string.h&quot;
+<span class="lineNum">      36 </span>                :            : #include &quot;openvswitch/json.h&quot;
+<span class="lineNum">      37 </span>                :            : #include &quot;openvswitch/shash.h&quot;
+<span class="lineNum">      38 </span>                :            : #include &quot;openvswitch/vlog.h&quot;
+<span class="lineNum">      39 </span>                :            : #include &quot;ovn/lib/ovn-sb-idl.h&quot;
+<span class="lineNum">      40 </span>                :            : #include &quot;ovn/lib/ovn-util.h&quot;
+<span class="lineNum">      41 </span>                :            : #include &quot;ovsdb-data.h&quot;
+<span class="lineNum">      42 </span>                :            : #include &quot;ovsdb-idl.h&quot;
+<span class="lineNum">      43 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      44 </span>                :            : #include &quot;process.h&quot;
+<span class="lineNum">      45 </span>                :            : #include &quot;sset.h&quot;
+<span class="lineNum">      46 </span>                :            : #include &quot;stream-ssl.h&quot;
+<span class="lineNum">      47 </span>                :            : #include &quot;stream.h&quot;
+<span class="lineNum">      48 </span>                :            : #include &quot;table.h&quot;
+<span class="lineNum">      49 </span>                :            : #include &quot;timeval.h&quot;
+<a name="50"><span class="lineNum">      50 </span>                :            : #include &quot;util.h&quot;</a>
+<span class="lineNum">      51 </span>                :            : 
+<span class="lineNum">      52 </span>                :<span class="lineCov">        362 : VLOG_DEFINE_THIS_MODULE(sbctl);</span>
+<span class="lineNum">      53 </span>                :            : 
+<span class="lineNum">      54 </span>                :            : struct sbctl_context;
+<span class="lineNum">      55 </span>                :            : 
+<span class="lineNum">      56 </span>                :            : /* --db: The database server to contact. */
+<span class="lineNum">      57 </span>                :            : static const char *db;
+<span class="lineNum">      58 </span>                :            : 
+<span class="lineNum">      59 </span>                :            : /* --oneline: Write each command's output as a single line? */
+<span class="lineNum">      60 </span>                :            : static bool oneline;
+<span class="lineNum">      61 </span>                :            : 
+<span class="lineNum">      62 </span>                :            : /* --dry-run: Do not commit any changes. */
+<span class="lineNum">      63 </span>                :            : static bool dry_run;
+<span class="lineNum">      64 </span>                :            : 
+<span class="lineNum">      65 </span>                :            : /* --timeout: Time to wait for a connection to 'db'. */
+<span class="lineNum">      66 </span>                :            : static int timeout;
+<span class="lineNum">      67 </span>                :            : 
+<span class="lineNum">      68 </span>                :            : /* Format for table output. */
+<span class="lineNum">      69 </span>                :            : static struct table_style table_style = TABLE_STYLE_DEFAULT;
+<span class="lineNum">      70 </span>                :            : 
+<span class="lineNum">      71 </span>                :            : /* The IDL we're using and the current transaction, if any.
+<span class="lineNum">      72 </span>                :            :  * This is for use by sbctl_exit() only, to allow it to clean up.
+<span class="lineNum">      73 </span>                :            :  * Other code should use its context arguments. */
+<span class="lineNum">      74 </span>                :            : static struct ovsdb_idl *the_idl;
+<span class="lineNum">      75 </span>                :            : static struct ovsdb_idl_txn *the_idl_txn;
+<span class="lineNum">      76 </span>                :            : OVS_NO_RETURN static void sbctl_exit(int status);
+<span class="lineNum">      77 </span>                :            : 
+<span class="lineNum">      78 </span>                :            : static void sbctl_cmd_init(void);
+<span class="lineNum">      79 </span>                :            : OVS_NO_RETURN static void usage(void);
+<span class="lineNum">      80 </span>                :            : static void parse_options(int argc, char *argv[], struct shash *local_options);
+<span class="lineNum">      81 </span>                :            : static void run_prerequisites(struct ctl_command[], size_t n_commands,
+<span class="lineNum">      82 </span>                :            :                               struct ovsdb_idl *);
+<span class="lineNum">      83 </span>                :            : static bool do_sbctl(const char *args, struct ctl_command *, size_t n,
+<span class="lineNum">      84 </span>                :            :                      struct ovsdb_idl *);
+<a name="85"><span class="lineNum">      85 </span>                :            : </a>
+<span class="lineNum">      86 </span>                :            : int
+<span class="lineNum">      87 </span>                :<span class="lineCov">        181 : main(int argc, char *argv[])</span>
+<span class="lineNum">      88 </span>                :            : {
+<span class="lineNum">      89 </span>                :            :     struct ovsdb_idl *idl;
+<span class="lineNum">      90 </span>                :            :     struct ctl_command *commands;
+<span class="lineNum">      91 </span>                :            :     struct shash local_options;
+<span class="lineNum">      92 </span>                :            :     unsigned int seqno;
+<span class="lineNum">      93 </span>                :            :     size_t n_commands;
+<span class="lineNum">      94 </span>                :            :     char *args;
+<span class="lineNum">      95 </span>                :            : 
+<span class="lineNum">      96 </span>                :<span class="lineCov">        181 :     set_program_name(argv[0]);</span>
+<span class="lineNum">      97 </span>                :<span class="lineCov">        181 :     fatal_ignore_sigpipe();</span>
+<span class="lineNum">      98 </span>                :<span class="lineCov">        181 :     vlog_set_levels(NULL, VLF_CONSOLE, VLL_WARN);</span>
+<span class="lineNum">      99 </span>                :<span class="lineCov">        181 :     vlog_set_levels_from_string_assert(&quot;reconnect:warn&quot;);</span>
+<span class="lineNum">     100 </span>                :<span class="lineCov">        181 :     sbrec_init();</span>
+<span class="lineNum">     101 </span>                :            : 
+<span class="lineNum">     102 </span>                :<span class="lineCov">        181 :     sbctl_cmd_init();</span>
+<span class="lineNum">     103 </span>                :            : 
+<span class="lineNum">     104 </span>                :            :     /* Log our arguments.  This is often valuable for debugging systems. */
+<span class="lineNum">     105 </span>                :<span class="lineCov">        181 :     args = process_escape_args(argv);</span>
+<span class="lineNum">     106 </span>[<span class="branchCov" title="Branch 1 was taken 64 times"> + </span><span class="branchCov" title="Branch 2 was taken 117 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 64 times"> + </span><span class="branchCov" title="Branch 4 was taken 117 times"> + </span>]:<span class="lineCov">        181 :     VLOG(ctl_might_write_to_db(argv) ? VLL_INFO : VLL_DBG, &quot;Called as %s&quot;, args);</span>
+<span class="lineNum">     107 </span>                :            : 
+<span class="lineNum">     108 </span>                :            :     /* Parse command line. */
+<span class="lineNum">     109 </span>                :<span class="lineCov">        181 :     shash_init(&amp;local_options);</span>
+<span class="lineNum">     110 </span>                :<span class="lineCov">        181 :     parse_options(argc, argv, &amp;local_options);</span>
+<span class="lineNum">     111 </span>                :<span class="lineCov">        181 :     commands = ctl_parse_commands(argc - optind, argv + optind, &amp;local_options,</span>
+<span class="lineNum">     112 </span>                :            :                                   &amp;n_commands);
+<span class="lineNum">     113 </span>                :            : 
+<span class="lineNum">     114 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 181 times"> + </span>]:<span class="lineCov">        181 :     if (timeout) {</span>
+<span class="lineNum">     115 </span>                :<span class="lineNoCov">          0 :         time_alarm(timeout);</span>
+<span class="lineNum">     116 </span>                :            :     }
+<span class="lineNum">     117 </span>                :            : 
+<span class="lineNum">     118 </span>                :            :     /* Initialize IDL. */
+<span class="lineNum">     119 </span>                :<span class="lineCov">        181 :     idl = the_idl = ovsdb_idl_create(db, &amp;sbrec_idl_class, false, false);</span>
+<span class="lineNum">     120 </span>                :<span class="lineCov">        181 :     run_prerequisites(commands, n_commands, idl);</span>
+<span class="lineNum">     121 </span>                :            : 
+<span class="lineNum">     122 </span>                :            :     /* Execute the commands.
+<span class="lineNum">     123 </span>                :            :      *
+<span class="lineNum">     124 </span>                :            :      * 'seqno' is the database sequence number for which we last tried to
+<span class="lineNum">     125 </span>                :            :      * execute our transaction.  There's no point in trying to commit more than
+<span class="lineNum">     126 </span>                :            :      * once for any given sequence number, because if the transaction fails
+<span class="lineNum">     127 </span>                :            :      * it's because the database changed and we need to obtain an up-to-date
+<span class="lineNum">     128 </span>                :            :      * view of the database before we try the transaction again. */
+<span class="lineNum">     129 </span>                :<span class="lineCov">        181 :     seqno = ovsdb_idl_get_seqno(idl);</span>
+<span class="lineNum">     130 </span>                :            :     for (;;) {
+<span class="lineNum">     131 </span>                :<span class="lineCov">        482 :         ovsdb_idl_run(idl);</span>
+<span class="lineNum">     132 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 482 times"> + </span>]:<span class="lineCov">        482 :         if (!ovsdb_idl_is_alive(idl)) {</span>
+<span class="lineNum">     133 </span>                :<span class="lineNoCov">          0 :             int retval = ovsdb_idl_get_last_error(idl);</span>
+<span class="lineNum">     134 </span>                :<span class="lineNoCov">          0 :             ctl_fatal(&quot;%s: database connection failed (%s)&quot;,</span>
+<span class="lineNum">     135 </span>                :            :                         db, ovs_retval_to_string(retval));
+<span class="lineNum">     136 </span>                :            :         }
+<span class="lineNum">     137 </span>                :            : 
+<span class="lineNum">     138 </span>        [<span class="branchCov" title="Branch 1 was taken 181 times"> + </span><span class="branchCov" title="Branch 2 was taken 301 times"> + </span>]:<span class="lineCov">        482 :         if (seqno != ovsdb_idl_get_seqno(idl)) {</span>
+<span class="lineNum">     139 </span>                :<span class="lineCov">        181 :             seqno = ovsdb_idl_get_seqno(idl);</span>
+<span class="lineNum">     140 </span>        [<span class="branchCov" title="Branch 1 was taken 181 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        181 :             if (do_sbctl(args, commands, n_commands, idl)) {</span>
+<span class="lineNum">     141 </span>                :<span class="lineCov">        181 :                 free(args);</span>
+<span class="lineNum">     142 </span>                :<span class="lineCov">        181 :                 exit(EXIT_SUCCESS);</span>
+<span class="lineNum">     143 </span>                :            :             }
+<span class="lineNum">     144 </span>                :            :         }
+<span class="lineNum">     145 </span>                :            : 
+<span class="lineNum">     146 </span>        [<span class="branchCov" title="Branch 1 was taken 301 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        301 :         if (seqno == ovsdb_idl_get_seqno(idl)) {</span>
+<span class="lineNum">     147 </span>                :<span class="lineCov">        301 :             ovsdb_idl_wait(idl);</span>
+<span class="lineNum">     148 </span>                :<span class="lineCov">        301 :             poll_block();</span>
+<span class="lineNum">     149 </span>                :            :         }
+<span class="lineNum">     150 </span>                :<span class="lineCov">        301 :     }</span>
+<span class="lineNum">     151 </span>                :            : }
+<a name="152"><span class="lineNum">     152 </span>                :            : </a>
+<span class="lineNum">     153 </span>                :            : static void
+<span class="lineNum">     154 </span>                :<span class="lineCov">        181 : parse_options(int argc, char *argv[], struct shash *local_options)</span>
+<span class="lineNum">     155 </span>                :            : {
+<span class="lineNum">     156 </span>                :            :     enum {
+<span class="lineNum">     157 </span>                :            :         OPT_DB = UCHAR_MAX + 1,
+<span class="lineNum">     158 </span>                :            :         OPT_ONELINE,
+<span class="lineNum">     159 </span>                :            :         OPT_NO_SYSLOG,
+<span class="lineNum">     160 </span>                :            :         OPT_DRY_RUN,
+<span class="lineNum">     161 </span>                :            :         OPT_LOCAL,
+<span class="lineNum">     162 </span>                :            :         OPT_COMMANDS,
+<span class="lineNum">     163 </span>                :            :         OPT_OPTIONS,
+<span class="lineNum">     164 </span>                :            :         VLOG_OPTION_ENUMS,
+<span class="lineNum">     165 </span>                :            :         TABLE_OPTION_ENUMS
+<span class="lineNum">     166 </span>                :            :     };
+<span class="lineNum">     167 </span>                :            :     static const struct option global_long_options[] = {
+<span class="lineNum">     168 </span>                :            :         {&quot;db&quot;, required_argument, NULL, OPT_DB},
+<span class="lineNum">     169 </span>                :            :         {&quot;no-syslog&quot;, no_argument, NULL, OPT_NO_SYSLOG},
+<span class="lineNum">     170 </span>                :            :         {&quot;dry-run&quot;, no_argument, NULL, OPT_DRY_RUN},
+<span class="lineNum">     171 </span>                :            :         {&quot;oneline&quot;, no_argument, NULL, OPT_ONELINE},
+<span class="lineNum">     172 </span>                :            :         {&quot;timeout&quot;, required_argument, NULL, 't'},
+<span class="lineNum">     173 </span>                :            :         {&quot;help&quot;, no_argument, NULL, 'h'},
+<span class="lineNum">     174 </span>                :            :         {&quot;commands&quot;, no_argument, NULL, OPT_COMMANDS},
+<span class="lineNum">     175 </span>                :            :         {&quot;options&quot;, no_argument, NULL, OPT_OPTIONS},
+<span class="lineNum">     176 </span>                :            :         {&quot;version&quot;, no_argument, NULL, 'V'},
+<span class="lineNum">     177 </span>                :            :         VLOG_LONG_OPTIONS,
+<span class="lineNum">     178 </span>                :            :         STREAM_SSL_LONG_OPTIONS,
+<span class="lineNum">     179 </span>                :            :         TABLE_LONG_OPTIONS,
+<span class="lineNum">     180 </span>                :            :         {NULL, 0, NULL, 0},
+<span class="lineNum">     181 </span>                :            :     };
+<span class="lineNum">     182 </span>                :<span class="lineCov">        181 :     const int n_global_long_options = ARRAY_SIZE(global_long_options) - 1;</span>
+<span class="lineNum">     183 </span>                :            :     char *tmp, *short_options;
+<span class="lineNum">     184 </span>                :            : 
+<span class="lineNum">     185 </span>                :            :     struct option *options;
+<span class="lineNum">     186 </span>                :            :     size_t allocated_options;
+<span class="lineNum">     187 </span>                :            :     size_t n_options;
+<span class="lineNum">     188 </span>                :            :     size_t i;
+<span class="lineNum">     189 </span>                :            : 
+<span class="lineNum">     190 </span>                :<span class="lineCov">        181 :     tmp = ovs_cmdl_long_options_to_short_options(global_long_options);</span>
+<span class="lineNum">     191 </span>                :<span class="lineCov">        181 :     short_options = xasprintf(&quot;+%s&quot;, tmp);</span>
+<span class="lineNum">     192 </span>                :<span class="lineCov">        181 :     free(tmp);</span>
+<span class="lineNum">     193 </span>                :            : 
+<span class="lineNum">     194 </span>                :            :     /* We want to parse both global and command-specific options here, but
+<span class="lineNum">     195 </span>                :            :      * getopt_long() isn't too convenient for the job.  We copy our global
+<span class="lineNum">     196 </span>                :            :      * options into a dynamic array, then append all of the command-specific
+<span class="lineNum">     197 </span>                :            :      * options. */
+<span class="lineNum">     198 </span>                :<span class="lineCov">        181 :     options = xmemdup(global_long_options, sizeof global_long_options);</span>
+<span class="lineNum">     199 </span>                :<span class="lineCov">        181 :     allocated_options = ARRAY_SIZE(global_long_options);</span>
+<span class="lineNum">     200 </span>                :<span class="lineCov">        181 :     n_options = n_global_long_options;</span>
+<span class="lineNum">     201 </span>                :<span class="lineCov">        181 :     ctl_add_cmd_options(&amp;options, &amp;n_options, &amp;allocated_options, OPT_LOCAL);</span>
+<span class="lineNum">     202 </span>                :<span class="lineCov">        181 :     table_style.format = TF_LIST;</span>
+<span class="lineNum">     203 </span>                :            : 
+<span class="lineNum">     204 </span>                :            :     for (;;) {
+<span class="lineNum">     205 </span>                :            :         int idx;
+<span class="lineNum">     206 </span>                :            :         int c;
+<span class="lineNum">     207 </span>                :            : 
+<span class="lineNum">     208 </span>                :<span class="lineCov">        244 :         c = getopt_long(argc, argv, short_options, options, &amp;idx);</span>
+<span class="lineNum">     209 </span>        [<span class="branchCov" title="Branch 0 was taken 181 times"> + </span><span class="branchCov" title="Branch 1 was taken 63 times"> + </span>]:<span class="lineCov">        244 :         if (c == -1) {</span>
+<span class="lineNum">     210 </span>                :<span class="lineCov">        181 :             break;</span>
+<span class="lineNum">     211 </span>                :            :         }
+<span class="lineNum">     212 </span>                :            : 
+<span class="lineNum">     213 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span> :<span class="lineCov">         63 :         switch (c) {</span>
+<span class="lineNum">         </span><span class="branchCov" title="Branch 4 was taken 33 times"> + </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchNoCov" title="Branch 6 was not taken"> - </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span><span class="branchNoCov" title="Branch 8 was not taken"> - </span> 
+<span class="lineNum">         </span><span class="branchNoCov" title="Branch 9 was not taken"> - </span><span class="branchNoCov" title="Branch 10 was not taken"> - </span><span class="branchNoCov" title="Branch 11 was not taken"> - </span><span class="branchNoCov" title="Branch 12 was not taken"> - </span><span class="branchNoCov" title="Branch 13 was not taken"> - </span> 
+<span class="lineNum">         </span><span class="branchCov" title="Branch 14 was taken 4 times"> + </span><span class="branchCov" title="Branch 15 was taken 13 times"> + </span><span class="branchCov" title="Branch 16 was taken 13 times"> + </span><span class="branchNoCov" title="Branch 17 was not taken"> - </span><span class="branchNoCov" title="Branch 18 was not taken"> - </span> 
+<span class="lineNum">         </span>   <span class="branchNoCov" title="Branch 19 was not taken"> - </span><span class="branchNoCov" title="Branch 20 was not taken"> - </span><span class="branchNoCov" title="Branch 21 was not taken"> - </span><span class="branchNoCov" title="Branch 22 was not taken"> - </span> 
+<span class="lineNum">         </span>            <span class="branchNoCov" title="Branch 23 was not taken"> - </span>]
+<span class="lineNum">     214 </span>                :            :         case OPT_DB:
+<span class="lineNum">     215 </span>                :<span class="lineNoCov">          0 :             db = optarg;</span>
+<span class="lineNum">     216 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     217 </span>                :            : 
+<span class="lineNum">     218 </span>                :            :         case OPT_ONELINE:
+<span class="lineNum">     219 </span>                :<span class="lineNoCov">          0 :             oneline = true;</span>
+<span class="lineNum">     220 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     221 </span>                :            : 
+<span class="lineNum">     222 </span>                :            :         case OPT_NO_SYSLOG:
+<span class="lineNum">     223 </span>                :<span class="lineNoCov">          0 :             vlog_set_levels(&amp;this_module, VLF_SYSLOG, VLL_WARN);</span>
+<span class="lineNum">     224 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     225 </span>                :            : 
+<span class="lineNum">     226 </span>                :            :         case OPT_DRY_RUN:
+<span class="lineNum">     227 </span>                :<span class="lineNoCov">          0 :             dry_run = true;</span>
+<span class="lineNum">     228 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     229 </span>                :            : 
+<span class="lineNum">     230 </span>                :            :         case OPT_LOCAL:
+<span class="lineNum">     231 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 33 times"> + </span>]:<span class="lineCov">         33 :             if (shash_find(local_options, options[idx].name)) {</span>
+<span class="lineNum">     232 </span>                :<span class="lineNoCov">          0 :                 ctl_fatal(&quot;'%s' option specified multiple times&quot;,</span>
+<span class="lineNum">     233 </span>                :<span class="lineNoCov">          0 :                             options[idx].name);</span>
+<span class="lineNum">     234 </span>                :            :             }
+<span class="lineNum">     235 </span>                :<span class="lineCov">         33 :             shash_add_nocopy(local_options,</span>
+<span class="lineNum">     236 </span>                :<span class="lineCov">         33 :                              xasprintf(&quot;--%s&quot;, options[idx].name),</span>
+<span class="lineNum">     237 </span>                :<span class="lineCov">         33 :                              nullable_xstrdup(optarg));</span>
+<span class="lineNum">     238 </span>                :<span class="lineCov">         33 :             break;</span>
+<span class="lineNum">     239 </span>                :            : 
+<span class="lineNum">     240 </span>                :            :         case 'h':
+<span class="lineNum">     241 </span>                :<span class="lineNoCov">          0 :             usage();</span>
+<span class="lineNum">     242 </span>                :            : 
+<span class="lineNum">     243 </span>                :            :         case OPT_COMMANDS:
+<span class="lineNum">     244 </span>                :<span class="lineNoCov">          0 :             ctl_print_commands();</span>
+<span class="lineNum">     245 </span>                :            : 
+<span class="lineNum">     246 </span>                :            :         case OPT_OPTIONS:
+<span class="lineNum">     247 </span>                :<span class="lineNoCov">          0 :             ctl_print_options(global_long_options);</span>
+<span class="lineNum">     248 </span>                :            : 
+<span class="lineNum">     249 </span>                :            :         case 'V':
+<span class="lineNum">     250 </span>                :<span class="lineNoCov">          0 :             ovs_print_version(0, 0);</span>
+<span class="lineNum">     251 </span>                :<span class="lineNoCov">          0 :             printf(&quot;DB Schema %s\n&quot;, sbrec_get_db_version());</span>
+<span class="lineNum">     252 </span>                :<span class="lineNoCov">          0 :             exit(EXIT_SUCCESS);</span>
+<span class="lineNum">     253 </span>                :            : 
+<span class="lineNum">     254 </span>                :            :         case 't':
+<span class="lineNum">     255 </span>                :<span class="lineNoCov">          0 :             timeout = strtoul(optarg, NULL, 10);</span>
+<span class="lineNum">     256 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (timeout &lt; 0) {</span>
+<span class="lineNum">     257 </span>                :<span class="lineNoCov">          0 :                 ctl_fatal(&quot;value %s on -t or --timeout is invalid&quot;, optarg);</span>
+<span class="lineNum">     258 </span>                :            :             }
+<span class="lineNum">     259 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     260 </span>                :            : 
+<span class="lineNum">     261 </span>                :<span class="lineNoCov">          0 :         VLOG_OPTION_HANDLERS</span>
+<span class="lineNum">     262 </span>                :<span class="lineCov">         30 :         TABLE_OPTION_HANDLERS(&amp;table_style)</span>
+<span class="lineNum">     263 </span>                :<span class="lineNoCov">          0 :         STREAM_SSL_OPTION_HANDLERS</span>
+<span class="lineNum">     264 </span>                :            : 
+<span class="lineNum">     265 </span>                :            :         case '?':
+<span class="lineNum">     266 </span>                :<span class="lineNoCov">          0 :             exit(EXIT_FAILURE);</span>
+<span class="lineNum">     267 </span>                :            : 
+<span class="lineNum">     268 </span>                :            :         default:
+<span class="lineNum">     269 </span>                :<span class="lineNoCov">          0 :             abort();</span>
+<span class="lineNum">     270 </span>                :            :         }
+<span class="lineNum">     271 </span>                :<span class="lineCov">         63 :     }</span>
+<span class="lineNum">     272 </span>                :<span class="lineCov">        181 :     free(short_options);</span>
+<span class="lineNum">     273 </span>                :            : 
+<span class="lineNum">     274 </span>        [<span class="branchCov" title="Branch 0 was taken 181 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        181 :     if (!db) {</span>
+<span class="lineNum">     275 </span>                :<span class="lineCov">        181 :         db = default_sb_db();</span>
+<span class="lineNum">     276 </span>                :            :     }
+<span class="lineNum">     277 </span>                :            : 
+<span class="lineNum">     278 </span>        [<span class="branchCov" title="Branch 0 was taken 905 times"> + </span><span class="branchCov" title="Branch 1 was taken 181 times"> + </span>]:<span class="lineCov">       1086 :     for (i = n_global_long_options; options[i].name; i++) {</span>
+<span class="lineNum">     279 </span>                :<span class="lineCov">        905 :         free(CONST_CAST(char *, options[i].name));</span>
+<span class="lineNum">     280 </span>                :            :     }
+<span class="lineNum">     281 </span>                :<span class="lineCov">        181 :     free(options);</span>
+<span class="lineNum">     282 </span>                :<span class="lineCov">        181 : }</span>
+<a name="283"><span class="lineNum">     283 </span>                :            : </a>
+<span class="lineNum">     284 </span>                :            : static void
+<span class="lineNum">     285 </span>                :<span class="lineNoCov">          0 : usage(void)</span>
+<span class="lineNum">     286 </span>                :            : {
+<span class="lineNum">     287 </span>                :<span class="lineNoCov">          0 :     printf(&quot;\</span>
+<span class="lineNum">     288 </span>                :            : %s: OVN southbound DB management utility\n\
+<span class="lineNum">     289 </span>                :            : \n\
+<span class="lineNum">     290 </span>                :            : For debugging and testing only, not for use in production.\n\
+<span class="lineNum">     291 </span>                :            : \n\
+<span class="lineNum">     292 </span>                :            : usage: %s [OPTIONS] COMMAND [ARG...]\n\
+<span class="lineNum">     293 </span>                :            : \n\
+<span class="lineNum">     294 </span>                :            : General commands:\n\
+<span class="lineNum">     295 </span>                :            :   show                        print overview of database contents\n\
+<span class="lineNum">     296 </span>                :            : \n\
+<span class="lineNum">     297 </span>                :            : Chassis commands:\n\
+<span class="lineNum">     298 </span>                :            :   chassis-add CHASSIS ENCAP-TYPE ENCAP-IP  create a new chassis named\n\
+<span class="lineNum">     299 </span>                :            :                                            CHASSIS with ENCAP-TYPE tunnels\n\
+<span class="lineNum">     300 </span>                :            :                                            and ENCAP-IP\n\
+<span class="lineNum">     301 </span>                :            :   chassis-del CHASSIS         delete CHASSIS and all of its encaps\n\
+<span class="lineNum">     302 </span>                :            :                               and gateway_ports\n\
+<span class="lineNum">     303 </span>                :            : \n\
+<span class="lineNum">     304 </span>                :            : Port binding commands:\n\
+<span class="lineNum">     305 </span>                :            :   lsp-bind PORT CHASSIS       bind logical port PORT to CHASSIS\n\
+<span class="lineNum">     306 </span>                :            :   lsp-unbind PORT             reset the port binding of logical port PORT\n\
+<span class="lineNum">     307 </span>                :            : \n\
+<span class="lineNum">     308 </span>                :            : Logical flow commands:\n\
+<span class="lineNum">     309 </span>                :            :   lflow-list [DATAPATH]       List logical flows for all or a single datapath\n\
+<span class="lineNum">     310 </span>                :            :   dump-flows [DATAPATH]       Alias for lflow-list\n\
+<span class="lineNum">     311 </span>                :            : \n\
+<span class="lineNum">     312 </span>                :            : %s\
+<span class="lineNum">     313 </span>                :            : \n\
+<span class="lineNum">     314 </span>                :            : Options:\n\
+<span class="lineNum">     315 </span>                :            :   --db=DATABASE               connect to DATABASE\n\
+<span class="lineNum">     316 </span>                :            :                               (default: %s)\n\
+<span class="lineNum">     317 </span>                :            :   -t, --timeout=SECS          wait at most SECS seconds\n\
+<span class="lineNum">     318 </span>                :            :   --dry-run                   do not commit changes to database\n\
+<span class="lineNum">     319 </span>                :            :   --oneline                   print exactly one line of output per command\n&quot;,
+<span class="lineNum">     320 </span>                :            :            program_name, program_name, ctl_get_db_cmd_usage(),
+<span class="lineNum">     321 </span>                :            :            default_sb_db());
+<span class="lineNum">     322 </span>                :<span class="lineNoCov">          0 :     vlog_usage();</span>
+<span class="lineNum">     323 </span>                :<span class="lineNoCov">          0 :     printf(&quot;\</span>
+<span class="lineNum">     324 </span>                :            :   --no-syslog             equivalent to --verbose=sbctl:syslog:warn\n&quot;);
+<span class="lineNum">     325 </span>                :<span class="lineNoCov">          0 :     printf(&quot;\n\</span>
+<span class="lineNum">     326 </span>                :            : Other options:\n\
+<span class="lineNum">     327 </span>                :            :   -h, --help                  display this help message\n\
+<span class="lineNum">     328 </span>                :            :   -V, --version               display version information\n&quot;);
+<span class="lineNum">     329 </span>                :<span class="lineNoCov">          0 :     stream_usage(&quot;database&quot;, true, true, false);</span>
+<span class="lineNum">     330 </span>                :<span class="lineNoCov">          0 :     exit(EXIT_SUCCESS);</span>
+<span class="lineNum">     331 </span>                :            : }
+<span class="lineNum">     332 </span>                :            : 
+<span class="lineNum">     333 </span>                :            : 
+<span class="lineNum">     334 </span>                :            : /* ovs-sbctl specific context.  Inherits the 'struct ctl_context' as base. */
+<span class="lineNum">     335 </span>                :            : struct sbctl_context {
+<span class="lineNum">     336 </span>                :            :     struct ctl_context base;
+<span class="lineNum">     337 </span>                :            : 
+<span class="lineNum">     338 </span>                :            :     /* A cache of the contents of the database.
+<span class="lineNum">     339 </span>                :            :      *
+<span class="lineNum">     340 </span>                :            :      * A command that needs to use any of this information must first call
+<span class="lineNum">     341 </span>                :            :      * sbctl_context_populate_cache().  A command that changes anything that
+<span class="lineNum">     342 </span>                :            :      * could invalidate the cache must either call
+<span class="lineNum">     343 </span>                :            :      * sbctl_context_invalidate_cache() or manually update the cache to
+<span class="lineNum">     344 </span>                :            :      * maintain its correctness. */
+<span class="lineNum">     345 </span>                :            :     bool cache_valid;
+<span class="lineNum">     346 </span>                :            :     /* Maps from chassis name to struct sbctl_chassis. */
+<span class="lineNum">     347 </span>                :            :     struct shash chassis;
+<span class="lineNum">     348 </span>                :            :     /* Maps from lport name to struct sbctl_port_binding. */
+<span class="lineNum">     349 </span>                :            :     struct shash port_bindings;
+<span class="lineNum">     350 </span>                :            : };
+<span class="lineNum">     351 </span>                :            : 
+<a name="352"><span class="lineNum">     352 </span>                :            : /* Casts 'base' into 'struct sbctl_context'. */</a>
+<span class="lineNum">     353 </span>                :            : static struct sbctl_context *
+<span class="lineNum">     354 </span>                :<span class="lineCov">        420 : sbctl_context_cast(struct ctl_context *base)</span>
+<span class="lineNum">     355 </span>                :            : {
+<span class="lineNum">     356 </span>                :<span class="lineCov">        420 :     return CONTAINER_OF(base, struct sbctl_context, base);</span>
+<span class="lineNum">     357 </span>                :            : }
+<span class="lineNum">     358 </span>                :            : 
+<span class="lineNum">     359 </span>                :            : struct sbctl_chassis {
+<span class="lineNum">     360 </span>                :            :     const struct sbrec_chassis *ch_cfg;
+<span class="lineNum">     361 </span>                :            : };
+<span class="lineNum">     362 </span>                :            : 
+<span class="lineNum">     363 </span>                :            : struct sbctl_port_binding {
+<span class="lineNum">     364 </span>                :            :     const struct sbrec_port_binding *bd_cfg;
+<span class="lineNum">     365 </span>                :            : };
+<a name="366"><span class="lineNum">     366 </span>                :            : </a>
+<span class="lineNum">     367 </span>                :            : static void
+<span class="lineNum">     368 </span>                :<span class="lineCov">        378 : sbctl_context_invalidate_cache(struct ctl_context *ctx)</span>
+<span class="lineNum">     369 </span>                :            : {
+<span class="lineNum">     370 </span>                :<span class="lineCov">        378 :     struct sbctl_context *sbctl_ctx = sbctl_context_cast(ctx);</span>
+<span class="lineNum">     371 </span>                :            : 
+<span class="lineNum">     372 </span>        [<span class="branchCov" title="Branch 0 was taken 357 times"> + </span><span class="branchCov" title="Branch 1 was taken 21 times"> + </span>]:<span class="lineCov">        378 :     if (!sbctl_ctx-&gt;cache_valid) {</span>
+<span class="lineNum">     373 </span>                :<span class="lineCov">        357 :         return;</span>
+<span class="lineNum">     374 </span>                :            :     }
+<span class="lineNum">     375 </span>                :<span class="lineCov">         21 :     sbctl_ctx-&gt;cache_valid = false;</span>
+<span class="lineNum">     376 </span>                :<span class="lineCov">         21 :     shash_destroy_free_data(&amp;sbctl_ctx-&gt;chassis);</span>
+<span class="lineNum">     377 </span>                :<span class="lineCov">         21 :     shash_destroy_free_data(&amp;sbctl_ctx-&gt;port_bindings);</span>
+<span class="lineNum">     378 </span>                :            : }
+<a name="379"><span class="lineNum">     379 </span>                :            : </a>
+<span class="lineNum">     380 </span>                :            : static void
+<span class="lineNum">     381 </span>                :<span class="lineCov">         21 : sbctl_context_populate_cache(struct ctl_context *ctx)</span>
+<span class="lineNum">     382 </span>                :            : {
+<span class="lineNum">     383 </span>                :<span class="lineCov">         21 :     struct sbctl_context *sbctl_ctx = sbctl_context_cast(ctx);</span>
+<span class="lineNum">     384 </span>                :            :     const struct sbrec_chassis *chassis_rec;
+<span class="lineNum">     385 </span>                :            :     const struct sbrec_port_binding *port_binding_rec;
+<span class="lineNum">     386 </span>                :            :     struct sset chassis, port_bindings;
+<span class="lineNum">     387 </span>                :            : 
+<span class="lineNum">     388 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 21 times"> + </span>]:<span class="lineCov">         21 :     if (sbctl_ctx-&gt;cache_valid) {</span>
+<span class="lineNum">     389 </span>                :            :         /* Cache is already populated. */
+<span class="lineNum">     390 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     391 </span>                :            :     }
+<span class="lineNum">     392 </span>                :<span class="lineCov">         21 :     sbctl_ctx-&gt;cache_valid = true;</span>
+<span class="lineNum">     393 </span>                :<span class="lineCov">         21 :     shash_init(&amp;sbctl_ctx-&gt;chassis);</span>
+<span class="lineNum">     394 </span>                :<span class="lineCov">         21 :     shash_init(&amp;sbctl_ctx-&gt;port_bindings);</span>
+<span class="lineNum">     395 </span>                :<span class="lineCov">         21 :     sset_init(&amp;chassis);</span>
+<span class="lineNum">     396 </span>        [<span class="branchCov" title="Branch 2 was taken 28 times"> + </span><span class="branchCov" title="Branch 3 was taken 21 times"> + </span>]:<span class="lineCov">         49 :     SBREC_CHASSIS_FOR_EACH(chassis_rec, ctx-&gt;idl) {</span>
+<span class="lineNum">     397 </span>                :            :         struct sbctl_chassis *ch;
+<span class="lineNum">     398 </span>                :            : 
+<span class="lineNum">     399 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 28 times"> + </span>]:<span class="lineCov">         28 :         if (!sset_add(&amp;chassis, chassis_rec-&gt;name)) {</span>
+<span class="lineNum">     400 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN(&quot;database contains duplicate chassis name (%s)&quot;,</span>
+<span class="lineNum">     401 </span>                :            :                       chassis_rec-&gt;name);
+<span class="lineNum">     402 </span>                :<span class="lineNoCov">          0 :             continue;</span>
+<span class="lineNum">     403 </span>                :            :         }
+<span class="lineNum">     404 </span>                :            : 
+<span class="lineNum">     405 </span>                :<span class="lineCov">         28 :         ch = xmalloc(sizeof *ch);</span>
+<span class="lineNum">     406 </span>                :<span class="lineCov">         28 :         ch-&gt;ch_cfg = chassis_rec;</span>
+<span class="lineNum">     407 </span>                :<span class="lineCov">         28 :         shash_add(&amp;sbctl_ctx-&gt;chassis, chassis_rec-&gt;name, ch);</span>
+<span class="lineNum">     408 </span>                :            :     }
+<span class="lineNum">     409 </span>                :<span class="lineCov">         21 :     sset_destroy(&amp;chassis);</span>
+<span class="lineNum">     410 </span>                :            : 
+<span class="lineNum">     411 </span>                :<span class="lineCov">         21 :     sset_init(&amp;port_bindings);</span>
+<span class="lineNum">     412 </span>        [<span class="branchCov" title="Branch 2 was taken 28 times"> + </span><span class="branchCov" title="Branch 3 was taken 21 times"> + </span>]:<span class="lineCov">         49 :     SBREC_PORT_BINDING_FOR_EACH(port_binding_rec, ctx-&gt;idl) {</span>
+<span class="lineNum">     413 </span>                :            :         struct sbctl_port_binding *bd;
+<span class="lineNum">     414 </span>                :            : 
+<span class="lineNum">     415 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 28 times"> + </span>]:<span class="lineCov">         28 :         if (!sset_add(&amp;port_bindings, port_binding_rec-&gt;logical_port)) {</span>
+<span class="lineNum">     416 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN(&quot;database contains duplicate port binding for logical &quot;</span>
+<span class="lineNum">     417 </span>                :            :                       &quot;port (%s)&quot;,
+<span class="lineNum">     418 </span>                :            :                       port_binding_rec-&gt;logical_port);
+<span class="lineNum">     419 </span>                :<span class="lineNoCov">          0 :             continue;</span>
+<span class="lineNum">     420 </span>                :            :         }
+<span class="lineNum">     421 </span>                :            : 
+<span class="lineNum">     422 </span>                :<span class="lineCov">         28 :         bd = xmalloc(sizeof *bd);</span>
+<span class="lineNum">     423 </span>                :<span class="lineCov">         28 :         bd-&gt;bd_cfg = port_binding_rec;</span>
+<span class="lineNum">     424 </span>                :<span class="lineCov">         28 :         shash_add(&amp;sbctl_ctx-&gt;port_bindings, port_binding_rec-&gt;logical_port,</span>
+<span class="lineNum">     425 </span>                :            :                   bd);
+<span class="lineNum">     426 </span>                :            :     }
+<span class="lineNum">     427 </span>                :<span class="lineCov">         21 :     sset_destroy(&amp;port_bindings);</span>
+<span class="lineNum">     428 </span>                :            : }
+<a name="429"><span class="lineNum">     429 </span>                :            : </a>
+<span class="lineNum">     430 </span>                :            : static void
+<span class="lineNum">     431 </span>                :<span class="lineCov">          9 : check_conflicts(struct sbctl_context *sbctl_ctx, const char *name,</span>
+<span class="lineNum">     432 </span>                :            :                 char *msg)
+<span class="lineNum">     433 </span>                :            : {
+<span class="lineNum">     434 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 9 times"> + </span>]:<span class="lineCov">          9 :     if (shash_find(&amp;sbctl_ctx-&gt;chassis, name)) {</span>
+<span class="lineNum">     435 </span>                :<span class="lineNoCov">          0 :         ctl_fatal(&quot;%s because a chassis named %s already exists&quot;,</span>
+<span class="lineNum">     436 </span>                :            :                     msg, name);
+<span class="lineNum">     437 </span>                :            :     }
+<span class="lineNum">     438 </span>                :<span class="lineCov">          9 :     free(msg);</span>
+<span class="lineNum">     439 </span>                :<span class="lineCov">          9 : }</span>
+<a name="440"><span class="lineNum">     440 </span>                :            : </a>
+<span class="lineNum">     441 </span>                :            : static struct sbctl_chassis *
+<span class="lineNum">     442 </span>                :<span class="lineCov">         12 : find_chassis(struct sbctl_context *sbctl_ctx, const char *name,</span>
+<span class="lineNum">     443 </span>                :            :              bool must_exist)
+<span class="lineNum">     444 </span>                :            : {
+<span class="lineNum">     445 </span>                :            :     struct sbctl_chassis *sbctl_ch;
+<span class="lineNum">     446 </span>                :            : 
+<span class="lineNum">     447 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 12 times"> + </span>]:<span class="lineCov">         12 :     ovs_assert(sbctl_ctx-&gt;cache_valid);</span>
+<span class="lineNum">     448 </span>                :            : 
+<span class="lineNum">     449 </span>                :<span class="lineCov">         12 :     sbctl_ch = shash_find_data(&amp;sbctl_ctx-&gt;chassis, name);</span>
+<span class="lineNum">     450 </span>[<span class="branchCov" title="Branch 0 was taken 12 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 12 times"> + </span>]:<span class="lineCov">         12 :     if (must_exist &amp;&amp; !sbctl_ch) {</span>
+<span class="lineNum">     451 </span>                :<span class="lineNoCov">          0 :         ctl_fatal(&quot;no chassis named %s&quot;, name);</span>
+<span class="lineNum">     452 </span>                :            :     }
+<span class="lineNum">     453 </span>                :            : 
+<span class="lineNum">     454 </span>                :<span class="lineCov">         12 :     return sbctl_ch;</span>
+<span class="lineNum">     455 </span>                :            : }
+<a name="456"><span class="lineNum">     456 </span>                :            : </a>
+<span class="lineNum">     457 </span>                :            : static struct sbctl_port_binding *
+<span class="lineNum">     458 </span>                :<span class="lineCov">         10 : find_port_binding(struct sbctl_context *sbctl_ctx, const char *name,</span>
+<span class="lineNum">     459 </span>                :            :                   bool must_exist)
+<span class="lineNum">     460 </span>                :            : {
+<span class="lineNum">     461 </span>                :            :     struct sbctl_port_binding *bd;
+<span class="lineNum">     462 </span>                :            : 
+<span class="lineNum">     463 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 10 times"> + </span>]:<span class="lineCov">         10 :     ovs_assert(sbctl_ctx-&gt;cache_valid);</span>
+<span class="lineNum">     464 </span>                :            : 
+<span class="lineNum">     465 </span>                :<span class="lineCov">         10 :     bd = shash_find_data(&amp;sbctl_ctx-&gt;port_bindings, name);</span>
+<span class="lineNum">     466 </span>[<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 10 times"> + </span>]:<span class="lineCov">         10 :     if (must_exist &amp;&amp; !bd) {</span>
+<span class="lineNum">     467 </span>                :<span class="lineNoCov">          0 :         ctl_fatal(&quot;no port named %s&quot;, name);</span>
+<span class="lineNum">     468 </span>                :            :     }
+<span class="lineNum">     469 </span>                :            : 
+<span class="lineNum">     470 </span>                :<span class="lineCov">         10 :     return bd;</span>
+<span class="lineNum">     471 </span>                :            : }
+<a name="472"><span class="lineNum">     472 </span>                :            : </a>
+<span class="lineNum">     473 </span>                :            : static void
+<span class="lineNum">     474 </span>                :<span class="lineCov">         30 : pre_get_info(struct ctl_context *ctx)</span>
+<span class="lineNum">     475 </span>                :            : {
+<span class="lineNum">     476 </span>                :<span class="lineCov">         30 :     ovsdb_idl_add_column(ctx-&gt;idl, &amp;sbrec_chassis_col_name);</span>
+<span class="lineNum">     477 </span>                :<span class="lineCov">         30 :     ovsdb_idl_add_column(ctx-&gt;idl, &amp;sbrec_chassis_col_encaps);</span>
+<span class="lineNum">     478 </span>                :            : 
+<span class="lineNum">     479 </span>                :<span class="lineCov">         30 :     ovsdb_idl_add_column(ctx-&gt;idl, &amp;sbrec_encap_col_type);</span>
+<span class="lineNum">     480 </span>                :<span class="lineCov">         30 :     ovsdb_idl_add_column(ctx-&gt;idl, &amp;sbrec_encap_col_ip);</span>
+<span class="lineNum">     481 </span>                :            : 
+<span class="lineNum">     482 </span>                :<span class="lineCov">         30 :     ovsdb_idl_add_column(ctx-&gt;idl, &amp;sbrec_port_binding_col_logical_port);</span>
+<span class="lineNum">     483 </span>                :<span class="lineCov">         30 :     ovsdb_idl_add_column(ctx-&gt;idl, &amp;sbrec_port_binding_col_chassis);</span>
+<span class="lineNum">     484 </span>                :            : 
+<span class="lineNum">     485 </span>                :<span class="lineCov">         30 :     ovsdb_idl_add_column(ctx-&gt;idl, &amp;sbrec_logical_flow_col_logical_datapath);</span>
+<span class="lineNum">     486 </span>                :<span class="lineCov">         30 :     ovsdb_idl_add_column(ctx-&gt;idl, &amp;sbrec_logical_flow_col_pipeline);</span>
+<span class="lineNum">     487 </span>                :<span class="lineCov">         30 :     ovsdb_idl_add_column(ctx-&gt;idl, &amp;sbrec_logical_flow_col_actions);</span>
+<span class="lineNum">     488 </span>                :<span class="lineCov">         30 :     ovsdb_idl_add_column(ctx-&gt;idl, &amp;sbrec_logical_flow_col_priority);</span>
+<span class="lineNum">     489 </span>                :<span class="lineCov">         30 :     ovsdb_idl_add_column(ctx-&gt;idl, &amp;sbrec_logical_flow_col_table_id);</span>
+<span class="lineNum">     490 </span>                :<span class="lineCov">         30 :     ovsdb_idl_add_column(ctx-&gt;idl, &amp;sbrec_logical_flow_col_match);</span>
+<span class="lineNum">     491 </span>                :<span class="lineCov">         30 :     ovsdb_idl_add_column(ctx-&gt;idl, &amp;sbrec_logical_flow_col_external_ids);</span>
+<span class="lineNum">     492 </span>                :            : 
+<span class="lineNum">     493 </span>                :<span class="lineCov">         30 :     ovsdb_idl_add_column(ctx-&gt;idl, &amp;sbrec_datapath_binding_col_external_ids);</span>
+<span class="lineNum">     494 </span>                :<span class="lineCov">         30 : }</span>
+<span class="lineNum">     495 </span>                :            : 
+<span class="lineNum">     496 </span>                :            : static struct cmd_show_table cmd_show_tables[] = {
+<span class="lineNum">     497 </span>                :            :     {&amp;sbrec_table_chassis,
+<span class="lineNum">     498 </span>                :            :      &amp;sbrec_chassis_col_name,
+<span class="lineNum">     499 </span>                :            :      {&amp;sbrec_chassis_col_hostname,
+<span class="lineNum">     500 </span>                :            :       &amp;sbrec_chassis_col_encaps,
+<span class="lineNum">     501 </span>                :            :       NULL},
+<span class="lineNum">     502 </span>                :            :      {&amp;sbrec_table_port_binding,
+<span class="lineNum">     503 </span>                :            :       &amp;sbrec_port_binding_col_logical_port,
+<span class="lineNum">     504 </span>                :            :       &amp;sbrec_port_binding_col_chassis}},
+<span class="lineNum">     505 </span>                :            : 
+<span class="lineNum">     506 </span>                :            :     {&amp;sbrec_table_encap,
+<span class="lineNum">     507 </span>                :            :      &amp;sbrec_encap_col_type,
+<span class="lineNum">     508 </span>                :            :      {&amp;sbrec_encap_col_ip,
+<span class="lineNum">     509 </span>                :            :       &amp;sbrec_encap_col_options,
+<span class="lineNum">     510 </span>                :            :       NULL},
+<span class="lineNum">     511 </span>                :            :      {NULL, NULL, NULL}},
+<span class="lineNum">     512 </span>                :            : 
+<span class="lineNum">     513 </span>                :            :     {NULL, NULL, {NULL, NULL, NULL}, {NULL, NULL, NULL}},
+<span class="lineNum">     514 </span>                :            : };
+<a name="515"><span class="lineNum">     515 </span>                :            : </a>
+<span class="lineNum">     516 </span>                :            : static void
+<span class="lineNum">     517 </span>                :<span class="lineCov">         33 : sbctl_init(struct ctl_context *ctx OVS_UNUSED)</span>
+<span class="lineNum">     518 </span>                :            : {
+<span class="lineNum">     519 </span>                :<span class="lineCov">         33 : }</span>
+<a name="520"><span class="lineNum">     520 </span>                :            : </a>
+<span class="lineNum">     521 </span>                :            : static void
+<span class="lineNum">     522 </span>                :<span class="lineCov">          9 : cmd_chassis_add(struct ctl_context *ctx)</span>
+<span class="lineNum">     523 </span>                :            : {
+<span class="lineNum">     524 </span>                :<span class="lineCov">          9 :     struct sbctl_context *sbctl_ctx = sbctl_context_cast(ctx);</span>
+<span class="lineNum">     525 </span>                :<span class="lineCov">          9 :     bool may_exist = shash_find(&amp;ctx-&gt;options, &quot;--may-exist&quot;) != NULL;</span>
+<span class="lineNum">     526 </span>                :            :     const char *ch_name, *encap_types, *encap_ip;
+<span class="lineNum">     527 </span>                :            : 
+<span class="lineNum">     528 </span>                :<span class="lineCov">          9 :     ch_name = ctx-&gt;argv[1];</span>
+<span class="lineNum">     529 </span>                :<span class="lineCov">          9 :     encap_types = ctx-&gt;argv[2];</span>
+<span class="lineNum">     530 </span>                :<span class="lineCov">          9 :     encap_ip = ctx-&gt;argv[3];</span>
+<span class="lineNum">     531 </span>                :            : 
+<span class="lineNum">     532 </span>                :<span class="lineCov">          9 :     sbctl_context_populate_cache(ctx);</span>
+<span class="lineNum">     533 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 9 times"> + </span>]:<span class="lineCov">          9 :     if (may_exist) {</span>
+<span class="lineNum">     534 </span>                :            :         struct sbctl_chassis *sbctl_ch;
+<span class="lineNum">     535 </span>                :            : 
+<span class="lineNum">     536 </span>                :<span class="lineNoCov">          0 :         sbctl_ch = find_chassis(sbctl_ctx, ch_name, false);</span>
+<span class="lineNum">     537 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (sbctl_ch) {</span>
+<span class="lineNum">     538 </span>                :<span class="lineNoCov">          0 :             return;</span>
+<span class="lineNum">     539 </span>                :            :         }
+<span class="lineNum">     540 </span>                :            :     }
+<span class="lineNum">     541 </span>                :<span class="lineCov">          9 :     check_conflicts(sbctl_ctx, ch_name,</span>
+<span class="lineNum">     542 </span>                :            :                     xasprintf(&quot;cannot create a chassis named %s&quot;, ch_name));
+<span class="lineNum">     543 </span>                :            : 
+<span class="lineNum">     544 </span>                :            :     struct sset encap_set;
+<span class="lineNum">     545 </span>                :<span class="lineCov">          9 :     sset_from_delimited_string(&amp;encap_set, encap_types, &quot;,&quot;);</span>
+<span class="lineNum">     546 </span>                :            : 
+<span class="lineNum">     547 </span>                :<span class="lineCov">          9 :     size_t n_encaps = sset_count(&amp;encap_set);</span>
+<span class="lineNum">     548 </span>                :<span class="lineCov">          9 :     struct sbrec_encap **encaps = xmalloc(n_encaps * sizeof *encaps);</span>
+<span class="lineNum">     549 </span>                :<span class="lineCov">          9 :     const struct smap options = SMAP_CONST1(&amp;options, &quot;csum&quot;, &quot;true&quot;);</span>
+<span class="lineNum">     550 </span>                :            :     const char *encap_type;
+<span class="lineNum">     551 </span>                :<span class="lineCov">          9 :     int i = 0;</span>
+<span class="lineNum">     552 </span>[<span class="branchCov" title="Branch 1 was taken 9 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>][<span class="branchCov" title="Branch 5 was taken 2 times"> + </span><span class="branchCov" title="Branch 6 was taken 9 times"> + </span>]:<span class="lineCov">         20 :     SSET_FOR_EACH (encap_type, &amp;encap_set){</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 8 was taken 11 times"> + </span><span class="branchCov" title="Branch 9 was taken 9 times"> + </span>]
+<span class="lineNum">     553 </span>                :<span class="lineCov">         11 :         encaps[i] = sbrec_encap_insert(ctx-&gt;txn);</span>
+<span class="lineNum">     554 </span>                :            : 
+<span class="lineNum">     555 </span>                :<span class="lineCov">         11 :         sbrec_encap_set_type(encaps[i], encap_type);</span>
+<span class="lineNum">     556 </span>                :<span class="lineCov">         11 :         sbrec_encap_set_ip(encaps[i], encap_ip);</span>
+<span class="lineNum">     557 </span>                :<span class="lineCov">         11 :         sbrec_encap_set_options(encaps[i], &amp;options);</span>
+<span class="lineNum">     558 </span>                :<span class="lineCov">         11 :         i++;</span>
+<span class="lineNum">     559 </span>                :            :     }
+<span class="lineNum">     560 </span>                :<span class="lineCov">          9 :     sset_destroy(&amp;encap_set);</span>
+<span class="lineNum">     561 </span>                :            : 
+<span class="lineNum">     562 </span>                :<span class="lineCov">          9 :     struct sbrec_chassis *ch = sbrec_chassis_insert(ctx-&gt;txn);</span>
+<span class="lineNum">     563 </span>                :<span class="lineCov">          9 :     sbrec_chassis_set_name(ch, ch_name);</span>
+<span class="lineNum">     564 </span>                :<span class="lineCov">          9 :     sbrec_chassis_set_encaps(ch, encaps, n_encaps);</span>
+<span class="lineNum">     565 </span>                :<span class="lineCov">          9 :     free(encaps);</span>
+<span class="lineNum">     566 </span>                :            : 
+<span class="lineNum">     567 </span>                :<span class="lineCov">          9 :     sbctl_context_invalidate_cache(ctx);</span>
+<span class="lineNum">     568 </span>                :            : }
+<a name="569"><span class="lineNum">     569 </span>                :            : </a>
+<span class="lineNum">     570 </span>                :            : static void
+<span class="lineNum">     571 </span>                :<span class="lineCov">          2 : cmd_chassis_del(struct ctl_context *ctx)</span>
+<span class="lineNum">     572 </span>                :            : {
+<span class="lineNum">     573 </span>                :<span class="lineCov">          2 :     struct sbctl_context *sbctl_ctx = sbctl_context_cast(ctx);</span>
+<span class="lineNum">     574 </span>                :<span class="lineCov">          2 :     bool must_exist = !shash_find(&amp;ctx-&gt;options, &quot;--if-exists&quot;);</span>
+<span class="lineNum">     575 </span>                :            :     struct sbctl_chassis *sbctl_ch;
+<span class="lineNum">     576 </span>                :            : 
+<span class="lineNum">     577 </span>                :<span class="lineCov">          2 :     sbctl_context_populate_cache(ctx);</span>
+<span class="lineNum">     578 </span>                :<span class="lineCov">          2 :     sbctl_ch = find_chassis(sbctl_ctx, ctx-&gt;argv[1], must_exist);</span>
+<span class="lineNum">     579 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :     if (sbctl_ch) {</span>
+<span class="lineNum">     580 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :         if (sbctl_ch-&gt;ch_cfg) {</span>
+<span class="lineNum">     581 </span>                :            :             size_t i;
+<span class="lineNum">     582 </span>                :            : 
+<span class="lineNum">     583 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          4 :             for (i = 0; i &lt; sbctl_ch-&gt;ch_cfg-&gt;n_encaps; i++) {</span>
+<span class="lineNum">     584 </span>                :<span class="lineCov">          2 :                 sbrec_encap_delete(sbctl_ch-&gt;ch_cfg-&gt;encaps[i]);</span>
+<span class="lineNum">     585 </span>                :            :             }
+<span class="lineNum">     586 </span>                :<span class="lineCov">          2 :             sbrec_chassis_delete(sbctl_ch-&gt;ch_cfg);</span>
+<span class="lineNum">     587 </span>                :            :         }
+<span class="lineNum">     588 </span>                :<span class="lineCov">          2 :         shash_find_and_delete(&amp;sbctl_ctx-&gt;chassis, ctx-&gt;argv[1]);</span>
+<span class="lineNum">     589 </span>                :<span class="lineCov">          2 :         free(sbctl_ch);</span>
+<span class="lineNum">     590 </span>                :            :     }
+<span class="lineNum">     591 </span>                :<span class="lineCov">          2 : }</span>
+<a name="592"><span class="lineNum">     592 </span>                :            : </a>
+<span class="lineNum">     593 </span>                :            : static void
+<span class="lineNum">     594 </span>                :<span class="lineCov">         10 : cmd_lsp_bind(struct ctl_context *ctx)</span>
+<span class="lineNum">     595 </span>                :            : {
+<span class="lineNum">     596 </span>                :<span class="lineCov">         10 :     struct sbctl_context *sbctl_ctx = sbctl_context_cast(ctx);</span>
+<span class="lineNum">     597 </span>                :<span class="lineCov">         10 :     bool may_exist = shash_find(&amp;ctx-&gt;options, &quot;--may-exist&quot;) != NULL;</span>
+<span class="lineNum">     598 </span>                :            :     struct sbctl_chassis *sbctl_ch;
+<span class="lineNum">     599 </span>                :            :     struct sbctl_port_binding *sbctl_bd;
+<span class="lineNum">     600 </span>                :            :     char *lport_name, *ch_name;
+<span class="lineNum">     601 </span>                :            : 
+<span class="lineNum">     602 </span>                :            :     /* port_binding must exist, chassis must exist! */
+<span class="lineNum">     603 </span>                :<span class="lineCov">         10 :     lport_name = ctx-&gt;argv[1];</span>
+<span class="lineNum">     604 </span>                :<span class="lineCov">         10 :     ch_name = ctx-&gt;argv[2];</span>
+<span class="lineNum">     605 </span>                :            : 
+<span class="lineNum">     606 </span>                :<span class="lineCov">         10 :     sbctl_context_populate_cache(ctx);</span>
+<span class="lineNum">     607 </span>                :<span class="lineCov">         10 :     sbctl_bd = find_port_binding(sbctl_ctx, lport_name, true);</span>
+<span class="lineNum">     608 </span>                :<span class="lineCov">         10 :     sbctl_ch = find_chassis(sbctl_ctx, ch_name, true);</span>
+<span class="lineNum">     609 </span>                :            : 
+<span class="lineNum">     610 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 10 times"> + </span>]:<span class="lineCov">         10 :     if (sbctl_bd-&gt;bd_cfg-&gt;chassis) {</span>
+<span class="lineNum">     611 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (may_exist &amp;&amp; sbctl_bd-&gt;bd_cfg-&gt;chassis == sbctl_ch-&gt;ch_cfg) {</span>
+<span class="lineNum">     612 </span>                :<span class="lineNoCov">          0 :             return;</span>
+<span class="lineNum">     613 </span>                :            :         } else {
+<span class="lineNum">     614 </span>                :<span class="lineNoCov">          0 :             ctl_fatal(&quot;lport (%s) has already been binded to chassis (%s)&quot;,</span>
+<span class="lineNum">     615 </span>                :<span class="lineNoCov">          0 :                       lport_name, sbctl_bd-&gt;bd_cfg-&gt;chassis-&gt;name);</span>
+<span class="lineNum">     616 </span>                :            :         }
+<span class="lineNum">     617 </span>                :            :     }
+<span class="lineNum">     618 </span>                :<span class="lineCov">         10 :     sbrec_port_binding_set_chassis(sbctl_bd-&gt;bd_cfg, sbctl_ch-&gt;ch_cfg);</span>
+<span class="lineNum">     619 </span>                :<span class="lineCov">         10 :     sbctl_context_invalidate_cache(ctx);</span>
+<span class="lineNum">     620 </span>                :            : }
+<a name="621"><span class="lineNum">     621 </span>                :            : </a>
+<span class="lineNum">     622 </span>                :            : static void
+<span class="lineNum">     623 </span>                :<span class="lineNoCov">          0 : cmd_lsp_unbind(struct ctl_context *ctx)</span>
+<span class="lineNum">     624 </span>                :            : {
+<span class="lineNum">     625 </span>                :<span class="lineNoCov">          0 :     struct sbctl_context *sbctl_ctx = sbctl_context_cast(ctx);</span>
+<span class="lineNum">     626 </span>                :<span class="lineNoCov">          0 :     bool must_exist = !shash_find(&amp;ctx-&gt;options, &quot;--if-exists&quot;);</span>
+<span class="lineNum">     627 </span>                :            :     struct sbctl_port_binding *sbctl_bd;
+<span class="lineNum">     628 </span>                :            :     char *lport_name;
+<span class="lineNum">     629 </span>                :            : 
+<span class="lineNum">     630 </span>                :<span class="lineNoCov">          0 :     lport_name = ctx-&gt;argv[1];</span>
+<span class="lineNum">     631 </span>                :<span class="lineNoCov">          0 :     sbctl_context_populate_cache(ctx);</span>
+<span class="lineNum">     632 </span>                :<span class="lineNoCov">          0 :     sbctl_bd = find_port_binding(sbctl_ctx, lport_name, must_exist);</span>
+<span class="lineNum">     633 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (sbctl_bd) {</span>
+<span class="lineNum">     634 </span>                :<span class="lineNoCov">          0 :         sbrec_port_binding_set_chassis(sbctl_bd-&gt;bd_cfg, NULL);</span>
+<span class="lineNum">     635 </span>                :            :     }
+<span class="lineNum">     636 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     637 </span>                :            : 
+<span class="lineNum">     638 </span>                :            : enum {
+<span class="lineNum">     639 </span>                :            :     PL_INGRESS,
+<span class="lineNum">     640 </span>                :            :     PL_EGRESS,
+<span class="lineNum">     641 </span>                :            : };
+<span class="lineNum">     642 </span>                :            : 
+<a name="643"><span class="lineNum">     643 </span>                :            : /* Help ensure we catch any future pipeline values */</a>
+<span class="lineNum">     644 </span>                :            : static int
+<span class="lineNum">     645 </span>                :<span class="lineCov">      18812 : pipeline_encode(const char *pl)</span>
+<span class="lineNum">     646 </span>                :            : {
+<span class="lineNum">     647 </span>        [<span class="branchCov" title="Branch 0 was taken 14506 times"> + </span><span class="branchCov" title="Branch 1 was taken 4306 times"> + </span>]:<span class="lineCov">      18812 :     if (!strcmp(pl, &quot;ingress&quot;)) {</span>
+<span class="lineNum">     648 </span>                :<span class="lineCov">      14506 :         return PL_INGRESS;</span>
+<span class="lineNum">     649 </span>        [<span class="branchCov" title="Branch 0 was taken 4306 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       4306 :     } else if (!strcmp(pl, &quot;egress&quot;)) {</span>
+<span class="lineNum">     650 </span>                :<span class="lineCov">       4306 :         return PL_EGRESS;</span>
+<span class="lineNum">     651 </span>                :            :     }
+<span class="lineNum">     652 </span>                :            : 
+<span class="lineNum">     653 </span>                :<span class="lineNoCov">          0 :     OVS_NOT_REACHED();</span>
+<span class="lineNum">     654 </span>                :            : }
+<a name="655"><span class="lineNum">     655 </span>                :            : </a>
+<span class="lineNum">     656 </span>                :            : static int
+<span class="lineNum">     657 </span>                :<span class="lineCov">       9406 : lflow_cmp(const void *lf1_, const void *lf2_)</span>
+<span class="lineNum">     658 </span>                :            : {
+<span class="lineNum">     659 </span>                :<span class="lineCov">       9406 :     const struct sbrec_logical_flow *const *lf1p = lf1_;</span>
+<span class="lineNum">     660 </span>                :<span class="lineCov">       9406 :     const struct sbrec_logical_flow *const *lf2p = lf2_;</span>
+<span class="lineNum">     661 </span>                :<span class="lineCov">       9406 :     const struct sbrec_logical_flow *lf1 = *lf1p;</span>
+<span class="lineNum">     662 </span>                :<span class="lineCov">       9406 :     const struct sbrec_logical_flow *lf2 = *lf2p;</span>
+<span class="lineNum">     663 </span>                :            : 
+<span class="lineNum">     664 </span>                :<span class="lineCov">       9406 :     int pl1 = pipeline_encode(lf1-&gt;pipeline);</span>
+<span class="lineNum">     665 </span>                :<span class="lineCov">       9406 :     int pl2 = pipeline_encode(lf2-&gt;pipeline);</span>
+<span class="lineNum">     666 </span>                :            : 
+<span class="lineNum">     667 </span>                :            : #define CMP(expr) \
+<span class="lineNum">     668 </span>                :            :     do { \
+<span class="lineNum">     669 </span>                :            :         int res; \
+<span class="lineNum">     670 </span>                :            :         res = (expr); \
+<span class="lineNum">     671 </span>                :            :         if (res) { \
+<span class="lineNum">     672 </span>                :            :             return res; \
+<span class="lineNum">     673 </span>                :            :         } \
+<span class="lineNum">     674 </span>                :            :     } while (0)
+<span class="lineNum">     675 </span>                :            : 
+<span class="lineNum">     676 </span>        [<span class="branchCov" title="Branch 1 was taken 2275 times"> + </span><span class="branchCov" title="Branch 2 was taken 7131 times"> + </span>]:<span class="lineCov">       9406 :     CMP(uuid_compare_3way(&amp;lf1-&gt;logical_datapath-&gt;header_.uuid,</span>
+<span class="lineNum">     677 </span>                :            :                           &amp;lf2-&gt;logical_datapath-&gt;header_.uuid));
+<span class="lineNum">     678 </span>        [<span class="branchCov" title="Branch 0 was taken 987 times"> + </span><span class="branchCov" title="Branch 1 was taken 6144 times"> + </span>]:<span class="lineCov">       7131 :     CMP(pl1 - pl2);</span>
+<span class="lineNum">     679 </span>[<span class="branchCov" title="Branch 0 was taken 4445 times"> + </span><span class="branchCov" title="Branch 1 was taken 1699 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 1669 times"> + </span><span class="branchCov" title="Branch 3 was taken 2776 times"> + </span>]:<span class="lineCov">       6144 :     CMP(lf1-&gt;table_id &gt; lf2-&gt;table_id ? 1 :</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 4 was taken 3368 times"> + </span><span class="branchCov" title="Branch 5 was taken 2776 times"> + </span>]
+<span class="lineNum">     680 </span>                :            :             (lf1-&gt;table_id &lt; lf2-&gt;table_id ? -1 : 0));
+<span class="lineNum">     681 </span>[<span class="branchCov" title="Branch 0 was taken 2273 times"> + </span><span class="branchCov" title="Branch 1 was taken 503 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 1004 times"> + </span><span class="branchCov" title="Branch 3 was taken 1772 times"> + </span>]:<span class="lineCov">       2776 :     CMP(lf1-&gt;priority &gt; lf2-&gt;priority ? -1 :</span>
+<span class="lineNum">     682 </span>                :            :             (lf1-&gt;priority &lt; lf2-&gt;priority ? 1 : 0));
+<span class="lineNum">     683 </span>        [<span class="branchCov" title="Branch 0 was taken 1772 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       1772 :     CMP(strcmp(lf1-&gt;match, lf2-&gt;match));</span>
+<span class="lineNum">     684 </span>                :            : 
+<span class="lineNum">     685 </span>                :            : #undef CMP
+<span class="lineNum">     686 </span>                :            : 
+<span class="lineNum">     687 </span>                :<span class="lineNoCov">          0 :     return 0;</span>
+<span class="lineNum">     688 </span>                :            : }
+<a name="689"><span class="lineNum">     689 </span>                :            : </a>
+<span class="lineNum">     690 </span>                :            : static void
+<span class="lineNum">     691 </span>                :<span class="lineCov">          9 : cmd_lflow_list(struct ctl_context *ctx)</span>
+<span class="lineNum">     692 </span>                :            : {
+<span class="lineNum">     693 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 9 times"> + </span>]:<span class="lineCov">          9 :     const char *datapath = ctx-&gt;argc == 2 ? ctx-&gt;argv[1] : NULL;</span>
+<span class="lineNum">     694 </span>                :<span class="lineCov">          9 :     struct uuid datapath_uuid = { .parts = { 0, }};</span>
+<span class="lineNum">     695 </span>                :            :     const struct sbrec_logical_flow **lflows;
+<span class="lineNum">     696 </span>                :            :     const struct sbrec_logical_flow *lflow;
+<span class="lineNum">     697 </span>                :<span class="lineCov">          9 :     size_t n_flows = 0, n_capacity = 64;</span>
+<span class="lineNum">     698 </span>                :            : 
+<span class="lineNum">     699 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 9 times"> + </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineCov">          9 :     if (datapath &amp;&amp; !uuid_from_string(&amp;datapath_uuid, datapath)) {</span>
+<span class="lineNum">     700 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_ERR(&quot;Invalid format of datapath UUID&quot;);</span>
+<span class="lineNum">     701 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     702 </span>                :            :     }
+<span class="lineNum">     703 </span>                :            : 
+<span class="lineNum">     704 </span>                :<span class="lineCov">          9 :     lflows = xmalloc(sizeof *lflows * n_capacity);</span>
+<span class="lineNum">     705 </span>        [<span class="branchCov" title="Branch 2 was taken 1470 times"> + </span><span class="branchCov" title="Branch 3 was taken 9 times"> + </span>]:<span class="lineCov">       1479 :     SBREC_LOGICAL_FLOW_FOR_EACH (lflow, ctx-&gt;idl) {</span>
+<span class="lineNum">     706 </span>        [<span class="branchCov" title="Branch 0 was taken 13 times"> + </span><span class="branchCov" title="Branch 1 was taken 1457 times"> + </span>]:<span class="lineCov">       1470 :         if (n_flows == n_capacity) {</span>
+<span class="lineNum">     707 </span>                :<span class="lineCov">         13 :             lflows = x2nrealloc(lflows, &amp;n_capacity, sizeof *lflows);</span>
+<span class="lineNum">     708 </span>                :            :         }
+<span class="lineNum">     709 </span>                :<span class="lineCov">       1470 :         lflows[n_flows] = lflow;</span>
+<span class="lineNum">     710 </span>                :<span class="lineCov">       1470 :         n_flows++;</span>
+<span class="lineNum">     711 </span>                :            :     }
+<span class="lineNum">     712 </span>                :            : 
+<span class="lineNum">     713 </span>                :<span class="lineCov">          9 :     qsort(lflows, n_flows, sizeof *lflows, lflow_cmp);</span>
+<span class="lineNum">     714 </span>                :            : 
+<span class="lineNum">     715 </span>                :<span class="lineCov">          9 :     const char *cur_pipeline = &quot;&quot;;</span>
+<span class="lineNum">     716 </span>                :            :     size_t i;
+<span class="lineNum">     717 </span>        [<span class="branchCov" title="Branch 0 was taken 1470 times"> + </span><span class="branchCov" title="Branch 1 was taken 9 times"> + </span>]:<span class="lineCov">       1479 :     for (i = 0; i &lt; n_flows; i++) {</span>
+<span class="lineNum">     718 </span>                :<span class="lineCov">       1470 :         lflow = lflows[i];</span>
+<span class="lineNum">     719 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1470 times"> + </span>][<span class="branchNoExec" title="Branch 3 was not executed"> # </span><span class="branchNoExec" title="Branch 4 was not executed"> # </span>]:<span class="lineCov">       1470 :         if (datapath &amp;&amp; !uuid_equals(&amp;datapath_uuid,</span>
+<span class="lineNum">     720 </span>                :<span class="lineNoCov">          0 :                                      &amp;lflow-&gt;logical_datapath-&gt;header_.uuid)) {</span>
+<span class="lineNum">     721 </span>                :<span class="lineNoCov">          0 :             continue;</span>
+<span class="lineNum">     722 </span>                :            :         }
+<span class="lineNum">     723 </span>        [<span class="branchCov" title="Branch 0 was taken 52 times"> + </span><span class="branchCov" title="Branch 1 was taken 1418 times"> + </span>]:<span class="lineCov">       1470 :         if (strcmp(cur_pipeline, lflow-&gt;pipeline)) {</span>
+<span class="lineNum">     724 </span>                :<span class="lineCov">         52 :             printf(&quot;Datapath: \&quot;%s\&quot; (&quot;UUID_FMT&quot;)  Pipeline: %s\n&quot;,</span>
+<span class="lineNum">     725 </span>                :<span class="lineCov">         52 :                    smap_get_def(&amp;lflow-&gt;logical_datapath-&gt;external_ids,</span>
+<span class="lineNum">     726 </span>                :            :                                 &quot;name&quot;, &quot;&quot;),
+<span class="lineNum">     727 </span>                :<span class="lineCov">        156 :                    UUID_ARGS(&amp;lflow-&gt;logical_datapath-&gt;header_.uuid),</span>
+<span class="lineNum">     728 </span>                :            :                    lflow-&gt;pipeline);
+<span class="lineNum">     729 </span>                :<span class="lineCov">         52 :             cur_pipeline = lflow-&gt;pipeline;</span>
+<span class="lineNum">     730 </span>                :            :         }
+<span class="lineNum">     731 </span>                :            : 
+<span class="lineNum">     732 </span>                :<span class="lineCov">       1470 :         printf(&quot;  table=%-2&quot; PRId64 &quot;(%-19s), priority=%-5&quot; PRId64</span>
+<span class="lineNum">     733 </span>                :            :                &quot;, match=(%s), action=(%s)\n&quot;,
+<span class="lineNum">     734 </span>                :            :                lflow-&gt;table_id,
+<span class="lineNum">     735 </span>                :            :                smap_get_def(&amp;lflow-&gt;external_ids, &quot;stage-name&quot;, &quot;&quot;),
+<span class="lineNum">     736 </span>                :            :                lflow-&gt;priority, lflow-&gt;match, lflow-&gt;actions);
+<span class="lineNum">     737 </span>                :            :     }
+<span class="lineNum">     738 </span>                :            : 
+<span class="lineNum">     739 </span>                :<span class="lineCov">          9 :     free(lflows);</span>
+<span class="lineNum">     740 </span>                :            : }
+<span class="lineNum">     741 </span>                :            : 
+<span class="lineNum">     742 </span>                :            : 
+<span class="lineNum">     743 </span>                :            : static const struct ctl_table_class tables[] = {
+<span class="lineNum">     744 </span>                :            :     {&amp;sbrec_table_sb_global,
+<span class="lineNum">     745 </span>                :            :      {{&amp;sbrec_table_sb_global, NULL, NULL},
+<span class="lineNum">     746 </span>                :            :       {NULL, NULL, NULL}}},
+<span class="lineNum">     747 </span>                :            : 
+<span class="lineNum">     748 </span>                :            :     {&amp;sbrec_table_chassis,
+<span class="lineNum">     749 </span>                :            :      {{&amp;sbrec_table_chassis, &amp;sbrec_chassis_col_name, NULL},
+<span class="lineNum">     750 </span>                :            :       {NULL, NULL, NULL}}},
+<span class="lineNum">     751 </span>                :            : 
+<span class="lineNum">     752 </span>                :            :     {&amp;sbrec_table_encap,
+<span class="lineNum">     753 </span>                :            :      {{NULL, NULL, NULL},
+<span class="lineNum">     754 </span>                :            :       {NULL, NULL, NULL}}},
+<span class="lineNum">     755 </span>                :            : 
+<span class="lineNum">     756 </span>                :            :     {&amp;sbrec_table_logical_flow,
+<span class="lineNum">     757 </span>                :            :      {{&amp;sbrec_table_logical_flow, NULL,
+<span class="lineNum">     758 </span>                :            :        &amp;sbrec_logical_flow_col_logical_datapath},
+<span class="lineNum">     759 </span>                :            :       {NULL, NULL, NULL}}},
+<span class="lineNum">     760 </span>                :            : 
+<span class="lineNum">     761 </span>                :            :     {&amp;sbrec_table_multicast_group,
+<span class="lineNum">     762 </span>                :            :      {{NULL, NULL, NULL},
+<span class="lineNum">     763 </span>                :            :       {NULL, NULL, NULL}}},
+<span class="lineNum">     764 </span>                :            : 
+<span class="lineNum">     765 </span>                :            :     {&amp;sbrec_table_datapath_binding,
+<span class="lineNum">     766 </span>                :            :      {{NULL, NULL, NULL},
+<span class="lineNum">     767 </span>                :            :       {NULL, NULL, NULL}}},
+<span class="lineNum">     768 </span>                :            : 
+<span class="lineNum">     769 </span>                :            :     {&amp;sbrec_table_port_binding,
+<span class="lineNum">     770 </span>                :            :      {{&amp;sbrec_table_port_binding, &amp;sbrec_port_binding_col_logical_port, NULL},
+<span class="lineNum">     771 </span>                :            :       {NULL, NULL, NULL}}},
+<span class="lineNum">     772 </span>                :            : 
+<span class="lineNum">     773 </span>                :            :     {&amp;sbrec_table_mac_binding,
+<span class="lineNum">     774 </span>                :            :      {{&amp;sbrec_table_mac_binding, &amp;sbrec_mac_binding_col_logical_port, NULL},
+<span class="lineNum">     775 </span>                :            :       {NULL, NULL, NULL}}},
+<span class="lineNum">     776 </span>                :            : 
+<span class="lineNum">     777 </span>                :            :     {&amp;sbrec_table_address_set,
+<span class="lineNum">     778 </span>                :            :      {{&amp;sbrec_table_address_set, &amp;sbrec_address_set_col_name, NULL},
+<span class="lineNum">     779 </span>                :            :       {NULL, NULL, NULL}}},
+<span class="lineNum">     780 </span>                :            : 
+<span class="lineNum">     781 </span>                :            :     {NULL, {{NULL, NULL, NULL}, {NULL, NULL, NULL}}}
+<span class="lineNum">     782 </span>                :            : };
+<span class="lineNum">     783 </span>                :            : 
+<a name="784"><span class="lineNum">     784 </span>                :            : </a>
+<span class="lineNum">     785 </span>                :            : static void
+<span class="lineNum">     786 </span>                :<span class="lineCov">        192 : sbctl_context_init_command(struct sbctl_context *sbctl_ctx,</span>
+<span class="lineNum">     787 </span>                :            :                            struct ctl_command *command)
+<span class="lineNum">     788 </span>                :            : {
+<span class="lineNum">     789 </span>                :<span class="lineCov">        192 :     ctl_context_init_command(&amp;sbctl_ctx-&gt;base, command);</span>
+<span class="lineNum">     790 </span>                :<span class="lineCov">        192 : }</span>
+<a name="791"><span class="lineNum">     791 </span>                :            : </a>
+<span class="lineNum">     792 </span>                :            : static void
+<span class="lineNum">     793 </span>                :<span class="lineCov">        352 : sbctl_context_init(struct sbctl_context *sbctl_ctx,</span>
+<span class="lineNum">     794 </span>                :            :                    struct ctl_command *command, struct ovsdb_idl *idl,
+<span class="lineNum">     795 </span>                :            :                    struct ovsdb_idl_txn *txn,
+<span class="lineNum">     796 </span>                :            :                    struct ovsdb_symbol_table *symtab)
+<span class="lineNum">     797 </span>                :            : {
+<span class="lineNum">     798 </span>                :<span class="lineCov">        352 :     ctl_context_init(&amp;sbctl_ctx-&gt;base, command, idl, txn, symtab,</span>
+<span class="lineNum">     799 </span>                :            :                      sbctl_context_invalidate_cache);
+<span class="lineNum">     800 </span>                :<span class="lineCov">        352 :     sbctl_ctx-&gt;cache_valid = false;</span>
+<span class="lineNum">     801 </span>                :<span class="lineCov">        352 : }</span>
+<a name="802"><span class="lineNum">     802 </span>                :            : </a>
+<span class="lineNum">     803 </span>                :            : static void
+<span class="lineNum">     804 </span>                :<span class="lineCov">        192 : sbctl_context_done_command(struct sbctl_context *sbctl_ctx,</span>
+<span class="lineNum">     805 </span>                :            :                            struct ctl_command *command)
+<span class="lineNum">     806 </span>                :            : {
+<span class="lineNum">     807 </span>                :<span class="lineCov">        192 :     ctl_context_done_command(&amp;sbctl_ctx-&gt;base, command);</span>
+<span class="lineNum">     808 </span>                :<span class="lineCov">        192 : }</span>
+<a name="809"><span class="lineNum">     809 </span>                :            : </a>
+<span class="lineNum">     810 </span>                :            : static void
+<span class="lineNum">     811 </span>                :<span class="lineCov">        352 : sbctl_context_done(struct sbctl_context *sbctl_ctx,</span>
+<span class="lineNum">     812 </span>                :            :                    struct ctl_command *command)
+<span class="lineNum">     813 </span>                :            : {
+<span class="lineNum">     814 </span>                :<span class="lineCov">        352 :     ctl_context_done(&amp;sbctl_ctx-&gt;base, command);</span>
+<span class="lineNum">     815 </span>                :<span class="lineCov">        352 : }</span>
+<a name="816"><span class="lineNum">     816 </span>                :            : </a>
+<span class="lineNum">     817 </span>                :            : static void
+<span class="lineNum">     818 </span>                :<span class="lineCov">        181 : run_prerequisites(struct ctl_command *commands, size_t n_commands,</span>
+<span class="lineNum">     819 </span>                :            :                   struct ovsdb_idl *idl)
+<span class="lineNum">     820 </span>                :            : {
+<span class="lineNum">     821 </span>                :<span class="lineCov">        181 :     ovsdb_idl_add_table(idl, &amp;sbrec_table_sb_global);</span>
+<span class="lineNum">     822 </span>                :            : 
+<span class="lineNum">     823 </span>        [<span class="branchCov" title="Branch 0 was taken 192 times"> + </span><span class="branchCov" title="Branch 1 was taken 181 times"> + </span>]:<span class="lineCov">        373 :     for (struct ctl_command *c = commands; c &lt; &amp;commands[n_commands]; c++) {</span>
+<span class="lineNum">     824 </span>        [<span class="branchCov" title="Branch 0 was taken 159 times"> + </span><span class="branchCov" title="Branch 1 was taken 33 times"> + </span>]:<span class="lineCov">        192 :         if (c-&gt;syntax-&gt;prerequisites) {</span>
+<span class="lineNum">     825 </span>                :            :             struct sbctl_context sbctl_ctx;
+<span class="lineNum">     826 </span>                :            : 
+<span class="lineNum">     827 </span>                :<span class="lineCov">        159 :             ds_init(&amp;c-&gt;output);</span>
+<span class="lineNum">     828 </span>                :<span class="lineCov">        159 :             c-&gt;table = NULL;</span>
+<span class="lineNum">     829 </span>                :            : 
+<span class="lineNum">     830 </span>                :<span class="lineCov">        159 :             sbctl_context_init(&amp;sbctl_ctx, c, idl, NULL, NULL);</span>
+<span class="lineNum">     831 </span>                :<span class="lineCov">        159 :             (c-&gt;syntax-&gt;prerequisites)(&amp;sbctl_ctx.base);</span>
+<span class="lineNum">     832 </span>                :<span class="lineCov">        159 :             sbctl_context_done(&amp;sbctl_ctx, c);</span>
+<span class="lineNum">     833 </span>                :            : 
+<span class="lineNum">     834 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 159 times"> + </span>]:<span class="lineCov">        159 :             ovs_assert(!c-&gt;output.string);</span>
+<span class="lineNum">     835 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 159 times"> + </span>]:<span class="lineCov">        159 :             ovs_assert(!c-&gt;table);</span>
+<span class="lineNum">     836 </span>                :            :         }
+<span class="lineNum">     837 </span>                :            :     }
+<span class="lineNum">     838 </span>                :<span class="lineCov">        181 : }</span>
+<a name="839"><span class="lineNum">     839 </span>                :            : </a>
+<span class="lineNum">     840 </span>                :            : static bool
+<span class="lineNum">     841 </span>                :<span class="lineCov">        181 : do_sbctl(const char *args, struct ctl_command *commands, size_t n_commands,</span>
+<span class="lineNum">     842 </span>                :            :          struct ovsdb_idl *idl)
+<span class="lineNum">     843 </span>                :            : {
+<span class="lineNum">     844 </span>                :            :     struct ovsdb_idl_txn *txn;
+<span class="lineNum">     845 </span>                :            :     enum ovsdb_idl_txn_status status;
+<span class="lineNum">     846 </span>                :            :     struct ovsdb_symbol_table *symtab;
+<span class="lineNum">     847 </span>                :            :     struct sbctl_context sbctl_ctx;
+<span class="lineNum">     848 </span>                :            :     struct ctl_command *c;
+<span class="lineNum">     849 </span>                :            :     struct shash_node *node;
+<span class="lineNum">     850 </span>                :<span class="lineCov">        181 :     char *error = NULL;</span>
+<span class="lineNum">     851 </span>                :            : 
+<span class="lineNum">     852 </span>                :<span class="lineCov">        181 :     txn = the_idl_txn = ovsdb_idl_txn_create(idl);</span>
+<span class="lineNum">     853 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 181 times"> + </span>]:<span class="lineCov">        181 :     if (dry_run) {</span>
+<span class="lineNum">     854 </span>                :<span class="lineNoCov">          0 :         ovsdb_idl_txn_set_dry_run(txn);</span>
+<span class="lineNum">     855 </span>                :            :     }
+<span class="lineNum">     856 </span>                :            : 
+<span class="lineNum">     857 </span>                :<span class="lineCov">        181 :     ovsdb_idl_txn_add_comment(txn, &quot;ovs-sbctl: %s&quot;, args);</span>
+<span class="lineNum">     858 </span>                :            : 
+<span class="lineNum">     859 </span>                :<span class="lineCov">        181 :     const struct sbrec_sb_global *sb = sbrec_sb_global_first(idl);</span>
+<span class="lineNum">     860 </span>        [<span class="branchCov" title="Branch 0 was taken 44 times"> + </span><span class="branchCov" title="Branch 1 was taken 137 times"> + </span>]:<span class="lineCov">        181 :     if (!sb) {</span>
+<span class="lineNum">     861 </span>                :            :         /* XXX add verification that table is empty */
+<span class="lineNum">     862 </span>                :<span class="lineCov">         44 :         sb = sbrec_sb_global_insert(txn);</span>
+<span class="lineNum">     863 </span>                :            :     }
+<span class="lineNum">     864 </span>                :            : 
+<span class="lineNum">     865 </span>                :<span class="lineCov">        181 :     symtab = ovsdb_symbol_table_create();</span>
+<span class="lineNum">     866 </span>        [<span class="branchCov" title="Branch 0 was taken 192 times"> + </span><span class="branchCov" title="Branch 1 was taken 181 times"> + </span>]:<span class="lineCov">        373 :     for (c = commands; c &lt; &amp;commands[n_commands]; c++) {</span>
+<span class="lineNum">     867 </span>                :<span class="lineCov">        192 :         ds_init(&amp;c-&gt;output);</span>
+<span class="lineNum">     868 </span>                :<span class="lineCov">        192 :         c-&gt;table = NULL;</span>
+<span class="lineNum">     869 </span>                :            :     }
+<span class="lineNum">     870 </span>                :<span class="lineCov">        181 :     sbctl_context_init(&amp;sbctl_ctx, NULL, idl, txn, symtab);</span>
+<span class="lineNum">     871 </span>        [<span class="branchCov" title="Branch 0 was taken 192 times"> + </span><span class="branchCov" title="Branch 1 was taken 181 times"> + </span>]:<span class="lineCov">        373 :     for (c = commands; c &lt; &amp;commands[n_commands]; c++) {</span>
+<span class="lineNum">     872 </span>                :<span class="lineCov">        192 :         sbctl_context_init_command(&amp;sbctl_ctx, c);</span>
+<span class="lineNum">     873 </span>        [<span class="branchCov" title="Branch 0 was taken 192 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        192 :         if (c-&gt;syntax-&gt;run) {</span>
+<span class="lineNum">     874 </span>                :<span class="lineCov">        192 :             (c-&gt;syntax-&gt;run)(&amp;sbctl_ctx.base);</span>
+<span class="lineNum">     875 </span>                :            :         }
+<span class="lineNum">     876 </span>                :<span class="lineCov">        192 :         sbctl_context_done_command(&amp;sbctl_ctx, c);</span>
+<span class="lineNum">     877 </span>                :            : 
+<span class="lineNum">     878 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 192 times"> + </span>]:<span class="lineCov">        192 :         if (sbctl_ctx.base.try_again) {</span>
+<span class="lineNum">     879 </span>                :<span class="lineNoCov">          0 :             sbctl_context_done(&amp;sbctl_ctx, NULL);</span>
+<span class="lineNum">     880 </span>                :<span class="lineNoCov">          0 :             goto try_again;</span>
+<span class="lineNum">     881 </span>                :            :         }
+<span class="lineNum">     882 </span>                :            :     }
+<span class="lineNum">     883 </span>                :<span class="lineCov">        181 :     sbctl_context_done(&amp;sbctl_ctx, NULL);</span>
+<span class="lineNum">     884 </span>                :            : 
+<span class="lineNum">     885 </span>[<span class="branchCov" title="Branch 2 was taken 5 times"> + </span><span class="branchCov" title="Branch 3 was taken 181 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 181 times"> + </span>]:<span class="lineCov">        186 :     SHASH_FOR_EACH (node, &amp;symtab-&gt;sh) {</span>
+<span class="lineNum">     886 </span>                :<span class="lineCov">          5 :         struct ovsdb_symbol *symbol = node-&gt;data;</span>
+<span class="lineNum">     887 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 5 times"> + </span>]:<span class="lineCov">          5 :         if (!symbol-&gt;created) {</span>
+<span class="lineNum">     888 </span>                :<span class="lineNoCov">          0 :             ctl_fatal(&quot;row id \&quot;%s\&quot; is referenced but never created (e.g. &quot;</span>
+<span class="lineNum">     889 </span>                :            :                       &quot;with \&quot;-- --id=%s create ...\&quot;)&quot;,
+<span class="lineNum">     890 </span>                :            :                       node-&gt;name, node-&gt;name);
+<span class="lineNum">     891 </span>                :            :         }
+<span class="lineNum">     892 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 5 times"> + </span>]:<span class="lineCov">          5 :         if (!symbol-&gt;strong_ref) {</span>
+<span class="lineNum">     893 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (!symbol-&gt;weak_ref) {</span>
+<span class="lineNum">     894 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_WARN(&quot;row id \&quot;%s\&quot; was created but no reference to it &quot;</span>
+<span class="lineNum">     895 </span>                :            :                           &quot;was inserted, so it will not actually appear in &quot;
+<span class="lineNum">     896 </span>                :            :                           &quot;the database&quot;, node-&gt;name);
+<span class="lineNum">     897 </span>                :            :             } else {
+<span class="lineNum">     898 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_WARN(&quot;row id \&quot;%s\&quot; was created but only a weak &quot;</span>
+<span class="lineNum">     899 </span>                :            :                           &quot;reference to it was inserted, so it will not &quot;
+<span class="lineNum">     900 </span>                :            :                           &quot;actually appear in the database&quot;, node-&gt;name);
+<span class="lineNum">     901 </span>                :            :             }
+<span class="lineNum">     902 </span>                :            :         }
+<span class="lineNum">     903 </span>                :            :     }
+<span class="lineNum">     904 </span>                :            : 
+<span class="lineNum">     905 </span>                :<span class="lineCov">        181 :     status = ovsdb_idl_txn_commit_block(txn);</span>
+<span class="lineNum">     906 </span>[<span class="branchCov" title="Branch 0 was taken 70 times"> + </span><span class="branchCov" title="Branch 1 was taken 111 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 70 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        181 :     if (status == TXN_UNCHANGED || status == TXN_SUCCESS) {</span>
+<span class="lineNum">     907 </span>        [<span class="branchCov" title="Branch 0 was taken 192 times"> + </span><span class="branchCov" title="Branch 1 was taken 181 times"> + </span>]:<span class="lineCov">        373 :         for (c = commands; c &lt; &amp;commands[n_commands]; c++) {</span>
+<span class="lineNum">     908 </span>        [<span class="branchCov" title="Branch 0 was taken 12 times"> + </span><span class="branchCov" title="Branch 1 was taken 180 times"> + </span>]:<span class="lineCov">        192 :             if (c-&gt;syntax-&gt;postprocess) {</span>
+<span class="lineNum">     909 </span>                :<span class="lineCov">         12 :                 sbctl_context_init(&amp;sbctl_ctx, c, idl, txn, symtab);</span>
+<span class="lineNum">     910 </span>                :<span class="lineCov">         12 :                 (c-&gt;syntax-&gt;postprocess)(&amp;sbctl_ctx.base);</span>
+<span class="lineNum">     911 </span>                :<span class="lineCov">         12 :                 sbctl_context_done(&amp;sbctl_ctx, c);</span>
+<span class="lineNum">     912 </span>                :            :             }
+<span class="lineNum">     913 </span>                :            :         }
+<span class="lineNum">     914 </span>                :            :     }
+<span class="lineNum">     915 </span>                :<span class="lineCov">        181 :     error = xstrdup(ovsdb_idl_txn_get_error(txn));</span>
+<span class="lineNum">     916 </span>                :            : 
+<span class="lineNum">     917 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 181 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span> :<span class="lineCov">        181 :     switch (status) {</span>
+<span class="lineNum">         </span>      <span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchNoCov" title="Branch 6 was not taken"> - </span>]
+<span class="lineNum">     918 </span>                :            :     case TXN_UNCOMMITTED:
+<span class="lineNum">     919 </span>                :            :     case TXN_INCOMPLETE:
+<span class="lineNum">     920 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     921 </span>                :            : 
+<span class="lineNum">     922 </span>                :            :     case TXN_ABORTED:
+<span class="lineNum">     923 </span>                :            :         /* Should not happen--we never call ovsdb_idl_txn_abort(). */
+<span class="lineNum">     924 </span>                :<span class="lineNoCov">          0 :         ctl_fatal(&quot;transaction aborted&quot;);</span>
+<span class="lineNum">     925 </span>                :            : 
+<span class="lineNum">     926 </span>                :            :     case TXN_UNCHANGED:
+<span class="lineNum">     927 </span>                :            :     case TXN_SUCCESS:
+<span class="lineNum">     928 </span>                :<span class="lineCov">        181 :         break;</span>
+<span class="lineNum">     929 </span>                :            : 
+<span class="lineNum">     930 </span>                :            :     case TXN_TRY_AGAIN:
+<span class="lineNum">     931 </span>                :<span class="lineNoCov">          0 :         goto try_again;</span>
+<span class="lineNum">     932 </span>                :            : 
+<span class="lineNum">     933 </span>                :            :     case TXN_ERROR:
+<span class="lineNum">     934 </span>                :<span class="lineNoCov">          0 :         ctl_fatal(&quot;transaction error: %s&quot;, error);</span>
+<span class="lineNum">     935 </span>                :            : 
+<span class="lineNum">     936 </span>                :            :     case TXN_NOT_LOCKED:
+<span class="lineNum">     937 </span>                :            :         /* Should not happen--we never call ovsdb_idl_set_lock(). */
+<span class="lineNum">     938 </span>                :<span class="lineNoCov">          0 :         ctl_fatal(&quot;database not locked&quot;);</span>
+<span class="lineNum">     939 </span>                :            : 
+<span class="lineNum">     940 </span>                :            :     default:
+<span class="lineNum">     941 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     942 </span>                :            :     }
+<span class="lineNum">     943 </span>                :<span class="lineCov">        181 :     free(error);</span>
+<span class="lineNum">     944 </span>                :            : 
+<span class="lineNum">     945 </span>                :<span class="lineCov">        181 :     ovsdb_symbol_table_destroy(symtab);</span>
+<span class="lineNum">     946 </span>                :            : 
+<span class="lineNum">     947 </span>        [<span class="branchCov" title="Branch 0 was taken 192 times"> + </span><span class="branchCov" title="Branch 1 was taken 181 times"> + </span>]:<span class="lineCov">        373 :     for (c = commands; c &lt; &amp;commands[n_commands]; c++) {</span>
+<span class="lineNum">     948 </span>                :<span class="lineCov">        192 :         struct ds *ds = &amp;c-&gt;output;</span>
+<span class="lineNum">     949 </span>                :            : 
+<span class="lineNum">     950 </span>        [<span class="branchCov" title="Branch 0 was taken 92 times"> + </span><span class="branchCov" title="Branch 1 was taken 100 times"> + </span>]:<span class="lineCov">        192 :         if (c-&gt;table) {</span>
+<span class="lineNum">     951 </span>                :<span class="lineCov">         92 :             table_print(c-&gt;table, &amp;table_style);</span>
+<span class="lineNum">     952 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 100 times"> + </span>]:<span class="lineCov">        100 :         } else if (oneline) {</span>
+<span class="lineNum">     953 </span>                :            :             size_t j;
+<span class="lineNum">     954 </span>                :            : 
+<span class="lineNum">     955 </span>                :<span class="lineNoCov">          0 :             ds_chomp(ds, '\n');</span>
+<span class="lineNum">     956 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             for (j = 0; j &lt; ds-&gt;length; j++) {</span>
+<span class="lineNum">     957 </span>                :<span class="lineNoCov">          0 :                 int ch = ds-&gt;string[j];</span>
+<span class="lineNum">     958 </span>     [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 switch (ch) {</span>
+<span class="lineNum">     959 </span>                :            :                 case '\n':
+<span class="lineNum">     960 </span>                :<span class="lineNoCov">          0 :                     fputs(&quot;\\n&quot;, stdout);</span>
+<span class="lineNum">     961 </span>                :<span class="lineNoCov">          0 :                     break;</span>
+<span class="lineNum">     962 </span>                :            : 
+<span class="lineNum">     963 </span>                :            :                 case '\\':
+<span class="lineNum">     964 </span>                :<span class="lineNoCov">          0 :                     fputs(&quot;\\\\&quot;, stdout);</span>
+<span class="lineNum">     965 </span>                :<span class="lineNoCov">          0 :                     break;</span>
+<span class="lineNum">     966 </span>                :            : 
+<span class="lineNum">     967 </span>                :            :                 default:
+<span class="lineNum">     968 </span>                :<span class="lineNoCov">          0 :                     putchar(ch);</span>
+<span class="lineNum">     969 </span>                :            :                 }
+<span class="lineNum">     970 </span>                :            :             }
+<span class="lineNum">     971 </span>                :<span class="lineNoCov">          0 :             putchar('\n');</span>
+<span class="lineNum">     972 </span>                :            :         } else {
+<span class="lineNum">     973 </span>                :<span class="lineCov">        100 :             fputs(ds_cstr(ds), stdout);</span>
+<span class="lineNum">     974 </span>                :            :         }
+<span class="lineNum">     975 </span>                :<span class="lineCov">        192 :         ds_destroy(&amp;c-&gt;output);</span>
+<span class="lineNum">     976 </span>                :<span class="lineCov">        192 :         table_destroy(c-&gt;table);</span>
+<span class="lineNum">     977 </span>                :<span class="lineCov">        192 :         free(c-&gt;table);</span>
+<span class="lineNum">     978 </span>                :            : 
+<span class="lineNum">     979 </span>                :<span class="lineCov">        192 :         shash_destroy_free_data(&amp;c-&gt;options);</span>
+<span class="lineNum">     980 </span>                :            :     }
+<span class="lineNum">     981 </span>                :<span class="lineCov">        181 :     free(commands);</span>
+<span class="lineNum">     982 </span>                :<span class="lineCov">        181 :     ovsdb_idl_txn_destroy(txn);</span>
+<span class="lineNum">     983 </span>                :<span class="lineCov">        181 :     ovsdb_idl_destroy(idl);</span>
+<span class="lineNum">     984 </span>                :            : 
+<span class="lineNum">     985 </span>                :<span class="lineCov">        181 :     return true;</span>
+<span class="lineNum">     986 </span>                :            : 
+<span class="lineNum">     987 </span>                :            : try_again:
+<span class="lineNum">     988 </span>                :            :     /* Our transaction needs to be rerun, or a prerequisite was not met.  Free
+<span class="lineNum">     989 </span>                :            :      * resources and return so that the caller can try again. */
+<span class="lineNum">     990 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (txn) {</span>
+<span class="lineNum">     991 </span>                :<span class="lineNoCov">          0 :         ovsdb_idl_txn_abort(txn);</span>
+<span class="lineNum">     992 </span>                :<span class="lineNoCov">          0 :         ovsdb_idl_txn_destroy(txn);</span>
+<span class="lineNum">     993 </span>                :<span class="lineNoCov">          0 :         the_idl_txn = NULL;</span>
+<span class="lineNum">     994 </span>                :            :     }
+<span class="lineNum">     995 </span>                :<span class="lineNoCov">          0 :     ovsdb_symbol_table_destroy(symtab);</span>
+<span class="lineNum">     996 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     for (c = commands; c &lt; &amp;commands[n_commands]; c++) {</span>
+<span class="lineNum">     997 </span>                :<span class="lineNoCov">          0 :         ds_destroy(&amp;c-&gt;output);</span>
+<span class="lineNum">     998 </span>                :<span class="lineNoCov">          0 :         table_destroy(c-&gt;table);</span>
+<span class="lineNum">     999 </span>                :<span class="lineNoCov">          0 :         free(c-&gt;table);</span>
+<span class="lineNum">    1000 </span>                :            :     }
+<span class="lineNum">    1001 </span>                :<span class="lineNoCov">          0 :     free(error);</span>
+<span class="lineNum">    1002 </span>                :<span class="lineCov">        181 :     return false;</span>
+<span class="lineNum">    1003 </span>                :            : }
+<span class="lineNum">    1004 </span>                :            : 
+<span class="lineNum">    1005 </span>                :            : /* Frees the current transaction and the underlying IDL and then calls
+<span class="lineNum">    1006 </span>                :            :  * exit(status).
+<span class="lineNum">    1007 </span>                :            :  *
+<span class="lineNum">    1008 </span>                :            :  * Freeing the transaction and the IDL is not strictly necessary, but it makes
+<span class="lineNum">    1009 </span>                :            :  * for a clean memory leak report from valgrind in the normal case.  That makes
+<a name="1010"><span class="lineNum">    1010 </span>                :            :  * it easier to notice real memory leaks. */</a>
+<span class="lineNum">    1011 </span>                :            : static void
+<span class="lineNum">    1012 </span>                :<span class="lineNoCov">          0 : sbctl_exit(int status)</span>
+<span class="lineNum">    1013 </span>                :            : {
+<span class="lineNum">    1014 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (the_idl_txn) {</span>
+<span class="lineNum">    1015 </span>                :<span class="lineNoCov">          0 :         ovsdb_idl_txn_abort(the_idl_txn);</span>
+<span class="lineNum">    1016 </span>                :<span class="lineNoCov">          0 :         ovsdb_idl_txn_destroy(the_idl_txn);</span>
+<span class="lineNum">    1017 </span>                :            :     }
+<span class="lineNum">    1018 </span>                :<span class="lineNoCov">          0 :     ovsdb_idl_destroy(the_idl);</span>
+<span class="lineNum">    1019 </span>                :<span class="lineNoCov">          0 :     exit(status);</span>
+<span class="lineNum">    1020 </span>                :            : }
+<span class="lineNum">    1021 </span>                :            : 
+<span class="lineNum">    1022 </span>                :            : static const struct ctl_command_syntax sbctl_commands[] = {
+<span class="lineNum">    1023 </span>                :            :     { &quot;init&quot;, 0, 0, &quot;&quot;, NULL, sbctl_init, NULL, &quot;&quot;, RW },
+<span class="lineNum">    1024 </span>                :            : 
+<span class="lineNum">    1025 </span>                :            :     /* Chassis commands. */
+<span class="lineNum">    1026 </span>                :            :     {&quot;chassis-add&quot;, 3, 3, &quot;CHASSIS ENCAP-TYPE ENCAP-IP&quot;, pre_get_info,
+<span class="lineNum">    1027 </span>                :            :      cmd_chassis_add, NULL, &quot;--may-exist&quot;, RW},
+<span class="lineNum">    1028 </span>                :            :     {&quot;chassis-del&quot;, 1, 1, &quot;CHASSIS&quot;, pre_get_info, cmd_chassis_del, NULL,
+<span class="lineNum">    1029 </span>                :            :      &quot;--if-exists&quot;, RW},
+<span class="lineNum">    1030 </span>                :            : 
+<span class="lineNum">    1031 </span>                :            :     /* Port binding commands. */
+<span class="lineNum">    1032 </span>                :            :     {&quot;lsp-bind&quot;, 2, 2, &quot;PORT CHASSIS&quot;, pre_get_info, cmd_lsp_bind, NULL,
+<span class="lineNum">    1033 </span>                :            :      &quot;--may-exist&quot;, RW},
+<span class="lineNum">    1034 </span>                :            :     {&quot;lsp-unbind&quot;, 1, 1, &quot;PORT&quot;, pre_get_info, cmd_lsp_unbind, NULL,
+<span class="lineNum">    1035 </span>                :            :      &quot;--if-exists&quot;, RW},
+<span class="lineNum">    1036 </span>                :            : 
+<span class="lineNum">    1037 </span>                :            :     /* Logical flow commands */
+<span class="lineNum">    1038 </span>                :            :     {&quot;lflow-list&quot;, 0, 1, &quot;[DATAPATH]&quot;, pre_get_info, cmd_lflow_list, NULL,
+<span class="lineNum">    1039 </span>                :            :      &quot;&quot;, RO},
+<span class="lineNum">    1040 </span>                :            :     {&quot;dump-flows&quot;, 0, 1, &quot;[DATAPATH]&quot;, pre_get_info, cmd_lflow_list, NULL,
+<span class="lineNum">    1041 </span>                :            :      &quot;&quot;, RO}, /* Friendly alias for lflow-list */
+<span class="lineNum">    1042 </span>                :            : 
+<span class="lineNum">    1043 </span>                :            :     /* SSL commands (To Be Added). */
+<span class="lineNum">    1044 </span>                :            : 
+<span class="lineNum">    1045 </span>                :            :     {NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, RO},
+<span class="lineNum">    1046 </span>                :            : };
+<span class="lineNum">    1047 </span>                :            : 
+<a name="1048"><span class="lineNum">    1048 </span>                :            : /* Registers sbctl and common db commands. */</a>
+<span class="lineNum">    1049 </span>                :            : static void
+<span class="lineNum">    1050 </span>                :<span class="lineCov">        181 : sbctl_cmd_init(void)</span>
+<span class="lineNum">    1051 </span>                :            : {
+<span class="lineNum">    1052 </span>                :<span class="lineCov">        181 :     ctl_init(tables, cmd_show_tables, sbctl_exit);</span>
+<span class="lineNum">    1053 </span>                :<span class="lineCov">        181 :     ctl_register_commands(sbctl_commands);</span>
+<span class="lineNum">    1054 </span>                :<span class="lineCov">        181 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

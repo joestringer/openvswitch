@@ -1,0 +1,267 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/rtnetlink.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - rtnetlink.c<span style="font-size: 80%;"> (source / <a href="rtnetlink.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">50</td>
+            <td class="headerCovTableEntry">50</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">8</td>
+            <td class="headerCovTableEntry">8</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">22</td>
+            <td class="headerCovTableEntry">32</td>
+            <td class="headerCovTableEntryLo">68.8 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2009, 2010, 2013, 2015, 2016 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &quot;rtnetlink.h&quot;
+<span class="lineNum">      20 </span>                :            : 
+<span class="lineNum">      21 </span>                :            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;linux/rtnetlink.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;net/if.h&gt;
+<span class="lineNum">      24 </span>                :            : 
+<span class="lineNum">      25 </span>                :            : #include &quot;netlink.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;netlink-notifier.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;openvswitch/ofpbuf.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;packets.h&quot;
+<span class="lineNum">      29 </span>                :            : 
+<span class="lineNum">      30 </span>                :            : static struct nln *nln = NULL;
+<span class="lineNum">      31 </span>                :            : static struct rtnetlink_change rtn_change;
+<span class="lineNum">      32 </span>                :            : 
+<a name="33"><span class="lineNum">      33 </span>                :            : /* Returns true if the given netlink msg type corresponds to RTNLGRP_LINK. */</a>
+<span class="lineNum">      34 </span>                :            : bool
+<span class="lineNum">      35 </span>                :<span class="lineCov">       6437 : rtnetlink_type_is_rtnlgrp_link(uint16_t type)</span>
+<span class="lineNum">      36 </span>                :            : {
+<span class="lineNum">      37 </span>[<span class="branchCov" title="Branch 0 was taken 864 times"> + </span><span class="branchCov" title="Branch 1 was taken 5573 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 448 times"> + </span><span class="branchCov" title="Branch 3 was taken 416 times"> + </span>]:<span class="lineCov">       6437 :     return type == RTM_NEWLINK || type == RTM_DELLINK;</span>
+<span class="lineNum">      38 </span>                :            : }
+<span class="lineNum">      39 </span>                :            : 
+<span class="lineNum">      40 </span>                :            : /* Returns true if the given netlink msg type corresponds to
+<a name="41"><span class="lineNum">      41 </span>                :            :  * RTNLGRP_IPV4_IFADDR or RTNLGRP_IPV6_IFADDR. */</a>
+<span class="lineNum">      42 </span>                :            : bool
+<span class="lineNum">      43 </span>                :<span class="lineCov">        416 : rtnetlink_type_is_rtnlgrp_addr(uint16_t type)</span>
+<span class="lineNum">      44 </span>                :            : {
+<span class="lineNum">      45 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 416 times"> + </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">        416 :     return type == RTM_NEWADDR || type == RTM_DELADDR;</span>
+<span class="lineNum">      46 </span>                :            : }
+<span class="lineNum">      47 </span>                :            : 
+<span class="lineNum">      48 </span>                :            : /* Parses a rtnetlink message 'buf' into 'change'.  If 'buf' is unparseable,
+<span class="lineNum">      49 </span>                :            :  * leaves 'change' untouched and returns false.  Otherwise, populates 'change'
+<a name="50"><span class="lineNum">      50 </span>                :            :  * and returns true. */</a>
+<span class="lineNum">      51 </span>                :            : bool
+<span class="lineNum">      52 </span>                :<span class="lineCov">       4886 : rtnetlink_parse(struct ofpbuf *buf, struct rtnetlink_change *change)</span>
+<span class="lineNum">      53 </span>                :            : {
+<span class="lineNum">      54 </span>                :<span class="lineCov">       4886 :     const struct nlmsghdr *nlmsg = buf-&gt;data;</span>
+<span class="lineNum">      55 </span>                :<span class="lineCov">       4886 :     bool parsed = false;</span>
+<span class="lineNum">      56 </span>                :            : 
+<span class="lineNum">      57 </span>        [<span class="branchCov" title="Branch 1 was taken 4678 times"> + </span><span class="branchCov" title="Branch 2 was taken 208 times"> + </span>]:<span class="lineCov">       4886 :     if (rtnetlink_type_is_rtnlgrp_link(nlmsg-&gt;nlmsg_type)) {</span>
+<span class="lineNum">      58 </span>                :            :         /* Policy for RTNLGRP_LINK messages.
+<span class="lineNum">      59 </span>                :            :          *
+<span class="lineNum">      60 </span>                :            :          * There are *many* more fields in these messages, but currently we
+<span class="lineNum">      61 </span>                :            :          * only care about these fields. */
+<span class="lineNum">      62 </span>                :            :         static const struct nl_policy policy[] = {
+<span class="lineNum">      63 </span>                :            :             [IFLA_IFNAME] = { .type = NL_A_STRING, .optional = false },
+<span class="lineNum">      64 </span>                :            :             [IFLA_MASTER] = { .type = NL_A_U32,    .optional = true },
+<span class="lineNum">      65 </span>                :            :             [IFLA_MTU]    = { .type = NL_A_U32,    .optional = true },
+<span class="lineNum">      66 </span>                :            :             [IFLA_ADDRESS] = { .type = NL_A_UNSPEC, .optional = true },
+<span class="lineNum">      67 </span>                :            :         };
+<span class="lineNum">      68 </span>                :            : 
+<span class="lineNum">      69 </span>                :            :         struct nlattr *attrs[ARRAY_SIZE(policy)];
+<span class="lineNum">      70 </span>                :            : 
+<span class="lineNum">      71 </span>                :<span class="lineCov">       4678 :         parsed = nl_policy_parse(buf, NLMSG_HDRLEN + sizeof(struct ifinfomsg),</span>
+<span class="lineNum">      72 </span>                :            :                                  policy, attrs, ARRAY_SIZE(policy));
+<span class="lineNum">      73 </span>                :            : 
+<span class="lineNum">      74 </span>        [<span class="branchCov" title="Branch 0 was taken 4678 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       4678 :         if (parsed) {</span>
+<span class="lineNum">      75 </span>                :            :             const struct ifinfomsg *ifinfo;
+<span class="lineNum">      76 </span>                :            : 
+<span class="lineNum">      77 </span>                :<span class="lineCov">       4678 :             ifinfo = ofpbuf_at(buf, NLMSG_HDRLEN, sizeof *ifinfo);</span>
+<span class="lineNum">      78 </span>                :            : 
+<span class="lineNum">      79 </span>                :<span class="lineCov">       4678 :             change-&gt;nlmsg_type     = nlmsg-&gt;nlmsg_type;</span>
+<span class="lineNum">      80 </span>                :<span class="lineCov">       4678 :             change-&gt;if_index       = ifinfo-&gt;ifi_index;</span>
+<span class="lineNum">      81 </span>                :<span class="lineCov">       4678 :             change-&gt;ifname         = nl_attr_get_string(attrs[IFLA_IFNAME]);</span>
+<span class="lineNum">      82 </span>                :<span class="lineCov">       4678 :             change-&gt;ifi_flags      = ifinfo-&gt;ifi_flags;</span>
+<span class="lineNum">      83 </span>        [<span class="branchCov" title="Branch 0 was taken 926 times"> + </span><span class="branchCov" title="Branch 1 was taken 3752 times"> + </span>]:<span class="lineCov">       5604 :             change-&gt;master_ifindex = (attrs[IFLA_MASTER]</span>
+<span class="lineNum">      84 </span>                :<span class="lineCov">        926 :                                       ? nl_attr_get_u32(attrs[IFLA_MASTER])</span>
+<span class="lineNum">      85 </span>                :            :                                       : 0);
+<span class="lineNum">      86 </span>        [<span class="branchCov" title="Branch 0 was taken 4678 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       9356 :             change-&gt;mtu            = (attrs[IFLA_MTU]</span>
+<span class="lineNum">      87 </span>                :<span class="lineCov">       4678 :                                       ? nl_attr_get_u32(attrs[IFLA_MTU])</span>
+<span class="lineNum">      88 </span>                :            :                                       : 0);
+<span class="lineNum">      89 </span>                :            : 
+<span class="lineNum">      90 </span>  [<span class="branchCov" title="Branch 0 was taken 4678 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 4676 times"> + </span><span class="branchCov" title="Branch 3 was taken 2 times"> + </span>]:<span class="lineCov">       9356 :             if (attrs[IFLA_ADDRESS] &amp;&amp;</span>
+<span class="lineNum">      91 </span>                :<span class="lineCov">       4678 :                 nl_attr_get_size(attrs[IFLA_ADDRESS]) == ETH_ADDR_LEN) {</span>
+<span class="lineNum">      92 </span>                :<span class="lineCov">       4676 :                 memcpy(&amp;change-&gt;mac, nl_attr_get(attrs[IFLA_ADDRESS]),</span>
+<span class="lineNum">      93 </span>                :            :                        ETH_ADDR_LEN);
+<span class="lineNum">      94 </span>                :            :             } else {
+<span class="lineNum">      95 </span>                :<span class="lineCov">       4678 :                 memset(&amp;change-&gt;mac, 0, ETH_ADDR_LEN);</span>
+<span class="lineNum">      96 </span>                :            :             }
+<span class="lineNum">      97 </span>                :            :         }
+<span class="lineNum">      98 </span>        [<span class="branchCov" title="Branch 1 was taken 208 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        208 :     } else if (rtnetlink_type_is_rtnlgrp_addr(nlmsg-&gt;nlmsg_type)) {</span>
+<span class="lineNum">      99 </span>                :            :         /* Policy for RTNLGRP_IPV4_IFADDR/RTNLGRP_IPV6_IFADDR messages.
+<span class="lineNum">     100 </span>                :            :          *
+<span class="lineNum">     101 </span>                :            :          * There are *many* more fields in these messages, but currently we
+<span class="lineNum">     102 </span>                :            :          * only care about these fields. */
+<span class="lineNum">     103 </span>                :            :         static const struct nl_policy policy[] = {
+<span class="lineNum">     104 </span>                :            :             [IFA_LABEL] = { .type = NL_A_STRING, .optional = true },
+<span class="lineNum">     105 </span>                :            :         };
+<span class="lineNum">     106 </span>                :            : 
+<span class="lineNum">     107 </span>                :            :         struct nlattr *attrs[ARRAY_SIZE(policy)];
+<span class="lineNum">     108 </span>                :            : 
+<span class="lineNum">     109 </span>                :<span class="lineCov">        208 :         parsed = nl_policy_parse(buf, NLMSG_HDRLEN + sizeof(struct ifaddrmsg),</span>
+<span class="lineNum">     110 </span>                :            :                                  policy, attrs, ARRAY_SIZE(policy));
+<span class="lineNum">     111 </span>                :            : 
+<span class="lineNum">     112 </span>        [<span class="branchCov" title="Branch 0 was taken 208 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        208 :         if (parsed) {</span>
+<span class="lineNum">     113 </span>                :            :             const struct ifaddrmsg *ifaddr;
+<span class="lineNum">     114 </span>                :            : 
+<span class="lineNum">     115 </span>                :<span class="lineCov">        208 :             ifaddr = ofpbuf_at(buf, NLMSG_HDRLEN, sizeof *ifaddr);</span>
+<span class="lineNum">     116 </span>                :            : 
+<span class="lineNum">     117 </span>                :<span class="lineCov">        208 :             change-&gt;nlmsg_type     = nlmsg-&gt;nlmsg_type;</span>
+<span class="lineNum">     118 </span>                :<span class="lineCov">        208 :             change-&gt;if_index       = ifaddr-&gt;ifa_index;</span>
+<span class="lineNum">     119 </span>                :<span class="lineCov">        208 :             change-&gt;ifname         = (attrs[IFA_LABEL]</span>
+<span class="lineNum">     120 </span>                :<span class="lineCov">         18 :                                       ? nl_attr_get_string(attrs[IFA_LABEL])</span>
+<span class="lineNum">     121 </span>        [<span class="branchCov" title="Branch 0 was taken 18 times"> + </span><span class="branchCov" title="Branch 1 was taken 190 times"> + </span>]:<span class="lineCov">        208 :                                       : NULL);</span>
+<span class="lineNum">     122 </span>                :            :         }
+<span class="lineNum">     123 </span>                :            :     }
+<span class="lineNum">     124 </span>                :            : 
+<span class="lineNum">     125 </span>                :<span class="lineCov">       4886 :     return parsed;</span>
+<span class="lineNum">     126 </span>                :            : }
+<span class="lineNum">     127 </span>                :            : 
+<a name="128"><span class="lineNum">     128 </span>                :            : /* Return RTNLGRP_LINK on success, 0 on parse error. */</a>
+<span class="lineNum">     129 </span>                :            : static int
+<span class="lineNum">     130 </span>                :<span class="lineCov">       2211 : rtnetlink_parse_cb(struct ofpbuf *buf, void *change)</span>
+<span class="lineNum">     131 </span>                :            : {
+<span class="lineNum">     132 </span>                :<span class="lineCov">       2211 :     return rtnetlink_parse(buf, change) ? RTNLGRP_LINK : 0;</span>
+<span class="lineNum">     133 </span>                :            : }
+<span class="lineNum">     134 </span>                :            : 
+<span class="lineNum">     135 </span>                :            : /* Registers 'cb' to be called with auxiliary data 'aux' with network device
+<span class="lineNum">     136 </span>                :            :  * change notifications.  The notifier is stored in 'notifier', which the
+<span class="lineNum">     137 </span>                :            :  * caller must not modify or free.
+<span class="lineNum">     138 </span>                :            :  *
+<span class="lineNum">     139 </span>                :            :  * This is probably not the function that you want.  You should probably be
+<span class="lineNum">     140 </span>                :            :  * using dpif_port_poll() or netdev_change_seq(), which unlike this function
+<span class="lineNum">     141 </span>                :            :  * are not Linux-specific.
+<span class="lineNum">     142 </span>                :            :  *
+<span class="lineNum">     143 </span>                :            :  * xxx Joins more multicast groups when needed.
+<span class="lineNum">     144 </span>                :            :  *
+<a name="145"><span class="lineNum">     145 </span>                :            :  * Returns an initialized nln_notifier if successful, NULL otherwise. */</a>
+<span class="lineNum">     146 </span>                :            : struct nln_notifier *
+<span class="lineNum">     147 </span>                :<span class="lineCov">       1301 : rtnetlink_notifier_create(rtnetlink_notify_func *cb, void *aux)</span>
+<span class="lineNum">     148 </span>                :            : {
+<span class="lineNum">     149 </span>        [<span class="branchCov" title="Branch 0 was taken 686 times"> + </span><span class="branchCov" title="Branch 1 was taken 615 times"> + </span>]:<span class="lineCov">       1301 :     if (!nln) {</span>
+<span class="lineNum">     150 </span>                :<span class="lineCov">        686 :         nln = nln_create(NETLINK_ROUTE, rtnetlink_parse_cb, &amp;rtn_change);</span>
+<span class="lineNum">     151 </span>                :            :     }
+<span class="lineNum">     152 </span>                :            : 
+<span class="lineNum">     153 </span>                :<span class="lineCov">       1301 :     return nln_notifier_create(nln, RTNLGRP_LINK, (nln_notify_func *) cb, aux);</span>
+<span class="lineNum">     154 </span>                :            : }
+<span class="lineNum">     155 </span>                :            : 
+<span class="lineNum">     156 </span>                :            : /* Destroys 'notifier', which must have previously been created with
+<a name="157"><span class="lineNum">     157 </span>                :            :  * rtnetlink_notifier_register(). */</a>
+<span class="lineNum">     158 </span>                :            : void
+<span class="lineNum">     159 </span>                :<span class="lineCov">        617 : rtnetlink_notifier_destroy(struct nln_notifier *notifier)</span>
+<span class="lineNum">     160 </span>                :            : {
+<span class="lineNum">     161 </span>                :<span class="lineCov">        617 :     nln_notifier_destroy(notifier);</span>
+<span class="lineNum">     162 </span>                :<span class="lineCov">        617 : }</span>
+<span class="lineNum">     163 </span>                :            : 
+<span class="lineNum">     164 </span>                :            : /* Calls all of the registered notifiers, passing along any as-yet-unreported
+<a name="165"><span class="lineNum">     165 </span>                :            :  * netdev change events. */</a>
+<span class="lineNum">     166 </span>                :            : void
+<span class="lineNum">     167 </span>                :<span class="lineCov">     833753 : rtnetlink_run(void)</span>
+<span class="lineNum">     168 </span>                :            : {
+<span class="lineNum">     169 </span>        [<span class="branchCov" title="Branch 0 was taken 833753 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">     833753 :     if (nln) {</span>
+<span class="lineNum">     170 </span>                :<span class="lineCov">     833753 :         nln_run(nln);</span>
+<span class="lineNum">     171 </span>                :            :     }
+<span class="lineNum">     172 </span>                :<span class="lineCov">     833753 : }</span>
+<span class="lineNum">     173 </span>                :            : 
+<span class="lineNum">     174 </span>                :            : /* Causes poll_block() to wake up when network device change notifications are
+<a name="175"><span class="lineNum">     175 </span>                :            :  * ready. */</a>
+<span class="lineNum">     176 </span>                :            : void
+<span class="lineNum">     177 </span>                :<span class="lineCov">     833328 : rtnetlink_wait(void)</span>
+<span class="lineNum">     178 </span>                :            : {
+<span class="lineNum">     179 </span>        [<span class="branchCov" title="Branch 0 was taken 833328 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">     833328 :     if (nln) {</span>
+<span class="lineNum">     180 </span>                :<span class="lineCov">     833328 :         nln_wait(nln);</span>
+<span class="lineNum">     181 </span>                :            :     }
+<span class="lineNum">     182 </span>                :<span class="lineCov">     833328 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,1501 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ovn/controller/pinctrl.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">ovn/controller</a> - pinctrl.c<span style="font-size: 80%;"> (source / <a href="pinctrl.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">555</td>
+            <td class="headerCovTableEntry">639</td>
+            <td class="headerCovTableEntryMed">86.9 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">38</td>
+            <td class="headerCovTableEntry">39</td>
+            <td class="headerCovTableEntryHi">97.4 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">196</td>
+            <td class="headerCovTableEntry">316</td>
+            <td class="headerCovTableEntryLo">62.0 %</td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (c) 2015, 2016 Red Hat, Inc.</a>
+<span class="lineNum">       2 </span>                :            :  *
+<span class="lineNum">       3 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       4 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       5 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       6 </span>                :            :  *
+<span class="lineNum">       7 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       8 </span>                :            :  *
+<span class="lineNum">       9 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      10 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      11 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      12 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      13 </span>                :            :  * limitations under the License.
+<span class="lineNum">      14 </span>                :            :  */
+<span class="lineNum">      15 </span>                :            : 
+<span class="lineNum">      16 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      17 </span>                :            : 
+<span class="lineNum">      18 </span>                :            : #include &quot;pinctrl.h&quot;
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &quot;coverage.h&quot;
+<span class="lineNum">      21 </span>                :            : #include &quot;csum.h&quot;
+<span class="lineNum">      22 </span>                :            : #include &quot;dirs.h&quot;
+<span class="lineNum">      23 </span>                :            : #include &quot;dp-packet.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;flow.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;lport.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;nx-match.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;ovn-controller.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;lib/packets.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;lib/sset.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;openvswitch/ofp-actions.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;openvswitch/ofp-msgs.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;openvswitch/ofp-print.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;openvswitch/ofp-util.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;openvswitch/vlog.h&quot;
+<span class="lineNum">      35 </span>                :            : 
+<span class="lineNum">      36 </span>                :            : #include &quot;lib/dhcp.h&quot;
+<span class="lineNum">      37 </span>                :            : #include &quot;ovn-controller.h&quot;
+<span class="lineNum">      38 </span>                :            : #include &quot;ovn/actions.h&quot;
+<span class="lineNum">      39 </span>                :            : #include &quot;ovn/lib/logical-fields.h&quot;
+<span class="lineNum">      40 </span>                :            : #include &quot;ovn/lib/ovn-dhcp.h&quot;
+<span class="lineNum">      41 </span>                :            : #include &quot;ovn/lib/ovn-util.h&quot;
+<span class="lineNum">      42 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      43 </span>                :            : #include &quot;rconn.h&quot;
+<span class="lineNum">      44 </span>                :            : #include &quot;socket-util.h&quot;
+<span class="lineNum">      45 </span>                :            : #include &quot;timeval.h&quot;
+<a name="46"><span class="lineNum">      46 </span>                :            : #include &quot;vswitch-idl.h&quot;</a>
+<span class="lineNum">      47 </span>                :            : 
+<span class="lineNum">      48 </span>                :<span class="lineCov">         94 : VLOG_DEFINE_THIS_MODULE(pinctrl);</span>
+<span class="lineNum">      49 </span>                :            : 
+<span class="lineNum">      50 </span>                :            : /* OpenFlow connection to the switch. */
+<span class="lineNum">      51 </span>                :            : static struct rconn *swconn;
+<span class="lineNum">      52 </span>                :            : 
+<span class="lineNum">      53 </span>                :            : /* Last seen sequence number for 'swconn'.  When this differs from
+<span class="lineNum">      54 </span>                :            :  * rconn_get_connection_seqno(rconn), 'swconn' has reconnected. */
+<span class="lineNum">      55 </span>                :            : static unsigned int conn_seq_no;
+<span class="lineNum">      56 </span>                :            : 
+<span class="lineNum">      57 </span>                :            : static void pinctrl_handle_put_mac_binding(const struct flow *md,
+<span class="lineNum">      58 </span>                :            :                                            const struct flow *headers,
+<span class="lineNum">      59 </span>                :            :                                            bool is_arp);
+<span class="lineNum">      60 </span>                :            : static void init_put_mac_bindings(void);
+<span class="lineNum">      61 </span>                :            : static void destroy_put_mac_bindings(void);
+<span class="lineNum">      62 </span>                :            : static void run_put_mac_bindings(struct controller_ctx *,
+<span class="lineNum">      63 </span>                :            :                                  const struct lport_index *lports);
+<span class="lineNum">      64 </span>                :            : static void wait_put_mac_bindings(struct controller_ctx *);
+<span class="lineNum">      65 </span>                :            : static void flush_put_mac_bindings(void);
+<span class="lineNum">      66 </span>                :            : 
+<span class="lineNum">      67 </span>                :            : static void init_send_garps(void);
+<span class="lineNum">      68 </span>                :            : static void destroy_send_garps(void);
+<span class="lineNum">      69 </span>                :            : static void send_garp_wait(void);
+<span class="lineNum">      70 </span>                :            : static void send_garp_run(const struct ovsrec_bridge *,
+<span class="lineNum">      71 </span>                :            :                           const char *chassis_id,
+<span class="lineNum">      72 </span>                :            :                           const struct lport_index *lports,
+<span class="lineNum">      73 </span>                :            :                           struct hmap *local_datapaths);
+<span class="lineNum">      74 </span>                :            : static void pinctrl_handle_nd_na(const struct flow *ip_flow,
+<span class="lineNum">      75 </span>                :            :                                  const struct match *md,
+<span class="lineNum">      76 </span>                :            :                                  struct ofpbuf *userdata);
+<span class="lineNum">      77 </span>                :            : static void reload_metadata(struct ofpbuf *ofpacts,
+<a name="78"><span class="lineNum">      78 </span>                :            :                             const struct match *md);</a>
+<span class="lineNum">      79 </span>                :            : 
+<span class="lineNum">      80 </span>                :<span class="lineCov">       1930 : COVERAGE_DEFINE(pinctrl_drop_put_mac_binding);</span>
+<a name="81"><span class="lineNum">      81 </span>                :            : </a>
+<span class="lineNum">      82 </span>                :            : void
+<span class="lineNum">      83 </span>                :<span class="lineCov">         44 : pinctrl_init(void)</span>
+<span class="lineNum">      84 </span>                :            : {
+<span class="lineNum">      85 </span>                :<span class="lineCov">         44 :     swconn = rconn_create(5, 0, DSCP_DEFAULT, 1 &lt;&lt; OFP13_VERSION);</span>
+<span class="lineNum">      86 </span>                :<span class="lineCov">         44 :     conn_seq_no = 0;</span>
+<span class="lineNum">      87 </span>                :<span class="lineCov">         44 :     init_put_mac_bindings();</span>
+<span class="lineNum">      88 </span>                :<span class="lineCov">         44 :     init_send_garps();</span>
+<span class="lineNum">      89 </span>                :<span class="lineCov">         44 : }</span>
+<a name="90"><span class="lineNum">      90 </span>                :            : </a>
+<span class="lineNum">      91 </span>                :            : static ovs_be32
+<span class="lineNum">      92 </span>                :<span class="lineCov">        369 : queue_msg(struct ofpbuf *msg)</span>
+<span class="lineNum">      93 </span>                :            : {
+<span class="lineNum">      94 </span>                :<span class="lineCov">        369 :     const struct ofp_header *oh = msg-&gt;data;</span>
+<span class="lineNum">      95 </span>                :<span class="lineCov">        369 :     ovs_be32 xid = oh-&gt;xid;</span>
+<span class="lineNum">      96 </span>                :            : 
+<span class="lineNum">      97 </span>                :<span class="lineCov">        369 :     rconn_send(swconn, msg, NULL);</span>
+<span class="lineNum">      98 </span>                :<span class="lineCov">        369 :     return xid;</span>
+<span class="lineNum">      99 </span>                :            : }
+<span class="lineNum">     100 </span>                :            : 
+<a name="101"><span class="lineNum">     101 </span>                :            : /* Sets up 'swconn', a newly (re)connected connection to a switch. */</a>
+<span class="lineNum">     102 </span>                :            : static void
+<span class="lineNum">     103 </span>                :<span class="lineCov">         46 : pinctrl_setup(struct rconn *swconn)</span>
+<span class="lineNum">     104 </span>                :            : {
+<span class="lineNum">     105 </span>                :            :     /* Fetch the switch configuration.  The response later will allow us to
+<span class="lineNum">     106 </span>                :            :      * change the miss_send_len to UINT16_MAX, so that we can enable
+<span class="lineNum">     107 </span>                :            :      * asynchronous messages. */
+<span class="lineNum">     108 </span>                :<span class="lineCov">         46 :     queue_msg(ofpraw_alloc(OFPRAW_OFPT_GET_CONFIG_REQUEST,</span>
+<span class="lineNum">     109 </span>                :<span class="lineCov">         46 :                            rconn_get_version(swconn), 0));</span>
+<span class="lineNum">     110 </span>                :            : 
+<span class="lineNum">     111 </span>                :            :     /* Set a packet-in format that supports userdata.  */
+<span class="lineNum">     112 </span>                :<span class="lineCov">         46 :     queue_msg(ofputil_make_set_packet_in_format(rconn_get_version(swconn),</span>
+<span class="lineNum">     113 </span>                :            :                                                 NXPIF_NXT_PACKET_IN2));
+<span class="lineNum">     114 </span>                :<span class="lineCov">         46 : }</span>
+<a name="115"><span class="lineNum">     115 </span>                :            : </a>
+<span class="lineNum">     116 </span>                :            : static void
+<span class="lineNum">     117 </span>                :<span class="lineCov">         46 : set_switch_config(struct rconn *swconn,</span>
+<span class="lineNum">     118 </span>                :            :                   const struct ofputil_switch_config *config)
+<span class="lineNum">     119 </span>                :            : {
+<span class="lineNum">     120 </span>                :<span class="lineCov">         46 :     enum ofp_version version = rconn_get_version(swconn);</span>
+<span class="lineNum">     121 </span>                :<span class="lineCov">         46 :     struct ofpbuf *request = ofputil_encode_set_config(config, version);</span>
+<span class="lineNum">     122 </span>                :<span class="lineCov">         46 :     queue_msg(request);</span>
+<span class="lineNum">     123 </span>                :<span class="lineCov">         46 : }</span>
+<a name="124"><span class="lineNum">     124 </span>                :            : </a>
+<span class="lineNum">     125 </span>                :            : static void
+<span class="lineNum">     126 </span>                :<span class="lineCov">        217 : pinctrl_handle_arp(const struct flow *ip_flow, const struct match *md,</span>
+<span class="lineNum">     127 </span>                :            :                    struct ofpbuf *userdata)
+<span class="lineNum">     128 </span>                :            : {
+<span class="lineNum">     129 </span>                :            :     /* This action only works for IP packets, and the switch should only send
+<span class="lineNum">     130 </span>                :            :      * us IP packets this way, but check here just to be sure. */
+<span class="lineNum">     131 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 217 times"> + </span>]:<span class="lineCov">        217 :     if (ip_flow-&gt;dl_type != htons(ETH_TYPE_IP)) {</span>
+<span class="lineNum">     132 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     133 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;ARP action on non-IP packet (Ethertype %&quot;PRIx16&quot;)&quot;,</span>
+<span class="lineNum">     134 </span>                :            :                      ntohs(ip_flow-&gt;dl_type));
+<span class="lineNum">     135 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     136 </span>                :            :     }
+<span class="lineNum">     137 </span>                :            : 
+<span class="lineNum">     138 </span>                :            :     /* Compose an ARP packet. */
+<span class="lineNum">     139 </span>                :            :     uint64_t packet_stub[128 / 8];
+<span class="lineNum">     140 </span>                :            :     struct dp_packet packet;
+<span class="lineNum">     141 </span>                :<span class="lineCov">        217 :     dp_packet_use_stub(&amp;packet, packet_stub, sizeof packet_stub);</span>
+<span class="lineNum">     142 </span>                :<span class="lineCov">        217 :     compose_arp__(&amp;packet);</span>
+<span class="lineNum">     143 </span>                :            : 
+<span class="lineNum">     144 </span>                :<span class="lineCov">        217 :     struct eth_header *eth = dp_packet_l2(&amp;packet);</span>
+<span class="lineNum">     145 </span>                :<span class="lineCov">        217 :     eth-&gt;eth_dst = ip_flow-&gt;dl_dst;</span>
+<span class="lineNum">     146 </span>                :<span class="lineCov">        217 :     eth-&gt;eth_src = ip_flow-&gt;dl_src;</span>
+<span class="lineNum">     147 </span>                :            : 
+<span class="lineNum">     148 </span>                :<span class="lineCov">        217 :     struct arp_eth_header *arp = dp_packet_l3(&amp;packet);</span>
+<span class="lineNum">     149 </span>                :<span class="lineCov">        217 :     arp-&gt;ar_op = htons(ARP_OP_REQUEST);</span>
+<span class="lineNum">     150 </span>                :<span class="lineCov">        217 :     arp-&gt;ar_sha = ip_flow-&gt;dl_src;</span>
+<span class="lineNum">     151 </span>                :<span class="lineCov">        217 :     put_16aligned_be32(&amp;arp-&gt;ar_spa, ip_flow-&gt;nw_src);</span>
+<span class="lineNum">     152 </span>                :<span class="lineCov">        217 :     arp-&gt;ar_tha = eth_addr_zero;</span>
+<span class="lineNum">     153 </span>                :<span class="lineCov">        217 :     put_16aligned_be32(&amp;arp-&gt;ar_tpa, ip_flow-&gt;nw_dst);</span>
+<span class="lineNum">     154 </span>                :            : 
+<span class="lineNum">     155 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 217 times"> + </span>]:<span class="lineCov">        217 :     if (ip_flow-&gt;vlan_tci &amp; htons(VLAN_CFI)) {</span>
+<span class="lineNum">     156 </span>                :<span class="lineNoCov">          0 :         eth_push_vlan(&amp;packet, htons(ETH_TYPE_VLAN_8021Q), ip_flow-&gt;vlan_tci);</span>
+<span class="lineNum">     157 </span>                :            :     }
+<span class="lineNum">     158 </span>                :            : 
+<span class="lineNum">     159 </span>                :            :     /* Compose actions.
+<span class="lineNum">     160 </span>                :            :      *
+<span class="lineNum">     161 </span>                :            :      * First, copy metadata from 'md' into the packet-out via &quot;set_field&quot;
+<span class="lineNum">     162 </span>                :            :      * actions, then add actions from 'userdata'.
+<span class="lineNum">     163 </span>                :            :      */
+<span class="lineNum">     164 </span>                :            :     uint64_t ofpacts_stub[4096 / 8];
+<span class="lineNum">     165 </span>                :<span class="lineCov">        217 :     struct ofpbuf ofpacts = OFPBUF_STUB_INITIALIZER(ofpacts_stub);</span>
+<span class="lineNum">     166 </span>                :<span class="lineCov">        217 :     enum ofp_version version = rconn_get_version(swconn);</span>
+<span class="lineNum">     167 </span>                :            : 
+<span class="lineNum">     168 </span>                :<span class="lineCov">        217 :     reload_metadata(&amp;ofpacts, md);</span>
+<span class="lineNum">     169 </span>                :<span class="lineCov">        217 :     enum ofperr error = ofpacts_pull_openflow_actions(userdata, userdata-&gt;size, version, &amp;ofpacts);</span>
+<span class="lineNum">     170 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 217 times"> + </span>]:<span class="lineCov">        217 :     if (error) {</span>
+<span class="lineNum">     171 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     172 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;failed to parse arp actions (%s)&quot;,</span>
+<span class="lineNum">     173 </span>                :            :                      ofperr_to_string(error));
+<span class="lineNum">     174 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     175 </span>                :            :     }
+<span class="lineNum">     176 </span>                :            : 
+<span class="lineNum">     177 </span>                :<span class="lineCov">        868 :     struct ofputil_packet_out po = {</span>
+<span class="lineNum">     178 </span>                :<span class="lineCov">        217 :         .packet = dp_packet_data(&amp;packet),</span>
+<span class="lineNum">     179 </span>                :<span class="lineCov">        217 :         .packet_len = dp_packet_size(&amp;packet),</span>
+<span class="lineNum">     180 </span>                :            :         .buffer_id = UINT32_MAX,
+<span class="lineNum">     181 </span>                :            :         .in_port = OFPP_CONTROLLER,
+<span class="lineNum">     182 </span>                :<span class="lineCov">        217 :         .ofpacts = ofpacts.data,</span>
+<span class="lineNum">     183 </span>                :<span class="lineCov">        217 :         .ofpacts_len = ofpacts.size,</span>
+<span class="lineNum">     184 </span>                :            :     };
+<span class="lineNum">     185 </span>                :<span class="lineCov">        217 :     enum ofputil_protocol proto = ofputil_protocol_from_ofp_version(version);</span>
+<span class="lineNum">     186 </span>                :<span class="lineCov">        217 :     queue_msg(ofputil_encode_packet_out(&amp;po, proto));</span>
+<span class="lineNum">     187 </span>                :            : 
+<span class="lineNum">     188 </span>                :            : exit:
+<span class="lineNum">     189 </span>                :<span class="lineCov">        217 :     dp_packet_uninit(&amp;packet);</span>
+<span class="lineNum">     190 </span>                :<span class="lineCov">        217 :     ofpbuf_uninit(&amp;ofpacts);</span>
+<span class="lineNum">     191 </span>                :            : }
+<a name="192"><span class="lineNum">     192 </span>                :            : </a>
+<span class="lineNum">     193 </span>                :            : static void
+<span class="lineNum">     194 </span>                :<span class="lineCov">          3 : pinctrl_handle_put_dhcp_opts(</span>
+<span class="lineNum">     195 </span>                :            :     struct dp_packet *pkt_in, struct ofputil_packet_in *pin,
+<span class="lineNum">     196 </span>                :            :     struct ofpbuf *userdata, struct ofpbuf *continuation)
+<span class="lineNum">     197 </span>                :            : {
+<span class="lineNum">     198 </span>                :<span class="lineCov">          3 :     enum ofp_version version = rconn_get_version(swconn);</span>
+<span class="lineNum">     199 </span>                :<span class="lineCov">          3 :     enum ofputil_protocol proto = ofputil_protocol_from_ofp_version(version);</span>
+<span class="lineNum">     200 </span>                :<span class="lineCov">          3 :     struct dp_packet *pkt_out_ptr = NULL;</span>
+<span class="lineNum">     201 </span>                :<span class="lineCov">          3 :     uint32_t success = 0;</span>
+<span class="lineNum">     202 </span>                :            : 
+<span class="lineNum">     203 </span>                :            :     /* Parse result field. */
+<span class="lineNum">     204 </span>                :            :     const struct mf_field *f;
+<span class="lineNum">     205 </span>                :<span class="lineCov">          3 :     enum ofperr ofperr = nx_pull_header(userdata, &amp;f, NULL);</span>
+<span class="lineNum">     206 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">          3 :     if (ofperr) {</span>
+<span class="lineNum">     207 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     208 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;bad result OXM (%s)&quot;, ofperr_to_string(ofperr));</span>
+<span class="lineNum">     209 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     210 </span>                :            :     }
+<span class="lineNum">     211 </span>                :            : 
+<span class="lineNum">     212 </span>                :            :     /* Parse result offset and offer IP. */
+<span class="lineNum">     213 </span>                :<span class="lineCov">          3 :     ovs_be32 *ofsp = ofpbuf_try_pull(userdata, sizeof *ofsp);</span>
+<span class="lineNum">     214 </span>                :<span class="lineCov">          3 :     ovs_be32 *offer_ip = ofpbuf_try_pull(userdata, sizeof *offer_ip);</span>
+<span class="lineNum">     215 </span>[<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 3 times"> + </span>]:<span class="lineCov">          3 :     if (!ofsp || !offer_ip) {</span>
+<span class="lineNum">     216 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     217 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;offset or offer_ip not present in the userdata&quot;);</span>
+<span class="lineNum">     218 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     219 </span>                :            :     }
+<span class="lineNum">     220 </span>                :            : 
+<span class="lineNum">     221 </span>                :            :     /* Check that the result is valid and writable. */
+<span class="lineNum">     222 </span>                :<span class="lineCov">          3 :     struct mf_subfield dst = { .field = f, .ofs = ntohl(*ofsp), .n_bits = 1 };</span>
+<span class="lineNum">     223 </span>                :<span class="lineCov">          3 :     ofperr = mf_check_dst(&amp;dst, NULL);</span>
+<span class="lineNum">     224 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">          3 :     if (ofperr) {</span>
+<span class="lineNum">     225 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     226 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;bad result bit (%s)&quot;, ofperr_to_string(ofperr));</span>
+<span class="lineNum">     227 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     228 </span>                :            :     }
+<span class="lineNum">     229 </span>                :            : 
+<span class="lineNum">     230 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">          3 :     if (!userdata-&gt;size) {</span>
+<span class="lineNum">     231 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     232 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;DHCP options not present in the userdata&quot;);</span>
+<span class="lineNum">     233 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     234 </span>                :            :     }
+<span class="lineNum">     235 </span>                :            : 
+<span class="lineNum">     236 </span>                :            :     /* Validate the DHCP request packet.
+<span class="lineNum">     237 </span>                :            :      * Format of the DHCP packet is
+<span class="lineNum">     238 </span>                :            :      * ------------------------------------------------------------------------
+<span class="lineNum">     239 </span>                :            :      *| UDP HEADER  | DHCP HEADER  | 4 Byte DHCP Cookie | DHCP OPTIONS(var len)|
+<span class="lineNum">     240 </span>                :            :      * ------------------------------------------------------------------------
+<span class="lineNum">     241 </span>                :            :      */
+<span class="lineNum">     242 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 3 times"> + </span>]:<span class="lineCov">          3 :     if (dp_packet_l4_size(pkt_in) &lt; (UDP_HEADER_LEN +</span>
+<span class="lineNum">     243 </span>                :            :         sizeof (struct dhcp_header) + sizeof(uint32_t) + 3)) {
+<span class="lineNum">     244 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     245 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;Invalid or incomplete DHCP packet recieved&quot;);</span>
+<span class="lineNum">     246 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     247 </span>                :            :     }
+<span class="lineNum">     248 </span>                :            : 
+<span class="lineNum">     249 </span>                :<span class="lineCov">          3 :     struct dhcp_header const *in_dhcp_data = dp_packet_get_udp_payload(pkt_in);</span>
+<span class="lineNum">     250 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">          3 :     if (in_dhcp_data-&gt;op != DHCP_OP_REQUEST) {</span>
+<span class="lineNum">     251 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     252 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;Invalid opcode in the DHCP packet : %d&quot;,</span>
+<span class="lineNum">     253 </span>                :            :                      in_dhcp_data-&gt;op);
+<span class="lineNum">     254 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     255 </span>                :            :     }
+<span class="lineNum">     256 </span>                :            : 
+<span class="lineNum">     257 </span>                :            :     /* DHCP options follow the DHCP header. The first 4 bytes of the DHCP
+<span class="lineNum">     258 </span>                :            :      * options is the DHCP magic cookie followed by the actual DHCP options.
+<span class="lineNum">     259 </span>                :            :      */
+<span class="lineNum">     260 </span>                :<span class="lineCov">          3 :     const uint8_t *in_dhcp_opt =</span>
+<span class="lineNum">     261 </span>                :<span class="lineCov">          3 :         (const uint8_t *)dp_packet_get_udp_payload(pkt_in) +</span>
+<span class="lineNum">     262 </span>                :            :         sizeof (struct dhcp_header);
+<span class="lineNum">     263 </span>                :            : 
+<span class="lineNum">     264 </span>                :<span class="lineCov">          3 :     ovs_be32 magic_cookie = htonl(DHCP_MAGIC_COOKIE);</span>
+<span class="lineNum">     265 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">          3 :     if (memcmp(in_dhcp_opt, &amp;magic_cookie, sizeof(ovs_be32))) {</span>
+<span class="lineNum">     266 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     267 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;DHCP magic cookie not present in the DHCP packet&quot;);</span>
+<span class="lineNum">     268 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     269 </span>                :            :     }
+<span class="lineNum">     270 </span>                :            : 
+<span class="lineNum">     271 </span>                :<span class="lineCov">          3 :     in_dhcp_opt += 4;</span>
+<span class="lineNum">     272 </span>                :            :     /* Check that the DHCP Message Type (opt 53) is present or not with
+<span class="lineNum">     273 </span>                :            :      * valid values - DHCP_MSG_DISCOVER or DHCP_MSG_REQUEST as the first
+<span class="lineNum">     274 </span>                :            :      * DHCP option.
+<span class="lineNum">     275 </span>                :            :      */
+<span class="lineNum">     276 </span>[<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">          3 :     if (!(in_dhcp_opt[0] == DHCP_OPT_MSG_TYPE &amp;&amp; in_dhcp_opt[1] == 1 &amp;&amp; (</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 4 was taken 2 times"> + </span><span class="branchCov" title="Branch 5 was taken 1 time"> + </span>]
+<span class="lineNum">     277 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          2 :             in_dhcp_opt[2] == DHCP_MSG_DISCOVER ||</span>
+<span class="lineNum">     278 </span>                :<span class="lineCov">          2 :             in_dhcp_opt[2] == DHCP_MSG_REQUEST))) {</span>
+<span class="lineNum">     279 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     280 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          1 :         VLOG_WARN_RL(&amp;rl, &quot;Invalid DHCP message type : opt code = %d,&quot;</span>
+<span class="lineNum">     281 </span>                :            :                      &quot; opt value = %d&quot;, in_dhcp_opt[0], in_dhcp_opt[2]);
+<span class="lineNum">     282 </span>                :<span class="lineCov">          1 :         goto exit;</span>
+<span class="lineNum">     283 </span>                :            :     }
+<span class="lineNum">     284 </span>                :            : 
+<span class="lineNum">     285 </span>                :            :     uint8_t msg_type;
+<span class="lineNum">     286 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          2 :     if (in_dhcp_opt[2] == DHCP_MSG_DISCOVER) {</span>
+<span class="lineNum">     287 </span>                :<span class="lineCov">          1 :         msg_type = DHCP_MSG_OFFER;</span>
+<span class="lineNum">     288 </span>                :            :     } else {
+<span class="lineNum">     289 </span>                :<span class="lineCov">          1 :         msg_type = DHCP_MSG_ACK;</span>
+<span class="lineNum">     290 </span>                :            :     }
+<span class="lineNum">     291 </span>                :            : 
+<span class="lineNum">     292 </span>                :            :     /* Frame the DHCP reply packet
+<span class="lineNum">     293 </span>                :            :      * Total DHCP options length will be options stored in the userdata +
+<span class="lineNum">     294 </span>                :            :      * 16 bytes.
+<span class="lineNum">     295 </span>                :            :      *
+<span class="lineNum">     296 </span>                :            :      * --------------------------------------------------------------
+<span class="lineNum">     297 </span>                :            :      *| 4 Bytes (dhcp cookie) | 3 Bytes (option type) | DHCP options |
+<span class="lineNum">     298 </span>                :            :      * --------------------------------------------------------------
+<span class="lineNum">     299 </span>                :            :      *| 4 Bytes padding | 1 Byte (option end 0xFF ) | 4 Bytes padding|
+<span class="lineNum">     300 </span>                :            :      * --------------------------------------------------------------
+<span class="lineNum">     301 </span>                :            :      */
+<span class="lineNum">     302 </span>                :<span class="lineCov">          2 :     uint16_t new_l4_size = UDP_HEADER_LEN + DHCP_HEADER_LEN + \</span>
+<span class="lineNum">     303 </span>                :<span class="lineCov">          2 :                            userdata-&gt;size + 16;</span>
+<span class="lineNum">     304 </span>                :<span class="lineCov">          2 :     size_t new_packet_size = pkt_in-&gt;l4_ofs + new_l4_size;</span>
+<span class="lineNum">     305 </span>                :            : 
+<span class="lineNum">     306 </span>                :            :     struct dp_packet pkt_out;
+<span class="lineNum">     307 </span>                :<span class="lineCov">          2 :     dp_packet_init(&amp;pkt_out, new_packet_size);</span>
+<span class="lineNum">     308 </span>                :<span class="lineCov">          2 :     dp_packet_clear(&amp;pkt_out);</span>
+<span class="lineNum">     309 </span>                :<span class="lineCov">          2 :     dp_packet_prealloc_tailroom(&amp;pkt_out, new_packet_size);</span>
+<span class="lineNum">     310 </span>                :<span class="lineCov">          2 :     pkt_out_ptr = &amp;pkt_out;</span>
+<span class="lineNum">     311 </span>                :            : 
+<span class="lineNum">     312 </span>                :            :     /* Copy the L2 and L3 headers from the pkt_in as they would remain same*/
+<span class="lineNum">     313 </span>                :<span class="lineCov">          2 :     dp_packet_put(</span>
+<span class="lineNum">     314 </span>                :<span class="lineCov">          2 :         &amp;pkt_out, dp_packet_pull(pkt_in, pkt_in-&gt;l4_ofs), pkt_in-&gt;l4_ofs);</span>
+<span class="lineNum">     315 </span>                :            : 
+<span class="lineNum">     316 </span>                :<span class="lineCov">          2 :     pkt_out.l2_5_ofs = pkt_in-&gt;l2_5_ofs;</span>
+<span class="lineNum">     317 </span>                :<span class="lineCov">          2 :     pkt_out.l2_pad_size = pkt_in-&gt;l2_pad_size;</span>
+<span class="lineNum">     318 </span>                :<span class="lineCov">          2 :     pkt_out.l3_ofs = pkt_in-&gt;l3_ofs;</span>
+<span class="lineNum">     319 </span>                :<span class="lineCov">          2 :     pkt_out.l4_ofs = pkt_in-&gt;l4_ofs;</span>
+<span class="lineNum">     320 </span>                :            : 
+<span class="lineNum">     321 </span>                :<span class="lineCov">          2 :     struct udp_header *udp = dp_packet_put(</span>
+<span class="lineNum">     322 </span>                :<span class="lineCov">          2 :         &amp;pkt_out, dp_packet_pull(pkt_in, UDP_HEADER_LEN), UDP_HEADER_LEN);</span>
+<span class="lineNum">     323 </span>                :            : 
+<span class="lineNum">     324 </span>                :<span class="lineCov">          2 :     struct dhcp_header *dhcp_data = dp_packet_put(</span>
+<span class="lineNum">     325 </span>                :<span class="lineCov">          2 :         &amp;pkt_out, dp_packet_pull(pkt_in, DHCP_HEADER_LEN), DHCP_HEADER_LEN);</span>
+<span class="lineNum">     326 </span>                :<span class="lineCov">          2 :     dhcp_data-&gt;op = DHCP_OP_REPLY;</span>
+<span class="lineNum">     327 </span>                :<span class="lineCov">          2 :     dhcp_data-&gt;yiaddr = *offer_ip;</span>
+<span class="lineNum">     328 </span>                :<span class="lineCov">          2 :     dp_packet_put(&amp;pkt_out, &amp;magic_cookie, sizeof(ovs_be32));</span>
+<span class="lineNum">     329 </span>                :            : 
+<span class="lineNum">     330 </span>                :<span class="lineCov">          2 :     uint8_t *out_dhcp_opts = dp_packet_put_zeros(&amp;pkt_out,</span>
+<span class="lineNum">     331 </span>                :<span class="lineCov">          2 :                                                  userdata-&gt;size + 12);</span>
+<span class="lineNum">     332 </span>                :            :     /* DHCP option - type */
+<span class="lineNum">     333 </span>                :<span class="lineCov">          2 :     out_dhcp_opts[0] = DHCP_OPT_MSG_TYPE;</span>
+<span class="lineNum">     334 </span>                :<span class="lineCov">          2 :     out_dhcp_opts[1] = 1;</span>
+<span class="lineNum">     335 </span>                :<span class="lineCov">          2 :     out_dhcp_opts[2] = msg_type;</span>
+<span class="lineNum">     336 </span>                :<span class="lineCov">          2 :     out_dhcp_opts += 3;</span>
+<span class="lineNum">     337 </span>                :            : 
+<span class="lineNum">     338 </span>                :<span class="lineCov">          2 :     memcpy(out_dhcp_opts, userdata-&gt;data, userdata-&gt;size);</span>
+<span class="lineNum">     339 </span>                :<span class="lineCov">          2 :     out_dhcp_opts += userdata-&gt;size;</span>
+<span class="lineNum">     340 </span>                :            :     /* Padding */
+<span class="lineNum">     341 </span>                :<span class="lineCov">          2 :     out_dhcp_opts += 4;</span>
+<span class="lineNum">     342 </span>                :            :     /* End */
+<span class="lineNum">     343 </span>                :<span class="lineCov">          2 :     out_dhcp_opts[0] = DHCP_OPT_END;</span>
+<span class="lineNum">     344 </span>                :            : 
+<span class="lineNum">     345 </span>                :<span class="lineCov">          2 :     udp-&gt;udp_len = htons(new_l4_size);</span>
+<span class="lineNum">     346 </span>                :            : 
+<span class="lineNum">     347 </span>                :<span class="lineCov">          2 :     struct ip_header *out_ip = dp_packet_l3(&amp;pkt_out);</span>
+<span class="lineNum">     348 </span>                :<span class="lineCov">          2 :     out_ip-&gt;ip_tot_len = htons(pkt_out.l4_ofs - pkt_out.l3_ofs + new_l4_size);</span>
+<span class="lineNum">     349 </span>                :<span class="lineCov">          2 :     udp-&gt;udp_csum = 0;</span>
+<span class="lineNum">     350 </span>                :            :     /* Checksum needs to be initialized to zero. */
+<span class="lineNum">     351 </span>                :<span class="lineCov">          2 :     out_ip-&gt;ip_csum = 0;</span>
+<span class="lineNum">     352 </span>                :<span class="lineCov">          2 :     out_ip-&gt;ip_csum = csum(out_ip, sizeof *out_ip);</span>
+<span class="lineNum">     353 </span>                :            : 
+<span class="lineNum">     354 </span>                :<span class="lineCov">          2 :     pin-&gt;packet = dp_packet_data(&amp;pkt_out);</span>
+<span class="lineNum">     355 </span>                :<span class="lineCov">          2 :     pin-&gt;packet_len = dp_packet_size(&amp;pkt_out);</span>
+<span class="lineNum">     356 </span>                :            : 
+<span class="lineNum">     357 </span>                :<span class="lineCov">          2 :     success = 1;</span>
+<span class="lineNum">     358 </span>                :            : exit:
+<span class="lineNum">     359 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          3 :     if (!ofperr) {</span>
+<span class="lineNum">     360 </span>                :            :         union mf_subvalue sv;
+<span class="lineNum">     361 </span>                :<span class="lineCov">          3 :         sv.u8_val = success;</span>
+<span class="lineNum">     362 </span>                :<span class="lineCov">          3 :         mf_write_subfield(&amp;dst, &amp;sv, &amp;pin-&gt;flow_metadata);</span>
+<span class="lineNum">     363 </span>                :            :     }
+<span class="lineNum">     364 </span>                :<span class="lineCov">          3 :     queue_msg(ofputil_encode_resume(pin, continuation, proto));</span>
+<span class="lineNum">     365 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          3 :     if (pkt_out_ptr) {</span>
+<span class="lineNum">     366 </span>                :<span class="lineCov">          2 :         dp_packet_uninit(pkt_out_ptr);</span>
+<span class="lineNum">     367 </span>                :            :     }
+<span class="lineNum">     368 </span>                :<span class="lineCov">          3 : }</span>
+<a name="369"><span class="lineNum">     369 </span>                :            : </a>
+<span class="lineNum">     370 </span>                :            : static bool
+<span class="lineNum">     371 </span>                :<span class="lineCov">          1 : compose_out_dhcpv6_opts(struct ofpbuf *userdata,</span>
+<span class="lineNum">     372 </span>                :            :                         struct ofpbuf *out_dhcpv6_opts, ovs_be32 iaid)
+<span class="lineNum">     373 </span>                :            : {
+<span class="lineNum">     374 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          3 :     while (userdata-&gt;size) {</span>
+<span class="lineNum">     375 </span>                :<span class="lineCov">          2 :         struct dhcp_opt6_header *userdata_opt = ofpbuf_try_pull(</span>
+<span class="lineNum">     376 </span>                :            :             userdata, sizeof *userdata_opt);
+<span class="lineNum">     377 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :         if (!userdata_opt) {</span>
+<span class="lineNum">     378 </span>                :<span class="lineNoCov">          0 :             return false;</span>
+<span class="lineNum">     379 </span>                :            :         }
+<span class="lineNum">     380 </span>                :            : 
+<span class="lineNum">     381 </span>                :<span class="lineCov">          2 :         uint8_t *userdata_opt_data = ofpbuf_try_pull(userdata,</span>
+<span class="lineNum">     382 </span>                :<span class="lineCov">          2 :                                                      userdata_opt-&gt;len);</span>
+<span class="lineNum">     383 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :         if (!userdata_opt_data) {</span>
+<span class="lineNum">     384 </span>                :<span class="lineNoCov">          0 :             return false;</span>
+<span class="lineNum">     385 </span>                :            :         }
+<span class="lineNum">     386 </span>                :            : 
+<span class="lineNum">     387 </span>  [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span> :<span class="lineCov">          2 :         switch (userdata_opt-&gt;code) {</span>
+<span class="lineNum">         </span>            <span class="branchNoCov" title="Branch 4 was not taken"> - </span>]
+<span class="lineNum">     388 </span>                :            :         case DHCPV6_OPT_SERVER_ID_CODE:
+<span class="lineNum">     389 </span>                :            :         {
+<span class="lineNum">     390 </span>                :            :             /* The Server Identifier option carries a DUID
+<span class="lineNum">     391 </span>                :            :              * identifying a server between a client and a server.
+<span class="lineNum">     392 </span>                :            :              * See RFC 3315 Sec 9 and Sec 22.3.
+<span class="lineNum">     393 </span>                :            :              *
+<span class="lineNum">     394 </span>                :            :              * We use DUID Based on Link-layer Address [DUID-LL].
+<span class="lineNum">     395 </span>                :            :              */
+<span class="lineNum">     396 </span>                :            : 
+<span class="lineNum">     397 </span>                :<span class="lineCov">          1 :             struct dhcpv6_opt_server_id *opt_server_id = ofpbuf_put_zeros(</span>
+<span class="lineNum">     398 </span>                :            :                 out_dhcpv6_opts, sizeof *opt_server_id);
+<span class="lineNum">     399 </span>                :            : 
+<span class="lineNum">     400 </span>                :<span class="lineCov">          1 :             opt_server_id-&gt;opt.code = htons(DHCPV6_OPT_SERVER_ID_CODE);</span>
+<span class="lineNum">     401 </span>                :<span class="lineCov">          1 :             opt_server_id-&gt;opt.len = htons(userdata_opt-&gt;len + 4);</span>
+<span class="lineNum">     402 </span>                :<span class="lineCov">          1 :             opt_server_id-&gt;duid_type = htons(DHCPV6_DUID_LL);</span>
+<span class="lineNum">     403 </span>                :<span class="lineCov">          1 :             opt_server_id-&gt;hw_type = htons(DHCPV6_HW_TYPE_ETH);</span>
+<span class="lineNum">     404 </span>                :<span class="lineCov">          1 :             memcpy(&amp;opt_server_id-&gt;mac, userdata_opt_data,</span>
+<span class="lineNum">     405 </span>                :            :                     sizeof(struct eth_addr));
+<span class="lineNum">     406 </span>                :<span class="lineCov">          1 :             break;</span>
+<span class="lineNum">     407 </span>                :            :         }
+<span class="lineNum">     408 </span>                :            : 
+<span class="lineNum">     409 </span>                :            :         case DHCPV6_OPT_IA_ADDR_CODE:
+<span class="lineNum">     410 </span>                :            :         {
+<span class="lineNum">     411 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :             if (userdata_opt-&gt;len != sizeof(struct in6_addr)) {</span>
+<span class="lineNum">     412 </span>                :<span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     413 </span>                :            :             }
+<span class="lineNum">     414 </span>                :            : 
+<span class="lineNum">     415 </span>                :            :             /* IA Address option is used to specify IPv6 addresses associated
+<span class="lineNum">     416 </span>                :            :              * with an IA_NA or IA_TA. The IA Address option must be
+<span class="lineNum">     417 </span>                :            :              * encapsulated in the Options field of an IA_NA or IA_TA option.
+<span class="lineNum">     418 </span>                :            :              *
+<span class="lineNum">     419 </span>                :            :              * We will encapsulate the IA Address within the IA_NA option.
+<span class="lineNum">     420 </span>                :            :              * Please see RFC 3315 section 22.5 and 22.6
+<span class="lineNum">     421 </span>                :            :              */
+<span class="lineNum">     422 </span>                :<span class="lineCov">          1 :             struct dhcpv6_opt_ia_na *opt_ia_na = ofpbuf_put_zeros(</span>
+<span class="lineNum">     423 </span>                :            :                 out_dhcpv6_opts, sizeof *opt_ia_na);
+<span class="lineNum">     424 </span>                :<span class="lineCov">          1 :             opt_ia_na-&gt;opt.code = htons(DHCPV6_OPT_IA_NA_CODE);</span>
+<span class="lineNum">     425 </span>                :            :             /* IA_NA length (in bytes)-
+<span class="lineNum">     426 </span>                :            :              *  IAID - 4
+<span class="lineNum">     427 </span>                :            :              *  T1   - 4
+<span class="lineNum">     428 </span>                :            :              *  T2   - 4
+<span class="lineNum">     429 </span>                :            :              *  IA Address - sizeof(struct dhcpv6_opt_ia_addr)
+<span class="lineNum">     430 </span>                :            :              */
+<span class="lineNum">     431 </span>                :<span class="lineCov">          1 :             opt_ia_na-&gt;opt.len = htons(12 + sizeof(struct dhcpv6_opt_ia_addr));</span>
+<span class="lineNum">     432 </span>                :<span class="lineCov">          1 :             opt_ia_na-&gt;iaid = iaid;</span>
+<span class="lineNum">     433 </span>                :            :             /* Set the lifetime of the address(es) to infinity */
+<span class="lineNum">     434 </span>                :<span class="lineCov">          1 :             opt_ia_na-&gt;t1 = OVS_BE32_MAX;</span>
+<span class="lineNum">     435 </span>                :<span class="lineCov">          1 :             opt_ia_na-&gt;t2 = OVS_BE32_MAX;</span>
+<span class="lineNum">     436 </span>                :            : 
+<span class="lineNum">     437 </span>                :<span class="lineCov">          1 :             struct dhcpv6_opt_ia_addr *opt_ia_addr = ofpbuf_put_zeros(</span>
+<span class="lineNum">     438 </span>                :            :                 out_dhcpv6_opts, sizeof *opt_ia_addr);
+<span class="lineNum">     439 </span>                :<span class="lineCov">          1 :             opt_ia_addr-&gt;opt.code = htons(DHCPV6_OPT_IA_ADDR_CODE);</span>
+<span class="lineNum">     440 </span>                :<span class="lineCov">          1 :             opt_ia_addr-&gt;opt.len = htons(userdata_opt-&gt;len + 8);</span>
+<span class="lineNum">     441 </span>                :<span class="lineCov">          1 :             memcpy(opt_ia_addr-&gt;ipv6.s6_addr, userdata_opt_data,</span>
+<span class="lineNum">     442 </span>                :<span class="lineCov">          1 :                    userdata_opt-&gt;len);</span>
+<span class="lineNum">     443 </span>                :<span class="lineCov">          1 :             opt_ia_addr-&gt;t1 = OVS_BE32_MAX;</span>
+<span class="lineNum">     444 </span>                :<span class="lineCov">          1 :             opt_ia_addr-&gt;t2 = OVS_BE32_MAX;</span>
+<span class="lineNum">     445 </span>                :<span class="lineCov">          1 :             break;</span>
+<span class="lineNum">     446 </span>                :            :         }
+<span class="lineNum">     447 </span>                :            : 
+<span class="lineNum">     448 </span>                :            :         case DHCPV6_OPT_DNS_SERVER_CODE:
+<span class="lineNum">     449 </span>                :            :         {
+<span class="lineNum">     450 </span>                :<span class="lineNoCov">          0 :             struct dhcpv6_opt_header *opt_dns = ofpbuf_put_zeros(</span>
+<span class="lineNum">     451 </span>                :            :                 out_dhcpv6_opts, sizeof *opt_dns);
+<span class="lineNum">     452 </span>                :<span class="lineNoCov">          0 :             opt_dns-&gt;code = htons(DHCPV6_OPT_DNS_SERVER_CODE);</span>
+<span class="lineNum">     453 </span>                :<span class="lineNoCov">          0 :             opt_dns-&gt;len = htons(userdata_opt-&gt;len);</span>
+<span class="lineNum">     454 </span>                :<span class="lineNoCov">          0 :             ofpbuf_put(out_dhcpv6_opts, userdata_opt_data, userdata_opt-&gt;len);</span>
+<span class="lineNum">     455 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     456 </span>                :            :         }
+<span class="lineNum">     457 </span>                :            : 
+<span class="lineNum">     458 </span>                :            :         case DHCPV6_OPT_DOMAIN_SEARCH_CODE:
+<span class="lineNum">     459 </span>                :            :         {
+<span class="lineNum">     460 </span>                :<span class="lineNoCov">          0 :             struct dhcpv6_opt_header *opt_dsl = ofpbuf_put_zeros(</span>
+<span class="lineNum">     461 </span>                :            :                 out_dhcpv6_opts, sizeof *opt_dsl);
+<span class="lineNum">     462 </span>                :<span class="lineNoCov">          0 :             opt_dsl-&gt;code = htons(DHCPV6_OPT_DOMAIN_SEARCH_CODE);</span>
+<span class="lineNum">     463 </span>                :<span class="lineNoCov">          0 :             opt_dsl-&gt;len = htons(userdata_opt-&gt;len + 2);</span>
+<span class="lineNum">     464 </span>                :<span class="lineNoCov">          0 :             uint8_t *data = ofpbuf_put_zeros(out_dhcpv6_opts,</span>
+<span class="lineNum">     465 </span>                :<span class="lineNoCov">          0 :                                               userdata_opt-&gt;len + 2);</span>
+<span class="lineNum">     466 </span>                :<span class="lineNoCov">          0 :             *data = userdata_opt-&gt;len;</span>
+<span class="lineNum">     467 </span>                :<span class="lineNoCov">          0 :             memcpy(data + 1, userdata_opt_data, userdata_opt-&gt;len);</span>
+<span class="lineNum">     468 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     469 </span>                :            :         }
+<span class="lineNum">     470 </span>                :            : 
+<span class="lineNum">     471 </span>                :            :         default:
+<span class="lineNum">     472 </span>                :<span class="lineNoCov">          0 :             return false;</span>
+<span class="lineNum">     473 </span>                :            :         }
+<span class="lineNum">     474 </span>                :            :     }
+<span class="lineNum">     475 </span>                :<span class="lineCov">          1 :     return true;</span>
+<span class="lineNum">     476 </span>                :            : }
+<a name="477"><span class="lineNum">     477 </span>                :            : </a>
+<span class="lineNum">     478 </span>                :            : static void
+<span class="lineNum">     479 </span>                :<span class="lineCov">          2 : pinctrl_handle_put_dhcpv6_opts(</span>
+<span class="lineNum">     480 </span>                :            :     struct dp_packet *pkt_in, struct ofputil_packet_in *pin,
+<span class="lineNum">     481 </span>                :            :     struct ofpbuf *userdata, struct ofpbuf *continuation OVS_UNUSED)
+<span class="lineNum">     482 </span>                :            : {
+<span class="lineNum">     483 </span>                :            :     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     484 </span>                :<span class="lineCov">          2 :     enum ofp_version version = rconn_get_version(swconn);</span>
+<span class="lineNum">     485 </span>                :<span class="lineCov">          2 :     enum ofputil_protocol proto = ofputil_protocol_from_ofp_version(version);</span>
+<span class="lineNum">     486 </span>                :<span class="lineCov">          2 :     struct dp_packet *pkt_out_ptr = NULL;</span>
+<span class="lineNum">     487 </span>                :<span class="lineCov">          2 :     uint32_t success = 0;</span>
+<span class="lineNum">     488 </span>                :            : 
+<span class="lineNum">     489 </span>                :            :     /* Parse result field. */
+<span class="lineNum">     490 </span>                :            :     const struct mf_field *f;
+<span class="lineNum">     491 </span>                :<span class="lineCov">          2 :     enum ofperr ofperr = nx_pull_header(userdata, &amp;f, NULL);</span>
+<span class="lineNum">     492 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :     if (ofperr) {</span>
+<span class="lineNum">     493 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :        VLOG_WARN_RL(&amp;rl, &quot;bad result OXM (%s)&quot;, ofperr_to_string(ofperr));</span>
+<span class="lineNum">     494 </span>                :<span class="lineNoCov">          0 :        goto exit;</span>
+<span class="lineNum">     495 </span>                :            :     }
+<span class="lineNum">     496 </span>                :            : 
+<span class="lineNum">     497 </span>                :            :     /* Parse result offset. */
+<span class="lineNum">     498 </span>                :<span class="lineCov">          2 :     ovs_be32 *ofsp = ofpbuf_try_pull(userdata, sizeof *ofsp);</span>
+<span class="lineNum">     499 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :     if (!ofsp) {</span>
+<span class="lineNum">     500 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;offset not present in the userdata&quot;);</span>
+<span class="lineNum">     501 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     502 </span>                :            :     }
+<span class="lineNum">     503 </span>                :            : 
+<span class="lineNum">     504 </span>                :            :     /* Check that the result is valid and writable. */
+<span class="lineNum">     505 </span>                :<span class="lineCov">          2 :     struct mf_subfield dst = { .field = f, .ofs = ntohl(*ofsp), .n_bits = 1 };</span>
+<span class="lineNum">     506 </span>                :<span class="lineCov">          2 :     ofperr = mf_check_dst(&amp;dst, NULL);</span>
+<span class="lineNum">     507 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :     if (ofperr) {</span>
+<span class="lineNum">     508 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;bad result bit (%s)&quot;, ofperr_to_string(ofperr));</span>
+<span class="lineNum">     509 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     510 </span>                :            :     }
+<span class="lineNum">     511 </span>                :            : 
+<span class="lineNum">     512 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          2 :     if (!userdata-&gt;size) {</span>
+<span class="lineNum">     513 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;DHCPv6 options not present in the userdata&quot;);</span>
+<span class="lineNum">     514 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     515 </span>                :            :     }
+<span class="lineNum">     516 </span>                :            : 
+<span class="lineNum">     517 </span>                :<span class="lineCov">          2 :     struct udp_header *in_udp = dp_packet_l4(pkt_in);</span>
+<span class="lineNum">     518 </span>                :<span class="lineCov">          2 :     const uint8_t *in_dhcpv6_data = dp_packet_get_udp_payload(pkt_in);</span>
+<span class="lineNum">     519 </span>                :            :     uint8_t out_dhcpv6_msg_type;
+<span class="lineNum">     520 </span>     [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">          2 :     switch(*in_dhcpv6_data) {</span>
+<span class="lineNum">     521 </span>                :            :     case DHCPV6_MSG_TYPE_SOLICIT:
+<span class="lineNum">     522 </span>                :<span class="lineCov">          1 :         out_dhcpv6_msg_type = DHCPV6_MSG_TYPE_ADVT;</span>
+<span class="lineNum">     523 </span>                :<span class="lineCov">          1 :         break;</span>
+<span class="lineNum">     524 </span>                :            : 
+<span class="lineNum">     525 </span>                :            :     case DHCPV6_MSG_TYPE_REQUEST:
+<span class="lineNum">     526 </span>                :            :     case DHCPV6_MSG_TYPE_CONFIRM:
+<span class="lineNum">     527 </span>                :            :     case DHCPV6_MSG_TYPE_DECLINE:
+<span class="lineNum">     528 </span>                :<span class="lineNoCov">          0 :         out_dhcpv6_msg_type = DHCPV6_MSG_TYPE_REPLY;</span>
+<span class="lineNum">     529 </span>                :<span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">     530 </span>                :            : 
+<span class="lineNum">     531 </span>                :            :     default:
+<span class="lineNum">     532 </span>                :            :         /* Invalid or unsupported DHCPv6 message type */
+<span class="lineNum">     533 </span>                :<span class="lineCov">          1 :         goto exit;</span>
+<span class="lineNum">     534 </span>                :            :     }
+<span class="lineNum">     535 </span>                :            : 
+<span class="lineNum">     536 </span>                :            :     /* Skip 4 bytes (message type (1 byte) + transaction ID (3 bytes). */
+<span class="lineNum">     537 </span>                :<span class="lineCov">          1 :     in_dhcpv6_data += 4;</span>
+<span class="lineNum">     538 </span>                :            :     /* We need to extract IAID from the IA-NA option of the client's DHCPv6
+<span class="lineNum">     539 </span>                :            :      * solicit/request/confirm packet and copy the same IAID in the Server's
+<span class="lineNum">     540 </span>                :            :      * response. */
+<span class="lineNum">     541 </span>                :<span class="lineCov">          1 :     ovs_be32 iaid = 0;</span>
+<span class="lineNum">     542 </span>                :<span class="lineCov">          1 :     struct dhcpv6_opt_header const *in_opt_client_id = NULL;</span>
+<span class="lineNum">     543 </span>                :<span class="lineCov">          1 :     size_t udp_len = ntohs(in_udp-&gt;udp_len);</span>
+<span class="lineNum">     544 </span>                :<span class="lineCov">          1 :     size_t l4_len = dp_packet_l4_size(pkt_in);</span>
+<span class="lineNum">     545 </span>                :<span class="lineCov">          1 :     uint8_t *end = (uint8_t *)in_udp + MIN(udp_len, l4_len);</span>
+<span class="lineNum">     546 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          3 :     while (in_dhcpv6_data &lt; end) {</span>
+<span class="lineNum">     547 </span>                :<span class="lineCov">          2 :         struct dhcpv6_opt_header const *in_opt =</span>
+<span class="lineNum">     548 </span>                :            :              (struct dhcpv6_opt_header *)in_dhcpv6_data;
+<span class="lineNum">     549 </span>     [<span class="branchCov" title="Branch 1 was taken 1 time"> + </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">          2 :         switch(ntohs(in_opt-&gt;code)) {</span>
+<span class="lineNum">     550 </span>                :            :         case DHCPV6_OPT_IA_NA_CODE:
+<span class="lineNum">     551 </span>                :            :         {
+<span class="lineNum">     552 </span>                :<span class="lineCov">          1 :             struct dhcpv6_opt_ia_na *opt_ia_na = (</span>
+<span class="lineNum">     553 </span>                :            :                 struct dhcpv6_opt_ia_na *)in_opt;
+<span class="lineNum">     554 </span>                :<span class="lineCov">          1 :             iaid = opt_ia_na-&gt;iaid;</span>
+<span class="lineNum">     555 </span>                :<span class="lineCov">          1 :             break;</span>
+<span class="lineNum">     556 </span>                :            :         }
+<span class="lineNum">     557 </span>                :            : 
+<span class="lineNum">     558 </span>                :            :         case DHCPV6_OPT_CLIENT_ID_CODE:
+<span class="lineNum">     559 </span>                :<span class="lineCov">          1 :             in_opt_client_id = in_opt;</span>
+<span class="lineNum">     560 </span>                :<span class="lineCov">          1 :             break;</span>
+<span class="lineNum">     561 </span>                :            : 
+<span class="lineNum">     562 </span>                :            :         default:
+<span class="lineNum">     563 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     564 </span>                :            :         }
+<span class="lineNum">     565 </span>                :<span class="lineCov">          2 :         in_dhcpv6_data += sizeof *in_opt + ntohs(in_opt-&gt;len);</span>
+<span class="lineNum">     566 </span>                :            :     }
+<span class="lineNum">     567 </span>                :            : 
+<span class="lineNum">     568 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     if (!in_opt_client_id) {</span>
+<span class="lineNum">     569 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;DHCPv6 option - Client id not present in the &quot;</span>
+<span class="lineNum">     570 </span>                :            :                      &quot; DHCPv6 packet&quot;);
+<span class="lineNum">     571 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     572 </span>                :            :     }
+<span class="lineNum">     573 </span>                :            : 
+<span class="lineNum">     574 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     if (!iaid) {</span>
+<span class="lineNum">     575 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;DHCPv6 option - IA NA not present in the &quot;</span>
+<span class="lineNum">     576 </span>                :            :                      &quot; DHCPv6 packet&quot;);
+<span class="lineNum">     577 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     578 </span>                :            :     }
+<span class="lineNum">     579 </span>                :            : 
+<span class="lineNum">     580 </span>                :            :     uint64_t out_ofpacts_dhcpv6_opts_stub[256 / 8];
+<span class="lineNum">     581 </span>                :<span class="lineCov">          1 :     struct ofpbuf out_dhcpv6_opts =</span>
+<span class="lineNum">     582 </span>                :            :         OFPBUF_STUB_INITIALIZER(out_ofpacts_dhcpv6_opts_stub);
+<span class="lineNum">     583 </span>                :            : 
+<span class="lineNum">     584 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     if (!compose_out_dhcpv6_opts(userdata, &amp;out_dhcpv6_opts, iaid)) {</span>
+<span class="lineNum">     585 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;Invalid userdata&quot;);</span>
+<span class="lineNum">     586 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">     587 </span>                :            :     }
+<span class="lineNum">     588 </span>                :            : 
+<span class="lineNum">     589 </span>                :<span class="lineCov">          1 :     uint16_t new_l4_size</span>
+<span class="lineNum">     590 </span>                :            :         = (UDP_HEADER_LEN + 4 + sizeof *in_opt_client_id +
+<span class="lineNum">     591 </span>                :<span class="lineCov">          1 :            ntohs(in_opt_client_id-&gt;len) + out_dhcpv6_opts.size);</span>
+<span class="lineNum">     592 </span>                :<span class="lineCov">          1 :     size_t new_packet_size = pkt_in-&gt;l4_ofs + new_l4_size;</span>
+<span class="lineNum">     593 </span>                :            : 
+<span class="lineNum">     594 </span>                :            :     struct dp_packet pkt_out;
+<span class="lineNum">     595 </span>                :<span class="lineCov">          1 :     dp_packet_init(&amp;pkt_out, new_packet_size);</span>
+<span class="lineNum">     596 </span>                :<span class="lineCov">          1 :     dp_packet_clear(&amp;pkt_out);</span>
+<span class="lineNum">     597 </span>                :<span class="lineCov">          1 :     dp_packet_prealloc_tailroom(&amp;pkt_out, new_packet_size);</span>
+<span class="lineNum">     598 </span>                :<span class="lineCov">          1 :     pkt_out_ptr = &amp;pkt_out;</span>
+<span class="lineNum">     599 </span>                :            : 
+<span class="lineNum">     600 </span>                :            :     /* Copy L2 and L3 headers from pkt_in. */
+<span class="lineNum">     601 </span>                :<span class="lineCov">          1 :     dp_packet_put(&amp;pkt_out, dp_packet_pull(pkt_in, pkt_in-&gt;l4_ofs),</span>
+<span class="lineNum">     602 </span>                :<span class="lineCov">          1 :                   pkt_in-&gt;l4_ofs);</span>
+<span class="lineNum">     603 </span>                :            : 
+<span class="lineNum">     604 </span>                :<span class="lineCov">          1 :     pkt_out.l2_5_ofs = pkt_in-&gt;l2_5_ofs;</span>
+<span class="lineNum">     605 </span>                :<span class="lineCov">          1 :     pkt_out.l2_pad_size = pkt_in-&gt;l2_pad_size;</span>
+<span class="lineNum">     606 </span>                :<span class="lineCov">          1 :     pkt_out.l3_ofs = pkt_in-&gt;l3_ofs;</span>
+<span class="lineNum">     607 </span>                :<span class="lineCov">          1 :     pkt_out.l4_ofs = pkt_in-&gt;l4_ofs;</span>
+<span class="lineNum">     608 </span>                :            : 
+<span class="lineNum">     609 </span>                :            :     /* Pull the DHCPv6 message type and transaction id from the pkt_in.
+<span class="lineNum">     610 </span>                :            :      * Need to preserve the transaction id in the DHCPv6 reply packet. */
+<span class="lineNum">     611 </span>                :<span class="lineCov">          1 :     struct udp_header *out_udp = dp_packet_put(</span>
+<span class="lineNum">     612 </span>                :<span class="lineCov">          1 :         &amp;pkt_out, dp_packet_pull(pkt_in, UDP_HEADER_LEN), UDP_HEADER_LEN);</span>
+<span class="lineNum">     613 </span>                :<span class="lineCov">          1 :     uint8_t *out_dhcpv6 = dp_packet_put(&amp;pkt_out, dp_packet_pull(pkt_in, 4), 4);</span>
+<span class="lineNum">     614 </span>                :            : 
+<span class="lineNum">     615 </span>                :            :     /* Set the proper DHCPv6 message type. */
+<span class="lineNum">     616 </span>                :<span class="lineCov">          1 :     *out_dhcpv6 = out_dhcpv6_msg_type;</span>
+<span class="lineNum">     617 </span>                :            : 
+<span class="lineNum">     618 </span>                :            :     /* Copy the Client Identifier. */
+<span class="lineNum">     619 </span>                :<span class="lineCov">          1 :     dp_packet_put(&amp;pkt_out, in_opt_client_id,</span>
+<span class="lineNum">     620 </span>                :<span class="lineCov">          1 :                   sizeof *in_opt_client_id + ntohs(in_opt_client_id-&gt;len));</span>
+<span class="lineNum">     621 </span>                :            : 
+<span class="lineNum">     622 </span>                :            :     /* Copy the DHCPv6 Options. */
+<span class="lineNum">     623 </span>                :<span class="lineCov">          1 :     dp_packet_put(&amp;pkt_out, out_dhcpv6_opts.data, out_dhcpv6_opts.size);</span>
+<span class="lineNum">     624 </span>                :<span class="lineCov">          1 :     out_udp-&gt;udp_len = htons(new_l4_size);</span>
+<span class="lineNum">     625 </span>                :<span class="lineCov">          1 :     out_udp-&gt;udp_csum = 0;</span>
+<span class="lineNum">     626 </span>                :            : 
+<span class="lineNum">     627 </span>                :<span class="lineCov">          1 :     struct ovs_16aligned_ip6_hdr *out_ip6 = dp_packet_l3(&amp;pkt_out);</span>
+<span class="lineNum">     628 </span>                :<span class="lineCov">          1 :     out_ip6-&gt;ip6_ctlun.ip6_un1.ip6_un1_plen = out_udp-&gt;udp_len;</span>
+<span class="lineNum">     629 </span>                :            : 
+<span class="lineNum">     630 </span>                :            :     uint32_t csum;
+<span class="lineNum">     631 </span>                :<span class="lineCov">          1 :     csum = packet_csum_pseudoheader6(dp_packet_l3(&amp;pkt_out));</span>
+<span class="lineNum">     632 </span>                :<span class="lineCov">          2 :     csum = csum_continue(csum, out_udp, dp_packet_size(&amp;pkt_out) -</span>
+<span class="lineNum">     633 </span>                :<span class="lineCov">          2 :                          ((const unsigned char *)out_udp -</span>
+<span class="lineNum">     634 </span>                :<span class="lineCov">          1 :                          (const unsigned char *)dp_packet_l2(&amp;pkt_out)));</span>
+<span class="lineNum">     635 </span>                :<span class="lineCov">          1 :     out_udp-&gt;udp_csum = csum_finish(csum);</span>
+<span class="lineNum">     636 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     if (!out_udp-&gt;udp_csum) {</span>
+<span class="lineNum">     637 </span>                :<span class="lineNoCov">          0 :         out_udp-&gt;udp_csum = htons(0xffff);</span>
+<span class="lineNum">     638 </span>                :            :     }
+<span class="lineNum">     639 </span>                :            : 
+<span class="lineNum">     640 </span>                :<span class="lineCov">          1 :     pin-&gt;packet = dp_packet_data(&amp;pkt_out);</span>
+<span class="lineNum">     641 </span>                :<span class="lineCov">          1 :     pin-&gt;packet_len = dp_packet_size(&amp;pkt_out);</span>
+<span class="lineNum">     642 </span>                :<span class="lineCov">          1 :     ofpbuf_uninit(&amp;out_dhcpv6_opts);</span>
+<span class="lineNum">     643 </span>                :<span class="lineCov">          1 :     success = 1;</span>
+<span class="lineNum">     644 </span>                :            : exit:
+<span class="lineNum">     645 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :     if (!ofperr) {</span>
+<span class="lineNum">     646 </span>                :            :         union mf_subvalue sv;
+<span class="lineNum">     647 </span>                :<span class="lineCov">          2 :         sv.u8_val = success;</span>
+<span class="lineNum">     648 </span>                :<span class="lineCov">          2 :         mf_write_subfield(&amp;dst, &amp;sv, &amp;pin-&gt;flow_metadata);</span>
+<span class="lineNum">     649 </span>                :            :     }
+<span class="lineNum">     650 </span>                :<span class="lineCov">          2 :     queue_msg(ofputil_encode_resume(pin, continuation, proto));</span>
+<span class="lineNum">     651 </span>                :<span class="lineCov">          2 :     dp_packet_uninit(pkt_out_ptr);</span>
+<span class="lineNum">     652 </span>                :<span class="lineCov">          2 : }</span>
+<a name="653"><span class="lineNum">     653 </span>                :            : </a>
+<span class="lineNum">     654 </span>                :            : static void
+<span class="lineNum">     655 </span>                :<span class="lineCov">        453 : process_packet_in(const struct ofp_header *msg)</span>
+<span class="lineNum">     656 </span>                :            : {
+<span class="lineNum">     657 </span>                :            :     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     658 </span>                :            : 
+<span class="lineNum">     659 </span>                :            :     struct ofputil_packet_in pin;
+<span class="lineNum">     660 </span>                :            :     struct ofpbuf continuation;
+<span class="lineNum">     661 </span>                :<span class="lineCov">        453 :     enum ofperr error = ofputil_decode_packet_in(msg, true, &amp;pin,</span>
+<span class="lineNum">     662 </span>                :            :                                                  NULL, NULL, &amp;continuation);
+<span class="lineNum">     663 </span>                :            : 
+<span class="lineNum">     664 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 453 times"> + </span>]:<span class="lineCov">        453 :     if (error) {</span>
+<span class="lineNum">     665 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;error decoding packet-in: %s&quot;,</span>
+<span class="lineNum">     666 </span>                :            :                      ofperr_to_string(error));
+<span class="lineNum">     667 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     668 </span>                :            :     }
+<span class="lineNum">     669 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 453 times"> + </span>]:<span class="lineCov">        453 :     if (pin.reason != OFPR_ACTION) {</span>
+<span class="lineNum">     670 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     671 </span>                :            :     }
+<span class="lineNum">     672 </span>                :            : 
+<span class="lineNum">     673 </span>                :<span class="lineCov">        453 :     struct ofpbuf userdata = ofpbuf_const_initializer(pin.userdata,</span>
+<span class="lineNum">     674 </span>                :            :                                                       pin.userdata_len);
+<span class="lineNum">     675 </span>                :<span class="lineCov">        453 :     const struct action_header *ah = ofpbuf_pull(&amp;userdata, sizeof *ah);</span>
+<span class="lineNum">     676 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 453 times"> + </span>]:<span class="lineCov">        453 :     if (!ah) {</span>
+<span class="lineNum">     677 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;packet-in userdata lacks action header&quot;);</span>
+<span class="lineNum">     678 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     679 </span>                :            :     }
+<span class="lineNum">     680 </span>                :            : 
+<span class="lineNum">     681 </span>                :            :     struct dp_packet packet;
+<span class="lineNum">     682 </span>                :<span class="lineCov">        453 :     dp_packet_use_const(&amp;packet, pin.packet, pin.packet_len);</span>
+<span class="lineNum">     683 </span>                :            :     struct flow headers;
+<span class="lineNum">     684 </span>                :<span class="lineCov">        453 :     flow_extract(&amp;packet, &amp;headers);</span>
+<span class="lineNum">     685 </span>                :            : 
+<span class="lineNum">     686 </span>  [<span class="branchCov" title="Branch 1 was taken 217 times"> + </span><span class="branchCov" title="Branch 2 was taken 216 times"> + </span><span class="branchCov" title="Branch 3 was taken 3 times"> + </span><span class="branchCov" title="Branch 4 was taken 1 time"> + </span> :<span class="lineCov">        453 :     switch (ntohl(ah-&gt;opcode)) {</span>
+<span class="lineNum">         </span>      <span class="branchCov" title="Branch 5 was taken 14 times"> + </span><span class="branchCov" title="Branch 6 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span>]
+<span class="lineNum">     687 </span>                :            :     case ACTION_OPCODE_ARP:
+<span class="lineNum">     688 </span>                :<span class="lineCov">        217 :         pinctrl_handle_arp(&amp;headers, &amp;pin.flow_metadata, &amp;userdata);</span>
+<span class="lineNum">     689 </span>                :<span class="lineCov">        217 :         break;</span>
+<span class="lineNum">     690 </span>                :            : 
+<span class="lineNum">     691 </span>                :            :     case ACTION_OPCODE_PUT_ARP:
+<span class="lineNum">     692 </span>                :<span class="lineCov">        216 :         pinctrl_handle_put_mac_binding(&amp;pin.flow_metadata.flow, &amp;headers,</span>
+<span class="lineNum">     693 </span>                :            :                                        true);
+<span class="lineNum">     694 </span>                :<span class="lineCov">        216 :         break;</span>
+<span class="lineNum">     695 </span>                :            : 
+<span class="lineNum">     696 </span>                :            :     case ACTION_OPCODE_PUT_DHCP_OPTS:
+<span class="lineNum">     697 </span>                :<span class="lineCov">          3 :         pinctrl_handle_put_dhcp_opts(&amp;packet, &amp;pin, &amp;userdata, &amp;continuation);</span>
+<span class="lineNum">     698 </span>                :<span class="lineCov">          3 :         break;</span>
+<span class="lineNum">     699 </span>                :            : 
+<span class="lineNum">     700 </span>                :            :     case ACTION_OPCODE_ND_NA:
+<span class="lineNum">     701 </span>                :<span class="lineCov">          1 :         pinctrl_handle_nd_na(&amp;headers, &amp;pin.flow_metadata, &amp;userdata);</span>
+<span class="lineNum">     702 </span>                :<span class="lineCov">          1 :         break;</span>
+<span class="lineNum">     703 </span>                :            : 
+<span class="lineNum">     704 </span>                :            :     case ACTION_OPCODE_PUT_ND:
+<span class="lineNum">     705 </span>                :<span class="lineCov">         14 :         pinctrl_handle_put_mac_binding(&amp;pin.flow_metadata.flow, &amp;headers,</span>
+<span class="lineNum">     706 </span>                :            :                                        false);
+<span class="lineNum">     707 </span>                :<span class="lineCov">         14 :         break;</span>
+<span class="lineNum">     708 </span>                :            : 
+<span class="lineNum">     709 </span>                :            :     case ACTION_OPCODE_PUT_DHCPV6_OPTS:
+<span class="lineNum">     710 </span>                :<span class="lineCov">          2 :         pinctrl_handle_put_dhcpv6_opts(&amp;packet, &amp;pin, &amp;userdata,</span>
+<span class="lineNum">     711 </span>                :            :                                        &amp;continuation);
+<span class="lineNum">     712 </span>                :<span class="lineCov">          2 :         break;</span>
+<span class="lineNum">     713 </span>                :            : 
+<span class="lineNum">     714 </span>                :            :     default:
+<span class="lineNum">     715 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;unrecognized packet-in opcode %&quot;PRIu32,</span>
+<span class="lineNum">     716 </span>                :            :                      ntohl(ah-&gt;opcode));
+<span class="lineNum">     717 </span>                :<span class="lineCov">        453 :         break;</span>
+<span class="lineNum">     718 </span>                :            :     }
+<span class="lineNum">     719 </span>                :            : }
+<a name="720"><span class="lineNum">     720 </span>                :            : </a>
+<span class="lineNum">     721 </span>                :            : static void
+<span class="lineNum">     722 </span>                :<span class="lineCov">        910 : pinctrl_recv(const struct ofp_header *oh, enum ofptype type)</span>
+<span class="lineNum">     723 </span>                :            : {
+<span class="lineNum">     724 </span>        [<span class="branchCov" title="Branch 0 was taken 6 times"> + </span><span class="branchCov" title="Branch 1 was taken 904 times"> + </span>]:<span class="lineCov">        910 :     if (type == OFPTYPE_ECHO_REQUEST) {</span>
+<span class="lineNum">     725 </span>                :<span class="lineCov">          6 :         queue_msg(make_echo_reply(oh));</span>
+<span class="lineNum">     726 </span>        [<span class="branchCov" title="Branch 0 was taken 46 times"> + </span><span class="branchCov" title="Branch 1 was taken 858 times"> + </span>]:<span class="lineCov">        904 :     } else if (type == OFPTYPE_GET_CONFIG_REPLY) {</span>
+<span class="lineNum">     727 </span>                :            :         /* Enable asynchronous messages (see &quot;Asynchronous Messages&quot; in
+<span class="lineNum">     728 </span>                :            :          * DESIGN.md for more information). */
+<span class="lineNum">     729 </span>                :            :         struct ofputil_switch_config config;
+<span class="lineNum">     730 </span>                :            : 
+<span class="lineNum">     731 </span>                :<span class="lineCov">         46 :         ofputil_decode_get_config_reply(oh, &amp;config);</span>
+<span class="lineNum">     732 </span>                :<span class="lineCov">         46 :         config.miss_send_len = UINT16_MAX;</span>
+<span class="lineNum">     733 </span>                :<span class="lineCov">         46 :         set_switch_config(swconn, &amp;config);</span>
+<span class="lineNum">     734 </span>        [<span class="branchCov" title="Branch 0 was taken 453 times"> + </span><span class="branchCov" title="Branch 1 was taken 405 times"> + </span>]:<span class="lineCov">        858 :     } else if (type == OFPTYPE_PACKET_IN) {</span>
+<span class="lineNum">     735 </span>                :<span class="lineCov">        453 :         process_packet_in(oh);</span>
+<span class="lineNum">     736 </span>[<span class="branchCov" title="Branch 0 was taken 405 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 405 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        405 :     } else if (type != OFPTYPE_ECHO_REPLY &amp;&amp; type != OFPTYPE_BARRIER_REPLY) {</span>
+<span class="lineNum">     737 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 405 times"> + </span>]:<span class="lineCov">        405 :         if (VLOG_IS_DBG_ENABLED()) {</span>
+<span class="lineNum">     738 </span>                :            :             static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(30, 300);
+<span class="lineNum">     739 </span>                :            : 
+<span class="lineNum">     740 </span>                :<span class="lineNoCov">          0 :             char *s = ofp_to_string(oh, ntohs(oh-&gt;length), 2);</span>
+<span class="lineNum">     741 </span>                :            : 
+<span class="lineNum">     742 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_DBG_RL(&amp;rl, &quot;OpenFlow packet ignored: %s&quot;, s);</span>
+<span class="lineNum">     743 </span>                :<span class="lineNoCov">          0 :             free(s);</span>
+<span class="lineNum">     744 </span>                :            :         }
+<span class="lineNum">     745 </span>                :            :     }
+<span class="lineNum">     746 </span>                :<span class="lineCov">        910 : }</span>
+<a name="747"><span class="lineNum">     747 </span>                :            : </a>
+<span class="lineNum">     748 </span>                :            : void
+<span class="lineNum">     749 </span>                :<span class="lineCov">       3167 : pinctrl_run(struct controller_ctx *ctx, const struct lport_index *lports,</span>
+<span class="lineNum">     750 </span>                :            :             const struct ovsrec_bridge *br_int,
+<span class="lineNum">     751 </span>                :            :             const char *chassis_id,
+<span class="lineNum">     752 </span>                :            :             struct hmap *local_datapaths)
+<span class="lineNum">     753 </span>                :            : {
+<span class="lineNum">     754 </span>                :<span class="lineCov">       3167 :     char *target = xasprintf(&quot;unix:%s/%s.mgmt&quot;, ovs_rundir(), br_int-&gt;name);</span>
+<span class="lineNum">     755 </span>        [<span class="branchCov" title="Branch 1 was taken 44 times"> + </span><span class="branchCov" title="Branch 2 was taken 3123 times"> + </span>]:<span class="lineCov">       3167 :     if (strcmp(target, rconn_get_target(swconn))) {</span>
+<span class="lineNum">     756 </span>        [<span class="branchCov" title="Branch 0 was taken 44 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         44 :         VLOG_INFO(&quot;%s: connecting to switch&quot;, target);</span>
+<span class="lineNum">     757 </span>                :<span class="lineCov">         44 :         rconn_connect(swconn, target, target);</span>
+<span class="lineNum">     758 </span>                :            :     }
+<span class="lineNum">     759 </span>                :<span class="lineCov">       3167 :     free(target);</span>
+<span class="lineNum">     760 </span>                :            : 
+<span class="lineNum">     761 </span>                :<span class="lineCov">       3167 :     rconn_run(swconn);</span>
+<span class="lineNum">     762 </span>                :            : 
+<span class="lineNum">     763 </span>        [<span class="branchCov" title="Branch 1 was taken 3070 times"> + </span><span class="branchCov" title="Branch 2 was taken 97 times"> + </span>]:<span class="lineCov">       3167 :     if (rconn_is_connected(swconn)) {</span>
+<span class="lineNum">     764 </span>        [<span class="branchCov" title="Branch 1 was taken 46 times"> + </span><span class="branchCov" title="Branch 2 was taken 3024 times"> + </span>]:<span class="lineCov">       3070 :         if (conn_seq_no != rconn_get_connection_seqno(swconn)) {</span>
+<span class="lineNum">     765 </span>                :<span class="lineCov">         46 :             pinctrl_setup(swconn);</span>
+<span class="lineNum">     766 </span>                :<span class="lineCov">         46 :             conn_seq_no = rconn_get_connection_seqno(swconn);</span>
+<span class="lineNum">     767 </span>                :<span class="lineCov">         46 :             flush_put_mac_bindings();</span>
+<span class="lineNum">     768 </span>                :            :         }
+<span class="lineNum">     769 </span>                :            : 
+<span class="lineNum">     770 </span>                :            :         /* Process a limited number of messages per call. */
+<span class="lineNum">     771 </span>        [<span class="branchCov" title="Branch 0 was taken 3980 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       3980 :         for (int i = 0; i &lt; 50; i++) {</span>
+<span class="lineNum">     772 </span>                :<span class="lineCov">       3980 :             struct ofpbuf *msg = rconn_recv(swconn);</span>
+<span class="lineNum">     773 </span>        [<span class="branchCov" title="Branch 0 was taken 3070 times"> + </span><span class="branchCov" title="Branch 1 was taken 910 times"> + </span>]:<span class="lineCov">       3980 :             if (!msg) {</span>
+<span class="lineNum">     774 </span>                :<span class="lineCov">       3070 :                 break;</span>
+<span class="lineNum">     775 </span>                :            :             }
+<span class="lineNum">     776 </span>                :            : 
+<span class="lineNum">     777 </span>                :<span class="lineCov">        910 :             const struct ofp_header *oh = msg-&gt;data;</span>
+<span class="lineNum">     778 </span>                :            :             enum ofptype type;
+<span class="lineNum">     779 </span>                :            : 
+<span class="lineNum">     780 </span>                :<span class="lineCov">        910 :             ofptype_decode(&amp;type, oh);</span>
+<span class="lineNum">     781 </span>                :<span class="lineCov">        910 :             pinctrl_recv(oh, type);</span>
+<span class="lineNum">     782 </span>                :<span class="lineCov">        910 :             ofpbuf_delete(msg);</span>
+<span class="lineNum">     783 </span>                :            :         }
+<span class="lineNum">     784 </span>                :            :     }
+<span class="lineNum">     785 </span>                :            : 
+<span class="lineNum">     786 </span>                :<span class="lineCov">       3167 :     run_put_mac_bindings(ctx, lports);</span>
+<span class="lineNum">     787 </span>                :<span class="lineCov">       3167 :     send_garp_run(br_int, chassis_id, lports, local_datapaths);</span>
+<span class="lineNum">     788 </span>                :<span class="lineCov">       3167 : }</span>
+<a name="789"><span class="lineNum">     789 </span>                :            : </a>
+<span class="lineNum">     790 </span>                :            : void
+<span class="lineNum">     791 </span>                :<span class="lineCov">       3167 : pinctrl_wait(struct controller_ctx *ctx)</span>
+<span class="lineNum">     792 </span>                :            : {
+<span class="lineNum">     793 </span>                :<span class="lineCov">       3167 :     wait_put_mac_bindings(ctx);</span>
+<span class="lineNum">     794 </span>                :<span class="lineCov">       3167 :     rconn_run_wait(swconn);</span>
+<span class="lineNum">     795 </span>                :<span class="lineCov">       3167 :     rconn_recv_wait(swconn);</span>
+<span class="lineNum">     796 </span>                :<span class="lineCov">       3167 :     send_garp_wait();</span>
+<span class="lineNum">     797 </span>                :<span class="lineCov">       3167 : }</span>
+<a name="798"><span class="lineNum">     798 </span>                :            : </a>
+<span class="lineNum">     799 </span>                :            : void
+<span class="lineNum">     800 </span>                :<span class="lineCov">         44 : pinctrl_destroy(void)</span>
+<span class="lineNum">     801 </span>                :            : {
+<span class="lineNum">     802 </span>                :<span class="lineCov">         44 :     rconn_destroy(swconn);</span>
+<span class="lineNum">     803 </span>                :<span class="lineCov">         44 :     destroy_put_mac_bindings();</span>
+<span class="lineNum">     804 </span>                :<span class="lineCov">         44 :     destroy_send_garps();</span>
+<span class="lineNum">     805 </span>                :<span class="lineCov">         44 : }</span>
+<span class="lineNum">     806 </span>                :            : 
+<span class="lineNum">     807 </span>                :            : /* Implementation of the &quot;put_arp&quot; and &quot;put_nd&quot; OVN actions.  These
+<span class="lineNum">     808 </span>                :            :  * actions send a packet to ovn-controller, using the flow as an API
+<span class="lineNum">     809 </span>                :            :  * (see actions.h for details).  This code implements the actions by
+<span class="lineNum">     810 </span>                :            :  * updating the MAC_Binding table in the southbound database.
+<span class="lineNum">     811 </span>                :            :  *
+<span class="lineNum">     812 </span>                :            :  * This code could be a lot simpler if the database could always be updated,
+<span class="lineNum">     813 </span>                :            :  * but in fact we can only update it when ctx-&gt;ovnsb_idl_txn is nonnull.  Thus,
+<span class="lineNum">     814 </span>                :            :  * we buffer up a few put_mac_bindings (but we don't keep them longer
+<span class="lineNum">     815 </span>                :            :  * than 1 second) and apply them whenever a database transaction is
+<span class="lineNum">     816 </span>                :            :  * available. */
+<span class="lineNum">     817 </span>                :            : 
+<span class="lineNum">     818 </span>                :            : /* Buffered &quot;put_mac_binding&quot; operation. */
+<span class="lineNum">     819 </span>                :            : struct put_mac_binding {
+<span class="lineNum">     820 </span>                :            :     struct hmap_node hmap_node; /* In 'put_mac_bindings'. */
+<span class="lineNum">     821 </span>                :            : 
+<span class="lineNum">     822 </span>                :            :     long long int timestamp;    /* In milliseconds. */
+<span class="lineNum">     823 </span>                :            : 
+<span class="lineNum">     824 </span>                :            :     /* Key. */
+<span class="lineNum">     825 </span>                :            :     uint32_t dp_key;
+<span class="lineNum">     826 </span>                :            :     uint32_t port_key;
+<span class="lineNum">     827 </span>                :            :     char ip_s[INET6_ADDRSTRLEN + 1];
+<span class="lineNum">     828 </span>                :            : 
+<span class="lineNum">     829 </span>                :            :     /* Value. */
+<span class="lineNum">     830 </span>                :            :     struct eth_addr mac;
+<span class="lineNum">     831 </span>                :            : };
+<span class="lineNum">     832 </span>                :            : 
+<span class="lineNum">     833 </span>                :            : /* Contains &quot;struct put_mac_binding&quot;s. */
+<span class="lineNum">     834 </span>                :            : static struct hmap put_mac_bindings;
+<a name="835"><span class="lineNum">     835 </span>                :            : </a>
+<span class="lineNum">     836 </span>                :            : static void
+<span class="lineNum">     837 </span>                :<span class="lineCov">         44 : init_put_mac_bindings(void)</span>
+<span class="lineNum">     838 </span>                :            : {
+<span class="lineNum">     839 </span>                :<span class="lineCov">         44 :     hmap_init(&amp;put_mac_bindings);</span>
+<span class="lineNum">     840 </span>                :<span class="lineCov">         44 : }</span>
+<a name="841"><span class="lineNum">     841 </span>                :            : </a>
+<span class="lineNum">     842 </span>                :            : static void
+<span class="lineNum">     843 </span>                :<span class="lineCov">         44 : destroy_put_mac_bindings(void)</span>
+<span class="lineNum">     844 </span>                :            : {
+<span class="lineNum">     845 </span>                :<span class="lineCov">         44 :     flush_put_mac_bindings();</span>
+<span class="lineNum">     846 </span>                :<span class="lineCov">         44 :     hmap_destroy(&amp;put_mac_bindings);</span>
+<span class="lineNum">     847 </span>                :<span class="lineCov">         44 : }</span>
+<a name="848"><span class="lineNum">     848 </span>                :            : </a>
+<span class="lineNum">     849 </span>                :            : static struct put_mac_binding *
+<span class="lineNum">     850 </span>                :<span class="lineCov">        230 : pinctrl_find_put_mac_binding(uint32_t dp_key, uint32_t port_key,</span>
+<span class="lineNum">     851 </span>                :            :                              const char *ip_s, uint32_t hash)
+<span class="lineNum">     852 </span>                :            : {
+<span class="lineNum">     853 </span>                :            :     struct put_mac_binding *pa;
+<span class="lineNum">     854 </span>[<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 230 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 230 times"> + </span>]:<span class="lineCov">        230 :     HMAP_FOR_EACH_WITH_HASH (pa, hmap_node, hash, &amp;put_mac_bindings) {</span>
+<span class="lineNum">     855 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (pa-&gt;dp_key == dp_key</span>
+<span class="lineNum">     856 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; pa-&gt;port_key == port_key</span>
+<span class="lineNum">     857 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             &amp;&amp; !strcmp(pa-&gt;ip_s, ip_s)) {</span>
+<span class="lineNum">     858 </span>                :<span class="lineNoCov">          0 :             return pa;</span>
+<span class="lineNum">     859 </span>                :            :         }
+<span class="lineNum">     860 </span>                :            :     }
+<span class="lineNum">     861 </span>                :<span class="lineCov">        230 :     return NULL;</span>
+<span class="lineNum">     862 </span>                :            : }
+<a name="863"><span class="lineNum">     863 </span>                :            : </a>
+<span class="lineNum">     864 </span>                :            : static void
+<span class="lineNum">     865 </span>                :<span class="lineCov">        230 : pinctrl_handle_put_mac_binding(const struct flow *md,</span>
+<span class="lineNum">     866 </span>                :            :                                const struct flow *headers, bool is_arp)
+<span class="lineNum">     867 </span>                :            : {
+<span class="lineNum">     868 </span>                :<span class="lineCov">        230 :     uint32_t dp_key = ntohll(md-&gt;metadata);</span>
+<span class="lineNum">     869 </span>                :<span class="lineCov">        230 :     uint32_t port_key = md-&gt;regs[MFF_LOG_INPORT - MFF_REG0];</span>
+<span class="lineNum">     870 </span>                :            :     char ip_s[INET6_ADDRSTRLEN];
+<span class="lineNum">     871 </span>                :            : 
+<span class="lineNum">     872 </span>        [<span class="branchCov" title="Branch 0 was taken 216 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>]:<span class="lineCov">        230 :     if (is_arp) {</span>
+<span class="lineNum">     873 </span>                :<span class="lineCov">        216 :         ovs_be32 ip = htonl(md-&gt;regs[0]);</span>
+<span class="lineNum">     874 </span>                :<span class="lineCov">        216 :         inet_ntop(AF_INET, &amp;ip, ip_s, sizeof(ip_s));</span>
+<span class="lineNum">     875 </span>                :            :     } else {
+<span class="lineNum">     876 </span>                :<span class="lineCov">         14 :         ovs_be128 ip6 = hton128(flow_get_xxreg(md, 0));</span>
+<span class="lineNum">     877 </span>                :<span class="lineCov">         14 :         inet_ntop(AF_INET6, &amp;ip6, ip_s, sizeof(ip_s));</span>
+<span class="lineNum">     878 </span>                :            :     }
+<span class="lineNum">     879 </span>                :<span class="lineCov">        230 :     uint32_t hash = hash_string(ip_s, hash_2words(dp_key, port_key));</span>
+<span class="lineNum">     880 </span>                :<span class="lineCov">        230 :     struct put_mac_binding *pmb</span>
+<span class="lineNum">     881 </span>                :            :         = pinctrl_find_put_mac_binding(dp_key, port_key, ip_s, hash);
+<span class="lineNum">     882 </span>        [<span class="branchCov" title="Branch 0 was taken 230 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        230 :     if (!pmb) {</span>
+<span class="lineNum">     883 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 230 times"> + </span>]:<span class="lineCov">        230 :         if (hmap_count(&amp;put_mac_bindings) &gt;= 1000) {</span>
+<span class="lineNum">     884 </span>                :<span class="lineNoCov">          0 :             COVERAGE_INC(pinctrl_drop_put_mac_binding);</span>
+<span class="lineNum">     885 </span>                :<span class="lineNoCov">          0 :             return;</span>
+<span class="lineNum">     886 </span>                :            :         }
+<span class="lineNum">     887 </span>                :            : 
+<span class="lineNum">     888 </span>                :<span class="lineCov">        230 :         pmb = xmalloc(sizeof *pmb);</span>
+<span class="lineNum">     889 </span>                :<span class="lineCov">        230 :         hmap_insert(&amp;put_mac_bindings, &amp;pmb-&gt;hmap_node, hash);</span>
+<span class="lineNum">     890 </span>                :<span class="lineCov">        230 :         pmb-&gt;dp_key = dp_key;</span>
+<span class="lineNum">     891 </span>                :<span class="lineCov">        230 :         pmb-&gt;port_key = port_key;</span>
+<span class="lineNum">     892 </span>                :<span class="lineCov">        230 :         ovs_strlcpy(pmb-&gt;ip_s, ip_s, sizeof pmb-&gt;ip_s);</span>
+<span class="lineNum">     893 </span>                :            :     }
+<span class="lineNum">     894 </span>                :<span class="lineCov">        230 :     pmb-&gt;timestamp = time_msec();</span>
+<span class="lineNum">     895 </span>                :<span class="lineCov">        230 :     pmb-&gt;mac = headers-&gt;dl_src;</span>
+<span class="lineNum">     896 </span>                :            : }
+<a name="897"><span class="lineNum">     897 </span>                :            : </a>
+<span class="lineNum">     898 </span>                :            : static void
+<span class="lineNum">     899 </span>                :<span class="lineCov">        230 : run_put_mac_binding(struct controller_ctx *ctx,</span>
+<span class="lineNum">     900 </span>                :            :                     const struct lport_index *lports,
+<span class="lineNum">     901 </span>                :            :                     const struct put_mac_binding *pmb)
+<span class="lineNum">     902 </span>                :            : {
+<span class="lineNum">     903 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 230 times"> + </span>]:<span class="lineCov">        230 :     if (time_msec() &gt; pmb-&gt;timestamp + 1000) {</span>
+<span class="lineNum">     904 </span>                :<span class="lineCov">          4 :         return;</span>
+<span class="lineNum">     905 </span>                :            :     }
+<span class="lineNum">     906 </span>                :            : 
+<span class="lineNum">     907 </span>                :            :     /* Convert logical datapath and logical port key into lport. */
+<span class="lineNum">     908 </span>                :<span class="lineCov">        230 :     const struct sbrec_port_binding *pb</span>
+<span class="lineNum">     909 </span>                :<span class="lineCov">        230 :         = lport_lookup_by_key(lports, pmb-&gt;dp_key, pmb-&gt;port_key);</span>
+<span class="lineNum">     910 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 230 times"> + </span>]:<span class="lineCov">        230 :     if (!pb) {</span>
+<span class="lineNum">     911 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">     912 </span>                :            : 
+<span class="lineNum">     913 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;unknown logical port with datapath %&quot;PRIu32&quot; &quot;</span>
+<span class="lineNum">     914 </span>                :            :                      &quot;and port %&quot;PRIu32, pmb-&gt;dp_key, pmb-&gt;port_key);
+<span class="lineNum">     915 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     916 </span>                :            :     }
+<span class="lineNum">     917 </span>                :            : 
+<span class="lineNum">     918 </span>                :            :     /* Convert ethernet argument to string form for database. */
+<span class="lineNum">     919 </span>                :            :     char mac_string[ETH_ADDR_STRLEN + 1];
+<span class="lineNum">     920 </span>                :<span class="lineCov">       1380 :     snprintf(mac_string, sizeof mac_string,</span>
+<span class="lineNum">     921 </span>                :<span class="lineCov">       1380 :              ETH_ADDR_FMT, ETH_ADDR_ARGS(pmb-&gt;mac));</span>
+<span class="lineNum">     922 </span>                :            : 
+<span class="lineNum">     923 </span>                :            :     /* Check for an update an existing IP-MAC binding for this logical
+<span class="lineNum">     924 </span>                :            :      * port.
+<span class="lineNum">     925 </span>                :            :      *
+<span class="lineNum">     926 </span>                :            :      * XXX This is not very efficient. */
+<span class="lineNum">     927 </span>                :            :     const struct sbrec_mac_binding *b;
+<span class="lineNum">     928 </span>        [<span class="branchCov" title="Branch 2 was taken 23037 times"> + </span><span class="branchCov" title="Branch 3 was taken 226 times"> + </span>]:<span class="lineCov">      23263 :     SBREC_MAC_BINDING_FOR_EACH (b, ctx-&gt;ovnsb_idl) {</span>
+<span class="lineNum">     929 </span>        [<span class="branchCov" title="Branch 0 was taken 2488 times"> + </span><span class="branchCov" title="Branch 1 was taken 20549 times"> + </span>]:<span class="lineCov">      23037 :         if (!strcmp(b-&gt;logical_port, pb-&gt;logical_port)</span>
+<span class="lineNum">     930 </span>        [<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchCov" title="Branch 1 was taken 2484 times"> + </span>]:<span class="lineCov">       2488 :             &amp;&amp; !strcmp(b-&gt;ip, pmb-&gt;ip_s)) {</span>
+<span class="lineNum">     931 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 4 times"> + </span>]:<span class="lineCov">          4 :             if (strcmp(b-&gt;mac, mac_string)) {</span>
+<span class="lineNum">     932 </span>                :<span class="lineNoCov">          0 :                 sbrec_mac_binding_set_mac(b, mac_string);</span>
+<span class="lineNum">     933 </span>                :            :             }
+<span class="lineNum">     934 </span>                :<span class="lineCov">          4 :             return;</span>
+<span class="lineNum">     935 </span>                :            :         }
+<span class="lineNum">     936 </span>                :            :     }
+<span class="lineNum">     937 </span>                :            : 
+<span class="lineNum">     938 </span>                :            :     /* Add new IP-MAC binding for this logical port. */
+<span class="lineNum">     939 </span>                :<span class="lineCov">        226 :     b = sbrec_mac_binding_insert(ctx-&gt;ovnsb_idl_txn);</span>
+<span class="lineNum">     940 </span>                :<span class="lineCov">        226 :     sbrec_mac_binding_set_logical_port(b, pb-&gt;logical_port);</span>
+<span class="lineNum">     941 </span>                :<span class="lineCov">        226 :     sbrec_mac_binding_set_ip(b, pmb-&gt;ip_s);</span>
+<span class="lineNum">     942 </span>                :<span class="lineCov">        226 :     sbrec_mac_binding_set_mac(b, mac_string);</span>
+<span class="lineNum">     943 </span>                :<span class="lineCov">        226 :     sbrec_mac_binding_set_datapath(b, pb-&gt;datapath);</span>
+<span class="lineNum">     944 </span>                :            : }
+<a name="945"><span class="lineNum">     945 </span>                :            : </a>
+<span class="lineNum">     946 </span>                :            : static void
+<span class="lineNum">     947 </span>                :<span class="lineCov">       3167 : run_put_mac_bindings(struct controller_ctx *ctx,</span>
+<span class="lineNum">     948 </span>                :            :                      const struct lport_index *lports)
+<span class="lineNum">     949 </span>                :            : {
+<span class="lineNum">     950 </span>        [<span class="branchCov" title="Branch 0 was taken 497 times"> + </span><span class="branchCov" title="Branch 1 was taken 2670 times"> + </span>]:<span class="lineCov">       3167 :     if (!ctx-&gt;ovnsb_idl_txn) {</span>
+<span class="lineNum">     951 </span>                :<span class="lineCov">        497 :         return;</span>
+<span class="lineNum">     952 </span>                :            :     }
+<span class="lineNum">     953 </span>                :            : 
+<span class="lineNum">     954 </span>                :            :     const struct put_mac_binding *pmb;
+<span class="lineNum">     955 </span>[<span class="branchCov" title="Branch 2 was taken 230 times"> + </span><span class="branchCov" title="Branch 3 was taken 2670 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 2670 times"> + </span>]:<span class="lineCov">       2900 :     HMAP_FOR_EACH (pmb, hmap_node, &amp;put_mac_bindings) {</span>
+<span class="lineNum">     956 </span>                :<span class="lineCov">        230 :         run_put_mac_binding(ctx, lports, pmb);</span>
+<span class="lineNum">     957 </span>                :            :     }
+<span class="lineNum">     958 </span>                :<span class="lineCov">       2670 :     flush_put_mac_bindings();</span>
+<span class="lineNum">     959 </span>                :            : }
+<a name="960"><span class="lineNum">     960 </span>                :            : </a>
+<span class="lineNum">     961 </span>                :            : static void
+<span class="lineNum">     962 </span>                :<span class="lineCov">       3167 : wait_put_mac_bindings(struct controller_ctx *ctx)</span>
+<span class="lineNum">     963 </span>                :            : {
+<span class="lineNum">     964 </span>[<span class="branchCov" title="Branch 0 was taken 2670 times"> + </span><span class="branchCov" title="Branch 1 was taken 497 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 2670 times"> + </span>]:<span class="lineCov">       3167 :     if (ctx-&gt;ovnsb_idl_txn &amp;&amp; !hmap_is_empty(&amp;put_mac_bindings)) {</span>
+<span class="lineNum">     965 </span>                :<span class="lineNoCov">          0 :         poll_immediate_wake();</span>
+<span class="lineNum">     966 </span>                :            :     }
+<span class="lineNum">     967 </span>                :<span class="lineCov">       3167 : }</span>
+<a name="968"><span class="lineNum">     968 </span>                :            : </a>
+<span class="lineNum">     969 </span>                :            : static void
+<span class="lineNum">     970 </span>                :<span class="lineCov">       2760 : flush_put_mac_bindings(void)</span>
+<span class="lineNum">     971 </span>                :            : {
+<span class="lineNum">     972 </span>                :            :     struct put_mac_binding *pmb;
+<span class="lineNum">     973 </span>[<span class="branchCov" title="Branch 1 was taken 2760 times"> + </span><span class="branchCov" title="Branch 2 was taken 230 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 2760 times"> + </span>]:<span class="lineCov">       2990 :     HMAP_FOR_EACH_POP (pmb, hmap_node, &amp;put_mac_bindings) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 5 was taken 230 times"> + </span><span class="branchCov" title="Branch 6 was taken 2760 times"> + </span>]
+<span class="lineNum">     974 </span>                :<span class="lineCov">        230 :         free(pmb);</span>
+<span class="lineNum">     975 </span>                :            :     }
+<span class="lineNum">     976 </span>                :<span class="lineCov">       2760 : }</span>
+<span class="lineNum">     977 </span>                :            : 
+<span class="lineNum">     978 </span>                :            : /*
+<span class="lineNum">     979 </span>                :            :  * Send gratuitous ARP for vif on localnet.
+<span class="lineNum">     980 </span>                :            :  *
+<span class="lineNum">     981 </span>                :            :  * When a new vif on localnet is added, gratuitous ARPs are sent announcing
+<span class="lineNum">     982 </span>                :            :  * the port's mac,ip mapping.  On localnet, such announcements are needed for
+<span class="lineNum">     983 </span>                :            :  * switches and routers on the broadcast segment to update their port-mac
+<span class="lineNum">     984 </span>                :            :  * and ARP tables.
+<span class="lineNum">     985 </span>                :            :  */
+<span class="lineNum">     986 </span>                :            : struct garp_data {
+<span class="lineNum">     987 </span>                :            :     struct eth_addr ea;          /* Ethernet address of port. */
+<span class="lineNum">     988 </span>                :            :     ovs_be32 ipv4;               /* Ipv4 address of port. */
+<span class="lineNum">     989 </span>                :            :     long long int announce_time; /* Next announcement in ms. */
+<span class="lineNum">     990 </span>                :            :     int backoff;                 /* Backoff for the next announcement. */
+<span class="lineNum">     991 </span>                :            :     ofp_port_t ofport;           /* ofport used to output this GARP. */
+<span class="lineNum">     992 </span>                :            : };
+<span class="lineNum">     993 </span>                :            : 
+<span class="lineNum">     994 </span>                :            : /* Contains GARPs to be sent. */
+<span class="lineNum">     995 </span>                :            : static struct shash send_garp_data;
+<span class="lineNum">     996 </span>                :            : 
+<span class="lineNum">     997 </span>                :            : /* Next GARP announcement in ms. */
+<span class="lineNum">     998 </span>                :            : static long long int send_garp_time;
+<a name="999"><span class="lineNum">     999 </span>                :            : </a>
+<span class="lineNum">    1000 </span>                :            : static void
+<span class="lineNum">    1001 </span>                :<span class="lineCov">         44 : init_send_garps(void)</span>
+<span class="lineNum">    1002 </span>                :            : {
+<span class="lineNum">    1003 </span>                :<span class="lineCov">         44 :     shash_init(&amp;send_garp_data);</span>
+<span class="lineNum">    1004 </span>                :<span class="lineCov">         44 :     send_garp_time = LLONG_MAX;</span>
+<span class="lineNum">    1005 </span>                :<span class="lineCov">         44 : }</span>
+<a name="1006"><span class="lineNum">    1006 </span>                :            : </a>
+<span class="lineNum">    1007 </span>                :            : static void
+<span class="lineNum">    1008 </span>                :<span class="lineCov">         44 : destroy_send_garps(void)</span>
+<span class="lineNum">    1009 </span>                :            : {
+<span class="lineNum">    1010 </span>                :<span class="lineCov">         44 :     shash_destroy_free_data(&amp;send_garp_data);</span>
+<span class="lineNum">    1011 </span>                :<span class="lineCov">         44 : }</span>
+<a name="1012"><span class="lineNum">    1012 </span>                :            : </a>
+<span class="lineNum">    1013 </span>                :            : static void
+<span class="lineNum">    1014 </span>                :<span class="lineCov">          3 : add_garp(const char *name, ofp_port_t ofport,</span>
+<span class="lineNum">    1015 </span>                :            :          const struct eth_addr ea, ovs_be32 ip)
+<span class="lineNum">    1016 </span>                :            : {
+<span class="lineNum">    1017 </span>                :<span class="lineCov">          3 :     struct garp_data *garp = xmalloc(sizeof *garp);</span>
+<span class="lineNum">    1018 </span>                :<span class="lineCov">          3 :     garp-&gt;ea = ea;</span>
+<span class="lineNum">    1019 </span>                :<span class="lineCov">          3 :     garp-&gt;ipv4 = ip;</span>
+<span class="lineNum">    1020 </span>                :<span class="lineCov">          3 :     garp-&gt;announce_time = time_msec() + 1000;</span>
+<span class="lineNum">    1021 </span>                :<span class="lineCov">          3 :     garp-&gt;backoff = 1;</span>
+<span class="lineNum">    1022 </span>                :<span class="lineCov">          3 :     garp-&gt;ofport = ofport;</span>
+<span class="lineNum">    1023 </span>                :<span class="lineCov">          3 :     shash_add(&amp;send_garp_data, name, garp);</span>
+<span class="lineNum">    1024 </span>                :<span class="lineCov">          3 : }</span>
+<span class="lineNum">    1025 </span>                :            : 
+<a name="1026"><span class="lineNum">    1026 </span>                :            : /* Add or update a vif for which GARPs need to be announced. */</a>
+<span class="lineNum">    1027 </span>                :            : static void
+<span class="lineNum">    1028 </span>                :<span class="lineCov">       1194 : send_garp_update(const struct sbrec_port_binding *binding_rec,</span>
+<span class="lineNum">    1029 </span>                :            :                  struct simap *localnet_ofports, struct hmap *local_datapaths,
+<span class="lineNum">    1030 </span>                :            :                  struct shash *nat_addresses)
+<span class="lineNum">    1031 </span>                :            : {
+<span class="lineNum">    1032 </span>                :            :     /* Find the localnet ofport to send this GARP. */
+<span class="lineNum">    1033 </span>                :<span class="lineCov">       1194 :     struct local_datapath *ld</span>
+<span class="lineNum">    1034 </span>                :<span class="lineCov">       1194 :         = get_local_datapath(local_datapaths,</span>
+<span class="lineNum">    1035 </span>                :<span class="lineCov">       1194 :                              binding_rec-&gt;datapath-&gt;tunnel_key);</span>
+<span class="lineNum">    1036 </span>[<span class="branchCov" title="Branch 0 was taken 1105 times"> + </span><span class="branchCov" title="Branch 1 was taken 89 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 546 times"> + </span><span class="branchCov" title="Branch 3 was taken 559 times"> + </span>]:<span class="lineCov">       1194 :     if (!ld || !ld-&gt;localnet_port) {</span>
+<span class="lineNum">    1037 </span>                :<span class="lineCov">        635 :         return;</span>
+<span class="lineNum">    1038 </span>                :            :     }
+<span class="lineNum">    1039 </span>                :<span class="lineCov">        559 :     ofp_port_t ofport = u16_to_ofp(simap_get(localnet_ofports,</span>
+<span class="lineNum">    1040 </span>                :<span class="lineCov">        559 :                                              ld-&gt;localnet_port-&gt;logical_port));</span>
+<span class="lineNum">    1041 </span>                :            : 
+<span class="lineNum">    1042 </span>                :<span class="lineCov">        559 :     volatile struct garp_data *garp = NULL;</span>
+<span class="lineNum">    1043 </span>                :            :     /* Update GARP for NAT IP if it exists. */
+<span class="lineNum">    1044 </span>        [<span class="branchCov" title="Branch 0 was taken 8 times"> + </span><span class="branchCov" title="Branch 1 was taken 551 times"> + </span>]:<span class="lineCov">        559 :     if (!strcmp(binding_rec-&gt;type, &quot;l3gateway&quot;)) {</span>
+<span class="lineNum">    1045 </span>                :<span class="lineCov">          8 :         struct lport_addresses *laddrs = NULL;</span>
+<span class="lineNum">    1046 </span>                :<span class="lineCov">          8 :         laddrs = shash_find_data(nat_addresses, binding_rec-&gt;logical_port);</span>
+<span class="lineNum">    1047 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>]:<span class="lineCov">          8 :         if (!laddrs) {</span>
+<span class="lineNum">    1048 </span>                :<span class="lineNoCov">          0 :             return;</span>
+<span class="lineNum">    1049 </span>                :            :         }
+<span class="lineNum">    1050 </span>                :            :         int i;
+<span class="lineNum">    1051 </span>        [<span class="branchCov" title="Branch 0 was taken 8 times"> + </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>]:<span class="lineCov">         16 :         for (i = 0; i &lt; laddrs-&gt;n_ipv4_addrs; i++) {</span>
+<span class="lineNum">    1052 </span>                :<span class="lineCov">          8 :             char *name = xasprintf(&quot;%s-%s&quot;, binding_rec-&gt;logical_port,</span>
+<span class="lineNum">    1053 </span>                :<span class="lineCov">          8 :                                             laddrs-&gt;ipv4_addrs[i].addr_s);</span>
+<span class="lineNum">    1054 </span>                :<span class="lineCov">          8 :             garp = shash_find_data(&amp;send_garp_data, name);</span>
+<span class="lineNum">    1055 </span>        [<span class="branchCov" title="Branch 0 was taken 7 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          8 :             if (garp) {</span>
+<span class="lineNum">    1056 </span>                :<span class="lineCov">          7 :                 garp-&gt;ofport = ofport;</span>
+<span class="lineNum">    1057 </span>                :            :             } else {
+<span class="lineNum">    1058 </span>                :<span class="lineCov">          1 :                 add_garp(name, ofport, laddrs-&gt;ea, laddrs-&gt;ipv4_addrs[i].addr);</span>
+<span class="lineNum">    1059 </span>                :            :             }
+<span class="lineNum">    1060 </span>                :<span class="lineCov">          8 :             free(name);</span>
+<span class="lineNum">    1061 </span>                :            :         }
+<span class="lineNum">    1062 </span>                :<span class="lineCov">          8 :         return;</span>
+<span class="lineNum">    1063 </span>                :            :     }
+<span class="lineNum">    1064 </span>                :            : 
+<span class="lineNum">    1065 </span>                :            :     /* Update GARP for vif if it exists. */
+<span class="lineNum">    1066 </span>                :<span class="lineCov">        551 :     garp = shash_find_data(&amp;send_garp_data, binding_rec-&gt;logical_port);</span>
+<span class="lineNum">    1067 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchCov" title="Branch 1 was taken 541 times"> + </span>]:<span class="lineCov">        551 :     if (garp) {</span>
+<span class="lineNum">    1068 </span>                :<span class="lineCov">         10 :         garp-&gt;ofport = ofport;</span>
+<span class="lineNum">    1069 </span>                :<span class="lineCov">         10 :         return;</span>
+<span class="lineNum">    1070 </span>                :            :     }
+<span class="lineNum">    1071 </span>                :            : 
+<span class="lineNum">    1072 </span>                :            :     /* Add GARP for new vif. */
+<span class="lineNum">    1073 </span>                :            :     int i;
+<span class="lineNum">    1074 </span>        [<span class="branchCov" title="Branch 0 was taken 492 times"> + </span><span class="branchCov" title="Branch 1 was taken 539 times"> + </span>]:<span class="lineCov">       1031 :     for (i = 0; i &lt; binding_rec-&gt;n_mac; i++) {</span>
+<span class="lineNum">    1075 </span>                :            :         struct lport_addresses laddrs;
+<span class="lineNum">    1076 </span>        [<span class="branchCov" title="Branch 1 was taken 492 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">        492 :         if (!extract_lsp_addresses(binding_rec-&gt;mac[i], &amp;laddrs)</span>
+<span class="lineNum">    1077 </span>        [<span class="branchCov" title="Branch 0 was taken 490 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">        492 :             || !laddrs.n_ipv4_addrs) {</span>
+<span class="lineNum">    1078 </span>                :<span class="lineCov">        490 :             continue;</span>
+<span class="lineNum">    1079 </span>                :            :         }
+<span class="lineNum">    1080 </span>                :            : 
+<span class="lineNum">    1081 </span>                :<span class="lineCov">          2 :         add_garp(binding_rec-&gt;logical_port, ofport,</span>
+<span class="lineNum">    1082 </span>                :<span class="lineCov">          2 :                  laddrs.ea, laddrs.ipv4_addrs[0].addr);</span>
+<span class="lineNum">    1083 </span>                :            : 
+<span class="lineNum">    1084 </span>                :<span class="lineCov">          2 :         destroy_lport_addresses(&amp;laddrs);</span>
+<span class="lineNum">    1085 </span>                :<span class="lineCov">          2 :         break;</span>
+<span class="lineNum">    1086 </span>                :            :     }
+<span class="lineNum">    1087 </span>                :            : }
+<span class="lineNum">    1088 </span>                :            : 
+<a name="1089"><span class="lineNum">    1089 </span>                :            : /* Remove a vif from GARP announcements. */</a>
+<span class="lineNum">    1090 </span>                :            : static void
+<span class="lineNum">    1091 </span>                :<span class="lineCov">          2 : send_garp_delete(const char *lport)</span>
+<span class="lineNum">    1092 </span>                :            : {
+<span class="lineNum">    1093 </span>                :<span class="lineCov">          2 :     struct garp_data *garp = shash_find_and_delete(&amp;send_garp_data, lport);</span>
+<span class="lineNum">    1094 </span>                :<span class="lineCov">          2 :     free(garp);</span>
+<span class="lineNum">    1095 </span>                :<span class="lineCov">          2 : }</span>
+<a name="1096"><span class="lineNum">    1096 </span>                :            : </a>
+<span class="lineNum">    1097 </span>                :            : static long long int
+<span class="lineNum">    1098 </span>                :<span class="lineCov">         21 : send_garp(struct garp_data *garp, long long int current_time)</span>
+<span class="lineNum">    1099 </span>                :            : {
+<span class="lineNum">    1100 </span>        [<span class="branchCov" title="Branch 0 was taken 19 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">         21 :     if (current_time &lt; garp-&gt;announce_time) {</span>
+<span class="lineNum">    1101 </span>                :<span class="lineCov">         19 :         return garp-&gt;announce_time;</span>
+<span class="lineNum">    1102 </span>                :            :     }
+<span class="lineNum">    1103 </span>                :            : 
+<span class="lineNum">    1104 </span>                :            :     /* Compose a GARP request packet. */
+<span class="lineNum">    1105 </span>                :            :     uint64_t packet_stub[128 / 8];
+<span class="lineNum">    1106 </span>                :            :     struct dp_packet packet;
+<span class="lineNum">    1107 </span>                :<span class="lineCov">          2 :     dp_packet_use_stub(&amp;packet, packet_stub, sizeof packet_stub);</span>
+<span class="lineNum">    1108 </span>                :<span class="lineCov">          2 :     compose_arp(&amp;packet, ARP_OP_REQUEST, garp-&gt;ea, eth_addr_zero,</span>
+<span class="lineNum">    1109 </span>                :            :                 true, garp-&gt;ipv4, garp-&gt;ipv4);
+<span class="lineNum">    1110 </span>                :            : 
+<span class="lineNum">    1111 </span>                :            :     /* Compose actions.  The garp request is output on localnet ofport. */
+<span class="lineNum">    1112 </span>                :            :     uint64_t ofpacts_stub[4096 / 8];
+<span class="lineNum">    1113 </span>                :<span class="lineCov">          2 :     struct ofpbuf ofpacts = OFPBUF_STUB_INITIALIZER(ofpacts_stub);</span>
+<span class="lineNum">    1114 </span>                :<span class="lineCov">          2 :     enum ofp_version version = rconn_get_version(swconn);</span>
+<span class="lineNum">    1115 </span>                :<span class="lineCov">          2 :     ofpact_put_OUTPUT(&amp;ofpacts)-&gt;port = garp-&gt;ofport;</span>
+<span class="lineNum">    1116 </span>                :            : 
+<span class="lineNum">    1117 </span>                :<span class="lineCov">          8 :     struct ofputil_packet_out po = {</span>
+<span class="lineNum">    1118 </span>                :<span class="lineCov">          2 :         .packet = dp_packet_data(&amp;packet),</span>
+<span class="lineNum">    1119 </span>                :<span class="lineCov">          2 :         .packet_len = dp_packet_size(&amp;packet),</span>
+<span class="lineNum">    1120 </span>                :            :         .buffer_id = UINT32_MAX,
+<span class="lineNum">    1121 </span>                :            :         .in_port = OFPP_CONTROLLER,
+<span class="lineNum">    1122 </span>                :<span class="lineCov">          2 :         .ofpacts = ofpacts.data,</span>
+<span class="lineNum">    1123 </span>                :<span class="lineCov">          2 :         .ofpacts_len = ofpacts.size,</span>
+<span class="lineNum">    1124 </span>                :            :     };
+<span class="lineNum">    1125 </span>                :<span class="lineCov">          2 :     enum ofputil_protocol proto = ofputil_protocol_from_ofp_version(version);</span>
+<span class="lineNum">    1126 </span>                :<span class="lineCov">          2 :     queue_msg(ofputil_encode_packet_out(&amp;po, proto));</span>
+<span class="lineNum">    1127 </span>                :<span class="lineCov">          2 :     dp_packet_uninit(&amp;packet);</span>
+<span class="lineNum">    1128 </span>                :<span class="lineCov">          2 :     ofpbuf_uninit(&amp;ofpacts);</span>
+<span class="lineNum">    1129 </span>                :            : 
+<span class="lineNum">    1130 </span>                :            :     /* Set the next announcement.  At most 5 announcements are sent for a
+<span class="lineNum">    1131 </span>                :            :      * vif. */
+<span class="lineNum">    1132 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :     if (garp-&gt;backoff &lt; 16) {</span>
+<span class="lineNum">    1133 </span>                :<span class="lineCov">          2 :         garp-&gt;backoff *= 2;</span>
+<span class="lineNum">    1134 </span>                :<span class="lineCov">          2 :         garp-&gt;announce_time = current_time + garp-&gt;backoff * 1000;</span>
+<span class="lineNum">    1135 </span>                :            :     } else {
+<span class="lineNum">    1136 </span>                :<span class="lineNoCov">          0 :         garp-&gt;announce_time = LLONG_MAX;</span>
+<span class="lineNum">    1137 </span>                :            :     }
+<span class="lineNum">    1138 </span>                :<span class="lineCov">         21 :     return garp-&gt;announce_time;</span>
+<span class="lineNum">    1139 </span>                :            : }
+<span class="lineNum">    1140 </span>                :            : 
+<a name="1141"><span class="lineNum">    1141 </span>                :            : /* Get localnet vifs, local l3gw ports and ofport for localnet patch ports. */</a>
+<span class="lineNum">    1142 </span>                :            : static void
+<span class="lineNum">    1143 </span>                :<span class="lineCov">       3167 : get_localnet_vifs_l3gwports(const struct ovsrec_bridge *br_int,</span>
+<span class="lineNum">    1144 </span>                :            :                   const char *this_chassis_id,
+<span class="lineNum">    1145 </span>                :            :                   const struct lport_index *lports,
+<span class="lineNum">    1146 </span>                :            :                   struct hmap *local_datapaths,
+<span class="lineNum">    1147 </span>                :            :                   struct sset *localnet_vifs,
+<span class="lineNum">    1148 </span>                :            :                   struct simap *localnet_ofports,
+<span class="lineNum">    1149 </span>                :            :                   struct sset *local_l3gw_ports)
+<span class="lineNum">    1150 </span>                :            : {
+<span class="lineNum">    1151 </span>        [<span class="branchCov" title="Branch 0 was taken 44449 times"> + </span><span class="branchCov" title="Branch 1 was taken 3167 times"> + </span>]:<span class="lineCov">      47616 :     for (int i = 0; i &lt; br_int-&gt;n_ports; i++) {</span>
+<span class="lineNum">    1152 </span>                :<span class="lineCov">      44449 :         const struct ovsrec_port *port_rec = br_int-&gt;ports[i];</span>
+<span class="lineNum">    1153 </span>        [<span class="branchCov" title="Branch 0 was taken 3167 times"> + </span><span class="branchCov" title="Branch 1 was taken 41282 times"> + </span>]:<span class="lineCov">      44449 :         if (!strcmp(port_rec-&gt;name, br_int-&gt;name)) {</span>
+<span class="lineNum">    1154 </span>                :<span class="lineCov">       3167 :             continue;</span>
+<span class="lineNum">    1155 </span>                :            :         }
+<span class="lineNum">    1156 </span>                :<span class="lineCov">      41282 :         const char *chassis_id = smap_get(&amp;port_rec-&gt;external_ids,</span>
+<span class="lineNum">    1157 </span>                :            :                                           &quot;ovn-chassis-id&quot;);
+<span class="lineNum">    1158 </span>[<span class="branchCov" title="Branch 0 was taken 3398 times"> + </span><span class="branchCov" title="Branch 1 was taken 37884 times"> + </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 3398 times"> + </span>]:<span class="lineCov">      41282 :         if (chassis_id &amp;&amp; !strcmp(chassis_id, this_chassis_id)) {</span>
+<span class="lineNum">    1159 </span>                :<span class="lineNoCov">          0 :             continue;</span>
+<span class="lineNum">    1160 </span>                :            :         }
+<span class="lineNum">    1161 </span>                :<span class="lineCov">      41282 :         const char *localnet = smap_get(&amp;port_rec-&gt;external_ids,</span>
+<span class="lineNum">    1162 </span>                :            :                                         &quot;ovn-localnet-port&quot;);
+<span class="lineNum">    1163 </span>                :<span class="lineCov">      41282 :         const char *l3_gateway_port = smap_get(&amp;port_rec-&gt;external_ids,</span>
+<span class="lineNum">    1164 </span>                :            :                                                &quot;ovn-l3gateway-port&quot;);
+<span class="lineNum">    1165 </span>        [<span class="branchCov" title="Branch 0 was taken 41282 times"> + </span><span class="branchCov" title="Branch 1 was taken 41282 times"> + </span>]:<span class="lineCov">      82564 :         for (int j = 0; j &lt; port_rec-&gt;n_interfaces; j++) {</span>
+<span class="lineNum">    1166 </span>                :<span class="lineCov">      41282 :             const struct ovsrec_interface *iface_rec = port_rec-&gt;interfaces[j];</span>
+<span class="lineNum">    1167 </span>        [<span class="branchCov" title="Branch 0 was taken 1100 times"> + </span><span class="branchCov" title="Branch 1 was taken 40182 times"> + </span>]:<span class="lineCov">      41282 :             if (!iface_rec-&gt;n_ofport) {</span>
+<span class="lineNum">    1168 </span>                :<span class="lineCov">       1100 :                 continue;</span>
+<span class="lineNum">    1169 </span>                :            :             }
+<span class="lineNum">    1170 </span>        [<span class="branchCov" title="Branch 0 was taken 327 times"> + </span><span class="branchCov" title="Branch 1 was taken 39855 times"> + </span>]:<span class="lineCov">      40182 :             if (localnet) {</span>
+<span class="lineNum">    1171 </span>                :<span class="lineCov">        327 :                 int64_t ofport = iface_rec-&gt;ofport[0];</span>
+<span class="lineNum">    1172 </span>[<span class="branchCov" title="Branch 0 was taken 327 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 327 times"> + </span>]:<span class="lineCov">        327 :                 if (ofport &lt; 1 || ofport &gt; ofp_to_u16(OFPP_MAX)) {</span>
+<span class="lineNum">    1173 </span>                :<span class="lineNoCov">          0 :                     continue;</span>
+<span class="lineNum">    1174 </span>                :            :                 }
+<span class="lineNum">    1175 </span>                :<span class="lineCov">        327 :                 simap_put(localnet_ofports, localnet, ofport);</span>
+<span class="lineNum">    1176 </span>                :<span class="lineCov">        327 :                 continue;</span>
+<span class="lineNum">    1177 </span>                :            :             }
+<span class="lineNum">    1178 </span>        [<span class="branchCov" title="Branch 0 was taken 643 times"> + </span><span class="branchCov" title="Branch 1 was taken 39212 times"> + </span>]:<span class="lineCov">      39855 :             if (l3_gateway_port) {</span>
+<span class="lineNum">    1179 </span>                :<span class="lineCov">        643 :                 sset_add(local_l3gw_ports, l3_gateway_port);</span>
+<span class="lineNum">    1180 </span>                :<span class="lineCov">        643 :                 continue;</span>
+<span class="lineNum">    1181 </span>                :            :             }
+<span class="lineNum">    1182 </span>                :<span class="lineCov">      39212 :             const char *iface_id = smap_get(&amp;iface_rec-&gt;external_ids,</span>
+<span class="lineNum">    1183 </span>                :            :                                             &quot;iface-id&quot;);
+<span class="lineNum">    1184 </span>        [<span class="branchCov" title="Branch 0 was taken 26447 times"> + </span><span class="branchCov" title="Branch 1 was taken 12765 times"> + </span>]:<span class="lineCov">      39212 :             if (!iface_id) {</span>
+<span class="lineNum">    1185 </span>                :<span class="lineCov">      26447 :                 continue;</span>
+<span class="lineNum">    1186 </span>                :            :             }
+<span class="lineNum">    1187 </span>                :<span class="lineCov">      12765 :             const struct sbrec_port_binding *pb</span>
+<span class="lineNum">    1188 </span>                :            :                 = lport_lookup_by_name(lports, iface_id);
+<span class="lineNum">    1189 </span>        [<span class="branchCov" title="Branch 0 was taken 379 times"> + </span><span class="branchCov" title="Branch 1 was taken 12386 times"> + </span>]:<span class="lineCov">      12765 :             if (!pb) {</span>
+<span class="lineNum">    1190 </span>                :<span class="lineCov">        379 :                 continue;</span>
+<span class="lineNum">    1191 </span>                :            :             }
+<span class="lineNum">    1192 </span>                :<span class="lineCov">      12386 :             struct local_datapath *ld</span>
+<span class="lineNum">    1193 </span>                :<span class="lineCov">      12386 :                 = get_local_datapath(local_datapaths,</span>
+<span class="lineNum">    1194 </span>                :<span class="lineCov">      12386 :                                      pb-&gt;datapath-&gt;tunnel_key);</span>
+<span class="lineNum">    1195 </span>[<span class="branchCov" title="Branch 0 was taken 12386 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 551 times"> + </span><span class="branchCov" title="Branch 3 was taken 11835 times"> + </span>]:<span class="lineCov">      12386 :             if (ld &amp;&amp; ld-&gt;localnet_port) {</span>
+<span class="lineNum">    1196 </span>                :<span class="lineCov">        551 :                 sset_add(localnet_vifs, iface_id);</span>
+<span class="lineNum">    1197 </span>                :            :             }
+<span class="lineNum">    1198 </span>                :            :         }
+<span class="lineNum">    1199 </span>                :            :     }
+<span class="lineNum">    1200 </span>                :<span class="lineCov">       3167 : }</span>
+<a name="1201"><span class="lineNum">    1201 </span>                :            : </a>
+<span class="lineNum">    1202 </span>                :            : static void
+<span class="lineNum">    1203 </span>                :<span class="lineCov">       3167 : get_nat_addresses_and_keys(struct sset *nat_address_keys,</span>
+<span class="lineNum">    1204 </span>                :            :                            struct sset *local_l3gw_ports,
+<span class="lineNum">    1205 </span>                :            :                            const struct lport_index *lports,
+<span class="lineNum">    1206 </span>                :            :                            struct shash *nat_addresses)
+<span class="lineNum">    1207 </span>                :            : {
+<span class="lineNum">    1208 </span>                :            :     const char *gw_port;
+<span class="lineNum">    1209 </span>[<span class="branchCov" title="Branch 1 was taken 197 times"> + </span><span class="branchCov" title="Branch 2 was taken 2970 times"> + </span>][<span class="branchCov" title="Branch 5 was taken 446 times"> + </span><span class="branchCov" title="Branch 6 was taken 197 times"> + </span>]:<span class="lineCov">       3810 :     SSET_FOR_EACH(gw_port, local_l3gw_ports) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 8 was taken 643 times"> + </span><span class="branchCov" title="Branch 9 was taken 3167 times"> + </span>]
+<span class="lineNum">    1210 </span>                :<span class="lineCov">        643 :         const struct sbrec_port_binding *pb = lport_lookup_by_name(lports,</span>
+<span class="lineNum">    1211 </span>                :            :                                                                    gw_port);
+<span class="lineNum">    1212 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 643 times"> + </span>]:<span class="lineCov">        643 :         if (!pb) {</span>
+<span class="lineNum">    1213 </span>                :<span class="lineNoCov">          0 :             continue;</span>
+<span class="lineNum">    1214 </span>                :            :         }
+<span class="lineNum">    1215 </span>                :<span class="lineCov">        643 :         const char *nat_addresses_options = smap_get(&amp;pb-&gt;options,</span>
+<span class="lineNum">    1216 </span>                :            :                                                      &quot;nat-addresses&quot;);
+<span class="lineNum">    1217 </span>        [<span class="branchCov" title="Branch 0 was taken 617 times"> + </span><span class="branchCov" title="Branch 1 was taken 26 times"> + </span>]:<span class="lineCov">        643 :         if (!nat_addresses_options) {</span>
+<span class="lineNum">    1218 </span>                :<span class="lineCov">        617 :             continue;</span>
+<span class="lineNum">    1219 </span>                :            :         }
+<span class="lineNum">    1220 </span>                :            : 
+<span class="lineNum">    1221 </span>                :<span class="lineCov">         26 :         struct lport_addresses *laddrs = xmalloc(sizeof *laddrs);</span>
+<span class="lineNum">    1222 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 26 times"> + </span>]:<span class="lineCov">         26 :         if (!extract_lsp_addresses(nat_addresses_options, laddrs)) {</span>
+<span class="lineNum">    1223 </span>                :<span class="lineNoCov">          0 :             free(laddrs);</span>
+<span class="lineNum">    1224 </span>                :<span class="lineNoCov">          0 :             continue;</span>
+<span class="lineNum">    1225 </span>                :            :         }
+<span class="lineNum">    1226 </span>                :            :         int i;
+<span class="lineNum">    1227 </span>        [<span class="branchCov" title="Branch 0 was taken 26 times"> + </span><span class="branchCov" title="Branch 1 was taken 26 times"> + </span>]:<span class="lineCov">         52 :         for (i = 0; i &lt; laddrs-&gt;n_ipv4_addrs; i++) {</span>
+<span class="lineNum">    1228 </span>                :<span class="lineCov">         26 :             char *name = xasprintf(&quot;%s-%s&quot;, pb-&gt;logical_port,</span>
+<span class="lineNum">    1229 </span>                :<span class="lineCov">         26 :                                             laddrs-&gt;ipv4_addrs[i].addr_s);</span>
+<span class="lineNum">    1230 </span>                :<span class="lineCov">         26 :             sset_add(nat_address_keys, name);</span>
+<span class="lineNum">    1231 </span>                :<span class="lineCov">         26 :             free(name);</span>
+<span class="lineNum">    1232 </span>                :            :         }
+<span class="lineNum">    1233 </span>                :<span class="lineCov">         26 :         shash_add(nat_addresses, pb-&gt;logical_port, laddrs);</span>
+<span class="lineNum">    1234 </span>                :            :     }
+<span class="lineNum">    1235 </span>                :<span class="lineCov">       3167 : }</span>
+<a name="1236"><span class="lineNum">    1236 </span>                :            : </a>
+<span class="lineNum">    1237 </span>                :            : static void
+<span class="lineNum">    1238 </span>                :<span class="lineCov">       3167 : send_garp_wait(void)</span>
+<span class="lineNum">    1239 </span>                :            : {
+<span class="lineNum">    1240 </span>                :<span class="lineCov">       3167 :     poll_timer_wait_until(send_garp_time);</span>
+<span class="lineNum">    1241 </span>                :<span class="lineCov">       3167 : }</span>
+<a name="1242"><span class="lineNum">    1242 </span>                :            : </a>
+<span class="lineNum">    1243 </span>                :            : static void
+<span class="lineNum">    1244 </span>                :<span class="lineCov">       3167 : send_garp_run(const struct ovsrec_bridge *br_int, const char *chassis_id,</span>
+<span class="lineNum">    1245 </span>                :            :               const struct lport_index *lports,
+<span class="lineNum">    1246 </span>                :            :               struct hmap *local_datapaths)
+<span class="lineNum">    1247 </span>                :            : {
+<span class="lineNum">    1248 </span>                :<span class="lineCov">       3167 :     struct sset localnet_vifs = SSET_INITIALIZER(&amp;localnet_vifs);</span>
+<span class="lineNum">    1249 </span>                :<span class="lineCov">       3167 :     struct sset local_l3gw_ports = SSET_INITIALIZER(&amp;local_l3gw_ports);</span>
+<span class="lineNum">    1250 </span>                :<span class="lineCov">       3167 :     struct sset nat_ip_keys = SSET_INITIALIZER(&amp;nat_ip_keys);</span>
+<span class="lineNum">    1251 </span>                :<span class="lineCov">       3167 :     struct simap localnet_ofports = SIMAP_INITIALIZER(&amp;localnet_ofports);</span>
+<span class="lineNum">    1252 </span>                :            :     struct shash nat_addresses;
+<span class="lineNum">    1253 </span>                :            : 
+<span class="lineNum">    1254 </span>                :<span class="lineCov">       3167 :     shash_init(&amp;nat_addresses);</span>
+<span class="lineNum">    1255 </span>                :            : 
+<span class="lineNum">    1256 </span>                :<span class="lineCov">       3167 :     get_localnet_vifs_l3gwports(br_int, chassis_id, lports, local_datapaths,</span>
+<span class="lineNum">    1257 </span>                :            :                       &amp;localnet_vifs, &amp;localnet_ofports, &amp;local_l3gw_ports);
+<span class="lineNum">    1258 </span>                :            : 
+<span class="lineNum">    1259 </span>                :<span class="lineCov">       3167 :     get_nat_addresses_and_keys(&amp;nat_ip_keys, &amp;local_l3gw_ports, lports,</span>
+<span class="lineNum">    1260 </span>                :            :                                &amp;nat_addresses);
+<span class="lineNum">    1261 </span>                :            :     /* For deleted ports and deleted nat ips, remove from send_garp_data. */
+<span class="lineNum">    1262 </span>                :            :     struct shash_node *iter, *next;
+<span class="lineNum">    1263 </span>[<span class="branchCov" title="Branch 1 was taken 3167 times"> + </span><span class="branchCov" title="Branch 2 was taken 20 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 3167 times"> + </span>]:<span class="lineCov">       3187 :     SHASH_FOR_EACH_SAFE (iter, next, &amp;send_garp_data) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 6 was taken 20 times"> + </span><span class="branchCov" title="Branch 7 was taken 3167 times"> + </span>]
+<span class="lineNum">    1264 </span>  [<span class="branchCov" title="Branch 1 was taken 10 times"> + </span><span class="branchCov" title="Branch 2 was taken 10 times"> + </span><span class="branchCov" title="Branch 3 was taken 2 times"> + </span><span class="branchCov" title="Branch 4 was taken 8 times"> + </span>]:<span class="lineCov">         30 :         if (!sset_contains(&amp;localnet_vifs, iter-&gt;name) &amp;&amp;</span>
+<span class="lineNum">    1265 </span>                :<span class="lineCov">         10 :             !sset_contains(&amp;nat_ip_keys, iter-&gt;name)) {</span>
+<span class="lineNum">    1266 </span>                :<span class="lineCov">          2 :             send_garp_delete(iter-&gt;name);</span>
+<span class="lineNum">    1267 </span>                :            :         }
+<span class="lineNum">    1268 </span>                :            :     }
+<span class="lineNum">    1269 </span>                :            : 
+<span class="lineNum">    1270 </span>                :            :     /* Update send_garp_data. */
+<span class="lineNum">    1271 </span>                :            :     const char *iface_id;
+<span class="lineNum">    1272 </span>[<span class="branchCov" title="Branch 1 was taken 180 times"> + </span><span class="branchCov" title="Branch 2 was taken 2987 times"> + </span>][<span class="branchCov" title="Branch 5 was taken 371 times"> + </span><span class="branchCov" title="Branch 6 was taken 180 times"> + </span>]:<span class="lineCov">       3718 :     SSET_FOR_EACH (iface_id, &amp;localnet_vifs) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 8 was taken 551 times"> + </span><span class="branchCov" title="Branch 9 was taken 3167 times"> + </span>]
+<span class="lineNum">    1273 </span>                :<span class="lineCov">        551 :         const struct sbrec_port_binding *pb = lport_lookup_by_name(lports,</span>
+<span class="lineNum">    1274 </span>                :            :                                                                    iface_id);
+<span class="lineNum">    1275 </span>        [<span class="branchCov" title="Branch 0 was taken 551 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        551 :         if (pb) {</span>
+<span class="lineNum">    1276 </span>                :<span class="lineCov">        551 :             send_garp_update(pb, &amp;localnet_ofports, local_datapaths,</span>
+<span class="lineNum">    1277 </span>                :            :                              &amp;nat_addresses);
+<span class="lineNum">    1278 </span>                :            :         }
+<span class="lineNum">    1279 </span>                :            :     }
+<span class="lineNum">    1280 </span>                :            : 
+<span class="lineNum">    1281 </span>                :            :     /* Update send_garp_data for nat-addresses. */
+<span class="lineNum">    1282 </span>                :            :     const char *gw_port;
+<span class="lineNum">    1283 </span>[<span class="branchCov" title="Branch 1 was taken 197 times"> + </span><span class="branchCov" title="Branch 2 was taken 2970 times"> + </span>][<span class="branchCov" title="Branch 5 was taken 446 times"> + </span><span class="branchCov" title="Branch 6 was taken 197 times"> + </span>]:<span class="lineCov">       3810 :     SSET_FOR_EACH (gw_port, &amp;local_l3gw_ports) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 8 was taken 643 times"> + </span><span class="branchCov" title="Branch 9 was taken 3167 times"> + </span>]
+<span class="lineNum">    1284 </span>                :<span class="lineCov">        643 :         const struct sbrec_port_binding *pb = lport_lookup_by_name(lports,</span>
+<span class="lineNum">    1285 </span>                :            :                                                                 gw_port);
+<span class="lineNum">    1286 </span>        [<span class="branchCov" title="Branch 0 was taken 643 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        643 :         if (pb) {</span>
+<span class="lineNum">    1287 </span>                :<span class="lineCov">        643 :             send_garp_update(pb, &amp;localnet_ofports, local_datapaths,</span>
+<span class="lineNum">    1288 </span>                :            :                              &amp;nat_addresses);
+<span class="lineNum">    1289 </span>                :            :         }
+<span class="lineNum">    1290 </span>                :            :     }
+<span class="lineNum">    1291 </span>                :            : 
+<span class="lineNum">    1292 </span>                :            :     /* Send GARPs, and update the next announcement. */
+<span class="lineNum">    1293 </span>                :<span class="lineCov">       3167 :     long long int current_time = time_msec();</span>
+<span class="lineNum">    1294 </span>                :<span class="lineCov">       3167 :     send_garp_time = LLONG_MAX;</span>
+<span class="lineNum">    1295 </span>[<span class="branchCov" title="Branch 2 was taken 21 times"> + </span><span class="branchCov" title="Branch 3 was taken 3167 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 3167 times"> + </span>]:<span class="lineCov">       3188 :     SHASH_FOR_EACH (iter, &amp;send_garp_data) {</span>
+<span class="lineNum">    1296 </span>                :<span class="lineCov">         21 :         long long int next_announce = send_garp(iter-&gt;data, current_time);</span>
+<span class="lineNum">    1297 </span>        [<span class="branchCov" title="Branch 0 was taken 21 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         21 :         if (send_garp_time &gt; next_announce) {</span>
+<span class="lineNum">    1298 </span>                :<span class="lineCov">         21 :             send_garp_time = next_announce;</span>
+<span class="lineNum">    1299 </span>                :            :         }
+<span class="lineNum">    1300 </span>                :            :     }
+<span class="lineNum">    1301 </span>                :<span class="lineCov">       3167 :     sset_destroy(&amp;localnet_vifs);</span>
+<span class="lineNum">    1302 </span>                :<span class="lineCov">       3167 :     sset_destroy(&amp;local_l3gw_ports);</span>
+<span class="lineNum">    1303 </span>                :<span class="lineCov">       3167 :     simap_destroy(&amp;localnet_ofports);</span>
+<span class="lineNum">    1304 </span>                :            : 
+<span class="lineNum">    1305 </span>[<span class="branchCov" title="Branch 1 was taken 3167 times"> + </span><span class="branchCov" title="Branch 2 was taken 26 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 3167 times"> + </span>]:<span class="lineCov">       3193 :     SHASH_FOR_EACH_SAFE (iter, next, &amp;nat_addresses) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 6 was taken 26 times"> + </span><span class="branchCov" title="Branch 7 was taken 3167 times"> + </span>]
+<span class="lineNum">    1306 </span>                :<span class="lineCov">         26 :         struct lport_addresses *laddrs = iter-&gt;data;</span>
+<span class="lineNum">    1307 </span>                :<span class="lineCov">         26 :         destroy_lport_addresses(laddrs);</span>
+<span class="lineNum">    1308 </span>                :<span class="lineCov">         26 :         shash_delete(&amp;nat_addresses, iter);</span>
+<span class="lineNum">    1309 </span>                :<span class="lineCov">         26 :         free(laddrs);</span>
+<span class="lineNum">    1310 </span>                :            :     }
+<span class="lineNum">    1311 </span>                :<span class="lineCov">       3167 :     shash_destroy(&amp;nat_addresses);</span>
+<span class="lineNum">    1312 </span>                :            : 
+<span class="lineNum">    1313 </span>                :<span class="lineCov">       3167 :     sset_destroy(&amp;nat_ip_keys);</span>
+<span class="lineNum">    1314 </span>                :<span class="lineCov">       3167 : }</span>
+<a name="1315"><span class="lineNum">    1315 </span>                :            : </a>
+<span class="lineNum">    1316 </span>                :            : static void
+<span class="lineNum">    1317 </span>                :<span class="lineCov">        218 : reload_metadata(struct ofpbuf *ofpacts, const struct match *md)</span>
+<span class="lineNum">    1318 </span>                :            : {
+<span class="lineNum">    1319 </span>                :<span class="lineCov">        218 :     enum mf_field_id md_fields[] = {</span>
+<span class="lineNum">    1320 </span>                :            : #if FLOW_N_REGS == 16
+<span class="lineNum">    1321 </span>                :            :         MFF_REG0,
+<span class="lineNum">    1322 </span>                :            :         MFF_REG1,
+<span class="lineNum">    1323 </span>                :            :         MFF_REG2,
+<span class="lineNum">    1324 </span>                :            :         MFF_REG3,
+<span class="lineNum">    1325 </span>                :            :         MFF_REG4,
+<span class="lineNum">    1326 </span>                :            :         MFF_REG5,
+<span class="lineNum">    1327 </span>                :            :         MFF_REG6,
+<span class="lineNum">    1328 </span>                :            :         MFF_REG7,
+<span class="lineNum">    1329 </span>                :            :         MFF_REG8,
+<span class="lineNum">    1330 </span>                :            :         MFF_REG9,
+<span class="lineNum">    1331 </span>                :            :         MFF_REG10,
+<span class="lineNum">    1332 </span>                :            :         MFF_REG11,
+<span class="lineNum">    1333 </span>                :            :         MFF_REG12,
+<span class="lineNum">    1334 </span>                :            :         MFF_REG13,
+<span class="lineNum">    1335 </span>                :            :         MFF_REG14,
+<span class="lineNum">    1336 </span>                :            :         MFF_REG15,
+<span class="lineNum">    1337 </span>                :            : #else
+<span class="lineNum">    1338 </span>                :            : #error
+<span class="lineNum">    1339 </span>                :            : #endif
+<span class="lineNum">    1340 </span>                :            :         MFF_METADATA,
+<span class="lineNum">    1341 </span>                :            :     };
+<span class="lineNum">    1342 </span>        [<span class="branchCov" title="Branch 0 was taken 3706 times"> + </span><span class="branchCov" title="Branch 1 was taken 218 times"> + </span>]:<span class="lineCov">       3924 :     for (size_t i = 0; i &lt; ARRAY_SIZE(md_fields); i++) {</span>
+<span class="lineNum">    1343 </span>                :<span class="lineCov">       3706 :         const struct mf_field *field = mf_from_id(md_fields[i]);</span>
+<span class="lineNum">    1344 </span>        [<span class="branchCov" title="Branch 1 was taken 1305 times"> + </span><span class="branchCov" title="Branch 2 was taken 2401 times"> + </span>]:<span class="lineCov">       3706 :         if (!mf_is_all_wild(field, &amp;md-&gt;wc)) {</span>
+<span class="lineNum">    1345 </span>                :            :             union mf_value value;
+<span class="lineNum">    1346 </span>                :<span class="lineCov">       1305 :             mf_get_value(field, &amp;md-&gt;flow, &amp;value);</span>
+<span class="lineNum">    1347 </span>                :<span class="lineCov">       1305 :             ofpact_put_set_field(ofpacts, field, &amp;value, NULL);</span>
+<span class="lineNum">    1348 </span>                :            :         }
+<span class="lineNum">    1349 </span>                :            :     }
+<span class="lineNum">    1350 </span>                :<span class="lineCov">        218 : }</span>
+<a name="1351"><span class="lineNum">    1351 </span>                :            : </a>
+<span class="lineNum">    1352 </span>                :            : static void
+<span class="lineNum">    1353 </span>                :<span class="lineCov">          1 : pinctrl_handle_nd_na(const struct flow *ip_flow, const struct match *md,</span>
+<span class="lineNum">    1354 </span>                :            :                      struct ofpbuf *userdata)
+<span class="lineNum">    1355 </span>                :            : {
+<span class="lineNum">    1356 </span>                :            :     /* This action only works for IPv6 ND packets, and the switch should only
+<span class="lineNum">    1357 </span>                :            :      * send us ND packets this way, but check here just to be sure. */
+<span class="lineNum">    1358 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     if (!is_nd(ip_flow, NULL)) {</span>
+<span class="lineNum">    1359 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">    1360 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;NA action on non-ND packet&quot;);</span>
+<span class="lineNum">    1361 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">    1362 </span>                :            :     }
+<span class="lineNum">    1363 </span>                :            : 
+<span class="lineNum">    1364 </span>                :<span class="lineCov">          1 :     enum ofp_version version = rconn_get_version(swconn);</span>
+<span class="lineNum">    1365 </span>                :<span class="lineCov">          1 :     enum ofputil_protocol proto = ofputil_protocol_from_ofp_version(version);</span>
+<span class="lineNum">    1366 </span>                :            : 
+<span class="lineNum">    1367 </span>                :            :     uint64_t packet_stub[128 / 8];
+<span class="lineNum">    1368 </span>                :            :     struct dp_packet packet;
+<span class="lineNum">    1369 </span>                :<span class="lineCov">          1 :     dp_packet_use_stub(&amp;packet, packet_stub, sizeof packet_stub);</span>
+<span class="lineNum">    1370 </span>                :            : 
+<span class="lineNum">    1371 </span>                :            :     /* xxx These flags are not exactly correct.  Look at section 7.2.4
+<span class="lineNum">    1372 </span>                :            :      * xxx of RFC 4861.  For example, we need to set ND_RSO_ROUTER for
+<span class="lineNum">    1373 </span>                :            :      * xxx router's interfaces and ND_RSO_SOLICITED only if it was
+<span class="lineNum">    1374 </span>                :            :      * xxx requested. */
+<span class="lineNum">    1375 </span>                :<span class="lineCov">          1 :     compose_nd_na(&amp;packet, ip_flow-&gt;dl_dst, ip_flow-&gt;dl_src,</span>
+<span class="lineNum">    1376 </span>                :            :                   &amp;ip_flow-&gt;nd_target, &amp;ip_flow-&gt;ipv6_src,
+<span class="lineNum">    1377 </span>                :            :                   htonl(ND_RSO_SOLICITED | ND_RSO_OVERRIDE));
+<span class="lineNum">    1378 </span>                :            : 
+<span class="lineNum">    1379 </span>                :            :     /* Reload previous packet metadata. */
+<span class="lineNum">    1380 </span>                :            :     uint64_t ofpacts_stub[4096 / 8];
+<span class="lineNum">    1381 </span>                :<span class="lineCov">          1 :     struct ofpbuf ofpacts = OFPBUF_STUB_INITIALIZER(ofpacts_stub);</span>
+<span class="lineNum">    1382 </span>                :<span class="lineCov">          1 :     reload_metadata(&amp;ofpacts, md);</span>
+<span class="lineNum">    1383 </span>                :            : 
+<span class="lineNum">    1384 </span>                :<span class="lineCov">          1 :     enum ofperr error = ofpacts_pull_openflow_actions(userdata, userdata-&gt;size,</span>
+<span class="lineNum">    1385 </span>                :            :                                                       version, &amp;ofpacts);
+<span class="lineNum">    1386 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          1 :     if (error) {</span>
+<span class="lineNum">    1387 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+<span class="lineNum">    1388 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;failed to parse actions for 'na' (%s)&quot;,</span>
+<span class="lineNum">    1389 </span>                :            :                      ofperr_to_string(error));
+<span class="lineNum">    1390 </span>                :<span class="lineNoCov">          0 :         goto exit;</span>
+<span class="lineNum">    1391 </span>                :            :     }
+<span class="lineNum">    1392 </span>                :            : 
+<span class="lineNum">    1393 </span>                :<span class="lineCov">          4 :     struct ofputil_packet_out po = {</span>
+<span class="lineNum">    1394 </span>                :<span class="lineCov">          1 :         .packet = dp_packet_data(&amp;packet),</span>
+<span class="lineNum">    1395 </span>                :<span class="lineCov">          1 :         .packet_len = dp_packet_size(&amp;packet),</span>
+<span class="lineNum">    1396 </span>                :            :         .buffer_id = UINT32_MAX,
+<span class="lineNum">    1397 </span>                :            :         .in_port = OFPP_CONTROLLER,
+<span class="lineNum">    1398 </span>                :<span class="lineCov">          1 :         .ofpacts = ofpacts.data,</span>
+<span class="lineNum">    1399 </span>                :<span class="lineCov">          1 :         .ofpacts_len = ofpacts.size,</span>
+<span class="lineNum">    1400 </span>                :            :     };
+<span class="lineNum">    1401 </span>                :            : 
+<span class="lineNum">    1402 </span>                :<span class="lineCov">          1 :     queue_msg(ofputil_encode_packet_out(&amp;po, proto));</span>
+<span class="lineNum">    1403 </span>                :            : 
+<span class="lineNum">    1404 </span>                :            : exit:
+<span class="lineNum">    1405 </span>                :<span class="lineCov">          1 :     dp_packet_uninit(&amp;packet);</span>
+<span class="lineNum">    1406 </span>                :<span class="lineCov">          1 :     ofpbuf_uninit(&amp;ofpacts);</span>
+<span class="lineNum">    1407 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,751 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/netdev-native-tnl.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - netdev-native-tnl.c<span style="font-size: 80%;"> (source / <a href="netdev-native-tnl.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">231</td>
+            <td class="headerCovTableEntry">302</td>
+            <td class="headerCovTableEntryMed">76.5 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">17</td>
+            <td class="headerCovTableEntry">18</td>
+            <td class="headerCovTableEntryHi">94.4 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">60</td>
+            <td class="headerCovTableEntry">124</td>
+            <td class="headerCovTableEntryLo">48.4 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2016 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  * Copyright (c) 2016 Red Hat, Inc.
+<span class="lineNum">       4 </span>                :            :  *
+<span class="lineNum">       5 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       6 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       7 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       8 </span>                :            :  *
+<span class="lineNum">       9 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">      10 </span>                :            :  *
+<span class="lineNum">      11 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      12 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      13 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      14 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      15 </span>                :            :  * limitations under the License.
+<span class="lineNum">      16 </span>                :            :  */
+<span class="lineNum">      17 </span>                :            : 
+<span class="lineNum">      18 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &quot;netdev-native-tnl.h&quot;
+<span class="lineNum">      21 </span>                :            : 
+<span class="lineNum">      22 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;fcntl.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      25 </span>                :            : #include &lt;net/if.h&gt;
+<span class="lineNum">      26 </span>                :            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      27 </span>                :            : #include &lt;netinet/ip.h&gt;
+<span class="lineNum">      28 </span>                :            : #include &lt;netinet/ip6.h&gt;
+<span class="lineNum">      29 </span>                :            : #include &lt;sys/ioctl.h&gt;
+<span class="lineNum">      30 </span>                :            : 
+<span class="lineNum">      31 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      32 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      33 </span>                :            : #include &lt;sys/time.h&gt;
+<span class="lineNum">      34 </span>                :            : 
+<span class="lineNum">      35 </span>                :            : #include &quot;byte-order.h&quot;
+<span class="lineNum">      36 </span>                :            : #include &quot;csum.h&quot;
+<span class="lineNum">      37 </span>                :            : #include &quot;dp-packet.h&quot;
+<span class="lineNum">      38 </span>                :            : #include &quot;netdev.h&quot;
+<span class="lineNum">      39 </span>                :            : #include &quot;netdev-vport.h&quot;
+<span class="lineNum">      40 </span>                :            : #include &quot;netdev-vport-private.h&quot;
+<span class="lineNum">      41 </span>                :            : #include &quot;odp-netlink.h&quot;
+<span class="lineNum">      42 </span>                :            : #include &quot;packets.h&quot;
+<span class="lineNum">      43 </span>                :            : #include &quot;seq.h&quot;
+<span class="lineNum">      44 </span>                :            : #include &quot;unaligned.h&quot;
+<span class="lineNum">      45 </span>                :            : #include &quot;unixctl.h&quot;
+<a name="46"><span class="lineNum">      46 </span>                :            : #include &quot;openvswitch/vlog.h&quot;</a>
+<span class="lineNum">      47 </span>                :            : 
+<span class="lineNum">      48 </span>                :<span class="lineCov">      20190 : VLOG_DEFINE_THIS_MODULE(native_tnl);</span>
+<span class="lineNum">      49 </span>                :            : static struct vlog_rate_limit err_rl = VLOG_RATE_LIMIT_INIT(60, 5);
+<span class="lineNum">      50 </span>                :            : 
+<span class="lineNum">      51 </span>                :            : #define VXLAN_HLEN   (sizeof(struct udp_header) +         \
+<span class="lineNum">      52 </span>                :            :                       sizeof(struct vxlanhdr))
+<span class="lineNum">      53 </span>                :            : 
+<span class="lineNum">      54 </span>                :            : #define GENEVE_BASE_HLEN   (sizeof(struct udp_header) +         \
+<span class="lineNum">      55 </span>                :            :                             sizeof(struct genevehdr))
+<span class="lineNum">      56 </span>                :            : 
+<span class="lineNum">      57 </span>                :            : uint16_t tnl_udp_port_min = 32768;
+<span class="lineNum">      58 </span>                :            : uint16_t tnl_udp_port_max = 61000;
+<a name="59"><span class="lineNum">      59 </span>                :            : </a>
+<span class="lineNum">      60 </span>                :            : void *
+<span class="lineNum">      61 </span>                :<span class="lineCov">       1932 : netdev_tnl_ip_extract_tnl_md(struct dp_packet *packet, struct flow_tnl *tnl,</span>
+<span class="lineNum">      62 </span>                :            :                   unsigned int *hlen)
+<span class="lineNum">      63 </span>                :            : {
+<span class="lineNum">      64 </span>                :            :     void *nh;
+<span class="lineNum">      65 </span>                :            :     struct ip_header *ip;
+<span class="lineNum">      66 </span>                :            :     struct ovs_16aligned_ip6_hdr *ip6;
+<span class="lineNum">      67 </span>                :            :     void *l4;
+<span class="lineNum">      68 </span>                :            :     int l3_size;
+<span class="lineNum">      69 </span>                :            : 
+<span class="lineNum">      70 </span>                :<span class="lineCov">       1932 :     nh = dp_packet_l3(packet);</span>
+<span class="lineNum">      71 </span>                :<span class="lineCov">       1932 :     ip = nh;</span>
+<span class="lineNum">      72 </span>                :<span class="lineCov">       1932 :     ip6 = nh;</span>
+<span class="lineNum">      73 </span>                :<span class="lineCov">       1932 :     l4 = dp_packet_l4(packet);</span>
+<span class="lineNum">      74 </span>                :            : 
+<span class="lineNum">      75 </span>[<span class="branchCov" title="Branch 0 was taken 1932 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 1932 times"> + </span>]:<span class="lineCov">       1932 :     if (!nh || !l4) {</span>
+<span class="lineNum">      76 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">      77 </span>                :            :     }
+<span class="lineNum">      78 </span>                :            : 
+<span class="lineNum">      79 </span>                :<span class="lineCov">       1932 :     *hlen = sizeof(struct eth_header);</span>
+<span class="lineNum">      80 </span>                :            : 
+<span class="lineNum">      81 </span>                :<span class="lineCov">       1932 :     l3_size = dp_packet_size(packet) -</span>
+<span class="lineNum">      82 </span>                :<span class="lineCov">       1932 :               ((char *)nh - (char *)dp_packet_data(packet));</span>
+<span class="lineNum">      83 </span>                :            : 
+<span class="lineNum">      84 </span>        [<span class="branchCov" title="Branch 0 was taken 1929 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">       1932 :     if (IP_VER(ip-&gt;ip_ihl_ver) == 4) {</span>
+<span class="lineNum">      85 </span>                :            : 
+<span class="lineNum">      86 </span>                :            :         ovs_be32 ip_src, ip_dst;
+<span class="lineNum">      87 </span>                :            : 
+<span class="lineNum">      88 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1929 times"> + </span>]:<span class="lineCov">       1929 :         if (csum(ip, IP_IHL(ip-&gt;ip_ihl_ver) * 4)) {</span>
+<span class="lineNum">      89 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN_RL(&amp;err_rl, &quot;ip packet has invalid checksum&quot;);</span>
+<span class="lineNum">      90 </span>                :<span class="lineNoCov">          0 :             return NULL;</span>
+<span class="lineNum">      91 </span>                :            :         }
+<span class="lineNum">      92 </span>                :            : 
+<span class="lineNum">      93 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1929 times"> + </span>]:<span class="lineCov">       1929 :         if (ntohs(ip-&gt;ip_tot_len) &gt; l3_size) {</span>
+<span class="lineNum">      94 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN_RL(&amp;err_rl, &quot;ip packet is truncated (IP length %d, actual %d)&quot;,</span>
+<span class="lineNum">      95 </span>                :            :                          ntohs(ip-&gt;ip_tot_len), l3_size);
+<span class="lineNum">      96 </span>                :<span class="lineNoCov">          0 :             return NULL;</span>
+<span class="lineNum">      97 </span>                :            :         }
+<span class="lineNum">      98 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1929 times"> + </span>]:<span class="lineCov">       1929 :         if (IP_IHL(ip-&gt;ip_ihl_ver) * 4 &gt; sizeof(struct ip_header)) {</span>
+<span class="lineNum">      99 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN_RL(&amp;err_rl, &quot;ip options not supported on tunnel packets &quot;</span>
+<span class="lineNum">     100 </span>                :            :                          &quot;(%d bytes)&quot;, IP_IHL(ip-&gt;ip_ihl_ver) * 4);
+<span class="lineNum">     101 </span>                :<span class="lineNoCov">          0 :             return NULL;</span>
+<span class="lineNum">     102 </span>                :            :         }
+<span class="lineNum">     103 </span>                :            : 
+<span class="lineNum">     104 </span>                :<span class="lineCov">       1929 :         ip_src = get_16aligned_be32(&amp;ip-&gt;ip_src);</span>
+<span class="lineNum">     105 </span>                :<span class="lineCov">       1929 :         ip_dst = get_16aligned_be32(&amp;ip-&gt;ip_dst);</span>
+<span class="lineNum">     106 </span>                :            : 
+<span class="lineNum">     107 </span>                :<span class="lineCov">       1929 :         tnl-&gt;ip_src = ip_src;</span>
+<span class="lineNum">     108 </span>                :<span class="lineCov">       1929 :         tnl-&gt;ip_dst = ip_dst;</span>
+<span class="lineNum">     109 </span>                :<span class="lineCov">       1929 :         tnl-&gt;ip_tos = ip-&gt;ip_tos;</span>
+<span class="lineNum">     110 </span>                :<span class="lineCov">       1929 :         tnl-&gt;ip_ttl = ip-&gt;ip_ttl;</span>
+<span class="lineNum">     111 </span>                :            : 
+<span class="lineNum">     112 </span>                :<span class="lineCov">       1929 :         *hlen += IP_HEADER_LEN;</span>
+<span class="lineNum">     113 </span>                :            : 
+<span class="lineNum">     114 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          3 :     } else if (IP_VER(ip-&gt;ip_ihl_ver) == 6) {</span>
+<span class="lineNum">     115 </span>                :<span class="lineCov">          3 :         ovs_be32 tc_flow = get_16aligned_be32(&amp;ip6-&gt;ip6_flow);</span>
+<span class="lineNum">     116 </span>                :            : 
+<span class="lineNum">     117 </span>                :<span class="lineCov">          3 :         memcpy(tnl-&gt;ipv6_src.s6_addr, ip6-&gt;ip6_src.be16, sizeof ip6-&gt;ip6_src);</span>
+<span class="lineNum">     118 </span>                :<span class="lineCov">          3 :         memcpy(tnl-&gt;ipv6_dst.s6_addr, ip6-&gt;ip6_dst.be16, sizeof ip6-&gt;ip6_dst);</span>
+<span class="lineNum">     119 </span>                :            : 
+<span class="lineNum">     120 </span>                :<span class="lineCov">          3 :         tnl-&gt;ip_tos = ntohl(tc_flow) &gt;&gt; 20;</span>
+<span class="lineNum">     121 </span>                :<span class="lineCov">          3 :         tnl-&gt;ip_ttl = ip6-&gt;ip6_hlim;</span>
+<span class="lineNum">     122 </span>                :            : 
+<span class="lineNum">     123 </span>                :<span class="lineCov">          3 :         *hlen += IPV6_HEADER_LEN;</span>
+<span class="lineNum">     124 </span>                :            : 
+<span class="lineNum">     125 </span>                :            :     } else {
+<span class="lineNum">     126 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;err_rl, &quot;ipv4 packet has invalid version (%d)&quot;,</span>
+<span class="lineNum">     127 </span>                :            :                      IP_VER(ip-&gt;ip_ihl_ver));
+<span class="lineNum">     128 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     129 </span>                :            :     }
+<span class="lineNum">     130 </span>                :            : 
+<span class="lineNum">     131 </span>                :<span class="lineCov">       1932 :     return l4;</span>
+<span class="lineNum">     132 </span>                :            : }
+<span class="lineNum">     133 </span>                :            : 
+<span class="lineNum">     134 </span>                :            : /* Pushes the 'size' bytes of 'header' into the headroom of 'packet',
+<span class="lineNum">     135 </span>                :            :  * reallocating the packet if necessary.  'header' should contain an Ethernet
+<span class="lineNum">     136 </span>                :            :  * header, followed by an IPv4 header (without options), and an L4 header.
+<span class="lineNum">     137 </span>                :            :  *
+<span class="lineNum">     138 </span>                :            :  * This function sets the IP header's ip_tot_len field (which should be zeroed
+<span class="lineNum">     139 </span>                :            :  * as part of 'header') and puts its value into '*ip_tot_size' as well.  Also
+<span class="lineNum">     140 </span>                :            :  * updates IP header checksum.
+<span class="lineNum">     141 </span>                :            :  *
+<a name="142"><span class="lineNum">     142 </span>                :            :  * Return pointer to the L4 header added to 'packet'. */</a>
+<span class="lineNum">     143 </span>                :            : void *
+<span class="lineNum">     144 </span>                :<span class="lineCov">       1927 : netdev_tnl_push_ip_header(struct dp_packet *packet,</span>
+<span class="lineNum">     145 </span>                :            :                const void *header, int size, int *ip_tot_size)
+<span class="lineNum">     146 </span>                :            : {
+<span class="lineNum">     147 </span>                :            :     struct eth_header *eth;
+<span class="lineNum">     148 </span>                :            :     struct ip_header *ip;
+<span class="lineNum">     149 </span>                :            :     struct ovs_16aligned_ip6_hdr *ip6;
+<span class="lineNum">     150 </span>                :            : 
+<span class="lineNum">     151 </span>                :<span class="lineCov">       1927 :     eth = dp_packet_push_uninit(packet, size);</span>
+<span class="lineNum">     152 </span>                :<span class="lineCov">       1927 :     *ip_tot_size = dp_packet_size(packet) - sizeof (struct eth_header);</span>
+<span class="lineNum">     153 </span>                :            : 
+<span class="lineNum">     154 </span>                :<span class="lineCov">       1927 :     memcpy(eth, header, size);</span>
+<span class="lineNum">     155 </span>                :            : 
+<span class="lineNum">     156 </span>        [<span class="branchCov" title="Branch 1 was taken 1 time"> + </span><span class="branchCov" title="Branch 2 was taken 1926 times"> + </span>]:<span class="lineCov">       1927 :     if (netdev_tnl_is_header_ipv6(header)) {</span>
+<span class="lineNum">     157 </span>                :<span class="lineCov">          1 :         ip6 = netdev_tnl_ipv6_hdr(eth);</span>
+<span class="lineNum">     158 </span>                :<span class="lineCov">          1 :         *ip_tot_size -= IPV6_HEADER_LEN;</span>
+<span class="lineNum">     159 </span>                :<span class="lineCov">          1 :         ip6-&gt;ip6_plen = htons(*ip_tot_size);</span>
+<span class="lineNum">     160 </span>                :<span class="lineCov">          1 :         return ip6 + 1;</span>
+<span class="lineNum">     161 </span>                :            :     } else {
+<span class="lineNum">     162 </span>                :<span class="lineCov">       1926 :         ip = netdev_tnl_ip_hdr(eth);</span>
+<span class="lineNum">     163 </span>                :<span class="lineCov">       1926 :         ip-&gt;ip_tot_len = htons(*ip_tot_size);</span>
+<span class="lineNum">     164 </span>                :<span class="lineCov">       1926 :         ip-&gt;ip_csum = recalc_csum16(ip-&gt;ip_csum, 0, ip-&gt;ip_tot_len);</span>
+<span class="lineNum">     165 </span>                :<span class="lineCov">       1926 :         *ip_tot_size -= IP_HEADER_LEN;</span>
+<span class="lineNum">     166 </span>                :<span class="lineCov">       1926 :         return ip + 1;</span>
+<span class="lineNum">     167 </span>                :            :     }
+<span class="lineNum">     168 </span>                :            : }
+<a name="169"><span class="lineNum">     169 </span>                :            : </a>
+<span class="lineNum">     170 </span>                :            : static void *
+<span class="lineNum">     171 </span>                :<span class="lineCov">       1898 : udp_extract_tnl_md(struct dp_packet *packet, struct flow_tnl *tnl,</span>
+<span class="lineNum">     172 </span>                :            :                    unsigned int *hlen)
+<span class="lineNum">     173 </span>                :            : {
+<span class="lineNum">     174 </span>                :            :     struct udp_header *udp;
+<span class="lineNum">     175 </span>                :            : 
+<span class="lineNum">     176 </span>                :<span class="lineCov">       1898 :     udp = netdev_tnl_ip_extract_tnl_md(packet, tnl, hlen);</span>
+<span class="lineNum">     177 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1898 times"> + </span>]:<span class="lineCov">       1898 :     if (!udp) {</span>
+<span class="lineNum">     178 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     179 </span>                :            :     }
+<span class="lineNum">     180 </span>                :            : 
+<span class="lineNum">     181 </span>        [<span class="branchCov" title="Branch 0 was taken 1855 times"> + </span><span class="branchCov" title="Branch 1 was taken 43 times"> + </span>]:<span class="lineCov">       1898 :     if (udp-&gt;udp_csum) {</span>
+<span class="lineNum">     182 </span>                :            :         uint32_t csum;
+<span class="lineNum">     183 </span>        [<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 1855 times"> + </span>]:<span class="lineCov">       1855 :         if (netdev_tnl_is_header_ipv6(dp_packet_data(packet))) {</span>
+<span class="lineNum">     184 </span>                :<span class="lineNoCov">          0 :             csum = packet_csum_pseudoheader6(dp_packet_l3(packet));</span>
+<span class="lineNum">     185 </span>                :            :         } else {
+<span class="lineNum">     186 </span>                :<span class="lineCov">       1855 :             csum = packet_csum_pseudoheader(dp_packet_l3(packet));</span>
+<span class="lineNum">     187 </span>                :            :         }
+<span class="lineNum">     188 </span>                :            : 
+<span class="lineNum">     189 </span>                :<span class="lineCov">       3710 :         csum = csum_continue(csum, udp, dp_packet_size(packet) -</span>
+<span class="lineNum">     190 </span>                :<span class="lineCov">       3710 :                              ((const unsigned char *)udp -</span>
+<span class="lineNum">     191 </span>                :<span class="lineCov">       1855 :                               (const unsigned char *)dp_packet_l2(packet)));</span>
+<span class="lineNum">     192 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1855 times"> + </span>]:<span class="lineCov">       1855 :         if (csum_finish(csum)) {</span>
+<span class="lineNum">     193 </span>                :<span class="lineNoCov">          0 :             return NULL;</span>
+<span class="lineNum">     194 </span>                :            :         }
+<span class="lineNum">     195 </span>                :<span class="lineCov">       1855 :         tnl-&gt;flags |= FLOW_TNL_F_CSUM;</span>
+<span class="lineNum">     196 </span>                :            :     }
+<span class="lineNum">     197 </span>                :            : 
+<span class="lineNum">     198 </span>                :<span class="lineCov">       1898 :     tnl-&gt;tp_src = udp-&gt;udp_src;</span>
+<span class="lineNum">     199 </span>                :<span class="lineCov">       1898 :     tnl-&gt;tp_dst = udp-&gt;udp_dst;</span>
+<span class="lineNum">     200 </span>                :            : 
+<span class="lineNum">     201 </span>                :<span class="lineCov">       1898 :     return udp + 1;</span>
+<span class="lineNum">     202 </span>                :            : }
+<span class="lineNum">     203 </span>                :            : 
+<a name="204"><span class="lineNum">     204 </span>                :            : </a>
+<span class="lineNum">     205 </span>                :            : void
+<span class="lineNum">     206 </span>                :<span class="lineCov">       1899 : netdev_tnl_push_udp_header(struct dp_packet *packet,</span>
+<span class="lineNum">     207 </span>                :            :                            const struct ovs_action_push_tnl *data)
+<span class="lineNum">     208 </span>                :            : {
+<span class="lineNum">     209 </span>                :            :     struct udp_header *udp;
+<span class="lineNum">     210 </span>                :            :     int ip_tot_size;
+<span class="lineNum">     211 </span>                :            : 
+<span class="lineNum">     212 </span>                :<span class="lineCov">       1899 :     udp = netdev_tnl_push_ip_header(packet, data-&gt;header, data-&gt;header_len, &amp;ip_tot_size);</span>
+<span class="lineNum">     213 </span>                :            : 
+<span class="lineNum">     214 </span>                :            :     /* set udp src port */
+<span class="lineNum">     215 </span>                :<span class="lineCov">       1899 :     udp-&gt;udp_src = netdev_tnl_get_src_port(packet);</span>
+<span class="lineNum">     216 </span>                :<span class="lineCov">       1899 :     udp-&gt;udp_len = htons(ip_tot_size);</span>
+<span class="lineNum">     217 </span>                :            : 
+<span class="lineNum">     218 </span>        [<span class="branchCov" title="Branch 0 was taken 1856 times"> + </span><span class="branchCov" title="Branch 1 was taken 43 times"> + </span>]:<span class="lineCov">       1899 :     if (udp-&gt;udp_csum) {</span>
+<span class="lineNum">     219 </span>                :            :         uint32_t csum;
+<span class="lineNum">     220 </span>        [<span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchCov" title="Branch 3 was taken 1855 times"> + </span>]:<span class="lineCov">       1856 :         if (netdev_tnl_is_header_ipv6(dp_packet_data(packet))) {</span>
+<span class="lineNum">     221 </span>                :<span class="lineCov">          1 :             csum = packet_csum_pseudoheader6(netdev_tnl_ipv6_hdr(dp_packet_data(packet)));</span>
+<span class="lineNum">     222 </span>                :            :         } else {
+<span class="lineNum">     223 </span>                :<span class="lineCov">       1855 :             csum = packet_csum_pseudoheader(netdev_tnl_ip_hdr(dp_packet_data(packet)));</span>
+<span class="lineNum">     224 </span>                :            :         }
+<span class="lineNum">     225 </span>                :            : 
+<span class="lineNum">     226 </span>                :<span class="lineCov">       1856 :         csum = csum_continue(csum, udp, ip_tot_size);</span>
+<span class="lineNum">     227 </span>                :<span class="lineCov">       1856 :         udp-&gt;udp_csum = csum_finish(csum);</span>
+<span class="lineNum">     228 </span>                :            : 
+<span class="lineNum">     229 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1856 times"> + </span>]:<span class="lineCov">       1856 :         if (!udp-&gt;udp_csum) {</span>
+<span class="lineNum">     230 </span>                :<span class="lineNoCov">          0 :             udp-&gt;udp_csum = htons(0xffff);</span>
+<span class="lineNum">     231 </span>                :            :         }
+<span class="lineNum">     232 </span>                :            :     }
+<span class="lineNum">     233 </span>                :<span class="lineCov">       1899 : }</span>
+<a name="234"><span class="lineNum">     234 </span>                :            : </a>
+<span class="lineNum">     235 </span>                :            : static void *
+<span class="lineNum">     236 </span>                :<span class="lineCov">       2407 : eth_build_header(struct ovs_action_push_tnl *data,</span>
+<span class="lineNum">     237 </span>                :            :                  const struct netdev_tnl_build_header_params *params)
+<span class="lineNum">     238 </span>                :            : {
+<span class="lineNum">     239 </span>        [<span class="branchCov" title="Branch 0 was taken 16 times"> + </span><span class="branchCov" title="Branch 1 was taken 2391 times"> + </span>]:<span class="lineCov">       2407 :     uint16_t eth_proto = params-&gt;is_ipv6 ? ETH_TYPE_IPV6 : ETH_TYPE_IP;</span>
+<span class="lineNum">     240 </span>                :            :     struct eth_header *eth;
+<span class="lineNum">     241 </span>                :            : 
+<span class="lineNum">     242 </span>                :<span class="lineCov">       2407 :     memset(data-&gt;header, 0, sizeof data-&gt;header);</span>
+<span class="lineNum">     243 </span>                :            : 
+<span class="lineNum">     244 </span>                :<span class="lineCov">       2407 :     eth = (struct eth_header *)data-&gt;header;</span>
+<span class="lineNum">     245 </span>                :<span class="lineCov">       2407 :     eth-&gt;eth_dst = params-&gt;dmac;</span>
+<span class="lineNum">     246 </span>                :<span class="lineCov">       2407 :     eth-&gt;eth_src = params-&gt;smac;</span>
+<span class="lineNum">     247 </span>                :<span class="lineCov">       2407 :     eth-&gt;eth_type = htons(eth_proto);</span>
+<span class="lineNum">     248 </span>                :<span class="lineCov">       2407 :     data-&gt;header_len = sizeof(struct eth_header);</span>
+<span class="lineNum">     249 </span>                :<span class="lineCov">       2407 :     return eth + 1;</span>
+<span class="lineNum">     250 </span>                :            : }
+<a name="251"><span class="lineNum">     251 </span>                :            : </a>
+<span class="lineNum">     252 </span>                :            : void *
+<span class="lineNum">     253 </span>                :<span class="lineCov">       2407 : netdev_tnl_ip_build_header(struct ovs_action_push_tnl *data,</span>
+<span class="lineNum">     254 </span>                :            :                            const struct netdev_tnl_build_header_params *params,
+<span class="lineNum">     255 </span>                :            :                            uint8_t next_proto)
+<span class="lineNum">     256 </span>                :            : {
+<span class="lineNum">     257 </span>                :            :     void *l3;
+<span class="lineNum">     258 </span>                :            : 
+<span class="lineNum">     259 </span>                :<span class="lineCov">       2407 :     l3 = eth_build_header(data, params);</span>
+<span class="lineNum">     260 </span>        [<span class="branchCov" title="Branch 0 was taken 2391 times"> + </span><span class="branchCov" title="Branch 1 was taken 16 times"> + </span>]:<span class="lineCov">       2407 :     if (!params-&gt;is_ipv6) {</span>
+<span class="lineNum">     261 </span>                :<span class="lineCov">       2391 :         ovs_be32 ip_src = in6_addr_get_mapped_ipv4(params-&gt;s_ip);</span>
+<span class="lineNum">     262 </span>                :            :         struct ip_header *ip;
+<span class="lineNum">     263 </span>                :            : 
+<span class="lineNum">     264 </span>                :<span class="lineCov">       2391 :         ip = (struct ip_header *) l3;</span>
+<span class="lineNum">     265 </span>                :            : 
+<span class="lineNum">     266 </span>                :<span class="lineCov">       2391 :         ip-&gt;ip_ihl_ver = IP_IHL_VER(5, 4);</span>
+<span class="lineNum">     267 </span>                :<span class="lineCov">       2391 :         ip-&gt;ip_tos = params-&gt;flow-&gt;tunnel.ip_tos;</span>
+<span class="lineNum">     268 </span>                :<span class="lineCov">       2391 :         ip-&gt;ip_ttl = params-&gt;flow-&gt;tunnel.ip_ttl;</span>
+<span class="lineNum">     269 </span>                :<span class="lineCov">       2391 :         ip-&gt;ip_proto = next_proto;</span>
+<span class="lineNum">     270 </span>                :<span class="lineCov">       2391 :         put_16aligned_be32(&amp;ip-&gt;ip_src, ip_src);</span>
+<span class="lineNum">     271 </span>                :<span class="lineCov">       2391 :         put_16aligned_be32(&amp;ip-&gt;ip_dst, params-&gt;flow-&gt;tunnel.ip_dst);</span>
+<span class="lineNum">     272 </span>                :            : 
+<span class="lineNum">     273 </span>        [<span class="branchCov" title="Branch 0 was taken 2391 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       2391 :         ip-&gt;ip_frag_off = (params-&gt;flow-&gt;tunnel.flags &amp; FLOW_TNL_F_DONT_FRAGMENT) ?</span>
+<span class="lineNum">     274 </span>                :            :                           htons(IP_DF) : 0;
+<span class="lineNum">     275 </span>                :            : 
+<span class="lineNum">     276 </span>                :            :         /* Checksum has already been zeroed by eth_build_header. */
+<span class="lineNum">     277 </span>                :<span class="lineCov">       2391 :         ip-&gt;ip_csum = csum(ip, sizeof *ip);</span>
+<span class="lineNum">     278 </span>                :            : 
+<span class="lineNum">     279 </span>                :<span class="lineCov">       2391 :         data-&gt;header_len += IP_HEADER_LEN;</span>
+<span class="lineNum">     280 </span>                :<span class="lineCov">       2391 :         return ip + 1;</span>
+<span class="lineNum">     281 </span>                :            :     } else {
+<span class="lineNum">     282 </span>                :            :         struct ovs_16aligned_ip6_hdr *ip6;
+<span class="lineNum">     283 </span>                :            : 
+<span class="lineNum">     284 </span>                :<span class="lineCov">         16 :         ip6 = (struct ovs_16aligned_ip6_hdr *) l3;</span>
+<span class="lineNum">     285 </span>                :            : 
+<span class="lineNum">     286 </span>                :<span class="lineCov">         32 :         put_16aligned_be32(&amp;ip6-&gt;ip6_flow, htonl(6 &lt;&lt; 28) |</span>
+<span class="lineNum">     287 </span>                :<span class="lineCov">         16 :                            htonl(params-&gt;flow-&gt;tunnel.ip_tos &lt;&lt; 20));</span>
+<span class="lineNum">     288 </span>                :<span class="lineCov">         16 :         ip6-&gt;ip6_hlim = params-&gt;flow-&gt;tunnel.ip_ttl;</span>
+<span class="lineNum">     289 </span>                :<span class="lineCov">         16 :         ip6-&gt;ip6_nxt = next_proto;</span>
+<span class="lineNum">     290 </span>                :<span class="lineCov">         16 :         memcpy(&amp;ip6-&gt;ip6_src, params-&gt;s_ip, sizeof(ovs_be32[4]));</span>
+<span class="lineNum">     291 </span>                :<span class="lineCov">         16 :         memcpy(&amp;ip6-&gt;ip6_dst, &amp;params-&gt;flow-&gt;tunnel.ipv6_dst, sizeof(ovs_be32[4]));</span>
+<span class="lineNum">     292 </span>                :            : 
+<span class="lineNum">     293 </span>                :<span class="lineCov">         16 :         data-&gt;header_len += IPV6_HEADER_LEN;</span>
+<span class="lineNum">     294 </span>                :<span class="lineCov">         16 :         return ip6 + 1;</span>
+<span class="lineNum">     295 </span>                :            :     }
+<span class="lineNum">     296 </span>                :            : }
+<a name="297"><span class="lineNum">     297 </span>                :            : </a>
+<span class="lineNum">     298 </span>                :            : static void *
+<span class="lineNum">     299 </span>                :<span class="lineCov">       2317 : udp_build_header(struct netdev_tunnel_config *tnl_cfg,</span>
+<span class="lineNum">     300 </span>                :            :                  struct ovs_action_push_tnl *data,
+<span class="lineNum">     301 </span>                :            :                  const struct netdev_tnl_build_header_params *params)
+<span class="lineNum">     302 </span>                :            : {
+<span class="lineNum">     303 </span>                :            :     struct udp_header *udp;
+<span class="lineNum">     304 </span>                :            : 
+<span class="lineNum">     305 </span>                :<span class="lineCov">       2317 :     udp = netdev_tnl_ip_build_header(data, params, IPPROTO_UDP);</span>
+<span class="lineNum">     306 </span>                :<span class="lineCov">       2317 :     udp-&gt;udp_dst = tnl_cfg-&gt;dst_port;</span>
+<span class="lineNum">     307 </span>                :            : 
+<span class="lineNum">     308 </span>[<span class="branchCov" title="Branch 0 was taken 2305 times"> + </span><span class="branchCov" title="Branch 1 was taken 12 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 2229 times"> + </span><span class="branchCov" title="Branch 3 was taken 76 times"> + </span>]:<span class="lineCov">       2317 :     if (params-&gt;is_ipv6 || params-&gt;flow-&gt;tunnel.flags &amp; FLOW_TNL_F_CSUM) {</span>
+<span class="lineNum">     309 </span>                :            :         /* Write a value in now to mark that we should compute the checksum
+<span class="lineNum">     310 </span>                :            :          * later. 0xffff is handy because it is transparent to the
+<span class="lineNum">     311 </span>                :            :          * calculation. */
+<span class="lineNum">     312 </span>                :<span class="lineCov">       2241 :         udp-&gt;udp_csum = htons(0xffff);</span>
+<span class="lineNum">     313 </span>                :            :     }
+<span class="lineNum">     314 </span>                :<span class="lineCov">       2317 :     data-&gt;header_len += sizeof *udp;</span>
+<span class="lineNum">     315 </span>                :<span class="lineCov">       2317 :     return udp + 1;</span>
+<span class="lineNum">     316 </span>                :            : }
+<a name="317"><span class="lineNum">     317 </span>                :            : </a>
+<span class="lineNum">     318 </span>                :            : static int
+<span class="lineNum">     319 </span>                :<span class="lineCov">         32 : gre_header_len(ovs_be16 flags)</span>
+<span class="lineNum">     320 </span>                :            : {
+<span class="lineNum">     321 </span>                :<span class="lineCov">         32 :     int hlen = 4;</span>
+<span class="lineNum">     322 </span>                :            : 
+<span class="lineNum">     323 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 32 times"> + </span>]:<span class="lineCov">         32 :     if (flags &amp; htons(GRE_CSUM)) {</span>
+<span class="lineNum">     324 </span>                :<span class="lineNoCov">          0 :         hlen += 4;</span>
+<span class="lineNum">     325 </span>                :            :     }
+<span class="lineNum">     326 </span>        [<span class="branchCov" title="Branch 1 was taken 2 times"> + </span><span class="branchCov" title="Branch 2 was taken 30 times"> + </span>]:<span class="lineCov">         32 :     if (flags &amp; htons(GRE_KEY)) {</span>
+<span class="lineNum">     327 </span>                :<span class="lineCov">          2 :         hlen += 4;</span>
+<span class="lineNum">     328 </span>                :            :     }
+<span class="lineNum">     329 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 32 times"> + </span>]:<span class="lineCov">         32 :     if (flags &amp; htons(GRE_SEQ)) {</span>
+<span class="lineNum">     330 </span>                :<span class="lineNoCov">          0 :         hlen += 4;</span>
+<span class="lineNum">     331 </span>                :            :     }
+<span class="lineNum">     332 </span>                :<span class="lineCov">         32 :     return hlen;</span>
+<span class="lineNum">     333 </span>                :            : }
+<a name="334"><span class="lineNum">     334 </span>                :            : </a>
+<span class="lineNum">     335 </span>                :            : static int
+<span class="lineNum">     336 </span>                :<span class="lineCov">         34 : parse_gre_header(struct dp_packet *packet,</span>
+<span class="lineNum">     337 </span>                :            :                  struct flow_tnl *tnl)
+<span class="lineNum">     338 </span>                :            : {
+<span class="lineNum">     339 </span>                :            :     const struct gre_base_hdr *greh;
+<span class="lineNum">     340 </span>                :            :     ovs_16aligned_be32 *options;
+<span class="lineNum">     341 </span>                :            :     int hlen;
+<span class="lineNum">     342 </span>                :            :     unsigned int ulen;
+<span class="lineNum">     343 </span>                :            : 
+<span class="lineNum">     344 </span>                :<span class="lineCov">         34 :     greh = netdev_tnl_ip_extract_tnl_md(packet, tnl, &amp;ulen);</span>
+<span class="lineNum">     345 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 34 times"> + </span>]:<span class="lineCov">         34 :     if (!greh) {</span>
+<span class="lineNum">     346 </span>                :<span class="lineNoCov">          0 :         return -EINVAL;</span>
+<span class="lineNum">     347 </span>                :            :     }
+<span class="lineNum">     348 </span>                :            : 
+<span class="lineNum">     349 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 34 times"> + </span>]:<span class="lineCov">         34 :     if (greh-&gt;flags &amp; ~(htons(GRE_CSUM | GRE_KEY | GRE_SEQ))) {</span>
+<span class="lineNum">     350 </span>                :<span class="lineNoCov">          0 :         return -EINVAL;</span>
+<span class="lineNum">     351 </span>                :            :     }
+<span class="lineNum">     352 </span>                :            : 
+<span class="lineNum">     353 </span>        [<span class="branchCov" title="Branch 1 was taken 2 times"> + </span><span class="branchCov" title="Branch 2 was taken 32 times"> + </span>]:<span class="lineCov">         34 :     if (greh-&gt;protocol != htons(ETH_TYPE_TEB)) {</span>
+<span class="lineNum">     354 </span>                :<span class="lineCov">          2 :         return -EINVAL;</span>
+<span class="lineNum">     355 </span>                :            :     }
+<span class="lineNum">     356 </span>                :            : 
+<span class="lineNum">     357 </span>                :<span class="lineCov">         32 :     hlen = ulen + gre_header_len(greh-&gt;flags);</span>
+<span class="lineNum">     358 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 32 times"> + </span>]:<span class="lineCov">         32 :     if (hlen &gt; dp_packet_size(packet)) {</span>
+<span class="lineNum">     359 </span>                :<span class="lineNoCov">          0 :         return -EINVAL;</span>
+<span class="lineNum">     360 </span>                :            :     }
+<span class="lineNum">     361 </span>                :            : 
+<span class="lineNum">     362 </span>                :<span class="lineCov">         32 :     options = (ovs_16aligned_be32 *)(greh + 1);</span>
+<span class="lineNum">     363 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 32 times"> + </span>]:<span class="lineCov">         32 :     if (greh-&gt;flags &amp; htons(GRE_CSUM)) {</span>
+<span class="lineNum">     364 </span>                :            :         ovs_be16 pkt_csum;
+<span class="lineNum">     365 </span>                :            : 
+<span class="lineNum">     366 </span>                :<span class="lineNoCov">          0 :         pkt_csum = csum(greh, dp_packet_size(packet) -</span>
+<span class="lineNum">     367 </span>                :<span class="lineNoCov">          0 :                               ((const unsigned char *)greh -</span>
+<span class="lineNum">     368 </span>                :<span class="lineNoCov">          0 :                                (const unsigned char *)dp_packet_l2(packet)));</span>
+<span class="lineNum">     369 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (pkt_csum) {</span>
+<span class="lineNum">     370 </span>                :<span class="lineNoCov">          0 :             return -EINVAL;</span>
+<span class="lineNum">     371 </span>                :            :         }
+<span class="lineNum">     372 </span>                :<span class="lineNoCov">          0 :         tnl-&gt;flags = FLOW_TNL_F_CSUM;</span>
+<span class="lineNum">     373 </span>                :<span class="lineNoCov">          0 :         options++;</span>
+<span class="lineNum">     374 </span>                :            :     }
+<span class="lineNum">     375 </span>                :            : 
+<span class="lineNum">     376 </span>        [<span class="branchCov" title="Branch 1 was taken 2 times"> + </span><span class="branchCov" title="Branch 2 was taken 30 times"> + </span>]:<span class="lineCov">         32 :     if (greh-&gt;flags &amp; htons(GRE_KEY)) {</span>
+<span class="lineNum">     377 </span>                :<span class="lineCov">          2 :         tnl-&gt;tun_id = be32_to_be64(get_16aligned_be32(options));</span>
+<span class="lineNum">     378 </span>                :<span class="lineCov">          2 :         tnl-&gt;flags |= FLOW_TNL_F_KEY;</span>
+<span class="lineNum">     379 </span>                :<span class="lineCov">          2 :         options++;</span>
+<span class="lineNum">     380 </span>                :            :     }
+<span class="lineNum">     381 </span>                :            : 
+<span class="lineNum">     382 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 32 times"> + </span>]:<span class="lineCov">         32 :     if (greh-&gt;flags &amp; htons(GRE_SEQ)) {</span>
+<span class="lineNum">     383 </span>                :<span class="lineNoCov">          0 :         options++;</span>
+<span class="lineNum">     384 </span>                :            :     }
+<span class="lineNum">     385 </span>                :            : 
+<span class="lineNum">     386 </span>                :<span class="lineCov">         34 :     return hlen;</span>
+<span class="lineNum">     387 </span>                :            : }
+<a name="388"><span class="lineNum">     388 </span>                :            : </a>
+<span class="lineNum">     389 </span>                :            : struct dp_packet *
+<span class="lineNum">     390 </span>                :<span class="lineCov">         34 : netdev_gre_pop_header(struct dp_packet *packet)</span>
+<span class="lineNum">     391 </span>                :            : {
+<span class="lineNum">     392 </span>                :<span class="lineCov">         34 :     struct pkt_metadata *md = &amp;packet-&gt;md;</span>
+<span class="lineNum">     393 </span>                :<span class="lineCov">         34 :     struct flow_tnl *tnl = &amp;md-&gt;tunnel;</span>
+<span class="lineNum">     394 </span>                :<span class="lineCov">         34 :     int hlen = sizeof(struct eth_header) + 4;</span>
+<span class="lineNum">     395 </span>                :            : 
+<span class="lineNum">     396 </span>                :<span class="lineCov">         34 :     hlen += netdev_tnl_is_header_ipv6(dp_packet_data(packet)) ?</span>
+<span class="lineNum">     397 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 32 times"> + </span>]:<span class="lineCov">         34 :             IPV6_HEADER_LEN : IP_HEADER_LEN;</span>
+<span class="lineNum">     398 </span>                :            : 
+<span class="lineNum">     399 </span>                :<span class="lineCov">         34 :     pkt_metadata_init_tnl(md);</span>
+<span class="lineNum">     400 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 34 times"> + </span>]:<span class="lineCov">         34 :     if (hlen &gt; dp_packet_size(packet)) {</span>
+<span class="lineNum">     401 </span>                :<span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">     402 </span>                :            :     }
+<span class="lineNum">     403 </span>                :            : 
+<span class="lineNum">     404 </span>                :<span class="lineCov">         34 :     hlen = parse_gre_header(packet, tnl);</span>
+<span class="lineNum">     405 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 32 times"> + </span>]:<span class="lineCov">         34 :     if (hlen &lt; 0) {</span>
+<span class="lineNum">     406 </span>                :<span class="lineCov">          2 :         goto err;</span>
+<span class="lineNum">     407 </span>                :            :     }
+<span class="lineNum">     408 </span>                :            : 
+<span class="lineNum">     409 </span>                :<span class="lineCov">         32 :     dp_packet_reset_packet(packet, hlen);</span>
+<span class="lineNum">     410 </span>                :            : 
+<span class="lineNum">     411 </span>                :<span class="lineCov">         32 :     return packet;</span>
+<span class="lineNum">     412 </span>                :            : err:
+<span class="lineNum">     413 </span>                :<span class="lineCov">          2 :     dp_packet_delete(packet);</span>
+<span class="lineNum">     414 </span>                :<span class="lineCov">          2 :     return NULL;</span>
+<span class="lineNum">     415 </span>                :            : }
+<a name="416"><span class="lineNum">     416 </span>                :            : </a>
+<span class="lineNum">     417 </span>                :            : void
+<span class="lineNum">     418 </span>                :<span class="lineCov">         28 : netdev_gre_push_header(struct dp_packet *packet,</span>
+<span class="lineNum">     419 </span>                :            :                        const struct ovs_action_push_tnl *data)
+<span class="lineNum">     420 </span>                :            : {
+<span class="lineNum">     421 </span>                :            :     struct gre_base_hdr *greh;
+<span class="lineNum">     422 </span>                :            :     int ip_tot_size;
+<span class="lineNum">     423 </span>                :            : 
+<span class="lineNum">     424 </span>                :<span class="lineCov">         28 :     greh = netdev_tnl_push_ip_header(packet, data-&gt;header, data-&gt;header_len, &amp;ip_tot_size);</span>
+<span class="lineNum">     425 </span>                :            : 
+<span class="lineNum">     426 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 28 times"> + </span>]:<span class="lineCov">         28 :     if (greh-&gt;flags &amp; htons(GRE_CSUM)) {</span>
+<span class="lineNum">     427 </span>                :<span class="lineNoCov">          0 :         ovs_be16 *csum_opt = (ovs_be16 *) (greh + 1);</span>
+<span class="lineNum">     428 </span>                :<span class="lineNoCov">          0 :         *csum_opt = csum(greh, ip_tot_size);</span>
+<span class="lineNum">     429 </span>                :            :     }
+<span class="lineNum">     430 </span>                :<span class="lineCov">         28 : }</span>
+<a name="431"><span class="lineNum">     431 </span>                :            : </a>
+<span class="lineNum">     432 </span>                :            : int
+<span class="lineNum">     433 </span>                :<span class="lineCov">         90 : netdev_gre_build_header(const struct netdev *netdev,</span>
+<span class="lineNum">     434 </span>                :            :                         struct ovs_action_push_tnl *data,
+<span class="lineNum">     435 </span>                :            :                         const struct netdev_tnl_build_header_params *params)
+<span class="lineNum">     436 </span>                :            : {
+<span class="lineNum">     437 </span>                :<span class="lineCov">         90 :     struct netdev_vport *dev = netdev_vport_cast(netdev);</span>
+<span class="lineNum">     438 </span>                :            :     struct netdev_tunnel_config *tnl_cfg;
+<span class="lineNum">     439 </span>                :            :     struct gre_base_hdr *greh;
+<span class="lineNum">     440 </span>                :            :     ovs_16aligned_be32 *options;
+<span class="lineNum">     441 </span>                :            :     unsigned int hlen;
+<span class="lineNum">     442 </span>                :            : 
+<span class="lineNum">     443 </span>                :            :     /* XXX: RCUfy tnl_cfg. */
+<span class="lineNum">     444 </span>                :<span class="lineCov">         90 :     ovs_mutex_lock(&amp;dev-&gt;mutex);</span>
+<span class="lineNum">     445 </span>                :<span class="lineCov">         90 :     tnl_cfg = &amp;dev-&gt;tnl_cfg;</span>
+<span class="lineNum">     446 </span>                :            : 
+<span class="lineNum">     447 </span>                :<span class="lineCov">         90 :     greh = netdev_tnl_ip_build_header(data, params, IPPROTO_GRE);</span>
+<span class="lineNum">     448 </span>                :            : 
+<span class="lineNum">     449 </span>                :<span class="lineCov">         90 :     greh-&gt;protocol = htons(ETH_TYPE_TEB);</span>
+<span class="lineNum">     450 </span>                :<span class="lineCov">         90 :     greh-&gt;flags = 0;</span>
+<span class="lineNum">     451 </span>                :            : 
+<span class="lineNum">     452 </span>                :<span class="lineCov">         90 :     options = (ovs_16aligned_be32 *) (greh + 1);</span>
+<span class="lineNum">     453 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 90 times"> + </span>]:<span class="lineCov">         90 :     if (params-&gt;flow-&gt;tunnel.flags &amp; FLOW_TNL_F_CSUM) {</span>
+<span class="lineNum">     454 </span>                :<span class="lineNoCov">          0 :         greh-&gt;flags |= htons(GRE_CSUM);</span>
+<span class="lineNum">     455 </span>                :<span class="lineNoCov">          0 :         put_16aligned_be32(options, 0);</span>
+<span class="lineNum">     456 </span>                :<span class="lineNoCov">          0 :         options++;</span>
+<span class="lineNum">     457 </span>                :            :     }
+<span class="lineNum">     458 </span>                :            : 
+<span class="lineNum">     459 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchCov" title="Branch 1 was taken 80 times"> + </span>]:<span class="lineCov">         90 :     if (tnl_cfg-&gt;out_key_present) {</span>
+<span class="lineNum">     460 </span>                :<span class="lineCov">         10 :         greh-&gt;flags |= htons(GRE_KEY);</span>
+<span class="lineNum">     461 </span>                :<span class="lineCov">         10 :         put_16aligned_be32(options, be64_to_be32(params-&gt;flow-&gt;tunnel.tun_id));</span>
+<span class="lineNum">     462 </span>                :<span class="lineCov">         10 :         options++;</span>
+<span class="lineNum">     463 </span>                :            :     }
+<span class="lineNum">     464 </span>                :            : 
+<span class="lineNum">     465 </span>                :<span class="lineCov">         90 :     ovs_mutex_unlock(&amp;dev-&gt;mutex);</span>
+<span class="lineNum">     466 </span>                :            : 
+<span class="lineNum">     467 </span>                :<span class="lineCov">         90 :     hlen = (uint8_t *) options - (uint8_t *) greh;</span>
+<span class="lineNum">     468 </span>                :            : 
+<span class="lineNum">     469 </span>                :<span class="lineCov">         90 :     data-&gt;header_len += hlen;</span>
+<span class="lineNum">     470 </span>                :<span class="lineCov">         90 :     data-&gt;tnl_type = OVS_VPORT_TYPE_GRE;</span>
+<span class="lineNum">     471 </span>                :<span class="lineCov">         90 :     return 0;</span>
+<span class="lineNum">     472 </span>                :            : }
+<a name="473"><span class="lineNum">     473 </span>                :            : </a>
+<span class="lineNum">     474 </span>                :            : struct dp_packet *
+<span class="lineNum">     475 </span>                :<span class="lineCov">         41 : netdev_vxlan_pop_header(struct dp_packet *packet)</span>
+<span class="lineNum">     476 </span>                :            : {
+<span class="lineNum">     477 </span>                :<span class="lineCov">         41 :     struct pkt_metadata *md = &amp;packet-&gt;md;</span>
+<span class="lineNum">     478 </span>                :<span class="lineCov">         41 :     struct flow_tnl *tnl = &amp;md-&gt;tunnel;</span>
+<span class="lineNum">     479 </span>                :            :     struct vxlanhdr *vxh;
+<span class="lineNum">     480 </span>                :            :     unsigned int hlen;
+<span class="lineNum">     481 </span>                :            : 
+<span class="lineNum">     482 </span>                :<span class="lineCov">         41 :     pkt_metadata_init_tnl(md);</span>
+<span class="lineNum">     483 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 41 times"> + </span>]:<span class="lineCov">         41 :     if (VXLAN_HLEN &gt; dp_packet_l4_size(packet)) {</span>
+<span class="lineNum">     484 </span>                :<span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">     485 </span>                :            :     }
+<span class="lineNum">     486 </span>                :            : 
+<span class="lineNum">     487 </span>                :<span class="lineCov">         41 :     vxh = udp_extract_tnl_md(packet, tnl, &amp;hlen);</span>
+<span class="lineNum">     488 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 41 times"> + </span>]:<span class="lineCov">         41 :     if (!vxh) {</span>
+<span class="lineNum">     489 </span>                :<span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">     490 </span>                :            :     }
+<span class="lineNum">     491 </span>                :            : 
+<span class="lineNum">     492 </span>  [<span class="branchCov" title="Branch 2 was taken 41 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 41 times"> + </span>]:<span class="lineCov">         82 :     if (get_16aligned_be32(&amp;vxh-&gt;vx_flags) != htonl(VXLAN_FLAGS) ||</span>
+<span class="lineNum">     493 </span>                :<span class="lineCov">         41 :        (get_16aligned_be32(&amp;vxh-&gt;vx_vni) &amp; htonl(0xff))) {</span>
+<span class="lineNum">     494 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;err_rl, &quot;invalid vxlan flags=%#x vni=%#x\n&quot;,</span>
+<span class="lineNum">     495 </span>                :            :                      ntohl(get_16aligned_be32(&amp;vxh-&gt;vx_flags)),
+<span class="lineNum">     496 </span>                :            :                      ntohl(get_16aligned_be32(&amp;vxh-&gt;vx_vni)));
+<span class="lineNum">     497 </span>                :<span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">     498 </span>                :            :     }
+<span class="lineNum">     499 </span>                :<span class="lineCov">         41 :     tnl-&gt;tun_id = htonll(ntohl(get_16aligned_be32(&amp;vxh-&gt;vx_vni)) &gt;&gt; 8);</span>
+<span class="lineNum">     500 </span>                :<span class="lineCov">         41 :     tnl-&gt;flags |= FLOW_TNL_F_KEY;</span>
+<span class="lineNum">     501 </span>                :            : 
+<span class="lineNum">     502 </span>                :<span class="lineCov">         41 :     dp_packet_reset_packet(packet, hlen + VXLAN_HLEN);</span>
+<span class="lineNum">     503 </span>                :            : 
+<span class="lineNum">     504 </span>                :<span class="lineCov">         41 :     return packet;</span>
+<span class="lineNum">     505 </span>                :            : err:
+<span class="lineNum">     506 </span>                :<span class="lineNoCov">          0 :     dp_packet_delete(packet);</span>
+<span class="lineNum">     507 </span>                :<span class="lineCov">         41 :     return NULL;</span>
+<span class="lineNum">     508 </span>                :            : }
+<a name="509"><span class="lineNum">     509 </span>                :            : </a>
+<span class="lineNum">     510 </span>                :            : int
+<span class="lineNum">     511 </span>                :<span class="lineCov">         79 : netdev_vxlan_build_header(const struct netdev *netdev,</span>
+<span class="lineNum">     512 </span>                :            :                           struct ovs_action_push_tnl *data,
+<span class="lineNum">     513 </span>                :            :                           const struct netdev_tnl_build_header_params *params)
+<span class="lineNum">     514 </span>                :            : {
+<span class="lineNum">     515 </span>                :<span class="lineCov">         79 :     struct netdev_vport *dev = netdev_vport_cast(netdev);</span>
+<span class="lineNum">     516 </span>                :            :     struct netdev_tunnel_config *tnl_cfg;
+<span class="lineNum">     517 </span>                :            :     struct vxlanhdr *vxh;
+<span class="lineNum">     518 </span>                :            : 
+<span class="lineNum">     519 </span>                :            :     /* XXX: RCUfy tnl_cfg. */
+<span class="lineNum">     520 </span>                :<span class="lineCov">         79 :     ovs_mutex_lock(&amp;dev-&gt;mutex);</span>
+<span class="lineNum">     521 </span>                :<span class="lineCov">         79 :     tnl_cfg = &amp;dev-&gt;tnl_cfg;</span>
+<span class="lineNum">     522 </span>                :            : 
+<span class="lineNum">     523 </span>                :<span class="lineCov">         79 :     vxh = udp_build_header(tnl_cfg, data, params);</span>
+<span class="lineNum">     524 </span>                :            : 
+<span class="lineNum">     525 </span>                :<span class="lineCov">         79 :     put_16aligned_be32(&amp;vxh-&gt;vx_flags, htonl(VXLAN_FLAGS));</span>
+<span class="lineNum">     526 </span>                :<span class="lineCov">         79 :     put_16aligned_be32(&amp;vxh-&gt;vx_vni, htonl(ntohll(params-&gt;flow-&gt;tunnel.tun_id) &lt;&lt; 8));</span>
+<span class="lineNum">     527 </span>                :            : 
+<span class="lineNum">     528 </span>                :<span class="lineCov">         79 :     ovs_mutex_unlock(&amp;dev-&gt;mutex);</span>
+<span class="lineNum">     529 </span>                :<span class="lineCov">         79 :     data-&gt;header_len += sizeof *vxh;</span>
+<span class="lineNum">     530 </span>                :<span class="lineCov">         79 :     data-&gt;tnl_type = OVS_VPORT_TYPE_VXLAN;</span>
+<span class="lineNum">     531 </span>                :<span class="lineCov">         79 :     return 0;</span>
+<span class="lineNum">     532 </span>                :            : }
+<a name="533"><span class="lineNum">     533 </span>                :            : </a>
+<span class="lineNum">     534 </span>                :            : struct dp_packet *
+<span class="lineNum">     535 </span>                :<span class="lineCov">       1857 : netdev_geneve_pop_header(struct dp_packet *packet)</span>
+<span class="lineNum">     536 </span>                :            : {
+<span class="lineNum">     537 </span>                :<span class="lineCov">       1857 :     struct pkt_metadata *md = &amp;packet-&gt;md;</span>
+<span class="lineNum">     538 </span>                :<span class="lineCov">       1857 :     struct flow_tnl *tnl = &amp;md-&gt;tunnel;</span>
+<span class="lineNum">     539 </span>                :            :     struct genevehdr *gnh;
+<span class="lineNum">     540 </span>                :            :     unsigned int hlen, opts_len, ulen;
+<span class="lineNum">     541 </span>                :            : 
+<span class="lineNum">     542 </span>                :<span class="lineCov">       1857 :     pkt_metadata_init_tnl(md);</span>
+<span class="lineNum">     543 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1857 times"> + </span>]:<span class="lineCov">       1857 :     if (GENEVE_BASE_HLEN &gt; dp_packet_l4_size(packet)) {</span>
+<span class="lineNum">     544 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;err_rl, &quot;geneve packet too small: min header=%u packet size=%&quot;PRIuSIZE&quot;\n&quot;,</span>
+<span class="lineNum">     545 </span>                :            :                      (unsigned int)GENEVE_BASE_HLEN, dp_packet_l4_size(packet));
+<span class="lineNum">     546 </span>                :<span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">     547 </span>                :            :     }
+<span class="lineNum">     548 </span>                :            : 
+<span class="lineNum">     549 </span>                :<span class="lineCov">       1857 :     gnh = udp_extract_tnl_md(packet, tnl, &amp;ulen);</span>
+<span class="lineNum">     550 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1857 times"> + </span>]:<span class="lineCov">       1857 :     if (!gnh) {</span>
+<span class="lineNum">     551 </span>                :<span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">     552 </span>                :            :     }
+<span class="lineNum">     553 </span>                :            : 
+<span class="lineNum">     554 </span>                :<span class="lineCov">       1857 :     opts_len = gnh-&gt;opt_len * 4;</span>
+<span class="lineNum">     555 </span>                :<span class="lineCov">       1857 :     hlen = ulen + GENEVE_BASE_HLEN + opts_len;</span>
+<span class="lineNum">     556 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1857 times"> + </span>]:<span class="lineCov">       1857 :     if (hlen &gt; dp_packet_size(packet)) {</span>
+<span class="lineNum">     557 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;err_rl, &quot;geneve packet too small: header len=%u packet size=%u\n&quot;,</span>
+<span class="lineNum">     558 </span>                :            :                      hlen, dp_packet_size(packet));
+<span class="lineNum">     559 </span>                :<span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">     560 </span>                :            :     }
+<span class="lineNum">     561 </span>                :            : 
+<span class="lineNum">     562 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1857 times"> + </span>]:<span class="lineCov">       1857 :     if (gnh-&gt;ver != 0) {</span>
+<span class="lineNum">     563 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;err_rl, &quot;unknown geneve version: %&quot;PRIu8&quot;\n&quot;, gnh-&gt;ver);</span>
+<span class="lineNum">     564 </span>                :<span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">     565 </span>                :            :     }
+<span class="lineNum">     566 </span>                :            : 
+<span class="lineNum">     567 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 1857 times"> + </span>]:<span class="lineCov">       1857 :     if (gnh-&gt;proto_type != htons(ETH_TYPE_TEB)) {</span>
+<span class="lineNum">     568 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;err_rl, &quot;unknown geneve encapsulated protocol: %#x\n&quot;,</span>
+<span class="lineNum">     569 </span>                :            :                      ntohs(gnh-&gt;proto_type));
+<span class="lineNum">     570 </span>                :<span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">     571 </span>                :            :     }
+<span class="lineNum">     572 </span>                :            : 
+<span class="lineNum">     573 </span>                :<span class="lineCov">       1857 :     tnl-&gt;flags |= gnh-&gt;oam ? FLOW_TNL_F_OAM : 0;</span>
+<span class="lineNum">     574 </span>                :<span class="lineCov">       1857 :     tnl-&gt;tun_id = htonll(ntohl(get_16aligned_be32(&amp;gnh-&gt;vni)) &gt;&gt; 8);</span>
+<span class="lineNum">     575 </span>                :<span class="lineCov">       1857 :     tnl-&gt;flags |= FLOW_TNL_F_KEY;</span>
+<span class="lineNum">     576 </span>                :            : 
+<span class="lineNum">     577 </span>                :<span class="lineCov">       1857 :     memcpy(tnl-&gt;metadata.opts.gnv, gnh-&gt;options, opts_len);</span>
+<span class="lineNum">     578 </span>                :<span class="lineCov">       1857 :     tnl-&gt;metadata.present.len = opts_len;</span>
+<span class="lineNum">     579 </span>                :<span class="lineCov">       1857 :     tnl-&gt;flags |= FLOW_TNL_F_UDPIF;</span>
+<span class="lineNum">     580 </span>                :            : 
+<span class="lineNum">     581 </span>                :<span class="lineCov">       1857 :     dp_packet_reset_packet(packet, hlen);</span>
+<span class="lineNum">     582 </span>                :            : 
+<span class="lineNum">     583 </span>                :<span class="lineCov">       1857 :     return packet;</span>
+<span class="lineNum">     584 </span>                :            : err:
+<span class="lineNum">     585 </span>                :<span class="lineNoCov">          0 :     dp_packet_delete(packet);</span>
+<span class="lineNum">     586 </span>                :<span class="lineCov">       1857 :     return NULL;</span>
+<span class="lineNum">     587 </span>                :            : }
+<a name="588"><span class="lineNum">     588 </span>                :            : </a>
+<span class="lineNum">     589 </span>                :            : int
+<span class="lineNum">     590 </span>                :<span class="lineCov">       2238 : netdev_geneve_build_header(const struct netdev *netdev,</span>
+<span class="lineNum">     591 </span>                :            :                            struct ovs_action_push_tnl *data,
+<span class="lineNum">     592 </span>                :            :                            const struct netdev_tnl_build_header_params *params)
+<span class="lineNum">     593 </span>                :            : {
+<span class="lineNum">     594 </span>                :<span class="lineCov">       2238 :     struct netdev_vport *dev = netdev_vport_cast(netdev);</span>
+<span class="lineNum">     595 </span>                :            :     struct netdev_tunnel_config *tnl_cfg;
+<span class="lineNum">     596 </span>                :            :     struct genevehdr *gnh;
+<span class="lineNum">     597 </span>                :            :     int opt_len;
+<span class="lineNum">     598 </span>                :            :     bool crit_opt;
+<span class="lineNum">     599 </span>                :            : 
+<span class="lineNum">     600 </span>                :            :     /* XXX: RCUfy tnl_cfg. */
+<span class="lineNum">     601 </span>                :<span class="lineCov">       2238 :     ovs_mutex_lock(&amp;dev-&gt;mutex);</span>
+<span class="lineNum">     602 </span>                :<span class="lineCov">       2238 :     tnl_cfg = &amp;dev-&gt;tnl_cfg;</span>
+<span class="lineNum">     603 </span>                :            : 
+<span class="lineNum">     604 </span>                :<span class="lineCov">       2238 :     gnh = udp_build_header(tnl_cfg, data, params);</span>
+<span class="lineNum">     605 </span>                :            : 
+<span class="lineNum">     606 </span>                :<span class="lineCov">       2238 :     put_16aligned_be32(&amp;gnh-&gt;vni, htonl(ntohll(params-&gt;flow-&gt;tunnel.tun_id) &lt;&lt; 8));</span>
+<span class="lineNum">     607 </span>                :            : 
+<span class="lineNum">     608 </span>                :<span class="lineCov">       2238 :     ovs_mutex_unlock(&amp;dev-&gt;mutex);</span>
+<span class="lineNum">     609 </span>                :            : 
+<span class="lineNum">     610 </span>                :<span class="lineCov">       2238 :     opt_len = tun_metadata_to_geneve_header(&amp;params-&gt;flow-&gt;tunnel,</span>
+<span class="lineNum">     611 </span>                :<span class="lineCov">       2238 :                                             gnh-&gt;options, &amp;crit_opt);</span>
+<span class="lineNum">     612 </span>                :            : 
+<span class="lineNum">     613 </span>                :<span class="lineCov">       2238 :     gnh-&gt;opt_len = opt_len / 4;</span>
+<span class="lineNum">     614 </span>                :<span class="lineCov">       2238 :     gnh-&gt;oam = !!(params-&gt;flow-&gt;tunnel.flags &amp; FLOW_TNL_F_OAM);</span>
+<span class="lineNum">     615 </span>                :<span class="lineCov">       2238 :     gnh-&gt;critical = crit_opt ? 1 : 0;</span>
+<span class="lineNum">     616 </span>                :<span class="lineCov">       2238 :     gnh-&gt;proto_type = htons(ETH_TYPE_TEB);</span>
+<span class="lineNum">     617 </span>                :            : 
+<span class="lineNum">     618 </span>                :<span class="lineCov">       2238 :     data-&gt;header_len += sizeof *gnh + opt_len;</span>
+<span class="lineNum">     619 </span>                :<span class="lineCov">       2238 :     data-&gt;tnl_type = OVS_VPORT_TYPE_GENEVE;</span>
+<span class="lineNum">     620 </span>                :<span class="lineCov">       2238 :     return 0;</span>
+<span class="lineNum">     621 </span>                :            : }
+<span class="lineNum">     622 </span>                :            : 
+<a name="623"><span class="lineNum">     623 </span>                :            : </a>
+<span class="lineNum">     624 </span>                :            : void
+<span class="lineNum">     625 </span>                :<span class="lineNoCov">          0 : netdev_tnl_egress_port_range(struct unixctl_conn *conn, int argc,</span>
+<span class="lineNum">     626 </span>                :            :                              const char *argv[], void *aux OVS_UNUSED)
+<span class="lineNum">     627 </span>                :            : {
+<span class="lineNum">     628 </span>                :            :     int val1, val2;
+<span class="lineNum">     629 </span>                :            : 
+<span class="lineNum">     630 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (argc &lt; 3) {</span>
+<span class="lineNum">     631 </span>                :<span class="lineNoCov">          0 :         struct ds ds = DS_EMPTY_INITIALIZER;</span>
+<span class="lineNum">     632 </span>                :            : 
+<span class="lineNum">     633 </span>                :<span class="lineNoCov">          0 :         ds_put_format(&amp;ds, &quot;Tunnel UDP source port range: %&quot;PRIu16&quot;-%&quot;PRIu16&quot;\n&quot;,</span>
+<span class="lineNum">     634 </span>                :            :                             tnl_udp_port_min, tnl_udp_port_max);
+<span class="lineNum">     635 </span>                :            : 
+<span class="lineNum">     636 </span>                :<span class="lineNoCov">          0 :         unixctl_command_reply(conn, ds_cstr(&amp;ds));</span>
+<span class="lineNum">     637 </span>                :<span class="lineNoCov">          0 :         ds_destroy(&amp;ds);</span>
+<span class="lineNum">     638 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     639 </span>                :            :     }
+<span class="lineNum">     640 </span>                :            : 
+<span class="lineNum">     641 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (argc != 3) {</span>
+<span class="lineNum">     642 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     643 </span>                :            :     }
+<span class="lineNum">     644 </span>                :            : 
+<span class="lineNum">     645 </span>                :<span class="lineNoCov">          0 :     val1 = atoi(argv[1]);</span>
+<span class="lineNum">     646 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (val1 &lt;= 0 || val1 &gt; UINT16_MAX) {</span>
+<span class="lineNum">     647 </span>                :<span class="lineNoCov">          0 :         unixctl_command_reply(conn, &quot;Invalid min.&quot;);</span>
+<span class="lineNum">     648 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     649 </span>                :            :     }
+<span class="lineNum">     650 </span>                :<span class="lineNoCov">          0 :     val2 = atoi(argv[2]);</span>
+<span class="lineNum">     651 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (val2 &lt;= 0 || val2 &gt; UINT16_MAX) {</span>
+<span class="lineNum">     652 </span>                :<span class="lineNoCov">          0 :         unixctl_command_reply(conn, &quot;Invalid max.&quot;);</span>
+<span class="lineNum">     653 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     654 </span>                :            :     }
+<span class="lineNum">     655 </span>                :            : 
+<span class="lineNum">     656 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (val1 &gt; val2) {</span>
+<span class="lineNum">     657 </span>                :<span class="lineNoCov">          0 :         tnl_udp_port_min = val2;</span>
+<span class="lineNum">     658 </span>                :<span class="lineNoCov">          0 :         tnl_udp_port_max = val1;</span>
+<span class="lineNum">     659 </span>                :            :     } else {
+<span class="lineNum">     660 </span>                :<span class="lineNoCov">          0 :         tnl_udp_port_min = val1;</span>
+<span class="lineNum">     661 </span>                :<span class="lineNoCov">          0 :         tnl_udp_port_max = val2;</span>
+<span class="lineNum">     662 </span>                :            :     }
+<span class="lineNum">     663 </span>                :<span class="lineNoCov">          0 :     seq_change(tnl_conf_seq);</span>
+<span class="lineNum">     664 </span>                :            : 
+<span class="lineNum">     665 </span>                :<span class="lineNoCov">          0 :     unixctl_command_reply(conn, &quot;OK&quot;);</span>
+<span class="lineNum">     666 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

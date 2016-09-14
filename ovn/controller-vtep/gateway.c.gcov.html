@@ -1,0 +1,316 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ovn/controller-vtep/gateway.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">ovn/controller-vtep</a> - gateway.c<span style="font-size: 80%;"> (source / <a href="gateway.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">74</td>
+            <td class="headerCovTableEntry">80</td>
+            <td class="headerCovTableEntryHi">92.5 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">6</td>
+            <td class="headerCovTableEntry">6</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">41</td>
+            <td class="headerCovTableEntry">56</td>
+            <td class="headerCovTableEntryLo">73.2 %</td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (c) 2015 Nicira, Inc.</a>
+<span class="lineNum">       2 </span>                :            :  *
+<span class="lineNum">       3 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       4 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       5 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       6 </span>                :            :  *
+<span class="lineNum">       7 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       8 </span>                :            :  *
+<span class="lineNum">       9 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      10 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      11 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      12 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      13 </span>                :            :  * limitations under the License.
+<span class="lineNum">      14 </span>                :            :  */
+<span class="lineNum">      15 </span>                :            : 
+<span class="lineNum">      16 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      17 </span>                :            : #include &quot;gateway.h&quot;
+<span class="lineNum">      18 </span>                :            : 
+<span class="lineNum">      19 </span>                :            : #include &quot;lib/poll-loop.h&quot;
+<span class="lineNum">      20 </span>                :            : #include &quot;lib/simap.h&quot;
+<span class="lineNum">      21 </span>                :            : #include &quot;lib/sset.h&quot;
+<span class="lineNum">      22 </span>                :            : #include &quot;lib/util.h&quot;
+<span class="lineNum">      23 </span>                :            : #include &quot;openvswitch/vlog.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;ovn/lib/ovn-sb-idl.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;vtep/vtep-idl.h&quot;
+<a name="26"><span class="lineNum">      26 </span>                :            : #include &quot;ovn-controller-vtep.h&quot;</a>
+<span class="lineNum">      27 </span>                :            : 
+<span class="lineNum">      28 </span>                :<span class="lineCov">         14 : VLOG_DEFINE_THIS_MODULE(gateway);</span>
+<span class="lineNum">      29 </span>                :            : 
+<span class="lineNum">      30 </span>                :            : /*
+<span class="lineNum">      31 </span>                :            :  * Registers the physical switches in vtep to ovnsb as chassis.  For each
+<span class="lineNum">      32 </span>                :            :  * physical switch in the vtep database, finds all vtep logical switches that
+<span class="lineNum">      33 </span>                :            :  * are associated with the physical switch, and updates the corresponding
+<span class="lineNum">      34 </span>                :            :  * chassis's 'vtep_logical_switches' column.
+<span class="lineNum">      35 </span>                :            :  *
+<span class="lineNum">      36 </span>                :            :  */
+<span class="lineNum">      37 </span>                :            : 
+<span class="lineNum">      38 </span>                :            : /* Global revalidation sequence number, incremented at each call to
+<span class="lineNum">      39 </span>                :            :  * 'revalidate_gateway()'. */
+<span class="lineNum">      40 </span>                :            : static unsigned int gw_reval_seq;
+<span class="lineNum">      41 </span>                :            : 
+<span class="lineNum">      42 </span>                :            : /* Maps all chassis created by the gateway module to their own reval_seq. */
+<span class="lineNum">      43 </span>                :            : static struct simap gw_chassis_map = SIMAP_INITIALIZER(&amp;gw_chassis_map);
+<span class="lineNum">      44 </span>                :            : 
+<a name="45"><span class="lineNum">      45 </span>                :            : /* Creates and returns a new instance of 'struct sbrec_chassis'. */</a>
+<span class="lineNum">      46 </span>                :            : static const struct sbrec_chassis *
+<span class="lineNum">      47 </span>                :<span class="lineCov">         10 : create_chassis_rec(struct ovsdb_idl_txn *txn, const char *name,</span>
+<span class="lineNum">      48 </span>                :            :                    const char *encap_ip)
+<span class="lineNum">      49 </span>                :            : {
+<span class="lineNum">      50 </span>                :            :     const struct sbrec_chassis *chassis_rec;
+<span class="lineNum">      51 </span>                :            :     struct sbrec_encap *encap_rec;
+<span class="lineNum">      52 </span>                :            : 
+<span class="lineNum">      53 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         10 :     VLOG_INFO(&quot;add Chassis row for VTEP physical switch (%s)&quot;, name);</span>
+<span class="lineNum">      54 </span>                :            : 
+<span class="lineNum">      55 </span>                :<span class="lineCov">         10 :     chassis_rec = sbrec_chassis_insert(txn);</span>
+<span class="lineNum">      56 </span>                :<span class="lineCov">         10 :     sbrec_chassis_set_name(chassis_rec, name);</span>
+<span class="lineNum">      57 </span>                :<span class="lineCov">         10 :     encap_rec = sbrec_encap_insert(txn);</span>
+<span class="lineNum">      58 </span>                :<span class="lineCov">         10 :     sbrec_encap_set_type(encap_rec, OVN_SB_ENCAP_TYPE);</span>
+<span class="lineNum">      59 </span>                :<span class="lineCov">         10 :     sbrec_encap_set_ip(encap_rec, encap_ip);</span>
+<span class="lineNum">      60 </span>                :<span class="lineCov">         10 :     const struct smap options = SMAP_CONST1(&amp;options, &quot;csum&quot;, &quot;false&quot;);</span>
+<span class="lineNum">      61 </span>                :<span class="lineCov">         10 :     sbrec_encap_set_options(encap_rec, &amp;options);</span>
+<span class="lineNum">      62 </span>                :<span class="lineCov">         10 :     sbrec_chassis_set_encaps(chassis_rec, &amp;encap_rec, 1);</span>
+<span class="lineNum">      63 </span>                :            : 
+<span class="lineNum">      64 </span>                :<span class="lineCov">         10 :     return chassis_rec;</span>
+<span class="lineNum">      65 </span>                :            : }
+<span class="lineNum">      66 </span>                :            : 
+<span class="lineNum">      67 </span>                :            : /* Revalidates chassis in ovnsb against vtep database.  Creates chassis for
+<span class="lineNum">      68 </span>                :            :  * new vtep physical switch.  And removes chassis which no longer have
+<span class="lineNum">      69 </span>                :            :  * physical switch in vtep.
+<span class="lineNum">      70 </span>                :            :  *
+<span class="lineNum">      71 </span>                :            :  * xxx: Support multiple tunnel encaps.
+<span class="lineNum">      72 </span>                :            :  *
+<a name="73"><span class="lineNum">      73 </span>                :            :  * */</a>
+<span class="lineNum">      74 </span>                :            : static void
+<span class="lineNum">      75 </span>                :<span class="lineCov">        224 : revalidate_gateway(struct controller_vtep_ctx *ctx)</span>
+<span class="lineNum">      76 </span>                :            : {
+<span class="lineNum">      77 </span>                :            :     const struct vteprec_physical_switch *pswitch;
+<span class="lineNum">      78 </span>                :            : 
+<span class="lineNum">      79 </span>                :            :     /* Increments the global revalidation sequence number. */
+<span class="lineNum">      80 </span>                :<span class="lineCov">        224 :     gw_reval_seq++;</span>
+<span class="lineNum">      81 </span>                :            : 
+<span class="lineNum">      82 </span>                :<span class="lineCov">        224 :     ovsdb_idl_txn_add_comment(ctx-&gt;ovnsb_idl_txn,</span>
+<span class="lineNum">      83 </span>                :            :                               &quot;ovn-controller-vtep: updating vtep chassis&quot;);
+<span class="lineNum">      84 </span>                :            : 
+<span class="lineNum">      85 </span>        [<span class="branchCov" title="Branch 2 was taken 238 times"> + </span><span class="branchCov" title="Branch 3 was taken 224 times"> + </span>]:<span class="lineCov">        462 :     VTEPREC_PHYSICAL_SWITCH_FOR_EACH (pswitch, ctx-&gt;vtep_idl) {</span>
+<span class="lineNum">      86 </span>                :            :         const struct sbrec_chassis *chassis_rec;
+<span class="lineNum">      87 </span>                :            :         struct simap_node *gw_node;
+<span class="lineNum">      88 </span>                :            :         const char *encap_ip;
+<span class="lineNum">      89 </span>                :            : 
+<span class="lineNum">      90 </span>        [<span class="branchCov" title="Branch 0 was taken 224 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>]:<span class="lineCov">        238 :         encap_ip = pswitch-&gt;n_tunnel_ips ? pswitch-&gt;tunnel_ips[0] : &quot;&quot;;</span>
+<span class="lineNum">      91 </span>                :<span class="lineCov">        238 :         gw_node = simap_find(&amp;gw_chassis_map, pswitch-&gt;name);</span>
+<span class="lineNum">      92 </span>                :<span class="lineCov">        238 :         chassis_rec = get_chassis_by_name(ctx-&gt;ovnsb_idl, pswitch-&gt;name);</span>
+<span class="lineNum">      93 </span>        [<span class="branchCov" title="Branch 0 was taken 228 times"> + </span><span class="branchCov" title="Branch 1 was taken 10 times"> + </span>]:<span class="lineCov">        238 :         if (chassis_rec) {</span>
+<span class="lineNum">      94 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 228 times"> + </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">        228 :             if (!gw_node &amp;&amp;</span>
+<span class="lineNum">      95 </span>                :<span class="lineNoCov">          0 :                 (strcmp(chassis_rec-&gt;encaps[0]-&gt;type, OVN_SB_ENCAP_TYPE)</span>
+<span class="lineNum">      96 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                  || strcmp(chassis_rec-&gt;encaps[0]-&gt;ip, encap_ip))) {</span>
+<span class="lineNum">      97 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_WARN(&quot;Chassis config changing on startup, make sure &quot;</span>
+<span class="lineNum">      98 </span>                :            :                           &quot;multiple chassis are not configured : %s/%s-&gt;%s/%s&quot;,
+<span class="lineNum">      99 </span>                :            :                           chassis_rec-&gt;encaps[0]-&gt;type,
+<span class="lineNum">     100 </span>                :            :                           chassis_rec-&gt;encaps[0]-&gt;ip,
+<span class="lineNum">     101 </span>                :            :                           OVN_SB_ENCAP_TYPE, encap_ip);
+<span class="lineNum">     102 </span>                :            :             }
+<span class="lineNum">     103 </span>                :            :             /* Updates chassis's encap if anything changed. */
+<span class="lineNum">     104 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 228 times"> + </span>]:<span class="lineCov">        228 :             if (strcmp(chassis_rec-&gt;encaps[0]-&gt;type, OVN_SB_ENCAP_TYPE)) {</span>
+<span class="lineNum">     105 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :                 VLOG_WARN(&quot;Chassis for VTEP physical switch (%s) can only have &quot;</span>
+<span class="lineNum">     106 </span>                :            :                           &quot;encap type \&quot;%s\&quot;&quot;, pswitch-&gt;name, OVN_SB_ENCAP_TYPE);
+<span class="lineNum">     107 </span>                :<span class="lineNoCov">          0 :                 sbrec_encap_set_type(chassis_rec-&gt;encaps[0], OVN_SB_ENCAP_TYPE);</span>
+<span class="lineNum">     108 </span>                :            :             }
+<span class="lineNum">     109 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 227 times"> + </span>]:<span class="lineCov">        228 :             if (strcmp(chassis_rec-&gt;encaps[0]-&gt;ip, encap_ip)) {</span>
+<span class="lineNum">     110 </span>                :<span class="lineCov">          1 :                 sbrec_encap_set_ip(chassis_rec-&gt;encaps[0], encap_ip);</span>
+<span class="lineNum">     111 </span>                :            :             }
+<span class="lineNum">     112 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 228 times"> + </span>]:<span class="lineCov">        228 :             if (smap_get_bool(&amp;chassis_rec-&gt;encaps[0]-&gt;options, &quot;csum&quot;, true)) {</span>
+<span class="lineNum">     113 </span>                :<span class="lineNoCov">          0 :                 const struct smap options = SMAP_CONST1(&amp;options, &quot;csum&quot;,</span>
+<span class="lineNum">     114 </span>                :            :                                                                   &quot;false&quot;);
+<span class="lineNum">     115 </span>                :<span class="lineCov">        228 :                 sbrec_encap_set_options(chassis_rec-&gt;encaps[0], &amp;options);</span>
+<span class="lineNum">     116 </span>                :            :             }
+<span class="lineNum">     117 </span>                :            :         } else {
+<span class="lineNum">     118 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 9 times"> + </span>]:<span class="lineCov">         10 :             if (gw_node) {</span>
+<span class="lineNum">     119 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          1 :                 VLOG_WARN(&quot;Chassis for VTEP physical switch (%s) disappears, &quot;</span>
+<span class="lineNum">     120 </span>                :            :                           &quot;maybe deleted by ovn-sbctl, adding it back&quot;,
+<span class="lineNum">     121 </span>                :            :                           pswitch-&gt;name);
+<span class="lineNum">     122 </span>                :            :             }
+<span class="lineNum">     123 </span>                :            :             /* Creates a new chassis for the VTEP physical switch. */
+<span class="lineNum">     124 </span>                :<span class="lineCov">         10 :             create_chassis_rec(ctx-&gt;ovnsb_idl_txn, pswitch-&gt;name, encap_ip);</span>
+<span class="lineNum">     125 </span>                :            :         }
+<span class="lineNum">     126 </span>                :            :         /* Updates or creates the simap node for 'pswitch-&gt;name'. */
+<span class="lineNum">     127 </span>                :<span class="lineCov">        238 :         simap_put(&amp;gw_chassis_map, pswitch-&gt;name, gw_reval_seq);</span>
+<span class="lineNum">     128 </span>                :            :     }
+<span class="lineNum">     129 </span>                :            : 
+<span class="lineNum">     130 </span>                :            :     struct simap_node *iter, *next;
+<span class="lineNum">     131 </span>                :            :     /* For 'gw_node' in 'gw_chassis_map' whose data is not
+<span class="lineNum">     132 </span>                :            :      * 'gw_reval_seq', it means the corresponding physical switch no
+<span class="lineNum">     133 </span>                :            :      * longer exist.  So, garbage collects them. */
+<span class="lineNum">     134 </span>[<span class="branchCov" title="Branch 1 was taken 224 times"> + </span><span class="branchCov" title="Branch 2 was taken 240 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 224 times"> + </span>]:<span class="lineCov">        464 :     SIMAP_FOR_EACH_SAFE (iter, next, &amp;gw_chassis_map) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 6 was taken 240 times"> + </span><span class="branchCov" title="Branch 7 was taken 224 times"> + </span>]
+<span class="lineNum">     135 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 238 times"> + </span>]:<span class="lineCov">        240 :         if (iter-&gt;data != gw_reval_seq) {</span>
+<span class="lineNum">     136 </span>                :            :             const struct sbrec_chassis *chassis_rec;
+<span class="lineNum">     137 </span>                :            : 
+<span class="lineNum">     138 </span>                :<span class="lineCov">          2 :             chassis_rec = get_chassis_by_name(ctx-&gt;ovnsb_idl, iter-&gt;name);</span>
+<span class="lineNum">     139 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          2 :             if (chassis_rec) {</span>
+<span class="lineNum">     140 </span>                :<span class="lineCov">          2 :                 sbrec_chassis_delete(chassis_rec);</span>
+<span class="lineNum">     141 </span>                :            :             }
+<span class="lineNum">     142 </span>                :<span class="lineCov">          2 :             simap_delete(&amp;gw_chassis_map, iter);</span>
+<span class="lineNum">     143 </span>                :            :         }
+<span class="lineNum">     144 </span>                :            :     }
+<span class="lineNum">     145 </span>                :<span class="lineCov">        224 : }</span>
+<span class="lineNum">     146 </span>                :            : 
+<span class="lineNum">     147 </span>                :            : /* Updates the 'vtep_logical_switches' column in the Chassis table based
+<a name="148"><span class="lineNum">     148 </span>                :            :  * on vtep database configuration. */</a>
+<span class="lineNum">     149 </span>                :            : static void
+<span class="lineNum">     150 </span>                :<span class="lineCov">        224 : update_vtep_logical_switches(struct controller_vtep_ctx *ctx)</span>
+<span class="lineNum">     151 </span>                :            : {
+<span class="lineNum">     152 </span>                :            :     const struct vteprec_physical_switch *pswitch;
+<span class="lineNum">     153 </span>                :            : 
+<span class="lineNum">     154 </span>                :<span class="lineCov">        224 :     ovsdb_idl_txn_add_comment(ctx-&gt;ovnsb_idl_txn, &quot;ovn-controller-vtep: &quot;</span>
+<span class="lineNum">     155 </span>                :            :                               &quot;updating chassis's vtep_logical_switches&quot;);
+<span class="lineNum">     156 </span>                :            : 
+<span class="lineNum">     157 </span>        [<span class="branchCov" title="Branch 2 was taken 238 times"> + </span><span class="branchCov" title="Branch 3 was taken 224 times"> + </span>]:<span class="lineCov">        462 :     VTEPREC_PHYSICAL_SWITCH_FOR_EACH (pswitch, ctx-&gt;vtep_idl) {</span>
+<span class="lineNum">     158 </span>                :<span class="lineCov">        238 :         const struct sbrec_chassis *chassis_rec =</span>
+<span class="lineNum">     159 </span>                :<span class="lineCov">        238 :             get_chassis_by_name(ctx-&gt;ovnsb_idl, pswitch-&gt;name);</span>
+<span class="lineNum">     160 </span>                :<span class="lineCov">        238 :         struct sset lswitches = SSET_INITIALIZER(&amp;lswitches);</span>
+<span class="lineNum">     161 </span>                :            :         size_t i;
+<span class="lineNum">     162 </span>                :            : 
+<span class="lineNum">     163 </span>        [<span class="branchCov" title="Branch 0 was taken 406 times"> + </span><span class="branchCov" title="Branch 1 was taken 238 times"> + </span>]:<span class="lineCov">        644 :         for (i = 0; i &lt; pswitch-&gt;n_ports; i++) {</span>
+<span class="lineNum">     164 </span>                :<span class="lineCov">        406 :             const struct vteprec_physical_port *port = pswitch-&gt;ports[i];</span>
+<span class="lineNum">     165 </span>                :            :             size_t j;
+<span class="lineNum">     166 </span>                :            : 
+<span class="lineNum">     167 </span>        [<span class="branchCov" title="Branch 0 was taken 276 times"> + </span><span class="branchCov" title="Branch 1 was taken 406 times"> + </span>]:<span class="lineCov">        682 :             for (j = 0; j &lt; port-&gt;n_vlan_bindings; j++) {</span>
+<span class="lineNum">     168 </span>                :            :                 const struct vteprec_logical_switch *vtep_lswitch;
+<span class="lineNum">     169 </span>                :            : 
+<span class="lineNum">     170 </span>                :<span class="lineCov">        276 :                 vtep_lswitch = port-&gt;value_vlan_bindings[j];</span>
+<span class="lineNum">     171 </span>                :            :                 /* If not already in 'lswitches', records it. */
+<span class="lineNum">     172 </span>        [<span class="branchCov" title="Branch 1 was taken 230 times"> + </span><span class="branchCov" title="Branch 2 was taken 46 times"> + </span>]:<span class="lineCov">        276 :                 if (!sset_find(&amp;lswitches, vtep_lswitch-&gt;name)) {</span>
+<span class="lineNum">     173 </span>                :<span class="lineCov">        230 :                     sset_add(&amp;lswitches, vtep_lswitch-&gt;name);</span>
+<span class="lineNum">     174 </span>                :            :                 }
+<span class="lineNum">     175 </span>                :            :             }
+<span class="lineNum">     176 </span>                :            :         }
+<span class="lineNum">     177 </span>                :            : 
+<span class="lineNum">     178 </span>                :<span class="lineCov">        238 :         const char **ls_arr = sset_array(&amp;lswitches);</span>
+<span class="lineNum">     179 </span>                :<span class="lineCov">        238 :         sbrec_chassis_set_vtep_logical_switches(chassis_rec, ls_arr,</span>
+<span class="lineNum">     180 </span>                :            :                                                 sset_count(&amp;lswitches));
+<span class="lineNum">     181 </span>                :<span class="lineCov">        238 :         free(ls_arr);</span>
+<span class="lineNum">     182 </span>                :<span class="lineCov">        238 :         sset_destroy(&amp;lswitches);</span>
+<span class="lineNum">     183 </span>                :            :     }
+<span class="lineNum">     184 </span>                :<span class="lineCov">        224 : }</span>
+<span class="lineNum">     185 </span>                :            : 
+<a name="186"><span class="lineNum">     186 </span>                :            : </a>
+<span class="lineNum">     187 </span>                :            : void
+<span class="lineNum">     188 </span>                :<span class="lineCov">        269 : gateway_run(struct controller_vtep_ctx *ctx)</span>
+<span class="lineNum">     189 </span>                :            : {
+<span class="lineNum">     190 </span>        [<span class="branchCov" title="Branch 0 was taken 45 times"> + </span><span class="branchCov" title="Branch 1 was taken 224 times"> + </span>]:<span class="lineCov">        269 :     if (!ctx-&gt;ovnsb_idl_txn) {</span>
+<span class="lineNum">     191 </span>                :<span class="lineCov">         45 :         return;</span>
+<span class="lineNum">     192 </span>                :            :     }
+<span class="lineNum">     193 </span>                :            : 
+<span class="lineNum">     194 </span>                :<span class="lineCov">        224 :     revalidate_gateway(ctx);</span>
+<span class="lineNum">     195 </span>                :<span class="lineCov">        224 :     update_vtep_logical_switches(ctx);</span>
+<span class="lineNum">     196 </span>                :            : }
+<span class="lineNum">     197 </span>                :            : 
+<span class="lineNum">     198 </span>                :            : /* Destroys the chassis table entries for vtep physical switches.
+<span class="lineNum">     199 </span>                :            :  * Returns true when done (i.e. there is no change made to 'ctx-&gt;ovnsb_idl'),
+<a name="200"><span class="lineNum">     200 </span>                :            :  * otherwise returns false. */</a>
+<span class="lineNum">     201 </span>                :            : bool
+<span class="lineNum">     202 </span>                :<span class="lineCov">         27 : gateway_cleanup(struct controller_vtep_ctx *ctx)</span>
+<span class="lineNum">     203 </span>                :            : {
+<span class="lineNum">     204 </span>                :            :     static bool simap_destroyed = false;
+<span class="lineNum">     205 </span>                :            :     const struct vteprec_physical_switch *pswitch;
+<span class="lineNum">     206 </span>                :            : 
+<span class="lineNum">     207 </span>        [<span class="branchCov" title="Branch 0 was taken 13 times"> + </span><span class="branchCov" title="Branch 1 was taken 14 times"> + </span>]:<span class="lineCov">         27 :     if (!ctx-&gt;ovnsb_idl_txn) {</span>
+<span class="lineNum">     208 </span>                :<span class="lineCov">         13 :         return false;</span>
+<span class="lineNum">     209 </span>                :            :     }
+<span class="lineNum">     210 </span>                :            : 
+<span class="lineNum">     211 </span>                :<span class="lineCov">         14 :     bool all_done = true;</span>
+<span class="lineNum">     212 </span>                :<span class="lineCov">         14 :     ovsdb_idl_txn_add_comment(ctx-&gt;ovnsb_idl_txn, &quot;ovn-controller-vtep: &quot;</span>
+<span class="lineNum">     213 </span>                :            :                               &quot;unregistering vtep chassis&quot;);
+<span class="lineNum">     214 </span>        [<span class="branchCov" title="Branch 2 was taken 14 times"> + </span><span class="branchCov" title="Branch 3 was taken 14 times"> + </span>]:<span class="lineCov">         28 :     VTEPREC_PHYSICAL_SWITCH_FOR_EACH (pswitch, ctx-&gt;vtep_idl) {</span>
+<span class="lineNum">     215 </span>                :            :         const struct sbrec_chassis *chassis_rec;
+<span class="lineNum">     216 </span>                :            : 
+<span class="lineNum">     217 </span>                :<span class="lineCov">         14 :         chassis_rec = get_chassis_by_name(ctx-&gt;ovnsb_idl, pswitch-&gt;name);</span>
+<span class="lineNum">     218 </span>        [<span class="branchCov" title="Branch 0 was taken 7 times"> + </span><span class="branchCov" title="Branch 1 was taken 7 times"> + </span>]:<span class="lineCov">         14 :         if (!chassis_rec) {</span>
+<span class="lineNum">     219 </span>                :<span class="lineCov">          7 :             continue;</span>
+<span class="lineNum">     220 </span>                :            :         }
+<span class="lineNum">     221 </span>                :<span class="lineCov">          7 :         all_done = false;</span>
+<span class="lineNum">     222 </span>                :<span class="lineCov">          7 :         sbrec_chassis_delete(chassis_rec);</span>
+<span class="lineNum">     223 </span>                :            :     }
+<span class="lineNum">     224 </span>        [<span class="branchCov" title="Branch 0 was taken 7 times"> + </span><span class="branchCov" title="Branch 1 was taken 7 times"> + </span>]:<span class="lineCov">         14 :     if (!simap_destroyed) {</span>
+<span class="lineNum">     225 </span>                :<span class="lineCov">          7 :         simap_destroy(&amp;gw_chassis_map);</span>
+<span class="lineNum">     226 </span>                :<span class="lineCov">          7 :         simap_destroyed = true;</span>
+<span class="lineNum">     227 </span>                :            :     }
+<span class="lineNum">     228 </span>                :            : 
+<span class="lineNum">     229 </span>                :<span class="lineCov">         14 :     return all_done;</span>
+<span class="lineNum">     230 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

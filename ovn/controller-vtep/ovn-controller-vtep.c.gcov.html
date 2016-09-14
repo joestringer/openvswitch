@@ -1,0 +1,363 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ovn/controller-vtep/ovn-controller-vtep.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">ovn/controller-vtep</a> - ovn-controller-vtep.c<span style="font-size: 80%;"> (source / <a href="ovn-controller-vtep.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">81</td>
+            <td class="headerCovTableEntry">104</td>
+            <td class="headerCovTableEntryMed">77.9 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">3</td>
+            <td class="headerCovTableEntry">5</td>
+            <td class="headerCovTableEntryLo">60.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">28</td>
+            <td class="headerCovTableEntry">50</td>
+            <td class="headerCovTableEntryLo">56.0 %</td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (c) 2015, 2016 Nicira, Inc.</a>
+<span class="lineNum">       2 </span>                :            :  *
+<span class="lineNum">       3 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       4 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       5 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       6 </span>                :            :  *
+<span class="lineNum">       7 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       8 </span>                :            :  *
+<span class="lineNum">       9 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      10 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      11 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      12 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      13 </span>                :            :  * limitations under the License.
+<span class="lineNum">      14 </span>                :            :  */
+<span class="lineNum">      15 </span>                :            : 
+<span class="lineNum">      16 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      17 </span>                :            : 
+<span class="lineNum">      18 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      19 </span>                :            : #include &lt;getopt.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &lt;signal.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      23 </span>                :            : 
+<span class="lineNum">      24 </span>                :            : #include &quot;command-line.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;compiler.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;daemon.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;dirs.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;openvswitch/dynamic-string.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;fatal-signal.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;stream.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;stream-ssl.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;unixctl.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;openvswitch/vconn.h&quot;
+<span class="lineNum">      36 </span>                :            : #include &quot;openvswitch/vlog.h&quot;
+<span class="lineNum">      37 </span>                :            : #include &quot;ovn/lib/ovn-sb-idl.h&quot;
+<span class="lineNum">      38 </span>                :            : #include &quot;ovn/lib/ovn-util.h&quot;
+<span class="lineNum">      39 </span>                :            : #include &quot;vtep/vtep-idl.h&quot;
+<span class="lineNum">      40 </span>                :            : 
+<span class="lineNum">      41 </span>                :            : #include &quot;binding.h&quot;
+<span class="lineNum">      42 </span>                :            : #include &quot;gateway.h&quot;
+<span class="lineNum">      43 </span>                :            : #include &quot;vtep.h&quot;
+<span class="lineNum">      44 </span>                :            : #include &quot;ovn-controller-vtep.h&quot;
+<span class="lineNum">      45 </span>                :            : 
+<span class="lineNum">      46 </span>                :            : static unixctl_cb_func ovn_controller_vtep_exit;
+<span class="lineNum">      47 </span>                :            : 
+<span class="lineNum">      48 </span>                :            : static void parse_options(int argc, char *argv[]);
+<span class="lineNum">      49 </span>                :            : OVS_NO_RETURN static void usage(void);
+<span class="lineNum">      50 </span>                :            : 
+<span class="lineNum">      51 </span>                :            : static char *vtep_remote;
+<span class="lineNum">      52 </span>                :            : static char *ovnsb_remote;
+<span class="lineNum">      53 </span>                :            : static char *default_db_;
+<a name="54"><span class="lineNum">      54 </span>                :            : </a>
+<span class="lineNum">      55 </span>                :            : int
+<span class="lineNum">      56 </span>                :<span class="lineCov">          7 : main(int argc, char *argv[])</span>
+<span class="lineNum">      57 </span>                :            : {
+<span class="lineNum">      58 </span>                :            :     struct unixctl_server *unixctl;
+<span class="lineNum">      59 </span>                :            :     bool exiting;
+<span class="lineNum">      60 </span>                :            :     int retval;
+<span class="lineNum">      61 </span>                :            : 
+<span class="lineNum">      62 </span>                :<span class="lineCov">          7 :     ovs_cmdl_proctitle_init(argc, argv);</span>
+<span class="lineNum">      63 </span>                :<span class="lineCov">          7 :     set_program_name(argv[0]);</span>
+<span class="lineNum">      64 </span>                :<span class="lineCov">          7 :     service_start(&amp;argc, &amp;argv);</span>
+<span class="lineNum">      65 </span>                :<span class="lineCov">          7 :     parse_options(argc, argv);</span>
+<span class="lineNum">      66 </span>                :<span class="lineCov">          7 :     fatal_ignore_sigpipe();</span>
+<span class="lineNum">      67 </span>                :            : 
+<span class="lineNum">      68 </span>                :<span class="lineCov">          7 :     daemonize_start(false);</span>
+<span class="lineNum">      69 </span>                :            : 
+<span class="lineNum">      70 </span>                :<span class="lineCov">          7 :     retval = unixctl_server_create(NULL, &amp;unixctl);</span>
+<span class="lineNum">      71 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 7 times"> + </span>]:<span class="lineCov">          7 :     if (retval) {</span>
+<span class="lineNum">      72 </span>                :<span class="lineNoCov">          0 :         exit(EXIT_FAILURE);</span>
+<span class="lineNum">      73 </span>                :            :     }
+<span class="lineNum">      74 </span>                :<span class="lineCov">          7 :     unixctl_command_register(&quot;exit&quot;, &quot;&quot;, 0, 0, ovn_controller_vtep_exit,</span>
+<span class="lineNum">      75 </span>                :            :                              &amp;exiting);
+<span class="lineNum">      76 </span>                :            : 
+<span class="lineNum">      77 </span>                :<span class="lineCov">          7 :     daemonize_complete();</span>
+<span class="lineNum">      78 </span>                :            : 
+<span class="lineNum">      79 </span>                :<span class="lineCov">          7 :     vteprec_init();</span>
+<span class="lineNum">      80 </span>                :<span class="lineCov">          7 :     sbrec_init();</span>
+<span class="lineNum">      81 </span>                :            : 
+<span class="lineNum">      82 </span>                :            :     /* Connect to VTEP database. */
+<span class="lineNum">      83 </span>                :<span class="lineCov">          7 :     struct ovsdb_idl_loop vtep_idl_loop = OVSDB_IDL_LOOP_INITIALIZER(</span>
+<span class="lineNum">      84 </span>                :            :         ovsdb_idl_create(vtep_remote, &amp;vteprec_idl_class, true, true));
+<span class="lineNum">      85 </span>                :<span class="lineCov">          7 :     ovsdb_idl_get_initial_snapshot(vtep_idl_loop.idl);</span>
+<span class="lineNum">      86 </span>                :            : 
+<span class="lineNum">      87 </span>                :            :     /* Connect to OVN SB database. */
+<span class="lineNum">      88 </span>                :<span class="lineCov">          7 :     struct ovsdb_idl_loop ovnsb_idl_loop = OVSDB_IDL_LOOP_INITIALIZER(</span>
+<span class="lineNum">      89 </span>                :            :         ovsdb_idl_create(ovnsb_remote, &amp;sbrec_idl_class, true, true));
+<span class="lineNum">      90 </span>                :<span class="lineCov">          7 :     ovsdb_idl_get_initial_snapshot(ovnsb_idl_loop.idl);</span>
+<span class="lineNum">      91 </span>                :            : 
+<span class="lineNum">      92 </span>                :            :     /* Main loop. */
+<span class="lineNum">      93 </span>                :<span class="lineCov">          7 :     exiting = false;</span>
+<span class="lineNum">      94 </span>        [<span class="branchCov" title="Branch 0 was taken 269 times"> + </span><span class="branchCov" title="Branch 1 was taken 7 times"> + </span>]:<span class="lineCov">        276 :     while (!exiting) {</span>
+<span class="lineNum">      95 </span>                :<span class="lineCov">       1076 :         struct controller_vtep_ctx ctx = {</span>
+<span class="lineNum">      96 </span>                :<span class="lineCov">        269 :             .vtep_idl = vtep_idl_loop.idl,</span>
+<span class="lineNum">      97 </span>                :<span class="lineCov">        269 :             .vtep_idl_txn = ovsdb_idl_loop_run(&amp;vtep_idl_loop),</span>
+<span class="lineNum">      98 </span>                :<span class="lineCov">        269 :             .ovnsb_idl = ovnsb_idl_loop.idl,</span>
+<span class="lineNum">      99 </span>                :<span class="lineCov">        269 :             .ovnsb_idl_txn = ovsdb_idl_loop_run(&amp;ovnsb_idl_loop),</span>
+<span class="lineNum">     100 </span>                :            :         };
+<span class="lineNum">     101 </span>                :            : 
+<span class="lineNum">     102 </span>                :<span class="lineCov">        269 :         gateway_run(&amp;ctx);</span>
+<span class="lineNum">     103 </span>                :<span class="lineCov">        269 :         binding_run(&amp;ctx);</span>
+<span class="lineNum">     104 </span>                :<span class="lineCov">        269 :         vtep_run(&amp;ctx);</span>
+<span class="lineNum">     105 </span>                :<span class="lineCov">        269 :         unixctl_server_run(unixctl);</span>
+<span class="lineNum">     106 </span>                :            : 
+<span class="lineNum">     107 </span>                :<span class="lineCov">        269 :         unixctl_server_wait(unixctl);</span>
+<span class="lineNum">     108 </span>        [<span class="branchCov" title="Branch 0 was taken 7 times"> + </span><span class="branchCov" title="Branch 1 was taken 262 times"> + </span>]:<span class="lineCov">        269 :         if (exiting) {</span>
+<span class="lineNum">     109 </span>                :<span class="lineCov">          7 :             poll_immediate_wake();</span>
+<span class="lineNum">     110 </span>                :            :         }
+<span class="lineNum">     111 </span>                :<span class="lineCov">        269 :         ovsdb_idl_loop_commit_and_wait(&amp;vtep_idl_loop);</span>
+<span class="lineNum">     112 </span>                :<span class="lineCov">        269 :         ovsdb_idl_loop_commit_and_wait(&amp;ovnsb_idl_loop);</span>
+<span class="lineNum">     113 </span>                :<span class="lineCov">        269 :         poll_block();</span>
+<span class="lineNum">     114 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 269 times"> + </span>]:<span class="lineCov">        269 :         if (should_service_stop()) {</span>
+<span class="lineNum">     115 </span>                :<span class="lineCov">        269 :             exiting = true;</span>
+<span class="lineNum">     116 </span>                :            :         }
+<span class="lineNum">     117 </span>                :            :     }
+<span class="lineNum">     118 </span>                :            : 
+<span class="lineNum">     119 </span>                :            :     /* It's time to exit.  Clean up the databases. */
+<span class="lineNum">     120 </span>                :<span class="lineCov">          7 :     bool done = false;</span>
+<span class="lineNum">     121 </span>        [<span class="branchCov" title="Branch 0 was taken 27 times"> + </span><span class="branchCov" title="Branch 1 was taken 7 times"> + </span>]:<span class="lineCov">         34 :     while (!done) {</span>
+<span class="lineNum">     122 </span>                :<span class="lineCov">        108 :         struct controller_vtep_ctx ctx = {</span>
+<span class="lineNum">     123 </span>                :<span class="lineCov">         27 :             .vtep_idl = vtep_idl_loop.idl,</span>
+<span class="lineNum">     124 </span>                :<span class="lineCov">         27 :             .vtep_idl_txn = ovsdb_idl_loop_run(&amp;vtep_idl_loop),</span>
+<span class="lineNum">     125 </span>                :<span class="lineCov">         27 :             .ovnsb_idl = ovnsb_idl_loop.idl,</span>
+<span class="lineNum">     126 </span>                :<span class="lineCov">         27 :             .ovnsb_idl_txn = ovsdb_idl_loop_run(&amp;ovnsb_idl_loop),</span>
+<span class="lineNum">     127 </span>                :            :         };
+<span class="lineNum">     128 </span>                :            : 
+<span class="lineNum">     129 </span>                :            :         /* Run all of the cleanup functions, even if one of them returns false.
+<span class="lineNum">     130 </span>                :            :          * We're done if all of them return true. */
+<span class="lineNum">     131 </span>                :<span class="lineCov">         27 :         done = binding_cleanup(&amp;ctx);</span>
+<span class="lineNum">     132 </span>[<span class="branchCov" title="Branch 1 was taken 7 times"> + </span><span class="branchCov" title="Branch 2 was taken 20 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 7 times"> + </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span>]:<span class="lineCov">         27 :         done = gateway_cleanup(&amp;ctx) &amp;&amp; done;</span>
+<span class="lineNum">     133 </span>[<span class="branchCov" title="Branch 1 was taken 11 times"> + </span><span class="branchCov" title="Branch 2 was taken 16 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 7 times"> + </span><span class="branchCov" title="Branch 4 was taken 4 times"> + </span>]:<span class="lineCov">         27 :         done = vtep_cleanup(&amp;ctx) &amp;&amp; done;</span>
+<span class="lineNum">     134 </span>        [<span class="branchCov" title="Branch 0 was taken 7 times"> + </span><span class="branchCov" title="Branch 1 was taken 20 times"> + </span>]:<span class="lineCov">         27 :         if (done) {</span>
+<span class="lineNum">     135 </span>                :<span class="lineCov">          7 :             poll_immediate_wake();</span>
+<span class="lineNum">     136 </span>                :            :         }
+<span class="lineNum">     137 </span>                :            : 
+<span class="lineNum">     138 </span>                :<span class="lineCov">         27 :         ovsdb_idl_loop_commit_and_wait(&amp;vtep_idl_loop);</span>
+<span class="lineNum">     139 </span>                :<span class="lineCov">         27 :         ovsdb_idl_loop_commit_and_wait(&amp;ovnsb_idl_loop);</span>
+<span class="lineNum">     140 </span>                :<span class="lineCov">         27 :         poll_block();</span>
+<span class="lineNum">     141 </span>                :            :     }
+<span class="lineNum">     142 </span>                :            : 
+<span class="lineNum">     143 </span>                :<span class="lineCov">          7 :     unixctl_server_destroy(unixctl);</span>
+<span class="lineNum">     144 </span>                :            : 
+<span class="lineNum">     145 </span>                :<span class="lineCov">          7 :     ovsdb_idl_loop_destroy(&amp;vtep_idl_loop);</span>
+<span class="lineNum">     146 </span>                :<span class="lineCov">          7 :     ovsdb_idl_loop_destroy(&amp;ovnsb_idl_loop);</span>
+<span class="lineNum">     147 </span>                :            : 
+<span class="lineNum">     148 </span>                :<span class="lineCov">          7 :     free(ovnsb_remote);</span>
+<span class="lineNum">     149 </span>                :<span class="lineCov">          7 :     free(vtep_remote);</span>
+<span class="lineNum">     150 </span>                :<span class="lineCov">          7 :     free(default_db_);</span>
+<span class="lineNum">     151 </span>                :<span class="lineCov">          7 :     service_stop();</span>
+<span class="lineNum">     152 </span>                :            : 
+<span class="lineNum">     153 </span>                :<span class="lineCov">          7 :     exit(retval);</span>
+<span class="lineNum">     154 </span>                :            : }
+<a name="155"><span class="lineNum">     155 </span>                :            : </a>
+<span class="lineNum">     156 </span>                :            : static const char *
+<span class="lineNum">     157 </span>                :<span class="lineNoCov">          0 : default_db(void)</span>
+<span class="lineNum">     158 </span>                :            : {
+<span class="lineNum">     159 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!default_db_) {</span>
+<span class="lineNum">     160 </span>                :<span class="lineNoCov">          0 :         default_db_ = xasprintf(&quot;unix:%s/db.sock&quot;, ovs_rundir());</span>
+<span class="lineNum">     161 </span>                :            :     }
+<span class="lineNum">     162 </span>                :<span class="lineNoCov">          0 :     return default_db_;</span>
+<span class="lineNum">     163 </span>                :            : }
+<a name="164"><span class="lineNum">     164 </span>                :            : </a>
+<span class="lineNum">     165 </span>                :            : static void
+<span class="lineNum">     166 </span>                :<span class="lineCov">          7 : parse_options(int argc, char *argv[])</span>
+<span class="lineNum">     167 </span>                :            : {
+<span class="lineNum">     168 </span>                :            :     enum {
+<span class="lineNum">     169 </span>                :            :         OPT_PEER_CA_CERT = UCHAR_MAX + 1,
+<span class="lineNum">     170 </span>                :            :         OPT_BOOTSTRAP_CA_CERT,
+<span class="lineNum">     171 </span>                :            :         VLOG_OPTION_ENUMS,
+<span class="lineNum">     172 </span>                :            :         DAEMON_OPTION_ENUMS
+<span class="lineNum">     173 </span>                :            :     };
+<span class="lineNum">     174 </span>                :            : 
+<span class="lineNum">     175 </span>                :            :     static struct option long_options[] = {
+<span class="lineNum">     176 </span>                :            :         {&quot;ovnsb-db&quot;, required_argument, NULL, 'd'},
+<span class="lineNum">     177 </span>                :            :         {&quot;vtep-db&quot;, required_argument, NULL, 'D'},
+<span class="lineNum">     178 </span>                :            :         {&quot;help&quot;, no_argument, NULL, 'h'},
+<span class="lineNum">     179 </span>                :            :         {&quot;version&quot;, no_argument, NULL, 'V'},
+<span class="lineNum">     180 </span>                :            :         VLOG_LONG_OPTIONS,
+<span class="lineNum">     181 </span>                :            :         DAEMON_LONG_OPTIONS,
+<span class="lineNum">     182 </span>                :            :         STREAM_SSL_LONG_OPTIONS,
+<span class="lineNum">     183 </span>                :            :         {&quot;peer-ca-cert&quot;, required_argument, NULL, OPT_PEER_CA_CERT},
+<span class="lineNum">     184 </span>                :            :         {&quot;bootstrap-ca-cert&quot;, required_argument, NULL, OPT_BOOTSTRAP_CA_CERT},
+<span class="lineNum">     185 </span>                :            :         {NULL, 0, NULL, 0}
+<span class="lineNum">     186 </span>                :            :     };
+<span class="lineNum">     187 </span>                :<span class="lineCov">          7 :     char *short_options = ovs_cmdl_long_options_to_short_options(long_options);</span>
+<span class="lineNum">     188 </span>                :            : 
+<span class="lineNum">     189 </span>                :            :     for (;;) {
+<span class="lineNum">     190 </span>                :            :         int c;
+<span class="lineNum">     191 </span>                :            : 
+<span class="lineNum">     192 </span>                :<span class="lineCov">         44 :         c = getopt_long(argc, argv, short_options, long_options, NULL);</span>
+<span class="lineNum">     193 </span>        [<span class="branchCov" title="Branch 0 was taken 7 times"> + </span><span class="branchCov" title="Branch 1 was taken 37 times"> + </span>]:<span class="lineCov">         44 :         if (c == -1) {</span>
+<span class="lineNum">     194 </span>                :<span class="lineCov">          7 :             break;</span>
+<span class="lineNum">     195 </span>                :            :         }
+<span class="lineNum">     196 </span>                :            : 
+<span class="lineNum">     197 </span>  [<span class="branchCov" title="Branch 0 was taken 7 times"> + </span><span class="branchCov" title="Branch 1 was taken 7 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span> :<span class="lineCov">         37 :         switch (c) {</span>
+<span class="lineNum">         </span><span class="branchCov" title="Branch 4 was taken 1 time"> + </span><span class="branchCov" title="Branch 5 was taken 7 times"> + </span><span class="branchNoCov" title="Branch 6 was not taken"> - </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span><span class="branchCov" title="Branch 8 was taken 7 times"> + </span> 
+<span class="lineNum">         </span><span class="branchNoCov" title="Branch 9 was not taken"> - </span><span class="branchCov" title="Branch 10 was taken 1 time"> + </span><span class="branchCov" title="Branch 11 was taken 7 times"> + </span><span class="branchNoCov" title="Branch 12 was not taken"> - </span><span class="branchNoCov" title="Branch 13 was not taken"> - </span> 
+<span class="lineNum">         </span><span class="branchNoCov" title="Branch 14 was not taken"> - </span><span class="branchNoCov" title="Branch 15 was not taken"> - </span><span class="branchNoCov" title="Branch 16 was not taken"> - </span><span class="branchNoCov" title="Branch 17 was not taken"> - </span><span class="branchNoCov" title="Branch 18 was not taken"> - </span> 
+<span class="lineNum">         </span>      <span class="branchNoCov" title="Branch 19 was not taken"> - </span><span class="branchNoCov" title="Branch 20 was not taken"> - </span><span class="branchNoCov" title="Branch 21 was not taken"> - </span>]
+<span class="lineNum">     198 </span>                :            :         case 'd':
+<span class="lineNum">     199 </span>                :<span class="lineCov">          7 :             ovnsb_remote = xstrdup(optarg);</span>
+<span class="lineNum">     200 </span>                :<span class="lineCov">          7 :             break;</span>
+<span class="lineNum">     201 </span>                :            : 
+<span class="lineNum">     202 </span>                :            :         case 'D':
+<span class="lineNum">     203 </span>                :<span class="lineCov">          7 :             vtep_remote = xstrdup(optarg);</span>
+<span class="lineNum">     204 </span>                :<span class="lineCov">          7 :             break;</span>
+<span class="lineNum">     205 </span>                :            : 
+<span class="lineNum">     206 </span>                :            :         case 'h':
+<span class="lineNum">     207 </span>                :<span class="lineNoCov">          0 :             usage();</span>
+<span class="lineNum">     208 </span>                :            : 
+<span class="lineNum">     209 </span>                :            :         case 'V':
+<span class="lineNum">     210 </span>                :<span class="lineNoCov">          0 :             ovs_print_version(OFP13_VERSION, OFP13_VERSION);</span>
+<span class="lineNum">     211 </span>                :<span class="lineNoCov">          0 :             exit(EXIT_SUCCESS);</span>
+<span class="lineNum">     212 </span>                :            : 
+<span class="lineNum">     213 </span>                :<span class="lineCov">          8 :         VLOG_OPTION_HANDLERS</span>
+<span class="lineNum">     214 </span>                :<span class="lineCov">         15 :         DAEMON_OPTION_HANDLERS</span>
+<span class="lineNum">     215 </span>                :<span class="lineNoCov">          0 :         STREAM_SSL_OPTION_HANDLERS</span>
+<span class="lineNum">     216 </span>                :            : 
+<span class="lineNum">     217 </span>                :            :         case OPT_PEER_CA_CERT:
+<span class="lineNum">     218 </span>                :<span class="lineNoCov">          0 :             stream_ssl_set_peer_ca_cert_file(optarg);</span>
+<span class="lineNum">     219 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     220 </span>                :            : 
+<span class="lineNum">     221 </span>                :            :         case OPT_BOOTSTRAP_CA_CERT:
+<span class="lineNum">     222 </span>                :<span class="lineNoCov">          0 :             stream_ssl_set_ca_cert_file(optarg, true);</span>
+<span class="lineNum">     223 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     224 </span>                :            : 
+<span class="lineNum">     225 </span>                :            :         case '?':
+<span class="lineNum">     226 </span>                :<span class="lineNoCov">          0 :             exit(EXIT_FAILURE);</span>
+<span class="lineNum">     227 </span>                :            : 
+<span class="lineNum">     228 </span>                :            :         default:
+<span class="lineNum">     229 </span>                :<span class="lineNoCov">          0 :             abort();</span>
+<span class="lineNum">     230 </span>                :            :         }
+<span class="lineNum">     231 </span>                :<span class="lineCov">         37 :     }</span>
+<span class="lineNum">     232 </span>                :<span class="lineCov">          7 :     free(short_options);</span>
+<span class="lineNum">     233 </span>                :            : 
+<span class="lineNum">     234 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 7 times"> + </span>]:<span class="lineCov">          7 :     if (!ovnsb_remote) {</span>
+<span class="lineNum">     235 </span>                :<span class="lineNoCov">          0 :         ovnsb_remote = xstrdup(default_sb_db());</span>
+<span class="lineNum">     236 </span>                :            :     }
+<span class="lineNum">     237 </span>                :            : 
+<span class="lineNum">     238 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 7 times"> + </span>]:<span class="lineCov">          7 :     if (!vtep_remote) {</span>
+<span class="lineNum">     239 </span>                :<span class="lineNoCov">          0 :         vtep_remote = xstrdup(default_db());</span>
+<span class="lineNum">     240 </span>                :            :     }
+<span class="lineNum">     241 </span>                :<span class="lineCov">          7 : }</span>
+<a name="242"><span class="lineNum">     242 </span>                :            : </a>
+<span class="lineNum">     243 </span>                :            : static void
+<span class="lineNum">     244 </span>                :<span class="lineNoCov">          0 : usage(void)</span>
+<span class="lineNum">     245 </span>                :            : {
+<span class="lineNum">     246 </span>                :<span class="lineNoCov">          0 :     printf(&quot;\</span>
+<span class="lineNum">     247 </span>                :            : %s: OVN controller VTEP\n\
+<span class="lineNum">     248 </span>                :            : usage %s [OPTIONS]\n\
+<span class="lineNum">     249 </span>                :            : \n\
+<span class="lineNum">     250 </span>                :            : Options:\n\
+<span class="lineNum">     251 </span>                :            :   --vtep-db=DATABASE        connect to vtep database at DATABASE\n\
+<span class="lineNum">     252 </span>                :            :                             (default: %s)\n\
+<span class="lineNum">     253 </span>                :            :   --ovnsb-db=DATABASE       connect to ovn-sb database at DATABASE\n\
+<span class="lineNum">     254 </span>                :            :                             (default: %s)\n\
+<span class="lineNum">     255 </span>                :            :   -h, --help                display this help message\n\
+<span class="lineNum">     256 </span>                :            :   -o, --options             list available options\n\
+<span class="lineNum">     257 </span>                :            :   -V, --version             display version information\n\
+<span class="lineNum">     258 </span>                :            : &quot;, program_name, program_name, default_db(), default_db());
+<span class="lineNum">     259 </span>                :<span class="lineNoCov">          0 :     stream_usage(&quot;database&quot;, true, false, false);</span>
+<span class="lineNum">     260 </span>                :<span class="lineNoCov">          0 :     daemon_usage();</span>
+<span class="lineNum">     261 </span>                :<span class="lineNoCov">          0 :     vlog_usage();</span>
+<span class="lineNum">     262 </span>                :<span class="lineNoCov">          0 :     exit(EXIT_SUCCESS);</span>
+<span class="lineNum">     263 </span>                :            : }
+<span class="lineNum">     264 </span>                :            : 
+<a name="265"><span class="lineNum">     265 </span>                :            : </a>
+<span class="lineNum">     266 </span>                :            : static void
+<span class="lineNum">     267 </span>                :<span class="lineCov">          7 : ovn_controller_vtep_exit(struct unixctl_conn *conn, int argc OVS_UNUSED,</span>
+<span class="lineNum">     268 </span>                :            :                        const char *argv[] OVS_UNUSED, void *exiting_)
+<span class="lineNum">     269 </span>                :            : {
+<span class="lineNum">     270 </span>                :<span class="lineCov">          7 :     bool *exiting = exiting_;</span>
+<span class="lineNum">     271 </span>                :<span class="lineCov">          7 :     *exiting = true;</span>
+<span class="lineNum">     272 </span>                :            : 
+<span class="lineNum">     273 </span>                :<span class="lineCov">          7 :     unixctl_command_reply(conn, NULL);</span>
+<span class="lineNum">     274 </span>                :<span class="lineCov">          7 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

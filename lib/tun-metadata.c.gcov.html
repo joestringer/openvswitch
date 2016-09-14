@@ -1,0 +1,1151 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/tun-metadata.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - tun-metadata.c<span style="font-size: 80%;"> (source / <a href="tun-metadata.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">401</td>
+            <td class="headerCovTableEntry">435</td>
+            <td class="headerCovTableEntryHi">92.2 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">35</td>
+            <td class="headerCovTableEntry">35</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">163</td>
+            <td class="headerCovTableEntry">208</td>
+            <td class="headerCovTableEntryMed">78.4 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2015 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      19 </span>                :            : #include &lt;stdbool.h&gt;
+<span class="lineNum">      20 </span>                :            : 
+<span class="lineNum">      21 </span>                :            : #include &quot;bitmap.h&quot;
+<span class="lineNum">      22 </span>                :            : #include &quot;compiler.h&quot;
+<span class="lineNum">      23 </span>                :            : #include &quot;openvswitch/hmap.h&quot;
+<span class="lineNum">      24 </span>                :            : #include &quot;openvswitch/match.h&quot;
+<span class="lineNum">      25 </span>                :            : #include &quot;nx-match.h&quot;
+<span class="lineNum">      26 </span>                :            : #include &quot;odp-netlink.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;openvswitch/ofp-util.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;ovs-thread.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;ovs-rcu.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;packets.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;tun-metadata.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      33 </span>                :            : 
+<span class="lineNum">      34 </span>                :            : struct tun_meta_entry {
+<span class="lineNum">      35 </span>                :            :     struct hmap_node node;      /* In struct tun_table's key_hmap. */
+<span class="lineNum">      36 </span>                :            :     uint32_t key;               /* (class &lt;&lt; 16) | type. */
+<span class="lineNum">      37 </span>                :            :     struct tun_metadata_loc loc;
+<span class="lineNum">      38 </span>                :            :     bool valid;                 /* True if allocated to a class and type. */
+<span class="lineNum">      39 </span>                :            : };
+<span class="lineNum">      40 </span>                :            : 
+<span class="lineNum">      41 </span>                :            : /* Maps from TLV option class+type to positions in a struct tun_metadata's
+<span class="lineNum">      42 </span>                :            :  * 'opts' array.  */
+<span class="lineNum">      43 </span>                :            : struct tun_table {
+<span class="lineNum">      44 </span>                :            :     /* TUN_METADATA&lt;i&gt; is stored in element &lt;i&gt;. */
+<span class="lineNum">      45 </span>                :            :     struct tun_meta_entry entries[TUN_METADATA_NUM_OPTS];
+<span class="lineNum">      46 </span>                :            : 
+<span class="lineNum">      47 </span>                :            :     /* Each bit represents 4 bytes of space, 0-bits are free space. */
+<span class="lineNum">      48 </span>                :            :     unsigned long alloc_map[BITMAP_N_LONGS(TUN_METADATA_TOT_OPT_SIZE / 4)];
+<span class="lineNum">      49 </span>                :            : 
+<span class="lineNum">      50 </span>                :            :     /* The valid elements in entries[], indexed by class+type. */
+<span class="lineNum">      51 </span>                :            :     struct hmap key_hmap;
+<span class="lineNum">      52 </span>                :            : };
+<span class="lineNum">      53 </span>                :            : BUILD_ASSERT_DECL(TUN_METADATA_TOT_OPT_SIZE % 4 == 0);
+<span class="lineNum">      54 </span>                :            : 
+<span class="lineNum">      55 </span>                :            : static struct ovs_mutex tab_mutex = OVS_MUTEX_INITIALIZER;
+<span class="lineNum">      56 </span>                :            : static OVSRCU_TYPE(struct tun_table *) metadata_tab;
+<span class="lineNum">      57 </span>                :            : 
+<span class="lineNum">      58 </span>                :            : static enum ofperr tun_metadata_add_entry(struct tun_table *map, uint8_t idx,
+<span class="lineNum">      59 </span>                :            :                                           uint16_t opt_class, uint8_t type,
+<span class="lineNum">      60 </span>                :            :                                           uint8_t len) OVS_REQUIRES(tab_mutex);
+<span class="lineNum">      61 </span>                :            : static void tun_metadata_del_entry(struct tun_table *map, uint8_t idx)
+<span class="lineNum">      62 </span>                :            :             OVS_REQUIRES(tab_mutex);
+<span class="lineNum">      63 </span>                :            : static void memcpy_to_metadata(struct tun_metadata *dst, const void *src,
+<span class="lineNum">      64 </span>                :            :                                const struct tun_metadata_loc *,
+<span class="lineNum">      65 </span>                :            :                                unsigned int idx);
+<span class="lineNum">      66 </span>                :            : static void memcpy_from_metadata(void *dst, const struct tun_metadata *src,
+<span class="lineNum">      67 </span>                :            :                                  const struct tun_metadata_loc *);
+<a name="68"><span class="lineNum">      68 </span>                :            : </a>
+<span class="lineNum">      69 </span>                :            : static uint32_t
+<span class="lineNum">      70 </span>                :<span class="lineCov">      18588 : tun_meta_key(ovs_be16 class, uint8_t type)</span>
+<span class="lineNum">      71 </span>                :            : {
+<span class="lineNum">      72 </span>                :<span class="lineCov">      18588 :     return (OVS_FORCE uint16_t)class &lt;&lt; 8 | type;</span>
+<span class="lineNum">      73 </span>                :            : }
+<a name="74"><span class="lineNum">      74 </span>                :            : </a>
+<span class="lineNum">      75 </span>                :            : static ovs_be16
+<span class="lineNum">      76 </span>                :<span class="lineCov">       3033 : tun_key_class(uint32_t key)</span>
+<span class="lineNum">      77 </span>                :            : {
+<span class="lineNum">      78 </span>                :<span class="lineCov">       3033 :     return (OVS_FORCE ovs_be16)(key &gt;&gt; 8);</span>
+<span class="lineNum">      79 </span>                :            : }
+<a name="80"><span class="lineNum">      80 </span>                :            : </a>
+<span class="lineNum">      81 </span>                :            : static uint8_t
+<span class="lineNum">      82 </span>                :<span class="lineCov">       3033 : tun_key_type(uint32_t key)</span>
+<span class="lineNum">      83 </span>                :            : {
+<span class="lineNum">      84 </span>                :<span class="lineCov">       3033 :     return key &amp; 0xff;</span>
+<span class="lineNum">      85 </span>                :            : }
+<span class="lineNum">      86 </span>                :            : 
+<span class="lineNum">      87 </span>                :            : /* Returns a newly allocated tun_table.  If 'old_map' is nonnull then the new
+<a name="88"><span class="lineNum">      88 </span>                :            :  * tun_table is a deep copy of the old one. */</a>
+<span class="lineNum">      89 </span>                :            : static struct tun_table *
+<span class="lineNum">      90 </span>                :<span class="lineCov">        690 : table_alloc(const struct tun_table *old_map) OVS_REQUIRES(tab_mutex)</span>
+<span class="lineNum">      91 </span>                :            : {
+<span class="lineNum">      92 </span>                :            :     struct tun_table *new_map;
+<span class="lineNum">      93 </span>                :            : 
+<span class="lineNum">      94 </span>                :<span class="lineCov">        690 :     new_map = xzalloc(sizeof *new_map);</span>
+<span class="lineNum">      95 </span>                :            : 
+<span class="lineNum">      96 </span>        [<span class="branchCov" title="Branch 0 was taken 58 times"> + </span><span class="branchCov" title="Branch 1 was taken 632 times"> + </span>]:<span class="lineCov">        690 :     if (old_map) {</span>
+<span class="lineNum">      97 </span>                :            :         struct tun_meta_entry *entry;
+<span class="lineNum">      98 </span>                :            : 
+<span class="lineNum">      99 </span>                :<span class="lineCov">         58 :         *new_map = *old_map;</span>
+<span class="lineNum">     100 </span>                :<span class="lineCov">         58 :         hmap_init(&amp;new_map-&gt;key_hmap);</span>
+<span class="lineNum">     101 </span>                :            : 
+<span class="lineNum">     102 </span>[<span class="branchCov" title="Branch 2 was taken 20 times"> + </span><span class="branchCov" title="Branch 3 was taken 58 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 58 times"> + </span>]:<span class="lineCov">         78 :         HMAP_FOR_EACH (entry, node, &amp;old_map-&gt;key_hmap) {</span>
+<span class="lineNum">     103 </span>                :            :             struct tun_meta_entry *new_entry;
+<span class="lineNum">     104 </span>                :            :             struct tun_metadata_loc_chain *chain;
+<span class="lineNum">     105 </span>                :            : 
+<span class="lineNum">     106 </span>                :<span class="lineCov">         20 :             new_entry = &amp;new_map-&gt;entries[entry - old_map-&gt;entries];</span>
+<span class="lineNum">     107 </span>                :<span class="lineCov">         20 :             hmap_insert(&amp;new_map-&gt;key_hmap, &amp;new_entry-&gt;node, entry-&gt;node.hash);</span>
+<span class="lineNum">     108 </span>                :            : 
+<span class="lineNum">     109 </span>                :<span class="lineCov">         20 :             chain = &amp;new_entry-&gt;loc.c;</span>
+<span class="lineNum">     110 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 20 times"> + </span>]:<span class="lineCov">         20 :             while (chain-&gt;next) {</span>
+<span class="lineNum">     111 </span>                :<span class="lineNoCov">          0 :                 chain-&gt;next = xmemdup(chain-&gt;next, sizeof *chain-&gt;next);</span>
+<span class="lineNum">     112 </span>                :<span class="lineNoCov">          0 :                 chain = chain-&gt;next;</span>
+<span class="lineNum">     113 </span>                :            :             }
+<span class="lineNum">     114 </span>                :            :         }
+<span class="lineNum">     115 </span>                :            :     } else {
+<span class="lineNum">     116 </span>                :<span class="lineCov">        632 :         hmap_init(&amp;new_map-&gt;key_hmap);</span>
+<span class="lineNum">     117 </span>                :            :     }
+<span class="lineNum">     118 </span>                :            : 
+<span class="lineNum">     119 </span>                :<span class="lineCov">        690 :     return new_map;</span>
+<span class="lineNum">     120 </span>                :            : }
+<span class="lineNum">     121 </span>                :            : 
+<a name="122"><span class="lineNum">     122 </span>                :            : /* Frees 'map' and all the memory it owns. */</a>
+<span class="lineNum">     123 </span>                :            : static void
+<span class="lineNum">     124 </span>                :<span class="lineCov">         68 : table_free(struct tun_table *map) OVS_REQUIRES(tab_mutex)</span>
+<span class="lineNum">     125 </span>                :            : {
+<span class="lineNum">     126 </span>                :            :     struct tun_meta_entry *entry;
+<span class="lineNum">     127 </span>                :            : 
+<span class="lineNum">     128 </span>        [<span class="branchCov" title="Branch 0 was taken 9 times"> + </span><span class="branchCov" title="Branch 1 was taken 59 times"> + </span>]:<span class="lineCov">         68 :     if (!map) {</span>
+<span class="lineNum">     129 </span>                :<span class="lineCov">          9 :         return;</span>
+<span class="lineNum">     130 </span>                :            :     }
+<span class="lineNum">     131 </span>                :            : 
+<span class="lineNum">     132 </span>[<span class="branchCov" title="Branch 2 was taken 26 times"> + </span><span class="branchCov" title="Branch 3 was taken 59 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 59 times"> + </span>]:<span class="lineCov">         85 :     HMAP_FOR_EACH (entry, node, &amp;map-&gt;key_hmap) {</span>
+<span class="lineNum">     133 </span>                :<span class="lineCov">         26 :         tun_metadata_del_entry(map, entry - map-&gt;entries);</span>
+<span class="lineNum">     134 </span>                :            :     }
+<span class="lineNum">     135 </span>                :            : 
+<span class="lineNum">     136 </span>                :<span class="lineCov">         59 :     hmap_destroy(&amp;map-&gt;key_hmap);</span>
+<span class="lineNum">     137 </span>                :<span class="lineCov">         59 :     free(map);</span>
+<span class="lineNum">     138 </span>                :            : }
+<span class="lineNum">     139 </span>                :            : 
+<a name="140"><span class="lineNum">     140 </span>                :            : /* Creates a global tunnel metadata mapping table, if none already exists. */</a>
+<span class="lineNum">     141 </span>                :            : void
+<span class="lineNum">     142 </span>                :<span class="lineCov">        749 : tun_metadata_init(void)</span>
+<span class="lineNum">     143 </span>                :            : {
+<span class="lineNum">     144 </span>                :<span class="lineCov">        749 :     ovs_mutex_lock(&amp;tab_mutex);</span>
+<span class="lineNum">     145 </span>                :            : 
+<span class="lineNum">     146 </span>        [<span class="branchCov" title="Branch 0 was taken 614 times"> + </span><span class="branchCov" title="Branch 1 was taken 135 times"> + </span>]:<span class="lineCov">        749 :     if (!ovsrcu_get_protected(struct tun_table *, &amp;metadata_tab)) {</span>
+<span class="lineNum">     147 </span>                :<span class="lineCov">        614 :         ovsrcu_set(&amp;metadata_tab, table_alloc(NULL));</span>
+<span class="lineNum">     148 </span>                :            :     }
+<span class="lineNum">     149 </span>                :            : 
+<span class="lineNum">     150 </span>                :<span class="lineCov">        749 :     ovs_mutex_unlock(&amp;tab_mutex);</span>
+<span class="lineNum">     151 </span>                :<span class="lineCov">        749 : }</span>
+<a name="152"><span class="lineNum">     152 </span>                :            : </a>
+<span class="lineNum">     153 </span>                :            : enum ofperr
+<span class="lineNum">     154 </span>                :<span class="lineCov">         76 : tun_metadata_table_mod(struct ofputil_tlv_table_mod *ttm)</span>
+<span class="lineNum">     155 </span>                :            : {
+<span class="lineNum">     156 </span>                :            :     struct tun_table *old_map, *new_map;
+<span class="lineNum">     157 </span>                :            :     struct ofputil_tlv_map *ofp_map;
+<span class="lineNum">     158 </span>                :<span class="lineCov">         76 :     enum ofperr err = 0;</span>
+<span class="lineNum">     159 </span>                :            : 
+<span class="lineNum">     160 </span>                :<span class="lineCov">         76 :     ovs_mutex_lock(&amp;tab_mutex);</span>
+<span class="lineNum">     161 </span>                :            : 
+<span class="lineNum">     162 </span>                :<span class="lineCov">         76 :     old_map = ovsrcu_get_protected(struct tun_table *, &amp;metadata_tab);</span>
+<span class="lineNum">     163 </span>                :            : 
+<span class="lineNum">     164 </span>  [<span class="branchCov" title="Branch 0 was taken 74 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span><span class="branchCov" title="Branch 2 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">         76 :     switch (ttm-&gt;command) {</span>
+<span class="lineNum">     165 </span>                :            :     case NXTTMC_ADD:
+<span class="lineNum">     166 </span>                :<span class="lineCov">         74 :         new_map = table_alloc(old_map);</span>
+<span class="lineNum">     167 </span>                :            : 
+<span class="lineNum">     168 </span>        [<span class="branchCov" title="Branch 0 was taken 64 times"> + </span><span class="branchCov" title="Branch 1 was taken 73 times"> + </span>]:<span class="lineCov">        137 :         LIST_FOR_EACH (ofp_map, list_node, &amp;ttm-&gt;mappings) {</span>
+<span class="lineNum">     169 </span>                :<span class="lineCov">         64 :             err = tun_metadata_add_entry(new_map, ofp_map-&gt;index,</span>
+<span class="lineNum">     170 </span>                :<span class="lineCov">         64 :                                          ofp_map-&gt;option_class,</span>
+<span class="lineNum">     171 </span>                :<span class="lineCov">         64 :                                          ofp_map-&gt;option_type,</span>
+<span class="lineNum">     172 </span>                :<span class="lineCov">         64 :                                          ofp_map-&gt;option_len);</span>
+<span class="lineNum">     173 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 63 times"> + </span>]:<span class="lineCov">         64 :             if (err) {</span>
+<span class="lineNum">     174 </span>                :<span class="lineCov">          1 :                 table_free(new_map);</span>
+<span class="lineNum">     175 </span>                :<span class="lineCov">          1 :                 goto out;</span>
+<span class="lineNum">     176 </span>                :            :             }
+<span class="lineNum">     177 </span>                :            :         }
+<span class="lineNum">     178 </span>                :<span class="lineCov">         73 :         break;</span>
+<span class="lineNum">     179 </span>                :            : 
+<span class="lineNum">     180 </span>                :            :     case NXTTMC_DELETE:
+<span class="lineNum">     181 </span>                :<span class="lineCov">          1 :         new_map = table_alloc(old_map);</span>
+<span class="lineNum">     182 </span>                :            : 
+<span class="lineNum">     183 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          2 :         LIST_FOR_EACH (ofp_map, list_node, &amp;ttm-&gt;mappings) {</span>
+<span class="lineNum">     184 </span>                :<span class="lineCov">          1 :             tun_metadata_del_entry(new_map, ofp_map-&gt;index);</span>
+<span class="lineNum">     185 </span>                :            :         }
+<span class="lineNum">     186 </span>                :<span class="lineCov">          1 :         break;</span>
+<span class="lineNum">     187 </span>                :            : 
+<span class="lineNum">     188 </span>                :            :     case NXTTMC_CLEAR:
+<span class="lineNum">     189 </span>                :<span class="lineCov">          1 :         new_map = table_alloc(NULL);</span>
+<span class="lineNum">     190 </span>                :<span class="lineCov">          1 :         break;</span>
+<span class="lineNum">     191 </span>                :            : 
+<span class="lineNum">     192 </span>                :            :     default:
+<span class="lineNum">     193 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     194 </span>                :            :     }
+<span class="lineNum">     195 </span>                :            : 
+<span class="lineNum">     196 </span>                :<span class="lineCov">         75 :     ovsrcu_set(&amp;metadata_tab, new_map);</span>
+<span class="lineNum">     197 </span>                :<span class="lineCov">         75 :     ovsrcu_postpone(table_free, old_map);</span>
+<span class="lineNum">     198 </span>                :            : 
+<span class="lineNum">     199 </span>                :            : out:
+<span class="lineNum">     200 </span>                :<span class="lineCov">         76 :     ovs_mutex_unlock(&amp;tab_mutex);</span>
+<span class="lineNum">     201 </span>                :<span class="lineCov">         76 :     return err;</span>
+<span class="lineNum">     202 </span>                :            : }
+<a name="203"><span class="lineNum">     203 </span>                :            : </a>
+<span class="lineNum">     204 </span>                :            : void
+<span class="lineNum">     205 </span>                :<span class="lineCov">         46 : tun_metadata_table_request(struct ofputil_tlv_table_reply *ttr)</span>
+<span class="lineNum">     206 </span>                :            : {
+<span class="lineNum">     207 </span>                :<span class="lineCov">         46 :     struct tun_table *map = ovsrcu_get(struct tun_table *, &amp;metadata_tab);</span>
+<span class="lineNum">     208 </span>                :            :     int i;
+<span class="lineNum">     209 </span>                :            : 
+<span class="lineNum">     210 </span>                :<span class="lineCov">         46 :     ttr-&gt;max_option_space = TUN_METADATA_TOT_OPT_SIZE;</span>
+<span class="lineNum">     211 </span>                :<span class="lineCov">         46 :     ttr-&gt;max_fields = TUN_METADATA_NUM_OPTS;</span>
+<span class="lineNum">     212 </span>                :<span class="lineCov">         46 :     ovs_list_init(&amp;ttr-&gt;mappings);</span>
+<span class="lineNum">     213 </span>                :            : 
+<span class="lineNum">     214 </span>        [<span class="branchCov" title="Branch 0 was taken 2944 times"> + </span><span class="branchCov" title="Branch 1 was taken 46 times"> + </span>]:<span class="lineCov">       2990 :     for (i = 0; i &lt; TUN_METADATA_NUM_OPTS; i++) {</span>
+<span class="lineNum">     215 </span>                :<span class="lineCov">       2944 :         struct tun_meta_entry *entry = &amp;map-&gt;entries[i];</span>
+<span class="lineNum">     216 </span>                :            :         struct ofputil_tlv_map *map;
+<span class="lineNum">     217 </span>                :            : 
+<span class="lineNum">     218 </span>        [<span class="branchCov" title="Branch 0 was taken 2944 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       2944 :         if (!entry-&gt;valid) {</span>
+<span class="lineNum">     219 </span>                :<span class="lineCov">       2944 :             continue;</span>
+<span class="lineNum">     220 </span>                :            :         }
+<span class="lineNum">     221 </span>                :            : 
+<span class="lineNum">     222 </span>                :<span class="lineNoCov">          0 :         map = xmalloc(sizeof *map);</span>
+<span class="lineNum">     223 </span>                :<span class="lineNoCov">          0 :         map-&gt;option_class = ntohs(tun_key_class(entry-&gt;key));</span>
+<span class="lineNum">     224 </span>                :<span class="lineNoCov">          0 :         map-&gt;option_type = tun_key_type(entry-&gt;key);</span>
+<span class="lineNum">     225 </span>                :<span class="lineNoCov">          0 :         map-&gt;option_len = entry-&gt;loc.len;</span>
+<span class="lineNum">     226 </span>                :<span class="lineNoCov">          0 :         map-&gt;index = i;</span>
+<span class="lineNum">     227 </span>                :            : 
+<span class="lineNum">     228 </span>                :<span class="lineNoCov">          0 :         ovs_list_push_back(&amp;ttr-&gt;mappings, &amp;map-&gt;list_node);</span>
+<span class="lineNum">     229 </span>                :            :     }
+<span class="lineNum">     230 </span>                :<span class="lineCov">         46 : }</span>
+<span class="lineNum">     231 </span>                :            : 
+<span class="lineNum">     232 </span>                :            : /* Copies the value of field 'mf' from 'tnl' (which must be in non-UDPIF format) * into 'value'.
+<span class="lineNum">     233 </span>                :            :  *
+<span class="lineNum">     234 </span>                :            :  * 'mf' must be an MFF_TUN_METADATA* field.
+<span class="lineNum">     235 </span>                :            :  *
+<span class="lineNum">     236 </span>                :            :  * This uses the global tunnel metadata mapping table created by
+<span class="lineNum">     237 </span>                :            :  * tun_metadata_init().  If no such table has been created or if 'mf' hasn't
+<a name="238"><span class="lineNum">     238 </span>                :            :  * been allocated in it yet, this just zeros 'value'. */</a>
+<span class="lineNum">     239 </span>                :            : void
+<span class="lineNum">     240 </span>                :<span class="lineCov">      42374 : tun_metadata_read(const struct flow_tnl *tnl,</span>
+<span class="lineNum">     241 </span>                :            :                   const struct mf_field *mf, union mf_value *value)
+<span class="lineNum">     242 </span>                :            : {
+<span class="lineNum">     243 </span>                :<span class="lineCov">      42374 :     struct tun_table *map = ovsrcu_get(struct tun_table *, &amp;metadata_tab);</span>
+<span class="lineNum">     244 </span>                :<span class="lineCov">      42374 :     unsigned int idx = mf-&gt;id - MFF_TUN_METADATA0;</span>
+<span class="lineNum">     245 </span>                :            :     struct tun_metadata_loc *loc;
+<span class="lineNum">     246 </span>                :            : 
+<span class="lineNum">     247 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 42372 times"> + </span>]:<span class="lineCov">      42374 :     if (!map) {</span>
+<span class="lineNum">     248 </span>                :<span class="lineCov">          2 :         memset(value-&gt;tun_metadata, 0, mf-&gt;n_bytes);</span>
+<span class="lineNum">     249 </span>                :<span class="lineCov">          2 :         return;</span>
+<span class="lineNum">     250 </span>                :            :     }
+<span class="lineNum">     251 </span>                :            : 
+<span class="lineNum">     252 </span>                :<span class="lineCov">      42372 :     loc = &amp;map-&gt;entries[idx].loc;</span>
+<span class="lineNum">     253 </span>                :            : 
+<span class="lineNum">     254 </span>                :<span class="lineCov">      42372 :     memset(value-&gt;tun_metadata, 0, mf-&gt;n_bytes - loc-&gt;len);</span>
+<span class="lineNum">     255 </span>                :<span class="lineCov">      42372 :     memcpy_from_metadata(value-&gt;tun_metadata + mf-&gt;n_bytes - loc-&gt;len,</span>
+<span class="lineNum">     256 </span>                :            :                          &amp;tnl-&gt;metadata, loc);
+<span class="lineNum">     257 </span>                :            : }
+<span class="lineNum">     258 </span>                :            : 
+<span class="lineNum">     259 </span>                :            : /* Copies 'value' into field 'mf' in 'tnl' (in non-UDPIF format).
+<span class="lineNum">     260 </span>                :            :  *
+<span class="lineNum">     261 </span>                :            :  * 'mf' must be an MFF_TUN_METADATA* field.
+<span class="lineNum">     262 </span>                :            :  *
+<span class="lineNum">     263 </span>                :            :  * This uses the global tunnel metadata mapping table created by
+<span class="lineNum">     264 </span>                :            :  * tun_metadata_init().  If no such table has been created or if 'mf' hasn't
+<a name="265"><span class="lineNum">     265 </span>                :            :  * been allocated in it yet, this function does nothing. */</a>
+<span class="lineNum">     266 </span>                :            : void
+<span class="lineNum">     267 </span>                :<span class="lineCov">      24548 : tun_metadata_write(struct flow_tnl *tnl,</span>
+<span class="lineNum">     268 </span>                :            :                    const struct mf_field *mf, const union mf_value *value)
+<span class="lineNum">     269 </span>                :            : {
+<span class="lineNum">     270 </span>                :<span class="lineCov">      24548 :     struct tun_table *map = ovsrcu_get(struct tun_table *, &amp;metadata_tab);</span>
+<span class="lineNum">     271 </span>                :<span class="lineCov">      24548 :     unsigned int idx = mf-&gt;id - MFF_TUN_METADATA0;</span>
+<span class="lineNum">     272 </span>                :            :     struct tun_metadata_loc *loc;
+<span class="lineNum">     273 </span>                :            : 
+<span class="lineNum">     274 </span>[<span class="branchCov" title="Branch 0 was taken 24548 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 24548 times"> + </span>]:<span class="lineCov">      24548 :     if (!map || !map-&gt;entries[idx].valid) {</span>
+<span class="lineNum">     275 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     276 </span>                :            :     }
+<span class="lineNum">     277 </span>                :            : 
+<span class="lineNum">     278 </span>                :<span class="lineCov">      24548 :     loc = &amp;map-&gt;entries[idx].loc;</span>
+<span class="lineNum">     279 </span>                :<span class="lineCov">      24548 :     memcpy_to_metadata(&amp;tnl-&gt;metadata,</span>
+<span class="lineNum">     280 </span>                :<span class="lineCov">      24548 :                        value-&gt;tun_metadata + mf-&gt;n_bytes - loc-&gt;len, loc, idx);</span>
+<span class="lineNum">     281 </span>                :            : }
+<a name="282"><span class="lineNum">     282 </span>                :            : </a>
+<span class="lineNum">     283 </span>                :            : static const struct tun_metadata_loc *
+<span class="lineNum">     284 </span>                :<span class="lineCov">        104 : metadata_loc_from_match(struct tun_table *map, struct match *match,</span>
+<span class="lineNum">     285 </span>                :            :                         const char *name, unsigned int idx,
+<span class="lineNum">     286 </span>                :            :                         unsigned int field_len, bool masked, char **err_str)
+<span class="lineNum">     287 </span>                :            : {
+<span class="lineNum">     288 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 104 times"> + </span>]:<span class="lineCov">        104 :     ovs_assert(idx &lt; TUN_METADATA_NUM_OPTS);</span>
+<span class="lineNum">     289 </span>                :            : 
+<span class="lineNum">     290 </span>        [<span class="branchCov" title="Branch 0 was taken 96 times"> + </span><span class="branchCov" title="Branch 1 was taken 8 times"> + </span>]:<span class="lineCov">        104 :     if (err_str) {</span>
+<span class="lineNum">     291 </span>                :<span class="lineCov">         96 :         *err_str = NULL;</span>
+<span class="lineNum">     292 </span>                :            :     }
+<span class="lineNum">     293 </span>                :            : 
+<span class="lineNum">     294 </span>        [<span class="branchCov" title="Branch 0 was taken 53 times"> + </span><span class="branchCov" title="Branch 1 was taken 51 times"> + </span>]:<span class="lineCov">        104 :     if (map) {</span>
+<span class="lineNum">     295 </span>        [<span class="branchCov" title="Branch 0 was taken 53 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         53 :         if (map-&gt;entries[idx].valid) {</span>
+<span class="lineNum">     296 </span>                :<span class="lineCov">         53 :             return &amp;map-&gt;entries[idx].loc;</span>
+<span class="lineNum">     297 </span>                :            :         } else {
+<span class="lineNum">     298 </span>                :<span class="lineNoCov">          0 :             return NULL;</span>
+<span class="lineNum">     299 </span>                :            :         }
+<span class="lineNum">     300 </span>                :            :     }
+<span class="lineNum">     301 </span>                :            : 
+<span class="lineNum">     302 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 50 times"> + </span>]:<span class="lineCov">         51 :     if (match-&gt;tun_md.alloc_offset + field_len &gt; TUN_METADATA_TOT_OPT_SIZE) {</span>
+<span class="lineNum">     303 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          1 :         if (err_str) {</span>
+<span class="lineNum">     304 </span>                :<span class="lineCov">          1 :             *err_str = xasprintf(&quot;field %s exceeds maximum size for tunnel &quot;</span>
+<span class="lineNum">     305 </span>                :            :                                  &quot;metadata (used %d, max %d)&quot;, name,
+<span class="lineNum">     306 </span>                :<span class="lineCov">          1 :                                  match-&gt;tun_md.alloc_offset + field_len,</span>
+<span class="lineNum">     307 </span>                :            :                                  TUN_METADATA_TOT_OPT_SIZE);
+<span class="lineNum">     308 </span>                :            :         }
+<span class="lineNum">     309 </span>                :            : 
+<span class="lineNum">     310 </span>                :<span class="lineCov">          1 :         return NULL;</span>
+<span class="lineNum">     311 </span>                :            :     }
+<span class="lineNum">     312 </span>                :            : 
+<span class="lineNum">     313 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 49 times"> + </span>]:<span class="lineCov">         50 :     if (ULLONG_GET(match-&gt;wc.masks.tunnel.metadata.present.map, idx)) {</span>
+<span class="lineNum">     314 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          1 :         if (err_str) {</span>
+<span class="lineNum">     315 </span>                :<span class="lineCov">          1 :             *err_str = xasprintf(&quot;field %s set multiple times&quot;, name);</span>
+<span class="lineNum">     316 </span>                :            :         }
+<span class="lineNum">     317 </span>                :            : 
+<span class="lineNum">     318 </span>                :<span class="lineCov">          1 :         return NULL;</span>
+<span class="lineNum">     319 </span>                :            :     }
+<span class="lineNum">     320 </span>                :            : 
+<span class="lineNum">     321 </span>                :<span class="lineCov">         49 :     match-&gt;tun_md.entry[idx].loc.len = field_len;</span>
+<span class="lineNum">     322 </span>                :<span class="lineCov">         49 :     match-&gt;tun_md.entry[idx].loc.c.offset = match-&gt;tun_md.alloc_offset;</span>
+<span class="lineNum">     323 </span>                :<span class="lineCov">         49 :     match-&gt;tun_md.entry[idx].loc.c.len = field_len;</span>
+<span class="lineNum">     324 </span>                :<span class="lineCov">         49 :     match-&gt;tun_md.entry[idx].loc.c.next = NULL;</span>
+<span class="lineNum">     325 </span>                :<span class="lineCov">         49 :     match-&gt;tun_md.entry[idx].masked = masked;</span>
+<span class="lineNum">     326 </span>                :<span class="lineCov">         49 :     match-&gt;tun_md.alloc_offset += field_len;</span>
+<span class="lineNum">     327 </span>                :<span class="lineCov">         49 :     match-&gt;tun_md.valid = true;</span>
+<span class="lineNum">     328 </span>                :            : 
+<span class="lineNum">     329 </span>                :<span class="lineCov">         49 :     return &amp;match-&gt;tun_md.entry[idx].loc;</span>
+<span class="lineNum">     330 </span>                :            : }
+<span class="lineNum">     331 </span>                :            : 
+<span class="lineNum">     332 </span>                :            : /* Makes 'match' match 'value'/'mask' on field 'mf'.
+<span class="lineNum">     333 </span>                :            :  *
+<span class="lineNum">     334 </span>                :            :  * 'mf' must be an MFF_TUN_METADATA* field. 'match' must be in non-UDPIF format.
+<span class="lineNum">     335 </span>                :            :  *
+<span class="lineNum">     336 </span>                :            :  * If there is global tunnel metadata matching table, this function is
+<span class="lineNum">     337 </span>                :            :  * effective only if there is already a mapping for 'mf'.  Otherwise, the
+<span class="lineNum">     338 </span>                :            :  * metadata mapping table integrated into 'match' is used, adding 'mf' to its
+<span class="lineNum">     339 </span>                :            :  * mapping table if it isn't already mapped (and if there is room).  If 'mf'
+<span class="lineNum">     340 </span>                :            :  * isn't or can't be mapped, this function returns without modifying 'match'.
+<span class="lineNum">     341 </span>                :            :  *
+<span class="lineNum">     342 </span>                :            :  * 'value' may be NULL; if so, then 'mf' is made to match on an all-zeros
+<span class="lineNum">     343 </span>                :            :  * value.
+<span class="lineNum">     344 </span>                :            :  *
+<span class="lineNum">     345 </span>                :            :  * 'mask' may be NULL; if so, then 'mf' is made exact-match.
+<span class="lineNum">     346 </span>                :            :  *
+<span class="lineNum">     347 </span>                :            :  * If non-NULL, 'err_str' returns a malloc'ed string describing any errors
+<span class="lineNum">     348 </span>                :            :  * with the request or NULL if there is no error. The caller is reponsible
+<span class="lineNum">     349 </span>                :            :  * for freeing the string.
+<a name="350"><span class="lineNum">     350 </span>                :            :  */</a>
+<span class="lineNum">     351 </span>                :            : void
+<span class="lineNum">     352 </span>                :<span class="lineCov">        102 : tun_metadata_set_match(const struct mf_field *mf, const union mf_value *value,</span>
+<span class="lineNum">     353 </span>                :            :                        const union mf_value *mask, struct match *match,
+<span class="lineNum">     354 </span>                :            :                        char **err_str)
+<span class="lineNum">     355 </span>                :            : {
+<span class="lineNum">     356 </span>                :<span class="lineCov">        102 :     struct tun_table *map = ovsrcu_get(struct tun_table *, &amp;metadata_tab);</span>
+<span class="lineNum">     357 </span>                :            :     const struct tun_metadata_loc *loc;
+<span class="lineNum">     358 </span>                :<span class="lineCov">        102 :     unsigned int idx = mf-&gt;id - MFF_TUN_METADATA0;</span>
+<span class="lineNum">     359 </span>                :            :     unsigned int field_len;
+<span class="lineNum">     360 </span>                :            :     bool is_masked;
+<span class="lineNum">     361 </span>                :            :     unsigned int data_offset;
+<span class="lineNum">     362 </span>                :            :     union mf_value data;
+<span class="lineNum">     363 </span>                :            : 
+<span class="lineNum">     364 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 102 times"> + </span>]:<span class="lineCov">        102 :     ovs_assert(!(match-&gt;flow.tunnel.flags &amp; FLOW_TNL_F_UDPIF));</span>
+<span class="lineNum">     365 </span>                :            : 
+<span class="lineNum">     366 </span>                :<span class="lineCov">        102 :     field_len = mf_field_len(mf, value, mask, &amp;is_masked);</span>
+<span class="lineNum">     367 </span>                :<span class="lineCov">        102 :     loc = metadata_loc_from_match(map, match, mf-&gt;name, idx, field_len,</span>
+<span class="lineNum">     368 </span>                :            :                                   is_masked, err_str);
+<span class="lineNum">     369 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 100 times"> + </span>]:<span class="lineCov">        102 :     if (!loc) {</span>
+<span class="lineNum">     370 </span>                :<span class="lineCov">          2 :         return;</span>
+<span class="lineNum">     371 </span>                :            :     }
+<span class="lineNum">     372 </span>                :            : 
+<span class="lineNum">     373 </span>                :<span class="lineCov">        100 :     data_offset = mf-&gt;n_bytes - loc-&gt;len;</span>
+<span class="lineNum">     374 </span>                :            : 
+<span class="lineNum">     375 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 100 times"> + </span>]:<span class="lineCov">        100 :     if (!value) {</span>
+<span class="lineNum">     376 </span>                :<span class="lineNoCov">          0 :         memset(data.tun_metadata, 0, loc-&gt;len);</span>
+<span class="lineNum">     377 </span>        [<span class="branchCov" title="Branch 0 was taken 73 times"> + </span><span class="branchCov" title="Branch 1 was taken 27 times"> + </span>]:<span class="lineCov">        100 :     } else if (!mask) {</span>
+<span class="lineNum">     378 </span>                :<span class="lineCov">         73 :         memcpy(data.tun_metadata, value-&gt;tun_metadata + data_offset, loc-&gt;len);</span>
+<span class="lineNum">     379 </span>                :            :     } else {
+<span class="lineNum">     380 </span>                :            :         int i;
+<span class="lineNum">     381 </span>        [<span class="branchCov" title="Branch 0 was taken 71 times"> + </span><span class="branchCov" title="Branch 1 was taken 27 times"> + </span>]:<span class="lineCov">         98 :         for (i = 0; i &lt; loc-&gt;len; i++) {</span>
+<span class="lineNum">     382 </span>                :<span class="lineCov">        142 :             data.tun_metadata[i] = value-&gt;tun_metadata[data_offset + i] &amp;</span>
+<span class="lineNum">     383 </span>                :<span class="lineCov">         71 :                                    mask-&gt;tun_metadata[data_offset + i];</span>
+<span class="lineNum">     384 </span>                :            :         }
+<span class="lineNum">     385 </span>                :            :     }
+<span class="lineNum">     386 </span>                :<span class="lineCov">        100 :     memcpy_to_metadata(&amp;match-&gt;flow.tunnel.metadata, data.tun_metadata,</span>
+<span class="lineNum">     387 </span>                :            :                        loc, idx);
+<span class="lineNum">     388 </span>                :            : 
+<span class="lineNum">     389 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 100 times"> + </span>]:<span class="lineCov">        100 :     if (!value) {</span>
+<span class="lineNum">     390 </span>                :<span class="lineNoCov">          0 :         memset(data.tun_metadata, 0, loc-&gt;len);</span>
+<span class="lineNum">     391 </span>        [<span class="branchCov" title="Branch 0 was taken 73 times"> + </span><span class="branchCov" title="Branch 1 was taken 27 times"> + </span>]:<span class="lineCov">        100 :     } else if (!mask) {</span>
+<span class="lineNum">     392 </span>                :<span class="lineCov">         73 :         memset(data.tun_metadata, 0xff, loc-&gt;len);</span>
+<span class="lineNum">     393 </span>                :            :     } else {
+<span class="lineNum">     394 </span>                :<span class="lineCov">         27 :         memcpy(data.tun_metadata, mask-&gt;tun_metadata + data_offset, loc-&gt;len);</span>
+<span class="lineNum">     395 </span>                :            :     }
+<span class="lineNum">     396 </span>                :<span class="lineCov">        100 :     memcpy_to_metadata(&amp;match-&gt;wc.masks.tunnel.metadata, data.tun_metadata,</span>
+<span class="lineNum">     397 </span>                :            :                        loc, idx);
+<span class="lineNum">     398 </span>                :            : }
+<a name="399"><span class="lineNum">     399 </span>                :            : </a>
+<span class="lineNum">     400 </span>                :            : static bool
+<span class="lineNum">     401 </span>                :<span class="lineCov">     167675 : udpif_to_parsed(const struct flow_tnl *flow, const struct flow_tnl *mask,</span>
+<span class="lineNum">     402 </span>                :            :                 struct flow_tnl *flow_xlate, struct flow_tnl *mask_xlate)
+<span class="lineNum">     403 </span>                :            : {
+<span class="lineNum">     404 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 167675 times"> + </span>]:<span class="lineCov">     167675 :     if (flow-&gt;flags &amp; FLOW_TNL_F_UDPIF) {</span>
+<span class="lineNum">     405 </span>                :            :         int err;
+<span class="lineNum">     406 </span>                :            : 
+<span class="lineNum">     407 </span>                :<span class="lineNoCov">          0 :         err = tun_metadata_from_geneve_udpif(flow, flow, flow_xlate);</span>
+<span class="lineNum">     408 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (err) {</span>
+<span class="lineNum">     409 </span>                :<span class="lineNoCov">          0 :             return false;</span>
+<span class="lineNum">     410 </span>                :            :         }
+<span class="lineNum">     411 </span>                :            : 
+<span class="lineNum">     412 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (mask) {</span>
+<span class="lineNum">     413 </span>                :<span class="lineNoCov">          0 :             tun_metadata_from_geneve_udpif(flow, mask, mask_xlate);</span>
+<span class="lineNum">     414 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             if (err) {</span>
+<span class="lineNum">     415 </span>                :<span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     416 </span>                :            :             }
+<span class="lineNum">     417 </span>                :            :         }
+<span class="lineNum">     418 </span>                :            :     } else {
+<span class="lineNum">     419 </span>        [<span class="branchCov" title="Branch 0 was taken 167475 times"> + </span><span class="branchCov" title="Branch 1 was taken 200 times"> + </span>]:<span class="lineCov">     167675 :         if (flow-&gt;metadata.present.map == 0) {</span>
+<span class="lineNum">     420 </span>                :            :             /* There is no tunnel metadata, don't bother copying. */
+<span class="lineNum">     421 </span>                :<span class="lineCov">     167475 :             return false;</span>
+<span class="lineNum">     422 </span>                :            :         }
+<span class="lineNum">     423 </span>                :            : 
+<span class="lineNum">     424 </span>                :<span class="lineCov">        200 :         memcpy(flow_xlate, flow, sizeof *flow_xlate);</span>
+<span class="lineNum">     425 </span>        [<span class="branchCov" title="Branch 0 was taken 198 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">        200 :         if (mask) {</span>
+<span class="lineNum">     426 </span>                :<span class="lineCov">        198 :             memcpy(mask_xlate, mask, sizeof *mask_xlate);</span>
+<span class="lineNum">     427 </span>                :            :         }
+<span class="lineNum">     428 </span>                :            : 
+<span class="lineNum">     429 </span>        [<span class="branchCov" title="Branch 0 was taken 101 times"> + </span><span class="branchCov" title="Branch 1 was taken 99 times"> + </span>]:<span class="lineCov">        200 :         if (!flow_xlate-&gt;metadata.tab) {</span>
+<span class="lineNum">     430 </span>                :<span class="lineCov">        101 :             flow_xlate-&gt;metadata.tab = ovsrcu_get(struct tun_table *,</span>
+<span class="lineNum">     431 </span>                :            :                                                   &amp;metadata_tab);
+<span class="lineNum">     432 </span>                :            :         }
+<span class="lineNum">     433 </span>                :            :     }
+<span class="lineNum">     434 </span>                :            : 
+<span class="lineNum">     435 </span>                :<span class="lineCov">        200 :     return true;</span>
+<span class="lineNum">     436 </span>                :            : }
+<span class="lineNum">     437 </span>                :            : 
+<a name="438"><span class="lineNum">     438 </span>                :            : /* Copies all MFF_TUN_METADATA* fields from 'tnl' to 'flow_metadata'. */</a>
+<span class="lineNum">     439 </span>                :            : void
+<span class="lineNum">     440 </span>                :<span class="lineCov">       1051 : tun_metadata_get_fmd(const struct flow_tnl *tnl, struct match *flow_metadata)</span>
+<span class="lineNum">     441 </span>                :            : {
+<span class="lineNum">     442 </span>                :            :     struct flow_tnl flow;
+<span class="lineNum">     443 </span>                :            :     int i;
+<span class="lineNum">     444 </span>                :            : 
+<span class="lineNum">     445 </span>        [<span class="branchCov" title="Branch 1 was taken 1049 times"> + </span><span class="branchCov" title="Branch 2 was taken 2 times"> + </span>]:<span class="lineCov">       1051 :     if (!udpif_to_parsed(tnl, NULL, &amp;flow, NULL)) {</span>
+<span class="lineNum">     446 </span>                :<span class="lineCov">       1049 :         return;</span>
+<span class="lineNum">     447 </span>                :            :     }
+<span class="lineNum">     448 </span>                :            : 
+<span class="lineNum">     449 </span>        [<span class="branchCov" title="Branch 1 was taken 2 times"> + </span><span class="branchCov" title="Branch 2 was taken 2 times"> + </span>]:<span class="lineCov">          4 :     ULLONG_FOR_EACH_1 (i, flow.metadata.present.map) {</span>
+<span class="lineNum">     450 </span>                :            :         union mf_value opts;
+<span class="lineNum">     451 </span>                :<span class="lineCov">          2 :         const struct tun_metadata_loc *old_loc = &amp;flow.metadata.tab-&gt;entries[i].loc;</span>
+<span class="lineNum">     452 </span>                :            :         const struct tun_metadata_loc *new_loc;
+<span class="lineNum">     453 </span>                :            : 
+<span class="lineNum">     454 </span>                :<span class="lineCov">          2 :         new_loc = metadata_loc_from_match(NULL, flow_metadata, NULL, i,</span>
+<span class="lineNum">     455 </span>                :<span class="lineCov">          2 :                                           old_loc-&gt;len, false, NULL);</span>
+<span class="lineNum">     456 </span>                :            : 
+<span class="lineNum">     457 </span>                :<span class="lineCov">          2 :         memcpy_from_metadata(opts.tun_metadata, &amp;flow.metadata, old_loc);</span>
+<span class="lineNum">     458 </span>                :<span class="lineCov">          2 :         memcpy_to_metadata(&amp;flow_metadata-&gt;flow.tunnel.metadata,</span>
+<span class="lineNum">     459 </span>                :            :                            opts.tun_metadata, new_loc, i);
+<span class="lineNum">     460 </span>                :            : 
+<span class="lineNum">     461 </span>                :<span class="lineCov">          2 :         memset(opts.tun_metadata, 0xff, old_loc-&gt;len);</span>
+<span class="lineNum">     462 </span>                :<span class="lineCov">          2 :         memcpy_to_metadata(&amp;flow_metadata-&gt;wc.masks.tunnel.metadata,</span>
+<span class="lineNum">     463 </span>                :            :                            opts.tun_metadata, new_loc, i);
+<span class="lineNum">     464 </span>                :            :     }
+<span class="lineNum">     465 </span>                :            : }
+<a name="466"><span class="lineNum">     466 </span>                :            : </a>
+<span class="lineNum">     467 </span>                :            : static uint32_t
+<span class="lineNum">     468 </span>                :<span class="lineCov">      18652 : tun_meta_hash(uint32_t key)</span>
+<span class="lineNum">     469 </span>                :            : {
+<span class="lineNum">     470 </span>                :<span class="lineCov">      18652 :     return hash_int(key, 0);</span>
+<span class="lineNum">     471 </span>                :            : }
+<a name="472"><span class="lineNum">     472 </span>                :            : </a>
+<span class="lineNum">     473 </span>                :            : static struct tun_meta_entry *
+<span class="lineNum">     474 </span>                :<span class="lineCov">      18588 : tun_meta_find_key(const struct hmap *hmap, uint32_t key)</span>
+<span class="lineNum">     475 </span>                :            : {
+<span class="lineNum">     476 </span>                :            :     struct tun_meta_entry *entry;
+<span class="lineNum">     477 </span>                :            : 
+<span class="lineNum">     478 </span>[<span class="branchCov" title="Branch 3 was taken 18530 times"> + </span><span class="branchCov" title="Branch 4 was taken 71 times"> + </span>][<span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchCov" title="Branch 6 was taken 71 times"> + </span>]:<span class="lineCov">      18601 :     HMAP_FOR_EACH_IN_BUCKET (entry, node, tun_meta_hash(key), hmap) {</span>
+<span class="lineNum">     479 </span>        [<span class="branchCov" title="Branch 0 was taken 18517 times"> + </span><span class="branchCov" title="Branch 1 was taken 13 times"> + </span>]:<span class="lineCov">      18530 :         if (entry-&gt;key == key) {</span>
+<span class="lineNum">     480 </span>                :<span class="lineCov">      18517 :             return entry;</span>
+<span class="lineNum">     481 </span>                :            :         }
+<span class="lineNum">     482 </span>                :            :     }
+<span class="lineNum">     483 </span>                :<span class="lineCov">         71 :     return NULL;</span>
+<span class="lineNum">     484 </span>                :            : }
+<a name="485"><span class="lineNum">     485 </span>                :            : </a>
+<span class="lineNum">     486 </span>                :            : static void
+<span class="lineNum">     487 </span>                :<span class="lineCov">      41673 : memcpy_to_metadata(struct tun_metadata *dst, const void *src,</span>
+<span class="lineNum">     488 </span>                :            :                    const struct tun_metadata_loc *loc, unsigned int idx)
+<span class="lineNum">     489 </span>                :            : {
+<span class="lineNum">     490 </span>                :<span class="lineCov">      41673 :     const struct tun_metadata_loc_chain *chain = &amp;loc-&gt;c;</span>
+<span class="lineNum">     491 </span>                :<span class="lineCov">      41673 :     int addr = 0;</span>
+<span class="lineNum">     492 </span>                :            : 
+<span class="lineNum">     493 </span>        [<span class="branchCov" title="Branch 0 was taken 41678 times"> + </span><span class="branchCov" title="Branch 1 was taken 41673 times"> + </span>]:<span class="lineCov">      83351 :     while (chain) {</span>
+<span class="lineNum">     494 </span>                :<span class="lineCov">      41678 :         memcpy(dst-&gt;opts.u8 + chain-&gt;offset, (uint8_t *)src + addr,</span>
+<span class="lineNum">     495 </span>                :<span class="lineCov">      41678 :                chain-&gt;len);</span>
+<span class="lineNum">     496 </span>                :<span class="lineCov">      41678 :         addr += chain-&gt;len;</span>
+<span class="lineNum">     497 </span>                :<span class="lineCov">      41678 :         chain = chain-&gt;next;</span>
+<span class="lineNum">     498 </span>                :            :     }
+<span class="lineNum">     499 </span>                :            : 
+<span class="lineNum">     500 </span>                :<span class="lineCov">      41673 :     ULLONG_SET1(dst-&gt;present.map, idx);</span>
+<span class="lineNum">     501 </span>                :<span class="lineCov">      41673 : }</span>
+<a name="502"><span class="lineNum">     502 </span>                :            : </a>
+<span class="lineNum">     503 </span>                :            : static void
+<span class="lineNum">     504 </span>                :<span class="lineCov">      47565 : memcpy_from_metadata(void *dst, const struct tun_metadata *src,</span>
+<span class="lineNum">     505 </span>                :            :                      const struct tun_metadata_loc *loc)
+<span class="lineNum">     506 </span>                :            : {
+<span class="lineNum">     507 </span>                :<span class="lineCov">      47565 :     const struct tun_metadata_loc_chain *chain = &amp;loc-&gt;c;</span>
+<span class="lineNum">     508 </span>                :<span class="lineCov">      47565 :     int addr = 0;</span>
+<span class="lineNum">     509 </span>                :            : 
+<span class="lineNum">     510 </span>        [<span class="branchCov" title="Branch 0 was taken 47577 times"> + </span><span class="branchCov" title="Branch 1 was taken 47565 times"> + </span>]:<span class="lineCov">      95142 :     while (chain) {</span>
+<span class="lineNum">     511 </span>                :<span class="lineCov">      47577 :         memcpy((uint8_t *)dst + addr, src-&gt;opts.u8 + chain-&gt;offset,</span>
+<span class="lineNum">     512 </span>                :<span class="lineCov">      47577 :                chain-&gt;len);</span>
+<span class="lineNum">     513 </span>                :<span class="lineCov">      47577 :         addr += chain-&gt;len;</span>
+<span class="lineNum">     514 </span>                :<span class="lineCov">      47577 :         chain = chain-&gt;next;</span>
+<span class="lineNum">     515 </span>                :            :     }
+<span class="lineNum">     516 </span>                :<span class="lineCov">      47565 : }</span>
+<a name="517"><span class="lineNum">     517 </span>                :            : </a>
+<span class="lineNum">     518 </span>                :            : static int
+<span class="lineNum">     519 </span>                :<span class="lineCov">         65 : tun_metadata_alloc_chain(struct tun_table *map, uint8_t len,</span>
+<span class="lineNum">     520 </span>                :            :                          struct tun_metadata_loc_chain *loc)
+<span class="lineNum">     521 </span>                :            :                          OVS_REQUIRES(tab_mutex)
+<span class="lineNum">     522 </span>                :            : {
+<span class="lineNum">     523 </span>                :<span class="lineCov">         65 :     int alloc_len = len / 4;</span>
+<span class="lineNum">     524 </span>                :<span class="lineCov">         65 :     int scan_start = 0;</span>
+<span class="lineNum">     525 </span>                :<span class="lineCov">         65 :     int scan_end = TUN_METADATA_TOT_OPT_SIZE / 4;</span>
+<span class="lineNum">     526 </span>                :            :     int pos_start, pos_end, pos_len;
+<span class="lineNum">     527 </span>                :<span class="lineCov">         65 :     int best_start = 0, best_len = 0;</span>
+<span class="lineNum">     528 </span>                :            : 
+<span class="lineNum">     529 </span>                :            :     while (true) {
+<span class="lineNum">     530 </span>                :<span class="lineCov">         68 :         pos_start = bitmap_scan(map-&gt;alloc_map, 0, scan_start, scan_end);</span>
+<span class="lineNum">     531 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 65 times"> + </span>]:<span class="lineCov">         68 :         if (pos_start == scan_end) {</span>
+<span class="lineNum">     532 </span>                :<span class="lineCov">          3 :             break;</span>
+<span class="lineNum">     533 </span>                :            :         }
+<span class="lineNum">     534 </span>                :            : 
+<span class="lineNum">     535 </span>                :<span class="lineCov">         65 :         pos_end = bitmap_scan(map-&gt;alloc_map, 1, pos_start,</span>
+<span class="lineNum">     536 </span>                :<span class="lineCov">         65 :                               MIN(pos_start + alloc_len, scan_end));</span>
+<span class="lineNum">     537 </span>                :<span class="lineCov">         65 :         pos_len = pos_end - pos_start;</span>
+<span class="lineNum">     538 </span>        [<span class="branchCov" title="Branch 0 was taken 62 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">         65 :         if (pos_len == alloc_len) {</span>
+<span class="lineNum">     539 </span>                :<span class="lineCov">         62 :             goto found;</span>
+<span class="lineNum">     540 </span>                :            :         }
+<span class="lineNum">     541 </span>                :            : 
+<span class="lineNum">     542 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 1 time"> + </span>]:<span class="lineCov">          3 :         if (pos_len &gt; best_len) {</span>
+<span class="lineNum">     543 </span>                :<span class="lineCov">          2 :             best_start = pos_start;</span>
+<span class="lineNum">     544 </span>                :<span class="lineCov">          2 :             best_len = pos_len;</span>
+<span class="lineNum">     545 </span>                :            :         }
+<span class="lineNum">     546 </span>                :<span class="lineCov">          3 :         scan_start = pos_end + 1;</span>
+<span class="lineNum">     547 </span>                :<span class="lineCov">          3 :     }</span>
+<span class="lineNum">     548 </span>                :            : 
+<span class="lineNum">     549 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">          3 :     if (best_len == 0) {</span>
+<span class="lineNum">     550 </span>                :<span class="lineCov">          1 :         return ENOSPC;</span>
+<span class="lineNum">     551 </span>                :            :     }
+<span class="lineNum">     552 </span>                :            : 
+<span class="lineNum">     553 </span>                :<span class="lineCov">          2 :     pos_start = best_start;</span>
+<span class="lineNum">     554 </span>                :<span class="lineCov">          2 :     pos_len = best_len;</span>
+<span class="lineNum">     555 </span>                :            : 
+<span class="lineNum">     556 </span>                :            : found:
+<span class="lineNum">     557 </span>                :<span class="lineCov">         64 :     bitmap_set_multiple(map-&gt;alloc_map, pos_start, pos_len, 1);</span>
+<span class="lineNum">     558 </span>                :<span class="lineCov">         64 :     loc-&gt;offset = pos_start * 4;</span>
+<span class="lineNum">     559 </span>                :<span class="lineCov">         64 :     loc-&gt;len = pos_len * 4;</span>
+<span class="lineNum">     560 </span>                :            : 
+<span class="lineNum">     561 </span>                :<span class="lineCov">         64 :     return 0;</span>
+<span class="lineNum">     562 </span>                :            : }
+<a name="563"><span class="lineNum">     563 </span>                :            : </a>
+<span class="lineNum">     564 </span>                :            : static enum ofperr
+<span class="lineNum">     565 </span>                :<span class="lineCov">         64 : tun_metadata_add_entry(struct tun_table *map, uint8_t idx, uint16_t opt_class,</span>
+<span class="lineNum">     566 </span>                :            :                        uint8_t type, uint8_t len) OVS_REQUIRES(tab_mutex)
+<span class="lineNum">     567 </span>                :            : {
+<span class="lineNum">     568 </span>                :            :     struct tun_meta_entry *entry;
+<span class="lineNum">     569 </span>                :            :     struct tun_metadata_loc_chain *cur_chain, *prev_chain;
+<span class="lineNum">     570 </span>                :            : 
+<span class="lineNum">     571 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 64 times"> + </span>]:<span class="lineCov">         64 :     ovs_assert(idx &lt; TUN_METADATA_NUM_OPTS);</span>
+<span class="lineNum">     572 </span>                :            : 
+<span class="lineNum">     573 </span>                :<span class="lineCov">         64 :     entry = &amp;map-&gt;entries[idx];</span>
+<span class="lineNum">     574 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 64 times"> + </span>]:<span class="lineCov">         64 :     if (entry-&gt;valid) {</span>
+<span class="lineNum">     575 </span>                :<span class="lineNoCov">          0 :         return OFPERR_NXTTMFC_ALREADY_MAPPED;</span>
+<span class="lineNum">     576 </span>                :            :     }
+<span class="lineNum">     577 </span>                :            : 
+<span class="lineNum">     578 </span>                :<span class="lineCov">         64 :     entry-&gt;key = tun_meta_key(htons(opt_class), type);</span>
+<span class="lineNum">     579 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 64 times"> + </span>]:<span class="lineCov">         64 :     if (tun_meta_find_key(&amp;map-&gt;key_hmap, entry-&gt;key)) {</span>
+<span class="lineNum">     580 </span>                :<span class="lineNoCov">          0 :         return OFPERR_NXTTMFC_DUP_ENTRY;</span>
+<span class="lineNum">     581 </span>                :            :     }
+<span class="lineNum">     582 </span>                :            : 
+<span class="lineNum">     583 </span>                :<span class="lineCov">         64 :     entry-&gt;valid = true;</span>
+<span class="lineNum">     584 </span>                :<span class="lineCov">         64 :     hmap_insert(&amp;map-&gt;key_hmap, &amp;entry-&gt;node,</span>
+<span class="lineNum">     585 </span>                :            :                 tun_meta_hash(entry-&gt;key));
+<span class="lineNum">     586 </span>                :            : 
+<span class="lineNum">     587 </span>                :<span class="lineCov">         64 :     entry-&gt;loc.len = len;</span>
+<span class="lineNum">     588 </span>                :<span class="lineCov">         64 :     cur_chain = &amp;entry-&gt;loc.c;</span>
+<span class="lineNum">     589 </span>                :<span class="lineCov">         64 :     memset(cur_chain, 0, sizeof *cur_chain);</span>
+<span class="lineNum">     590 </span>                :<span class="lineCov">         64 :     prev_chain = NULL;</span>
+<span class="lineNum">     591 </span>                :            : 
+<span class="lineNum">     592 </span>        [<span class="branchCov" title="Branch 0 was taken 65 times"> + </span><span class="branchCov" title="Branch 1 was taken 63 times"> + </span>]:<span class="lineCov">        128 :     while (len) {</span>
+<span class="lineNum">     593 </span>                :            :         int err;
+<span class="lineNum">     594 </span>                :            : 
+<span class="lineNum">     595 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 63 times"> + </span>]:<span class="lineCov">         65 :         if (!cur_chain) {</span>
+<span class="lineNum">     596 </span>                :<span class="lineCov">          2 :             cur_chain = xzalloc(sizeof *cur_chain);</span>
+<span class="lineNum">     597 </span>                :<span class="lineCov">          2 :             prev_chain-&gt;next = cur_chain;</span>
+<span class="lineNum">     598 </span>                :            :         }
+<span class="lineNum">     599 </span>                :            : 
+<span class="lineNum">     600 </span>                :<span class="lineCov">         65 :         err = tun_metadata_alloc_chain(map, len, cur_chain);</span>
+<span class="lineNum">     601 </span>        [<span class="branchCov" title="Branch 0 was taken 1 time"> + </span><span class="branchCov" title="Branch 1 was taken 64 times"> + </span>]:<span class="lineCov">         65 :         if (err) {</span>
+<span class="lineNum">     602 </span>                :<span class="lineCov">          1 :             tun_metadata_del_entry(map, idx);</span>
+<span class="lineNum">     603 </span>                :<span class="lineCov">          1 :             return OFPERR_NXTTMFC_TABLE_FULL;</span>
+<span class="lineNum">     604 </span>                :            :         }
+<span class="lineNum">     605 </span>                :            : 
+<span class="lineNum">     606 </span>                :<span class="lineCov">         64 :         len -= cur_chain-&gt;len;</span>
+<span class="lineNum">     607 </span>                :            : 
+<span class="lineNum">     608 </span>                :<span class="lineCov">         64 :         prev_chain = cur_chain;</span>
+<span class="lineNum">     609 </span>                :<span class="lineCov">         64 :         cur_chain = NULL;</span>
+<span class="lineNum">     610 </span>                :            :     }
+<span class="lineNum">     611 </span>                :            : 
+<span class="lineNum">     612 </span>                :<span class="lineCov">         63 :     return 0;</span>
+<span class="lineNum">     613 </span>                :            : }
+<a name="614"><span class="lineNum">     614 </span>                :            : </a>
+<span class="lineNum">     615 </span>                :            : static void
+<span class="lineNum">     616 </span>                :<span class="lineCov">         28 : tun_metadata_del_entry(struct tun_table *map, uint8_t idx)</span>
+<span class="lineNum">     617 </span>                :            :                        OVS_REQUIRES(tab_mutex)
+<span class="lineNum">     618 </span>                :            : {
+<span class="lineNum">     619 </span>                :            :     struct tun_meta_entry *entry;
+<span class="lineNum">     620 </span>                :            :     struct tun_metadata_loc_chain *chain;
+<span class="lineNum">     621 </span>                :            : 
+<span class="lineNum">     622 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 28 times"> + </span>]:<span class="lineCov">         28 :     if (idx &gt;= TUN_METADATA_NUM_OPTS) {</span>
+<span class="lineNum">     623 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     624 </span>                :            :     }
+<span class="lineNum">     625 </span>                :            : 
+<span class="lineNum">     626 </span>                :<span class="lineCov">         28 :     entry = &amp;map-&gt;entries[idx];</span>
+<span class="lineNum">     627 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 28 times"> + </span>]:<span class="lineCov">         28 :     if (!entry-&gt;valid) {</span>
+<span class="lineNum">     628 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     629 </span>                :            :     }
+<span class="lineNum">     630 </span>                :            : 
+<span class="lineNum">     631 </span>                :<span class="lineCov">         28 :     chain = &amp;entry-&gt;loc.c;</span>
+<span class="lineNum">     632 </span>        [<span class="branchCov" title="Branch 0 was taken 30 times"> + </span><span class="branchCov" title="Branch 1 was taken 28 times"> + </span>]:<span class="lineCov">         58 :     while (chain) {</span>
+<span class="lineNum">     633 </span>                :<span class="lineCov">         30 :         struct tun_metadata_loc_chain *next = chain-&gt;next;</span>
+<span class="lineNum">     634 </span>                :            : 
+<span class="lineNum">     635 </span>                :<span class="lineCov">         30 :         bitmap_set_multiple(map-&gt;alloc_map, chain-&gt;offset / 4,</span>
+<span class="lineNum">     636 </span>                :<span class="lineCov">         30 :                             chain-&gt;len / 4, 0);</span>
+<span class="lineNum">     637 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 28 times"> + </span>]:<span class="lineCov">         30 :         if (chain != &amp;entry-&gt;loc.c) {</span>
+<span class="lineNum">     638 </span>                :<span class="lineCov">          2 :             free(chain);</span>
+<span class="lineNum">     639 </span>                :            :         }
+<span class="lineNum">     640 </span>                :<span class="lineCov">         30 :         chain = next;</span>
+<span class="lineNum">     641 </span>                :            :     }
+<span class="lineNum">     642 </span>                :            : 
+<span class="lineNum">     643 </span>                :<span class="lineCov">         28 :     entry-&gt;valid = false;</span>
+<span class="lineNum">     644 </span>                :<span class="lineCov">         28 :     hmap_remove(&amp;map-&gt;key_hmap, &amp;entry-&gt;node);</span>
+<span class="lineNum">     645 </span>                :<span class="lineCov">         28 :     memset(&amp;entry-&gt;loc, 0, sizeof entry-&gt;loc);</span>
+<span class="lineNum">     646 </span>                :            : }
+<a name="647"><span class="lineNum">     647 </span>                :            : </a>
+<span class="lineNum">     648 </span>                :            : static int
+<span class="lineNum">     649 </span>                :<span class="lineCov">      16921 : tun_metadata_from_geneve__(const struct tun_metadata *flow_metadata,</span>
+<span class="lineNum">     650 </span>                :            :                            const struct geneve_opt *opt,
+<span class="lineNum">     651 </span>                :            :                            const struct geneve_opt *flow_opt, int opts_len,
+<span class="lineNum">     652 </span>                :            :                            struct tun_metadata *metadata)
+<span class="lineNum">     653 </span>                :            : {
+<span class="lineNum">     654 </span>                :            :     struct tun_table *map;
+<span class="lineNum">     655 </span>                :<span class="lineCov">      16921 :     bool is_mask = flow_opt != opt;</span>
+<span class="lineNum">     656 </span>                :            : 
+<span class="lineNum">     657 </span>        [<span class="branchCov" title="Branch 0 was taken 9017 times"> + </span><span class="branchCov" title="Branch 1 was taken 7904 times"> + </span>]:<span class="lineCov">      16921 :     if (!is_mask) {</span>
+<span class="lineNum">     658 </span>                :<span class="lineCov">       9017 :         map = ovsrcu_get(struct tun_table *, &amp;metadata_tab);</span>
+<span class="lineNum">     659 </span>                :<span class="lineCov">       9017 :         metadata-&gt;tab = map;</span>
+<span class="lineNum">     660 </span>                :            :     } else {
+<span class="lineNum">     661 </span>                :<span class="lineCov">       7904 :         map = flow_metadata-&gt;tab;</span>
+<span class="lineNum">     662 </span>                :            :     }
+<span class="lineNum">     663 </span>                :            : 
+<span class="lineNum">     664 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 16921 times"> + </span>]:<span class="lineCov">      16921 :     if (!map) {</span>
+<span class="lineNum">     665 </span>                :<span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     666 </span>                :            :     }
+<span class="lineNum">     667 </span>                :            : 
+<span class="lineNum">     668 </span>        [<span class="branchCov" title="Branch 0 was taken 16926 times"> + </span><span class="branchCov" title="Branch 1 was taken 16921 times"> + </span>]:<span class="lineCov">      33847 :     while (opts_len &gt; 0) {</span>
+<span class="lineNum">     669 </span>                :            :         int len;
+<span class="lineNum">     670 </span>                :            :         struct tun_meta_entry *entry;
+<span class="lineNum">     671 </span>                :            : 
+<span class="lineNum">     672 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 16926 times"> + </span>]:<span class="lineCov">      16926 :         if (opts_len &lt; sizeof(*opt)) {</span>
+<span class="lineNum">     673 </span>                :<span class="lineNoCov">          0 :             return EINVAL;</span>
+<span class="lineNum">     674 </span>                :            :         }
+<span class="lineNum">     675 </span>                :            : 
+<span class="lineNum">     676 </span>                :<span class="lineCov">      16926 :         len = sizeof(*opt) + flow_opt-&gt;length * 4;</span>
+<span class="lineNum">     677 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 16926 times"> + </span>]:<span class="lineCov">      16926 :         if (len &gt; opts_len) {</span>
+<span class="lineNum">     678 </span>                :<span class="lineNoCov">          0 :             return EINVAL;</span>
+<span class="lineNum">     679 </span>                :            :         }
+<span class="lineNum">     680 </span>                :            : 
+<span class="lineNum">     681 </span>                :<span class="lineCov">      16926 :         entry = tun_meta_find_key(&amp;map-&gt;key_hmap,</span>
+<span class="lineNum">     682 </span>                :<span class="lineCov">      16926 :                                   tun_meta_key(flow_opt-&gt;opt_class,</span>
+<span class="lineNum">     683 </span>                :<span class="lineCov">      16926 :                                                flow_opt-&gt;type));</span>
+<span class="lineNum">     684 </span>        [<span class="branchCov" title="Branch 0 was taken 16921 times"> + </span><span class="branchCov" title="Branch 1 was taken 5 times"> + </span>]:<span class="lineCov">      16926 :         if (entry) {</span>
+<span class="lineNum">     685 </span>        [<span class="branchCov" title="Branch 0 was taken 16921 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      16921 :             if (entry-&gt;loc.len == flow_opt-&gt;length * 4) {</span>
+<span class="lineNum">     686 </span>                :<span class="lineCov">      16921 :                 memcpy_to_metadata(metadata, opt + 1, &amp;entry-&gt;loc,</span>
+<span class="lineNum">     687 </span>                :<span class="lineCov">      16921 :                                    entry - map-&gt;entries);</span>
+<span class="lineNum">     688 </span>                :            :             } else {
+<span class="lineNum">     689 </span>                :<span class="lineNoCov">          0 :                 return EINVAL;</span>
+<span class="lineNum">     690 </span>                :            :             }
+<span class="lineNum">     691 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 5 times"> + </span>]:<span class="lineCov">          5 :         } else if (flow_opt-&gt;type &amp; GENEVE_CRIT_OPT_TYPE) {</span>
+<span class="lineNum">     692 </span>                :<span class="lineNoCov">          0 :             return EINVAL;</span>
+<span class="lineNum">     693 </span>                :            :         }
+<span class="lineNum">     694 </span>                :            : 
+<span class="lineNum">     695 </span>                :<span class="lineCov">      16926 :         opt = opt + len / sizeof(*opt);</span>
+<span class="lineNum">     696 </span>                :<span class="lineCov">      16926 :         flow_opt = flow_opt + len / sizeof(*opt);</span>
+<span class="lineNum">     697 </span>                :<span class="lineCov">      16926 :         opts_len -= len;</span>
+<span class="lineNum">     698 </span>                :            :     }
+<span class="lineNum">     699 </span>                :            : 
+<span class="lineNum">     700 </span>                :<span class="lineCov">      16921 :     return 0;</span>
+<span class="lineNum">     701 </span>                :            : }
+<a name="702"><span class="lineNum">     702 </span>                :            : </a>
+<span class="lineNum">     703 </span>                :            : static const struct nlattr *
+<span class="lineNum">     704 </span>                :<span class="lineCov">      21011 : tun_metadata_find_geneve_key(const struct nlattr *key, uint32_t key_len)</span>
+<span class="lineNum">     705 </span>                :            : {
+<span class="lineNum">     706 </span>                :            :     const struct nlattr *tnl_key;
+<span class="lineNum">     707 </span>                :            : 
+<span class="lineNum">     708 </span>                :<span class="lineCov">      21011 :     tnl_key = nl_attr_find__(key, key_len, OVS_KEY_ATTR_TUNNEL);</span>
+<span class="lineNum">     709 </span>        [<span class="branchCov" title="Branch 0 was taken 7280 times"> + </span><span class="branchCov" title="Branch 1 was taken 13731 times"> + </span>]:<span class="lineCov">      21011 :     if (!tnl_key) {</span>
+<span class="lineNum">     710 </span>                :<span class="lineCov">       7280 :         return NULL;</span>
+<span class="lineNum">     711 </span>                :            :     }
+<span class="lineNum">     712 </span>                :            : 
+<span class="lineNum">     713 </span>                :<span class="lineCov">      13731 :     return nl_attr_find_nested(tnl_key, OVS_TUNNEL_KEY_ATTR_GENEVE_OPTS);</span>
+<span class="lineNum">     714 </span>                :            : }
+<span class="lineNum">     715 </span>                :            : 
+<span class="lineNum">     716 </span>                :            : /* Converts from Geneve netlink attributes in 'attr' to tunnel metadata
+<span class="lineNum">     717 </span>                :            :  * in 'tun'. The result may either in be UDPIF format or not, as determined
+<span class="lineNum">     718 </span>                :            :  * by 'udpif'.
+<span class="lineNum">     719 </span>                :            :  *
+<span class="lineNum">     720 </span>                :            :  * In the event that a mask is being converted, it is also necessary to
+<span class="lineNum">     721 </span>                :            :  * pass in flow information. This includes the full set of netlink attributes
+<span class="lineNum">     722 </span>                :            :  * (i.e. not just the Geneve attribute) in 'flow_attrs'/'flow_attr_len' and
+<span class="lineNum">     723 </span>                :            :  * the previously converted tunnel metadata 'flow_tun'.
+<span class="lineNum">     724 </span>                :            :  *
+<a name="725"><span class="lineNum">     725 </span>                :            :  * If a flow rather than mask is being converted, 'flow_attrs' must be NULL. */</a>
+<span class="lineNum">     726 </span>                :            : int
+<span class="lineNum">     727 </span>                :<span class="lineCov">      16133 : tun_metadata_from_geneve_nlattr(const struct nlattr *attr,</span>
+<span class="lineNum">     728 </span>                :            :                                 const struct nlattr *flow_attrs,
+<span class="lineNum">     729 </span>                :            :                                 size_t flow_attr_len,
+<span class="lineNum">     730 </span>                :            :                                 const struct flow_tnl *flow_tun, bool udpif,
+<span class="lineNum">     731 </span>                :            :                                 struct flow_tnl *tun)
+<span class="lineNum">     732 </span>                :            : {
+<span class="lineNum">     733 </span>                :<span class="lineCov">      16133 :     bool is_mask = !!flow_attrs;</span>
+<span class="lineNum">     734 </span>                :<span class="lineCov">      16133 :     int attr_len = nl_attr_get_size(attr);</span>
+<span class="lineNum">     735 </span>                :            :     const struct nlattr *flow;
+<span class="lineNum">     736 </span>                :            : 
+<span class="lineNum">     737 </span>                :            :     /* No need for real translation, just copy things over. */
+<span class="lineNum">     738 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchCov" title="Branch 1 was taken 16123 times"> + </span>]:<span class="lineCov">      16133 :     if (udpif) {</span>
+<span class="lineNum">     739 </span>                :<span class="lineCov">         10 :         memcpy(tun-&gt;metadata.opts.gnv, nl_attr_get(attr), attr_len);</span>
+<span class="lineNum">     740 </span>                :            : 
+<span class="lineNum">     741 </span>        [<span class="branchCov" title="Branch 0 was taken 5 times"> + </span><span class="branchCov" title="Branch 1 was taken 5 times"> + </span>]:<span class="lineCov">         10 :         if (!is_mask) {</span>
+<span class="lineNum">     742 </span>                :<span class="lineCov">          5 :             tun-&gt;metadata.present.len = attr_len;</span>
+<span class="lineNum">     743 </span>                :<span class="lineCov">          5 :             tun-&gt;flags |= FLOW_TNL_F_UDPIF;</span>
+<span class="lineNum">     744 </span>                :            :         } else {
+<span class="lineNum">     745 </span>                :            :             /* We need to exact match on the length so we don't
+<span class="lineNum">     746 </span>                :            :              * accidentally match on sets of options that are the same
+<span class="lineNum">     747 </span>                :            :              * at the beginning but with additional options after. */
+<span class="lineNum">     748 </span>                :<span class="lineCov">          5 :             tun-&gt;metadata.present.len = 0xff;</span>
+<span class="lineNum">     749 </span>                :            :         }
+<span class="lineNum">     750 </span>                :            : 
+<span class="lineNum">     751 </span>                :<span class="lineCov">         10 :         return 0;</span>
+<span class="lineNum">     752 </span>                :            :     }
+<span class="lineNum">     753 </span>                :            : 
+<span class="lineNum">     754 </span>        [<span class="branchCov" title="Branch 0 was taken 7904 times"> + </span><span class="branchCov" title="Branch 1 was taken 8219 times"> + </span>]:<span class="lineCov">      16123 :     if (is_mask) {</span>
+<span class="lineNum">     755 </span>                :<span class="lineCov">       7904 :         flow = tun_metadata_find_geneve_key(flow_attrs, flow_attr_len);</span>
+<span class="lineNum">     756 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 7904 times"> + </span>]:<span class="lineCov">       7904 :         if (!flow) {</span>
+<span class="lineNum">     757 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             return attr_len ? EINVAL : 0;</span>
+<span class="lineNum">     758 </span>                :            :         }
+<span class="lineNum">     759 </span>                :            : 
+<span class="lineNum">     760 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 7904 times"> + </span>]:<span class="lineCov">       7904 :         if (attr_len != nl_attr_get_size(flow)) {</span>
+<span class="lineNum">     761 </span>                :<span class="lineNoCov">          0 :             return EINVAL;</span>
+<span class="lineNum">     762 </span>                :            :         }
+<span class="lineNum">     763 </span>                :            :     } else {
+<span class="lineNum">     764 </span>                :<span class="lineCov">       8219 :         flow = attr;</span>
+<span class="lineNum">     765 </span>                :            :     }
+<span class="lineNum">     766 </span>                :            : 
+<span class="lineNum">     767 </span>                :<span class="lineCov">      16123 :     return tun_metadata_from_geneve__(&amp;flow_tun-&gt;metadata, nl_attr_get(attr),</span>
+<span class="lineNum">     768 </span>                :<span class="lineCov">      16123 :                                       nl_attr_get(flow), nl_attr_get_size(flow),</span>
+<span class="lineNum">     769 </span>                :            :                                       &amp;tun-&gt;metadata);
+<span class="lineNum">     770 </span>                :            : }
+<span class="lineNum">     771 </span>                :            : 
+<span class="lineNum">     772 </span>                :            : /* Converts from the flat Geneve options representation extracted directly
+<span class="lineNum">     773 </span>                :            :  * from the tunnel header to the representation that maps options to
+<span class="lineNum">     774 </span>                :            :  * pre-allocated locations. The original version (in UDPIF form) is passed
+<span class="lineNum">     775 </span>                :            :  * in 'src' and the translated form in stored in 'dst'.  To handle masks, the
+<a name="776"><span class="lineNum">     776 </span>                :            :  * flow must also be passed in through 'flow' (in the original, raw form). */</a>
+<span class="lineNum">     777 </span>                :            : int
+<span class="lineNum">     778 </span>                :<span class="lineCov">        798 : tun_metadata_from_geneve_udpif(const struct flow_tnl *flow,</span>
+<span class="lineNum">     779 </span>                :            :                                const struct flow_tnl *src,
+<span class="lineNum">     780 </span>                :            :                                struct flow_tnl *dst)
+<span class="lineNum">     781 </span>                :            : {
+<span class="lineNum">     782 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 798 times"> + </span>]:<span class="lineCov">        798 :     ovs_assert(flow-&gt;flags &amp; FLOW_TNL_F_UDPIF);</span>
+<span class="lineNum">     783 </span>                :            : 
+<span class="lineNum">     784 </span>        [<span class="branchCov" title="Branch 0 was taken 798 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        798 :     if (flow == src) {</span>
+<span class="lineNum">     785 </span>                :<span class="lineCov">        798 :         dst-&gt;flags = flow-&gt;flags &amp; ~FLOW_TNL_F_UDPIF;</span>
+<span class="lineNum">     786 </span>                :            :     } else {
+<span class="lineNum">     787 </span>                :<span class="lineNoCov">          0 :         dst-&gt;metadata.tab = NULL;</span>
+<span class="lineNum">     788 </span>                :            :     }
+<span class="lineNum">     789 </span>                :<span class="lineCov">        798 :     dst-&gt;metadata.present.map = 0;</span>
+<span class="lineNum">     790 </span>                :<span class="lineCov">        798 :     return tun_metadata_from_geneve__(&amp;flow-&gt;metadata, src-&gt;metadata.opts.gnv,</span>
+<span class="lineNum">     791 </span>                :<span class="lineCov">        798 :                                       flow-&gt;metadata.opts.gnv,</span>
+<span class="lineNum">     792 </span>                :<span class="lineCov">        798 :                                       flow-&gt;metadata.present.len,</span>
+<span class="lineNum">     793 </span>                :            :                                       &amp;dst-&gt;metadata);
+<span class="lineNum">     794 </span>                :            : }
+<a name="795"><span class="lineNum">     795 </span>                :            : </a>
+<span class="lineNum">     796 </span>                :            : static void
+<span class="lineNum">     797 </span>                :<span class="lineCov">       3038 : tun_metadata_to_geneve__(const struct tun_metadata *flow, struct ofpbuf *b,</span>
+<span class="lineNum">     798 </span>                :            :                          bool *crit_opt)
+<span class="lineNum">     799 </span>                :            : {
+<span class="lineNum">     800 </span>                :            :     struct tun_table *map;
+<span class="lineNum">     801 </span>                :            :     int i;
+<span class="lineNum">     802 </span>                :            : 
+<span class="lineNum">     803 </span>                :<span class="lineCov">       3038 :     map = flow-&gt;tab;</span>
+<span class="lineNum">     804 </span>        [<span class="branchCov" title="Branch 0 was taken 2239 times"> + </span><span class="branchCov" title="Branch 1 was taken 799 times"> + </span>]:<span class="lineCov">       3038 :     if (!map) {</span>
+<span class="lineNum">     805 </span>                :<span class="lineCov">       2239 :         map = ovsrcu_get(struct tun_table *, &amp;metadata_tab);</span>
+<span class="lineNum">     806 </span>                :            :     }
+<span class="lineNum">     807 </span>                :            : 
+<span class="lineNum">     808 </span>                :<span class="lineCov">       3038 :     *crit_opt = false;</span>
+<span class="lineNum">     809 </span>                :            : 
+<span class="lineNum">     810 </span>        [<span class="branchCov" title="Branch 1 was taken 3033 times"> + </span><span class="branchCov" title="Branch 2 was taken 3038 times"> + </span>]:<span class="lineCov">       6071 :     ULLONG_FOR_EACH_1 (i, flow-&gt;present.map) {</span>
+<span class="lineNum">     811 </span>                :<span class="lineCov">       3033 :         struct tun_meta_entry *entry = &amp;map-&gt;entries[i];</span>
+<span class="lineNum">     812 </span>                :            :         struct geneve_opt *opt;
+<span class="lineNum">     813 </span>                :            : 
+<span class="lineNum">     814 </span>                :<span class="lineCov">       3033 :         opt = ofpbuf_put_uninit(b, sizeof *opt + entry-&gt;loc.len);</span>
+<span class="lineNum">     815 </span>                :            : 
+<span class="lineNum">     816 </span>                :<span class="lineCov">       3033 :         opt-&gt;opt_class = tun_key_class(entry-&gt;key);</span>
+<span class="lineNum">     817 </span>                :<span class="lineCov">       3033 :         opt-&gt;type = tun_key_type(entry-&gt;key);</span>
+<span class="lineNum">     818 </span>                :<span class="lineCov">       3033 :         opt-&gt;length = entry-&gt;loc.len / 4;</span>
+<span class="lineNum">     819 </span>                :<span class="lineCov">       3033 :         opt-&gt;r1 = 0;</span>
+<span class="lineNum">     820 </span>                :<span class="lineCov">       3033 :         opt-&gt;r2 = 0;</span>
+<span class="lineNum">     821 </span>                :<span class="lineCov">       3033 :         opt-&gt;r3 = 0;</span>
+<span class="lineNum">     822 </span>                :            : 
+<span class="lineNum">     823 </span>                :<span class="lineCov">       3033 :         memcpy_from_metadata(opt + 1, flow, &amp;entry-&gt;loc);</span>
+<span class="lineNum">     824 </span>                :<span class="lineCov">       3033 :         *crit_opt |= !!(opt-&gt;type &amp; GENEVE_CRIT_OPT_TYPE);</span>
+<span class="lineNum">     825 </span>                :            :     }
+<span class="lineNum">     826 </span>                :<span class="lineCov">       3038 : }</span>
+<a name="827"><span class="lineNum">     827 </span>                :            : </a>
+<span class="lineNum">     828 </span>                :            : static void
+<span class="lineNum">     829 </span>                :<span class="lineCov">       1062 : tun_metadata_to_geneve_nlattr_flow(const struct flow_tnl *flow,</span>
+<span class="lineNum">     830 </span>                :            :                                    struct ofpbuf *b)
+<span class="lineNum">     831 </span>                :            : {
+<span class="lineNum">     832 </span>                :            :     size_t nlattr_offset;
+<span class="lineNum">     833 </span>                :            :     bool crit_opt;
+<span class="lineNum">     834 </span>                :            : 
+<span class="lineNum">     835 </span>        [<span class="branchCov" title="Branch 0 was taken 262 times"> + </span><span class="branchCov" title="Branch 1 was taken 800 times"> + </span>]:<span class="lineCov">       1062 :     if (!flow-&gt;metadata.present.map) {</span>
+<span class="lineNum">     836 </span>                :<span class="lineCov">        262 :         return;</span>
+<span class="lineNum">     837 </span>                :            :     }
+<span class="lineNum">     838 </span>                :            : 
+<span class="lineNum">     839 </span>                :            :     /* For all intents and purposes, the Geneve options are nested
+<span class="lineNum">     840 </span>                :            :      * attributes even if this doesn't show up directly to netlink. It's
+<span class="lineNum">     841 </span>                :            :      * similar enough that we can use the same mechanism. */
+<span class="lineNum">     842 </span>                :<span class="lineCov">        800 :     nlattr_offset = nl_msg_start_nested(b, OVS_TUNNEL_KEY_ATTR_GENEVE_OPTS);</span>
+<span class="lineNum">     843 </span>                :            : 
+<span class="lineNum">     844 </span>                :<span class="lineCov">        800 :     tun_metadata_to_geneve__(&amp;flow-&gt;metadata, b, &amp;crit_opt);</span>
+<span class="lineNum">     845 </span>                :            : 
+<span class="lineNum">     846 </span>                :<span class="lineCov">        800 :     nl_msg_end_nested(b, nlattr_offset);</span>
+<span class="lineNum">     847 </span>                :            : }
+<span class="lineNum">     848 </span>                :            : 
+<span class="lineNum">     849 </span>                :            : /* Converts from processed tunnel metadata information (in non-udpif
+<span class="lineNum">     850 </span>                :            :  * format) in 'flow' to a stream of Geneve options suitable for
+<span class="lineNum">     851 </span>                :            :  * transmission in 'opts'. Additionally returns whether there were
+<span class="lineNum">     852 </span>                :            :  * any critical options in 'crit_opt' as well as the total length of
+<a name="853"><span class="lineNum">     853 </span>                :            :  * data. */</a>
+<span class="lineNum">     854 </span>                :            : int
+<span class="lineNum">     855 </span>                :<span class="lineCov">       2238 : tun_metadata_to_geneve_header(const struct flow_tnl *flow,</span>
+<span class="lineNum">     856 </span>                :            :                               struct geneve_opt *opts, bool *crit_opt)
+<span class="lineNum">     857 </span>                :            : {
+<span class="lineNum">     858 </span>                :            :     struct ofpbuf b;
+<span class="lineNum">     859 </span>                :            : 
+<span class="lineNum">     860 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2238 times"> + </span>]:<span class="lineCov">       2238 :     ovs_assert(!(flow-&gt;flags &amp; FLOW_TNL_F_UDPIF));</span>
+<span class="lineNum">     861 </span>                :            : 
+<span class="lineNum">     862 </span>                :<span class="lineCov">       2238 :     ofpbuf_use_stack(&amp;b, opts, TLV_TOT_OPT_SIZE);</span>
+<span class="lineNum">     863 </span>                :<span class="lineCov">       2238 :     tun_metadata_to_geneve__(&amp;flow-&gt;metadata, &amp;b, crit_opt);</span>
+<span class="lineNum">     864 </span>                :            : 
+<span class="lineNum">     865 </span>                :<span class="lineCov">       2238 :     return b.size;</span>
+<span class="lineNum">     866 </span>                :            : }
+<a name="867"><span class="lineNum">     867 </span>                :            : </a>
+<span class="lineNum">     868 </span>                :            : static void
+<span class="lineNum">     869 </span>                :<span class="lineCov">       1596 : tun_metadata_to_geneve_mask__(const struct tun_metadata *flow,</span>
+<span class="lineNum">     870 </span>                :            :                               const struct tun_metadata *mask,
+<span class="lineNum">     871 </span>                :            :                               struct geneve_opt *opt, int opts_len)
+<span class="lineNum">     872 </span>                :            : {
+<span class="lineNum">     873 </span>                :<span class="lineCov">       1596 :     struct tun_table *map = flow-&gt;tab;</span>
+<span class="lineNum">     874 </span>                :            : 
+<span class="lineNum">     875 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 1596 times"> + </span>]:<span class="lineCov">       1596 :     if (!map) {</span>
+<span class="lineNum">     876 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     877 </span>                :            :     }
+<span class="lineNum">     878 </span>                :            : 
+<span class="lineNum">     879 </span>                :            :     /* All of these options have already been validated, so no need
+<span class="lineNum">     880 </span>                :            :      * for sanity checking. */
+<span class="lineNum">     881 </span>        [<span class="branchCov" title="Branch 0 was taken 1598 times"> + </span><span class="branchCov" title="Branch 1 was taken 1596 times"> + </span>]:<span class="lineCov">       3194 :     while (opts_len &gt; 0) {</span>
+<span class="lineNum">     882 </span>                :            :         struct tun_meta_entry *entry;
+<span class="lineNum">     883 </span>                :<span class="lineCov">       1598 :         int len = sizeof(*opt) + opt-&gt;length * 4;</span>
+<span class="lineNum">     884 </span>                :            : 
+<span class="lineNum">     885 </span>                :<span class="lineCov">       1598 :         entry = tun_meta_find_key(&amp;map-&gt;key_hmap,</span>
+<span class="lineNum">     886 </span>                :<span class="lineCov">       3196 :                                   tun_meta_key(opt-&gt;opt_class, opt-&gt;type));</span>
+<span class="lineNum">     887 </span>        [<span class="branchCov" title="Branch 0 was taken 1596 times"> + </span><span class="branchCov" title="Branch 1 was taken 2 times"> + </span>]:<span class="lineCov">       1598 :         if (entry) {</span>
+<span class="lineNum">     888 </span>                :<span class="lineCov">       1596 :             memcpy_from_metadata(opt + 1, mask, &amp;entry-&gt;loc);</span>
+<span class="lineNum">     889 </span>                :            :         } else {
+<span class="lineNum">     890 </span>                :<span class="lineCov">          2 :             memset(opt + 1, 0, opt-&gt;length * 4);</span>
+<span class="lineNum">     891 </span>                :            :         }
+<span class="lineNum">     892 </span>                :            : 
+<span class="lineNum">     893 </span>                :<span class="lineCov">       1598 :         opt-&gt;opt_class = htons(0xffff);</span>
+<span class="lineNum">     894 </span>                :<span class="lineCov">       1598 :         opt-&gt;type = 0xff;</span>
+<span class="lineNum">     895 </span>                :<span class="lineCov">       1598 :         opt-&gt;length = 0x1f;</span>
+<span class="lineNum">     896 </span>                :<span class="lineCov">       1598 :         opt-&gt;r1 = 0;</span>
+<span class="lineNum">     897 </span>                :<span class="lineCov">       1598 :         opt-&gt;r2 = 0;</span>
+<span class="lineNum">     898 </span>                :<span class="lineCov">       1598 :         opt-&gt;r3 = 0;</span>
+<span class="lineNum">     899 </span>                :            : 
+<span class="lineNum">     900 </span>                :<span class="lineCov">       1598 :         opt = opt + len / sizeof(*opt);</span>
+<span class="lineNum">     901 </span>                :<span class="lineCov">       1598 :         opts_len -= len;</span>
+<span class="lineNum">     902 </span>                :            :     }
+<span class="lineNum">     903 </span>                :            : }
+<a name="904"><span class="lineNum">     904 </span>                :            : </a>
+<span class="lineNum">     905 </span>                :            : static void
+<span class="lineNum">     906 </span>                :<span class="lineCov">      13107 : tun_metadata_to_geneve_nlattr_mask(const struct ofpbuf *key,</span>
+<span class="lineNum">     907 </span>                :            :                                    const struct flow_tnl *mask,
+<span class="lineNum">     908 </span>                :            :                                    const struct flow_tnl *flow,
+<span class="lineNum">     909 </span>                :            :                                    struct ofpbuf *b)
+<span class="lineNum">     910 </span>                :            : {
+<span class="lineNum">     911 </span>                :            :     const struct nlattr *geneve_key;
+<span class="lineNum">     912 </span>                :            :     struct nlattr *geneve_mask;
+<span class="lineNum">     913 </span>                :            :     struct geneve_opt *opt;
+<span class="lineNum">     914 </span>                :            :     int opts_len;
+<span class="lineNum">     915 </span>                :            : 
+<span class="lineNum">     916 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 13107 times"> + </span>]:<span class="lineCov">      13107 :     if (!key) {</span>
+<span class="lineNum">     917 </span>                :<span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     918 </span>                :            :     }
+<span class="lineNum">     919 </span>                :            : 
+<span class="lineNum">     920 </span>                :<span class="lineCov">      13107 :     geneve_key = tun_metadata_find_geneve_key(key-&gt;data, key-&gt;size);</span>
+<span class="lineNum">     921 </span>        [<span class="branchCov" title="Branch 0 was taken 12309 times"> + </span><span class="branchCov" title="Branch 1 was taken 798 times"> + </span>]:<span class="lineCov">      13107 :     if (!geneve_key) {</span>
+<span class="lineNum">     922 </span>                :<span class="lineCov">      12309 :         return;</span>
+<span class="lineNum">     923 </span>                :            :     }
+<span class="lineNum">     924 </span>                :            : 
+<span class="lineNum">     925 </span>                :<span class="lineCov">        798 :     geneve_mask = ofpbuf_tail(b);</span>
+<span class="lineNum">     926 </span>                :<span class="lineCov">        798 :     nl_msg_put(b, geneve_key, geneve_key-&gt;nla_len);</span>
+<span class="lineNum">     927 </span>                :            : 
+<span class="lineNum">     928 </span>                :<span class="lineCov">        798 :     opt = CONST_CAST(struct geneve_opt *, nl_attr_get(geneve_mask));</span>
+<span class="lineNum">     929 </span>                :<span class="lineCov">        798 :     opts_len = nl_attr_get_size(geneve_mask);</span>
+<span class="lineNum">     930 </span>                :            : 
+<span class="lineNum">     931 </span>                :<span class="lineCov">        798 :     tun_metadata_to_geneve_mask__(&amp;flow-&gt;metadata, &amp;mask-&gt;metadata,</span>
+<span class="lineNum">     932 </span>                :            :                                   opt, opts_len);
+<span class="lineNum">     933 </span>                :            : }
+<span class="lineNum">     934 </span>                :            : 
+<span class="lineNum">     935 </span>                :            : /* Convert from the tunnel metadata in 'tun' to netlink attributes stored
+<span class="lineNum">     936 </span>                :            :  * in 'b'. Either UDPIF or non-UDPIF input forms are accepted.
+<span class="lineNum">     937 </span>                :            :  *
+<span class="lineNum">     938 </span>                :            :  * To assist with parsing, it is necessary to also pass in the tunnel metadata
+<span class="lineNum">     939 </span>                :            :  * from the flow in 'flow' as well in the original netlink form of the flow in
+<a name="940"><span class="lineNum">     940 </span>                :            :  * 'key'. */</a>
+<span class="lineNum">     941 </span>                :            : void
+<span class="lineNum">     942 </span>                :<span class="lineCov">      14173 : tun_metadata_to_geneve_nlattr(const struct flow_tnl *tun,</span>
+<span class="lineNum">     943 </span>                :            :                               const struct flow_tnl *flow,
+<span class="lineNum">     944 </span>                :            :                               const struct ofpbuf *key,
+<span class="lineNum">     945 </span>                :            :                               struct ofpbuf *b)
+<span class="lineNum">     946 </span>                :            : {
+<span class="lineNum">     947 </span>                :<span class="lineCov">      14173 :     bool is_mask = tun != flow;</span>
+<span class="lineNum">     948 </span>                :            : 
+<span class="lineNum">     949 </span>        [<span class="branchCov" title="Branch 0 was taken 14169 times"> + </span><span class="branchCov" title="Branch 1 was taken 4 times"> + </span>]:<span class="lineCov">      14173 :     if (!(flow-&gt;flags &amp; FLOW_TNL_F_UDPIF)) {</span>
+<span class="lineNum">     950 </span>        [<span class="branchCov" title="Branch 0 was taken 1062 times"> + </span><span class="branchCov" title="Branch 1 was taken 13107 times"> + </span>]:<span class="lineCov">      14169 :         if (!is_mask) {</span>
+<span class="lineNum">     951 </span>                :<span class="lineCov">       1062 :             tun_metadata_to_geneve_nlattr_flow(tun, b);</span>
+<span class="lineNum">     952 </span>                :            :         } else {
+<span class="lineNum">     953 </span>                :<span class="lineCov">      14169 :             tun_metadata_to_geneve_nlattr_mask(key, tun, flow, b);</span>
+<span class="lineNum">     954 </span>                :            :         }
+<span class="lineNum">     955 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 4 times"> + </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">          4 :     } else if (flow-&gt;metadata.present.len || is_mask) {</span>
+<span class="lineNum">     956 </span>                :<span class="lineCov">          4 :         nl_msg_put_unspec(b, OVS_TUNNEL_KEY_ATTR_GENEVE_OPTS,</span>
+<span class="lineNum">     957 </span>                :<span class="lineCov">          4 :                           tun-&gt;metadata.opts.gnv,</span>
+<span class="lineNum">     958 </span>                :<span class="lineCov">          4 :                           flow-&gt;metadata.present.len);</span>
+<span class="lineNum">     959 </span>                :            :     }
+<span class="lineNum">     960 </span>                :<span class="lineCov">      14173 : }</span>
+<span class="lineNum">     961 </span>                :            : 
+<span class="lineNum">     962 </span>                :            : /* Converts 'mask_src' (in non-UDPIF format) to a series of masked options in
+<span class="lineNum">     963 </span>                :            :  * 'dst'. 'flow_src' (also in non-UDPIF format) and the  original set of
+<span class="lineNum">     964 </span>                :            :  * options 'flow_src_opt'/'opts_len' are needed as a guide to interpret the
+<a name="965"><span class="lineNum">     965 </span>                :            :  * mask data. */</a>
+<span class="lineNum">     966 </span>                :            : void
+<span class="lineNum">     967 </span>                :<span class="lineCov">        798 : tun_metadata_to_geneve_udpif_mask(const struct flow_tnl *flow_src,</span>
+<span class="lineNum">     968 </span>                :            :                                   const struct flow_tnl *mask_src,
+<span class="lineNum">     969 </span>                :            :                                   const struct geneve_opt *flow_src_opt,
+<span class="lineNum">     970 </span>                :            :                                   int opts_len, struct geneve_opt *dst)
+<span class="lineNum">     971 </span>                :            : {
+<span class="lineNum">     972 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 798 times"> + </span>]:<span class="lineCov">        798 :     ovs_assert(!(flow_src-&gt;flags &amp; FLOW_TNL_F_UDPIF));</span>
+<span class="lineNum">     973 </span>                :            : 
+<span class="lineNum">     974 </span>                :<span class="lineCov">        798 :     memcpy(dst, flow_src_opt, opts_len);</span>
+<span class="lineNum">     975 </span>                :<span class="lineCov">        798 :     tun_metadata_to_geneve_mask__(&amp;flow_src-&gt;metadata,</span>
+<span class="lineNum">     976 </span>                :            :                                   &amp;mask_src-&gt;metadata, dst, opts_len);
+<span class="lineNum">     977 </span>                :<span class="lineCov">        798 : }</span>
+<a name="978"><span class="lineNum">     978 </span>                :            : </a>
+<span class="lineNum">     979 </span>                :            : static const struct tun_metadata_loc *
+<span class="lineNum">     980 </span>                :<span class="lineCov">        205 : metadata_loc_from_match_read(struct tun_table *map, const struct match *match,</span>
+<span class="lineNum">     981 </span>                :            :                              unsigned int idx, struct flow_tnl *mask,
+<span class="lineNum">     982 </span>                :            :                              bool *is_masked)
+<span class="lineNum">     983 </span>                :            : {
+<span class="lineNum">     984 </span>                :            :     union mf_value mask_opts;
+<span class="lineNum">     985 </span>                :            : 
+<span class="lineNum">     986 </span>        [<span class="branchCov" title="Branch 0 was taken 38 times"> + </span><span class="branchCov" title="Branch 1 was taken 167 times"> + </span>]:<span class="lineCov">        205 :     if (match-&gt;tun_md.valid) {</span>
+<span class="lineNum">     987 </span>                :<span class="lineCov">         38 :         *is_masked = match-&gt;tun_md.entry[idx].masked;</span>
+<span class="lineNum">     988 </span>                :<span class="lineCov">         38 :         return &amp;match-&gt;tun_md.entry[idx].loc;</span>
+<span class="lineNum">     989 </span>                :            :     }
+<span class="lineNum">     990 </span>                :            : 
+<span class="lineNum">     991 </span>                :<span class="lineCov">        167 :     memcpy_from_metadata(mask_opts.tun_metadata, &amp;mask-&gt;metadata,</span>
+<span class="lineNum">     992 </span>                :<span class="lineCov">        167 :                          &amp;map-&gt;entries[idx].loc);</span>
+<span class="lineNum">     993 </span>                :            : 
+<span class="lineNum">     994 </span>  [<span class="branchCov" title="Branch 0 was taken 160 times"> + </span><span class="branchCov" title="Branch 1 was taken 7 times"> + </span><span class="branchCov" title="Branch 2 was taken 16 times"> + </span><span class="branchCov" title="Branch 3 was taken 144 times"> + </span>]:<span class="lineCov">        327 :     *is_masked = map-&gt;entries[idx].loc.len == 0 ||</span>
+<span class="lineNum">     995 </span>                :<span class="lineCov">        160 :                  !is_all_ones(mask_opts.tun_metadata,</span>
+<span class="lineNum">     996 </span>                :<span class="lineCov">        160 :                               map-&gt;entries[idx].loc.len);</span>
+<span class="lineNum">     997 </span>                :<span class="lineCov">        205 :     return &amp;map-&gt;entries[idx].loc;</span>
+<span class="lineNum">     998 </span>                :            : }
+<a name="999"><span class="lineNum">     999 </span>                :            : </a>
+<span class="lineNum">    1000 </span>                :            : void
+<span class="lineNum">    1001 </span>                :<span class="lineCov">      56198 : tun_metadata_to_nx_match(struct ofpbuf *b, enum ofp_version oxm,</span>
+<span class="lineNum">    1002 </span>                :            :                          const struct match *match)
+<span class="lineNum">    1003 </span>                :            : {
+<span class="lineNum">    1004 </span>                :            :     struct flow_tnl flow, mask;
+<span class="lineNum">    1005 </span>                :            :     int i;
+<span class="lineNum">    1006 </span>                :            : 
+<span class="lineNum">    1007 </span>        [<span class="branchCov" title="Branch 1 was taken 56163 times"> + </span><span class="branchCov" title="Branch 2 was taken 35 times"> + </span>]:<span class="lineCov">      56198 :     if (!udpif_to_parsed(&amp;match-&gt;flow.tunnel, &amp;match-&gt;wc.masks.tunnel,</span>
+<span class="lineNum">    1008 </span>                :            :                          &amp;flow, &amp;mask)) {
+<span class="lineNum">    1009 </span>                :<span class="lineCov">      56163 :         return;</span>
+<span class="lineNum">    1010 </span>                :            :     }
+<span class="lineNum">    1011 </span>                :            : 
+<span class="lineNum">    1012 </span>        [<span class="branchCov" title="Branch 1 was taken 37 times"> + </span><span class="branchCov" title="Branch 2 was taken 35 times"> + </span>]:<span class="lineCov">         72 :     ULLONG_FOR_EACH_1 (i, mask.metadata.present.map) {</span>
+<span class="lineNum">    1013 </span>                :            :         const struct tun_metadata_loc *loc;
+<span class="lineNum">    1014 </span>                :            :         bool is_masked;
+<span class="lineNum">    1015 </span>                :            :         union mf_value opts;
+<span class="lineNum">    1016 </span>                :            :         union mf_value mask_opts;
+<span class="lineNum">    1017 </span>                :            : 
+<span class="lineNum">    1018 </span>                :<span class="lineCov">         37 :         loc = metadata_loc_from_match_read(flow.metadata.tab, match, i,</span>
+<span class="lineNum">    1019 </span>                :            :                                            &amp;mask, &amp;is_masked);
+<span class="lineNum">    1020 </span>                :<span class="lineCov">         37 :         memcpy_from_metadata(opts.tun_metadata, &amp;flow.metadata, loc);</span>
+<span class="lineNum">    1021 </span>                :<span class="lineCov">         37 :         memcpy_from_metadata(mask_opts.tun_metadata, &amp;mask.metadata, loc);</span>
+<span class="lineNum">    1022 </span>        [<span class="branchCov" title="Branch 0 was taken 10 times"> + </span><span class="branchCov" title="Branch 1 was taken 27 times"> + </span>]:<span class="lineCov">         37 :         nxm_put__(b, MFF_TUN_METADATA0 + i, oxm, opts.tun_metadata,</span>
+<span class="lineNum">    1023 </span>                :<span class="lineCov">         37 :                   is_masked ? mask_opts.tun_metadata : NULL, loc-&gt;len);</span>
+<span class="lineNum">    1024 </span>                :            :     }
+<span class="lineNum">    1025 </span>                :            : }
+<a name="1026"><span class="lineNum">    1026 </span>                :            : </a>
+<span class="lineNum">    1027 </span>                :            : void
+<span class="lineNum">    1028 </span>                :<span class="lineCov">     110426 : tun_metadata_match_format(struct ds *s, const struct match *match)</span>
+<span class="lineNum">    1029 </span>                :            : {
+<span class="lineNum">    1030 </span>                :            :     struct flow_tnl flow, mask;
+<span class="lineNum">    1031 </span>                :            :     unsigned int i;
+<span class="lineNum">    1032 </span>                :            : 
+<span class="lineNum">    1033 </span>        [<span class="branchCov" title="Branch 1 was taken 110263 times"> + </span><span class="branchCov" title="Branch 2 was taken 163 times"> + </span>]:<span class="lineCov">     110426 :     if (!udpif_to_parsed(&amp;match-&gt;flow.tunnel, &amp;match-&gt;wc.masks.tunnel,</span>
+<span class="lineNum">    1034 </span>                :            :                          &amp;flow, &amp;mask)) {
+<span class="lineNum">    1035 </span>                :<span class="lineCov">     110263 :         return;</span>
+<span class="lineNum">    1036 </span>                :            :     }
+<span class="lineNum">    1037 </span>                :            : 
+<span class="lineNum">    1038 </span>        [<span class="branchCov" title="Branch 1 was taken 168 times"> + </span><span class="branchCov" title="Branch 2 was taken 163 times"> + </span>]:<span class="lineCov">        331 :     ULLONG_FOR_EACH_1 (i, mask.metadata.present.map) {</span>
+<span class="lineNum">    1039 </span>                :            :         const struct tun_metadata_loc *loc;
+<span class="lineNum">    1040 </span>                :            :         bool is_masked;
+<span class="lineNum">    1041 </span>                :            :         union mf_value opts, mask_opts;
+<span class="lineNum">    1042 </span>                :            : 
+<span class="lineNum">    1043 </span>                :<span class="lineCov">        168 :         loc = metadata_loc_from_match_read(flow.metadata.tab, match, i,</span>
+<span class="lineNum">    1044 </span>                :            :                                            &amp;mask, &amp;is_masked);
+<span class="lineNum">    1045 </span>                :            : 
+<span class="lineNum">    1046 </span>                :<span class="lineCov">        168 :         ds_put_format(s, &quot;tun_metadata%u&quot;, i);</span>
+<span class="lineNum">    1047 </span>                :<span class="lineCov">        168 :         memcpy_from_metadata(mask_opts.tun_metadata, &amp;mask.metadata, loc);</span>
+<span class="lineNum">    1048 </span>                :            : 
+<span class="lineNum">    1049 </span>        [<span class="branchCov" title="Branch 0 was taken 3 times"> + </span><span class="branchCov" title="Branch 1 was taken 165 times"> + </span>]:<span class="lineCov">        168 :         if (!ULLONG_GET(flow.metadata.present.map, i)) {</span>
+<span class="lineNum">    1050 </span>                :            :             /* Indicate that we are matching on the field being not present. */
+<span class="lineNum">    1051 </span>                :<span class="lineCov">          3 :             ds_put_cstr(s, &quot;=NP&quot;);</span>
+<span class="lineNum">    1052 </span>  [<span class="branchCov" title="Branch 0 was taken 23 times"> + </span><span class="branchCov" title="Branch 1 was taken 142 times"> + </span><span class="branchCov" title="Branch 2 was taken 11 times"> + </span><span class="branchCov" title="Branch 3 was taken 12 times"> + </span>]:<span class="lineCov">        188 :         } else if (!(is_masked &amp;&amp;</span>
+<span class="lineNum">    1053 </span>                :<span class="lineCov">         23 :                      is_all_zeros(mask_opts.tun_metadata, loc-&gt;len))) {</span>
+<span class="lineNum">    1054 </span>                :<span class="lineCov">        153 :             ds_put_char(s, '=');</span>
+<span class="lineNum">    1055 </span>                :            : 
+<span class="lineNum">    1056 </span>                :<span class="lineCov">        153 :             memcpy_from_metadata(opts.tun_metadata, &amp;flow.metadata, loc);</span>
+<span class="lineNum">    1057 </span>                :<span class="lineCov">        153 :             ds_put_hex(s, opts.tun_metadata, loc-&gt;len);</span>
+<span class="lineNum">    1058 </span>                :            : 
+<span class="lineNum">    1059 </span>        [<span class="branchCov" title="Branch 1 was taken 11 times"> + </span><span class="branchCov" title="Branch 2 was taken 142 times"> + </span>]:<span class="lineCov">        153 :             if (!is_all_ones(mask_opts.tun_metadata, loc-&gt;len)) {</span>
+<span class="lineNum">    1060 </span>                :<span class="lineCov">         11 :                 ds_put_char(s, '/');</span>
+<span class="lineNum">    1061 </span>                :<span class="lineCov">         11 :                 ds_put_hex(s, mask_opts.tun_metadata, loc-&gt;len);</span>
+<span class="lineNum">    1062 </span>                :            :             }
+<span class="lineNum">    1063 </span>                :            :         }
+<span class="lineNum">    1064 </span>                :<span class="lineCov">        168 :         ds_put_char(s, ',');</span>
+<span class="lineNum">    1065 </span>                :            :     }
+<span class="lineNum">    1066 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

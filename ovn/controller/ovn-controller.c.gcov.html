@@ -1,0 +1,783 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - ovn/controller/ovn-controller.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">ovn/controller</a> - ovn-controller.c<span style="font-size: 80%;"> (source / <a href="ovn-controller.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">251</td>
+            <td class="headerCovTableEntry">315</td>
+            <td class="headerCovTableEntryMed">79.7 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">15</td>
+            <td class="headerCovTableEntry">18</td>
+            <td class="headerCovTableEntryMed">83.3 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">98</td>
+            <td class="headerCovTableEntry">152</td>
+            <td class="headerCovTableEntryLo">64.5 %</td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (c) 2015, 2016 Nicira, Inc.</a>
+<span class="lineNum">       2 </span>                :            :  *
+<span class="lineNum">       3 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       4 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       5 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       6 </span>                :            :  *
+<span class="lineNum">       7 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       8 </span>                :            :  *
+<span class="lineNum">       9 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      10 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      11 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      12 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      13 </span>                :            :  * limitations under the License.
+<span class="lineNum">      14 </span>                :            :  */
+<span class="lineNum">      15 </span>                :            : 
+<span class="lineNum">      16 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      17 </span>                :            : 
+<span class="lineNum">      18 </span>                :            : #include &quot;ovn-controller.h&quot;
+<span class="lineNum">      19 </span>                :            : 
+<span class="lineNum">      20 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;getopt.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;signal.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      25 </span>                :            : 
+<span class="lineNum">      26 </span>                :            : #include &quot;binding.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;chassis.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;command-line.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;compiler.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;daemon.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;dirs.h&quot;
+<span class="lineNum">      32 </span>                :            : #include &quot;openvswitch/dynamic-string.h&quot;
+<span class="lineNum">      33 </span>                :            : #include &quot;encaps.h&quot;
+<span class="lineNum">      34 </span>                :            : #include &quot;fatal-signal.h&quot;
+<span class="lineNum">      35 </span>                :            : #include &quot;openvswitch/hmap.h&quot;
+<span class="lineNum">      36 </span>                :            : #include &quot;lflow.h&quot;
+<span class="lineNum">      37 </span>                :            : #include &quot;lib/vswitch-idl.h&quot;
+<span class="lineNum">      38 </span>                :            : #include &quot;lport.h&quot;
+<span class="lineNum">      39 </span>                :            : #include &quot;ofctrl.h&quot;
+<span class="lineNum">      40 </span>                :            : #include &quot;openvswitch/vconn.h&quot;
+<span class="lineNum">      41 </span>                :            : #include &quot;openvswitch/vlog.h&quot;
+<span class="lineNum">      42 </span>                :            : #include &quot;ovn/actions.h&quot;
+<span class="lineNum">      43 </span>                :            : #include &quot;ovn/lib/ovn-sb-idl.h&quot;
+<span class="lineNum">      44 </span>                :            : #include &quot;ovn/lib/ovn-util.h&quot;
+<span class="lineNum">      45 </span>                :            : #include &quot;patch.h&quot;
+<span class="lineNum">      46 </span>                :            : #include &quot;physical.h&quot;
+<span class="lineNum">      47 </span>                :            : #include &quot;pinctrl.h&quot;
+<span class="lineNum">      48 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      49 </span>                :            : #include &quot;lib/bitmap.h&quot;
+<span class="lineNum">      50 </span>                :            : #include &quot;lib/hash.h&quot;
+<span class="lineNum">      51 </span>                :            : #include &quot;smap.h&quot;
+<span class="lineNum">      52 </span>                :            : #include &quot;sset.h&quot;
+<span class="lineNum">      53 </span>                :            : #include &quot;stream-ssl.h&quot;
+<span class="lineNum">      54 </span>                :            : #include &quot;stream.h&quot;
+<span class="lineNum">      55 </span>                :            : #include &quot;unixctl.h&quot;
+<a name="56"><span class="lineNum">      56 </span>                :            : #include &quot;util.h&quot;</a>
+<span class="lineNum">      57 </span>                :            : 
+<span class="lineNum">      58 </span>                :<span class="lineCov">         94 : VLOG_DEFINE_THIS_MODULE(main);</span>
+<span class="lineNum">      59 </span>                :            : 
+<span class="lineNum">      60 </span>                :            : static unixctl_cb_func ovn_controller_exit;
+<span class="lineNum">      61 </span>                :            : static unixctl_cb_func ct_zone_list;
+<span class="lineNum">      62 </span>                :            : 
+<span class="lineNum">      63 </span>                :            : #define DEFAULT_BRIDGE_NAME &quot;br-int&quot;
+<span class="lineNum">      64 </span>                :            : #define DEFAULT_PROBE_INTERVAL_MSEC 5000
+<span class="lineNum">      65 </span>                :            : 
+<span class="lineNum">      66 </span>                :            : static void update_probe_interval(struct controller_ctx *);
+<span class="lineNum">      67 </span>                :            : static void parse_options(int argc, char *argv[]);
+<span class="lineNum">      68 </span>                :            : OVS_NO_RETURN static void usage(void);
+<span class="lineNum">      69 </span>                :            : 
+<span class="lineNum">      70 </span>                :            : static char *ovs_remote;
+<a name="71"><span class="lineNum">      71 </span>                :            : </a>
+<span class="lineNum">      72 </span>                :            : struct local_datapath *
+<span class="lineNum">      73 </span>                :<span class="lineCov">     569304 : get_local_datapath(const struct hmap *local_datapaths, uint32_t tunnel_key)</span>
+<span class="lineNum">      74 </span>                :            : {
+<span class="lineNum">      75 </span>                :<span class="lineCov">     569304 :     struct hmap_node *node = hmap_first_with_hash(local_datapaths, tunnel_key);</span>
+<span class="lineNum">      76 </span>                :<span class="lineCov">     569304 :     return (node</span>
+<span class="lineNum">      77 </span>                :            :             ? CONTAINER_OF(node, struct local_datapath, hmap_node)
+<span class="lineNum">      78 </span>                :            :             : NULL);
+<span class="lineNum">      79 </span>                :            : }
+<a name="80"><span class="lineNum">      80 </span>                :            : </a>
+<span class="lineNum">      81 </span>                :            : struct patched_datapath *
+<span class="lineNum">      82 </span>                :<span class="lineCov">     120153 : get_patched_datapath(const struct hmap *patched_datapaths, uint32_t tunnel_key)</span>
+<span class="lineNum">      83 </span>                :            : {
+<span class="lineNum">      84 </span>                :<span class="lineCov">     120153 :     struct hmap_node *node = hmap_first_with_hash(patched_datapaths,</span>
+<span class="lineNum">      85 </span>                :            :                                                   tunnel_key);
+<span class="lineNum">      86 </span>                :<span class="lineCov">     120153 :     return (node</span>
+<span class="lineNum">      87 </span>                :            :             ? CONTAINER_OF(node, struct patched_datapath, hmap_node)
+<span class="lineNum">      88 </span>                :            :             : NULL);
+<span class="lineNum">      89 </span>                :            : }
+<a name="90"><span class="lineNum">      90 </span>                :            : </a>
+<span class="lineNum">      91 </span>                :            : const struct sbrec_chassis *
+<span class="lineNum">      92 </span>                :<span class="lineCov">       9062 : get_chassis(struct ovsdb_idl *ovnsb_idl, const char *chassis_id)</span>
+<span class="lineNum">      93 </span>                :            : {
+<span class="lineNum">      94 </span>                :            :     const struct sbrec_chassis *chassis_rec;
+<span class="lineNum">      95 </span>                :            : 
+<span class="lineNum">      96 </span>        [<span class="branchCov" title="Branch 2 was taken 13488 times"> + </span><span class="branchCov" title="Branch 3 was taken 195 times"> + </span>]:<span class="lineCov">      13683 :     SBREC_CHASSIS_FOR_EACH(chassis_rec, ovnsb_idl) {</span>
+<span class="lineNum">      97 </span>        [<span class="branchCov" title="Branch 0 was taken 8867 times"> + </span><span class="branchCov" title="Branch 1 was taken 4621 times"> + </span>]:<span class="lineCov">      13488 :         if (!strcmp(chassis_rec-&gt;name, chassis_id)) {</span>
+<span class="lineNum">      98 </span>                :<span class="lineCov">       8867 :             break;</span>
+<span class="lineNum">      99 </span>                :            :         }
+<span class="lineNum">     100 </span>                :            :     }
+<span class="lineNum">     101 </span>                :            : 
+<span class="lineNum">     102 </span>                :<span class="lineCov">       9062 :     return chassis_rec;</span>
+<span class="lineNum">     103 </span>                :            : }
+<a name="104"><span class="lineNum">     104 </span>                :            : </a>
+<span class="lineNum">     105 </span>                :            : uint32_t
+<span class="lineNum">     106 </span>                :<span class="lineCov">      16615 : get_tunnel_type(const char *name)</span>
+<span class="lineNum">     107 </span>                :            : {
+<span class="lineNum">     108 </span>        [<span class="branchCov" title="Branch 0 was taken 8597 times"> + </span><span class="branchCov" title="Branch 1 was taken 8018 times"> + </span>]:<span class="lineCov">      16615 :     if (!strcmp(name, &quot;geneve&quot;)) {</span>
+<span class="lineNum">     109 </span>                :<span class="lineCov">       8597 :         return GENEVE;</span>
+<span class="lineNum">     110 </span>        [<span class="branchCov" title="Branch 0 was taken 32 times"> + </span><span class="branchCov" title="Branch 1 was taken 7986 times"> + </span>]:<span class="lineCov">       8018 :     } else if (!strcmp(name, &quot;stt&quot;)) {</span>
+<span class="lineNum">     111 </span>                :<span class="lineCov">         32 :         return STT;</span>
+<span class="lineNum">     112 </span>        [<span class="branchCov" title="Branch 0 was taken 7986 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       7986 :     } else if (!strcmp(name, &quot;vxlan&quot;)) {</span>
+<span class="lineNum">     113 </span>                :<span class="lineCov">       7986 :         return VXLAN;</span>
+<span class="lineNum">     114 </span>                :            :     }
+<span class="lineNum">     115 </span>                :            : 
+<span class="lineNum">     116 </span>                :<span class="lineNoCov">          0 :     return 0;</span>
+<span class="lineNum">     117 </span>                :            : }
+<a name="118"><span class="lineNum">     118 </span>                :            : </a>
+<span class="lineNum">     119 </span>                :            : const struct ovsrec_bridge *
+<span class="lineNum">     120 </span>                :<span class="lineCov">       3572 : get_bridge(struct ovsdb_idl *ovs_idl, const char *br_name)</span>
+<span class="lineNum">     121 </span>                :            : {
+<span class="lineNum">     122 </span>                :            :     const struct ovsrec_bridge *br;
+<span class="lineNum">     123 </span>        [<span class="branchCov" title="Branch 2 was taken 6184 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">       6184 :     OVSREC_BRIDGE_FOR_EACH (br, ovs_idl) {</span>
+<span class="lineNum">     124 </span>        [<span class="branchCov" title="Branch 0 was taken 3572 times"> + </span><span class="branchCov" title="Branch 1 was taken 2612 times"> + </span>]:<span class="lineCov">       6184 :         if (!strcmp(br-&gt;name, br_name)) {</span>
+<span class="lineNum">     125 </span>                :<span class="lineCov">       3572 :             return br;</span>
+<span class="lineNum">     126 </span>                :            :         }
+<span class="lineNum">     127 </span>                :            :     }
+<span class="lineNum">     128 </span>                :<span class="lineNoCov">          0 :     return NULL;</span>
+<span class="lineNum">     129 </span>                :            : }
+<a name="130"><span class="lineNum">     130 </span>                :            : </a>
+<span class="lineNum">     131 </span>                :            : static const struct ovsrec_bridge *
+<span class="lineNum">     132 </span>                :<span class="lineNoCov">          0 : create_br_int(struct controller_ctx *ctx,</span>
+<span class="lineNum">     133 </span>                :            :               const struct ovsrec_open_vswitch *cfg,
+<span class="lineNum">     134 </span>                :            :               const char *bridge_name)
+<span class="lineNum">     135 </span>                :            : {
+<span class="lineNum">     136 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     if (!ctx-&gt;ovs_idl_txn) {</span>
+<span class="lineNum">     137 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     138 </span>                :            :     }
+<span class="lineNum">     139 </span>                :            : 
+<span class="lineNum">     140 </span>                :<span class="lineNoCov">          0 :     ovsdb_idl_txn_add_comment(ctx-&gt;ovs_idl_txn,</span>
+<span class="lineNum">     141 </span>                :            :             &quot;ovn-controller: creating integration bridge '%s'&quot;, bridge_name);
+<span class="lineNum">     142 </span>                :            : 
+<span class="lineNum">     143 </span>                :            :     struct ovsrec_interface *iface;
+<span class="lineNum">     144 </span>                :<span class="lineNoCov">          0 :     iface = ovsrec_interface_insert(ctx-&gt;ovs_idl_txn);</span>
+<span class="lineNum">     145 </span>                :<span class="lineNoCov">          0 :     ovsrec_interface_set_name(iface, bridge_name);</span>
+<span class="lineNum">     146 </span>                :<span class="lineNoCov">          0 :     ovsrec_interface_set_type(iface, &quot;internal&quot;);</span>
+<span class="lineNum">     147 </span>                :            : 
+<span class="lineNum">     148 </span>                :            :     struct ovsrec_port *port;
+<span class="lineNum">     149 </span>                :<span class="lineNoCov">          0 :     port = ovsrec_port_insert(ctx-&gt;ovs_idl_txn);</span>
+<span class="lineNum">     150 </span>                :<span class="lineNoCov">          0 :     ovsrec_port_set_name(port, bridge_name);</span>
+<span class="lineNum">     151 </span>                :<span class="lineNoCov">          0 :     ovsrec_port_set_interfaces(port, &amp;iface, 1);</span>
+<span class="lineNum">     152 </span>                :            : 
+<span class="lineNum">     153 </span>                :            :     struct ovsrec_bridge *bridge;
+<span class="lineNum">     154 </span>                :<span class="lineNoCov">          0 :     bridge = ovsrec_bridge_insert(ctx-&gt;ovs_idl_txn);</span>
+<span class="lineNum">     155 </span>                :<span class="lineNoCov">          0 :     ovsrec_bridge_set_name(bridge, bridge_name);</span>
+<span class="lineNum">     156 </span>                :<span class="lineNoCov">          0 :     ovsrec_bridge_set_fail_mode(bridge, &quot;secure&quot;);</span>
+<span class="lineNum">     157 </span>                :<span class="lineNoCov">          0 :     const struct smap oc = SMAP_CONST1(&amp;oc, &quot;disable-in-band&quot;, &quot;true&quot;);</span>
+<span class="lineNum">     158 </span>                :<span class="lineNoCov">          0 :     ovsrec_bridge_set_other_config(bridge, &amp;oc);</span>
+<span class="lineNum">     159 </span>                :<span class="lineNoCov">          0 :     ovsrec_bridge_set_ports(bridge, &amp;port, 1);</span>
+<span class="lineNum">     160 </span>                :            : 
+<span class="lineNum">     161 </span>                :            :     struct ovsrec_bridge **bridges;
+<span class="lineNum">     162 </span>                :<span class="lineNoCov">          0 :     size_t bytes = sizeof *bridges * cfg-&gt;n_bridges;</span>
+<span class="lineNum">     163 </span>                :<span class="lineNoCov">          0 :     bridges = xmalloc(bytes + sizeof *bridges);</span>
+<span class="lineNum">     164 </span>                :<span class="lineNoCov">          0 :     memcpy(bridges, cfg-&gt;bridges, bytes);</span>
+<span class="lineNum">     165 </span>                :<span class="lineNoCov">          0 :     bridges[cfg-&gt;n_bridges] = bridge;</span>
+<span class="lineNum">     166 </span>                :<span class="lineNoCov">          0 :     ovsrec_open_vswitch_verify_bridges(cfg);</span>
+<span class="lineNum">     167 </span>                :<span class="lineNoCov">          0 :     ovsrec_open_vswitch_set_bridges(cfg, bridges, cfg-&gt;n_bridges + 1);</span>
+<span class="lineNum">     168 </span>                :            : 
+<span class="lineNum">     169 </span>                :<span class="lineNoCov">          0 :     return bridge;</span>
+<span class="lineNum">     170 </span>                :            : }
+<a name="171"><span class="lineNum">     171 </span>                :            : </a>
+<span class="lineNum">     172 </span>                :            : static const struct ovsrec_bridge *
+<span class="lineNum">     173 </span>                :<span class="lineCov">       3305 : get_br_int(struct controller_ctx *ctx)</span>
+<span class="lineNum">     174 </span>                :            : {
+<span class="lineNum">     175 </span>                :            :     const struct ovsrec_open_vswitch *cfg;
+<span class="lineNum">     176 </span>                :<span class="lineCov">       3305 :     cfg = ovsrec_open_vswitch_first(ctx-&gt;ovs_idl);</span>
+<span class="lineNum">     177 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3305 times"> + </span>]:<span class="lineCov">       3305 :     if (!cfg) {</span>
+<span class="lineNum">     178 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     179 </span>                :            :     }
+<span class="lineNum">     180 </span>                :            : 
+<span class="lineNum">     181 </span>                :<span class="lineCov">       3305 :     const char *br_int_name = smap_get_def(&amp;cfg-&gt;external_ids, &quot;ovn-bridge&quot;,</span>
+<span class="lineNum">     182 </span>                :            :                                            DEFAULT_BRIDGE_NAME);
+<span class="lineNum">     183 </span>                :            : 
+<span class="lineNum">     184 </span>                :            :     const struct ovsrec_bridge *br;
+<span class="lineNum">     185 </span>                :<span class="lineCov">       3305 :     br = get_bridge(ctx-&gt;ovs_idl, br_int_name);</span>
+<span class="lineNum">     186 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3305 times"> + </span>]:<span class="lineCov">       3305 :     if (!br) {</span>
+<span class="lineNum">     187 </span>                :<span class="lineNoCov">          0 :         return create_br_int(ctx, cfg, br_int_name);</span>
+<span class="lineNum">     188 </span>                :            :     }
+<span class="lineNum">     189 </span>                :<span class="lineCov">       3305 :     return br;</span>
+<span class="lineNum">     190 </span>                :            : }
+<a name="191"><span class="lineNum">     191 </span>                :            : </a>
+<span class="lineNum">     192 </span>                :            : static const char *
+<span class="lineNum">     193 </span>                :<span class="lineCov">       3305 : get_chassis_id(const struct ovsdb_idl *ovs_idl)</span>
+<span class="lineNum">     194 </span>                :            : {
+<span class="lineNum">     195 </span>                :<span class="lineCov">       3305 :     const struct ovsrec_open_vswitch *cfg = ovsrec_open_vswitch_first(ovs_idl);</span>
+<span class="lineNum">     196 </span>        [<span class="branchCov" title="Branch 0 was taken 3305 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       3305 :     const char *chassis_id = cfg ? smap_get(&amp;cfg-&gt;external_ids, &quot;system-id&quot;) : NULL;</span>
+<span class="lineNum">     197 </span>                :            : 
+<span class="lineNum">     198 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 3305 times"> + </span>]:<span class="lineCov">       3305 :     if (!chassis_id) {</span>
+<span class="lineNum">     199 </span>                :            :         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 1);
+<span class="lineNum">     200 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_WARN_RL(&amp;rl, &quot;'system-id' in Open_vSwitch database is missing.&quot;);</span>
+<span class="lineNum">     201 </span>                :            :     }
+<span class="lineNum">     202 </span>                :            : 
+<span class="lineNum">     203 </span>                :<span class="lineCov">       3305 :     return chassis_id;</span>
+<span class="lineNum">     204 </span>                :            : }
+<span class="lineNum">     205 </span>                :            : 
+<span class="lineNum">     206 </span>                :            : /* Retrieves the OVN Southbound remote location from the
+<span class="lineNum">     207 </span>                :            :  * &quot;external-ids:ovn-remote&quot; key in 'ovs_idl' and returns a copy of it.
+<span class="lineNum">     208 </span>                :            :  *
+<span class="lineNum">     209 </span>                :            :  * XXX ovn-controller does not support this changing mid-run, but that should
+<a name="210"><span class="lineNum">     210 </span>                :            :  * be addressed later. */</a>
+<span class="lineNum">     211 </span>                :            : static char *
+<span class="lineNum">     212 </span>                :<span class="lineCov">       3211 : get_ovnsb_remote(struct ovsdb_idl *ovs_idl)</span>
+<span class="lineNum">     213 </span>                :            : {
+<span class="lineNum">     214 </span>                :            :     while (1) {
+<span class="lineNum">     215 </span>                :<span class="lineCov">       3211 :         ovsdb_idl_run(ovs_idl);</span>
+<span class="lineNum">     216 </span>                :            : 
+<span class="lineNum">     217 </span>                :<span class="lineCov">       3211 :         const struct ovsrec_open_vswitch *cfg</span>
+<span class="lineNum">     218 </span>                :            :             = ovsrec_open_vswitch_first(ovs_idl);
+<span class="lineNum">     219 </span>        [<span class="branchCov" title="Branch 0 was taken 3211 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       3211 :         if (cfg) {</span>
+<span class="lineNum">     220 </span>                :<span class="lineCov">       3211 :             const char *remote = smap_get(&amp;cfg-&gt;external_ids, &quot;ovn-remote&quot;);</span>
+<span class="lineNum">     221 </span>        [<span class="branchCov" title="Branch 0 was taken 3211 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       3211 :             if (remote) {</span>
+<span class="lineNum">     222 </span>                :<span class="lineCov">       3211 :                 return xstrdup(remote);</span>
+<span class="lineNum">     223 </span>                :            :             }
+<span class="lineNum">     224 </span>                :            :         }
+<span class="lineNum">     225 </span>                :            : 
+<span class="lineNum">     226 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :         VLOG_INFO(&quot;OVN OVSDB remote not specified.  Waiting...&quot;);</span>
+<span class="lineNum">     227 </span>                :<span class="lineNoCov">          0 :         ovsdb_idl_wait(ovs_idl);</span>
+<span class="lineNum">     228 </span>                :<span class="lineNoCov">          0 :         poll_block();</span>
+<span class="lineNum">     229 </span>                :<span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     230 </span>                :            : }
+<a name="231"><span class="lineNum">     231 </span>                :            : </a>
+<span class="lineNum">     232 </span>                :            : static void
+<span class="lineNum">     233 </span>                :<span class="lineCov">       3167 : update_ct_zones(struct sset *lports, struct hmap *patched_datapaths,</span>
+<span class="lineNum">     234 </span>                :            :                 struct simap *ct_zones, unsigned long *ct_zone_bitmap)
+<span class="lineNum">     235 </span>                :            : {
+<span class="lineNum">     236 </span>                :            :     struct simap_node *ct_zone, *ct_zone_next;
+<span class="lineNum">     237 </span>                :<span class="lineCov">       3167 :     int scan_start = 1;</span>
+<span class="lineNum">     238 </span>                :            :     struct patched_datapath *pd;
+<span class="lineNum">     239 </span>                :            :     const char *user;
+<span class="lineNum">     240 </span>                :<span class="lineCov">       3167 :     struct sset all_users = SSET_INITIALIZER(&amp;all_users);</span>
+<span class="lineNum">     241 </span>                :            : 
+<span class="lineNum">     242 </span>[<span class="branchCov" title="Branch 1 was taken 2627 times"> + </span><span class="branchCov" title="Branch 2 was taken 540 times"> + </span>][<span class="branchCov" title="Branch 5 was taken 10973 times"> + </span><span class="branchCov" title="Branch 6 was taken 2627 times"> + </span>]:<span class="lineCov">      16767 :     SSET_FOR_EACH(user, lports) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 8 was taken 13600 times"> + </span><span class="branchCov" title="Branch 9 was taken 3167 times"> + </span>]
+<span class="lineNum">     243 </span>                :<span class="lineCov">      13600 :         sset_add(&amp;all_users, user);</span>
+<span class="lineNum">     244 </span>                :            :     }
+<span class="lineNum">     245 </span>                :            : 
+<span class="lineNum">     246 </span>                :            :     /* Local patched datapath (gateway routers) need zones assigned. */
+<span class="lineNum">     247 </span>[<span class="branchCov" title="Branch 2 was taken 6986 times"> + </span><span class="branchCov" title="Branch 3 was taken 3167 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 3167 times"> + </span>]:<span class="lineCov">      10153 :     HMAP_FOR_EACH(pd, hmap_node, patched_datapaths) {</span>
+<span class="lineNum">     248 </span>        [<span class="branchCov" title="Branch 0 was taken 6507 times"> + </span><span class="branchCov" title="Branch 1 was taken 479 times"> + </span>]:<span class="lineCov">       6986 :         if (!pd-&gt;local) {</span>
+<span class="lineNum">     249 </span>                :<span class="lineCov">       6507 :             continue;</span>
+<span class="lineNum">     250 </span>                :            :         }
+<span class="lineNum">     251 </span>                :            : 
+<span class="lineNum">     252 </span>                :<span class="lineCov">        479 :         char *dnat = alloc_nat_zone_key(&amp;pd-&gt;key, &quot;dnat&quot;);</span>
+<span class="lineNum">     253 </span>                :<span class="lineCov">        479 :         char *snat = alloc_nat_zone_key(&amp;pd-&gt;key, &quot;snat&quot;);</span>
+<span class="lineNum">     254 </span>                :<span class="lineCov">        479 :         sset_add(&amp;all_users, dnat);</span>
+<span class="lineNum">     255 </span>                :<span class="lineCov">        479 :         sset_add(&amp;all_users, snat);</span>
+<span class="lineNum">     256 </span>                :<span class="lineCov">        479 :         free(dnat);</span>
+<span class="lineNum">     257 </span>                :<span class="lineCov">        479 :         free(snat);</span>
+<span class="lineNum">     258 </span>                :            :     }
+<span class="lineNum">     259 </span>                :            : 
+<span class="lineNum">     260 </span>                :            :     /* Delete zones that do not exist in above sset. */
+<span class="lineNum">     261 </span>[<span class="branchCov" title="Branch 1 was taken 3167 times"> + </span><span class="branchCov" title="Branch 2 was taken 14415 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 3167 times"> + </span>]:<span class="lineCov">      17582 :     SIMAP_FOR_EACH_SAFE(ct_zone, ct_zone_next, ct_zones) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 6 was taken 14415 times"> + </span><span class="branchCov" title="Branch 7 was taken 3167 times"> + </span>]
+<span class="lineNum">     262 </span>        [<span class="branchCov" title="Branch 1 was taken 97 times"> + </span><span class="branchCov" title="Branch 2 was taken 14318 times"> + </span>]:<span class="lineCov">      14415 :         if (!sset_contains(&amp;all_users, ct_zone-&gt;name)) {</span>
+<span class="lineNum">     263 </span>                :<span class="lineCov">         97 :             bitmap_set0(ct_zone_bitmap, ct_zone-&gt;data);</span>
+<span class="lineNum">     264 </span>                :<span class="lineCov">         97 :             simap_delete(ct_zones, ct_zone);</span>
+<span class="lineNum">     265 </span>                :            :         }
+<span class="lineNum">     266 </span>                :            :     }
+<span class="lineNum">     267 </span>                :            : 
+<span class="lineNum">     268 </span>                :            :     /* xxx This is wasteful to assign a zone to each port--even if no
+<span class="lineNum">     269 </span>                :            :      * xxx security policy is applied. */
+<span class="lineNum">     270 </span>                :            : 
+<span class="lineNum">     271 </span>                :            :     /* Assign a unique zone id for each logical port and two zones
+<span class="lineNum">     272 </span>                :            :      * to a gateway router. */
+<span class="lineNum">     273 </span>[<span class="branchCov" title="Branch 1 was taken 2688 times"> + </span><span class="branchCov" title="Branch 2 was taken 479 times"> + </span>][<span class="branchCov" title="Branch 5 was taken 11870 times"> + </span><span class="branchCov" title="Branch 6 was taken 2688 times"> + </span>]:<span class="lineCov">      17725 :     SSET_FOR_EACH(user, &amp;all_users) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 8 was taken 14558 times"> + </span><span class="branchCov" title="Branch 9 was taken 3167 times"> + </span>]
+<span class="lineNum">     274 </span>                :            :         size_t zone;
+<span class="lineNum">     275 </span>                :            : 
+<span class="lineNum">     276 </span>        [<span class="branchCov" title="Branch 1 was taken 14318 times"> + </span><span class="branchCov" title="Branch 2 was taken 240 times"> + </span>]:<span class="lineCov">      14558 :         if (simap_contains(ct_zones, user)) {</span>
+<span class="lineNum">     277 </span>                :<span class="lineCov">      14318 :             continue;</span>
+<span class="lineNum">     278 </span>                :            :         }
+<span class="lineNum">     279 </span>                :            : 
+<span class="lineNum">     280 </span>                :            :         /* We assume that there are 64K zones and that we own them all. */
+<span class="lineNum">     281 </span>                :<span class="lineCov">        240 :         zone = bitmap_scan(ct_zone_bitmap, 0, scan_start, MAX_CT_ZONES + 1);</span>
+<span class="lineNum">     282 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 240 times"> + </span>]:<span class="lineCov">        240 :         if (zone == MAX_CT_ZONES + 1) {</span>
+<span class="lineNum">     283 </span>                :            :             static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 1);
+<span class="lineNum">     284 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_WARN_RL(&amp;rl, &quot;exhausted all ct zones&quot;);</span>
+<span class="lineNum">     285 </span>                :<span class="lineNoCov">          0 :             return;</span>
+<span class="lineNum">     286 </span>                :            :         }
+<span class="lineNum">     287 </span>                :<span class="lineCov">        240 :         scan_start = zone + 1;</span>
+<span class="lineNum">     288 </span>                :            : 
+<span class="lineNum">     289 </span>                :<span class="lineCov">        240 :         bitmap_set1(ct_zone_bitmap, zone);</span>
+<span class="lineNum">     290 </span>                :<span class="lineCov">        240 :         simap_put(ct_zones, user, zone);</span>
+<span class="lineNum">     291 </span>                :            : 
+<span class="lineNum">     292 </span>                :            :         /* xxx We should erase any old entries for this
+<span class="lineNum">     293 </span>                :            :          * xxx zone, but we need a generic interface to the conntrack
+<span class="lineNum">     294 </span>                :            :          * xxx table. */
+<span class="lineNum">     295 </span>                :            :     }
+<span class="lineNum">     296 </span>                :            : 
+<span class="lineNum">     297 </span>                :<span class="lineCov">       3167 :     sset_destroy(&amp;all_users);</span>
+<span class="lineNum">     298 </span>                :            : }
+<a name="299"><span class="lineNum">     299 </span>                :            : </a>
+<span class="lineNum">     300 </span>                :            : static int64_t
+<span class="lineNum">     301 </span>                :<span class="lineCov">       3167 : get_nb_cfg(struct ovsdb_idl *idl)</span>
+<span class="lineNum">     302 </span>                :            : {
+<span class="lineNum">     303 </span>                :<span class="lineCov">       3167 :     const struct sbrec_sb_global *sb = sbrec_sb_global_first(idl);</span>
+<span class="lineNum">     304 </span>        [<span class="branchCov" title="Branch 0 was taken 3139 times"> + </span><span class="branchCov" title="Branch 1 was taken 28 times"> + </span>]:<span class="lineCov">       3167 :     return sb ? sb-&gt;nb_cfg : 0;</span>
+<span class="lineNum">     305 </span>                :            : }
+<a name="306"><span class="lineNum">     306 </span>                :            : </a>
+<span class="lineNum">     307 </span>                :            : int
+<span class="lineNum">     308 </span>                :<span class="lineCov">         47 : main(int argc, char *argv[])</span>
+<span class="lineNum">     309 </span>                :            : {
+<span class="lineNum">     310 </span>                :            :     struct unixctl_server *unixctl;
+<span class="lineNum">     311 </span>                :            :     bool exiting;
+<span class="lineNum">     312 </span>                :            :     int retval;
+<span class="lineNum">     313 </span>                :            : 
+<span class="lineNum">     314 </span>                :<span class="lineCov">         47 :     ovs_cmdl_proctitle_init(argc, argv);</span>
+<span class="lineNum">     315 </span>                :<span class="lineCov">         47 :     set_program_name(argv[0]);</span>
+<span class="lineNum">     316 </span>                :<span class="lineCov">         47 :     service_start(&amp;argc, &amp;argv);</span>
+<span class="lineNum">     317 </span>                :<span class="lineCov">         47 :     parse_options(argc, argv);</span>
+<span class="lineNum">     318 </span>                :<span class="lineCov">         47 :     fatal_ignore_sigpipe();</span>
+<span class="lineNum">     319 </span>                :            : 
+<span class="lineNum">     320 </span>                :<span class="lineCov">         47 :     daemonize_start(false);</span>
+<span class="lineNum">     321 </span>                :            : 
+<span class="lineNum">     322 </span>                :<span class="lineCov">         44 :     retval = unixctl_server_create(NULL, &amp;unixctl);</span>
+<span class="lineNum">     323 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 44 times"> + </span>]:<span class="lineCov">         44 :     if (retval) {</span>
+<span class="lineNum">     324 </span>                :<span class="lineNoCov">          0 :         exit(EXIT_FAILURE);</span>
+<span class="lineNum">     325 </span>                :            :     }
+<span class="lineNum">     326 </span>                :<span class="lineCov">         44 :     unixctl_command_register(&quot;exit&quot;, &quot;&quot;, 0, 0, ovn_controller_exit, &amp;exiting);</span>
+<span class="lineNum">     327 </span>                :            : 
+<span class="lineNum">     328 </span>                :            :     /* Initialize group ids for loadbalancing. */
+<span class="lineNum">     329 </span>                :            :     struct group_table group_table;
+<span class="lineNum">     330 </span>                :<span class="lineCov">         44 :     group_table.group_ids = bitmap_allocate(MAX_OVN_GROUPS);</span>
+<span class="lineNum">     331 </span>                :<span class="lineCov">         44 :     bitmap_set1(group_table.group_ids, 0); /* Group id 0 is invalid. */</span>
+<span class="lineNum">     332 </span>                :<span class="lineCov">         44 :     hmap_init(&amp;group_table.desired_groups);</span>
+<span class="lineNum">     333 </span>                :<span class="lineCov">         44 :     hmap_init(&amp;group_table.existing_groups);</span>
+<span class="lineNum">     334 </span>                :            : 
+<span class="lineNum">     335 </span>                :<span class="lineCov">         44 :     daemonize_complete();</span>
+<span class="lineNum">     336 </span>                :            : 
+<span class="lineNum">     337 </span>                :<span class="lineCov">         44 :     ovsrec_init();</span>
+<span class="lineNum">     338 </span>                :<span class="lineCov">         44 :     sbrec_init();</span>
+<span class="lineNum">     339 </span>                :            : 
+<span class="lineNum">     340 </span>                :<span class="lineCov">         44 :     ofctrl_init(&amp;group_table);</span>
+<span class="lineNum">     341 </span>                :<span class="lineCov">         44 :     pinctrl_init();</span>
+<span class="lineNum">     342 </span>                :<span class="lineCov">         44 :     lflow_init();</span>
+<span class="lineNum">     343 </span>                :            : 
+<span class="lineNum">     344 </span>                :            :     /* Connect to OVS OVSDB instance.  We do not monitor all tables by
+<span class="lineNum">     345 </span>                :            :      * default, so modules must register their interest explicitly.  */
+<span class="lineNum">     346 </span>                :<span class="lineCov">         44 :     struct ovsdb_idl_loop ovs_idl_loop = OVSDB_IDL_LOOP_INITIALIZER(</span>
+<span class="lineNum">     347 </span>                :            :         ovsdb_idl_create(ovs_remote, &amp;ovsrec_idl_class, false, true));
+<span class="lineNum">     348 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_table(ovs_idl_loop.idl, &amp;ovsrec_table_open_vswitch);</span>
+<span class="lineNum">     349 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl_loop.idl,</span>
+<span class="lineNum">     350 </span>                :            :                          &amp;ovsrec_open_vswitch_col_external_ids);
+<span class="lineNum">     351 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl_loop.idl, &amp;ovsrec_open_vswitch_col_bridges);</span>
+<span class="lineNum">     352 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_table(ovs_idl_loop.idl, &amp;ovsrec_table_interface);</span>
+<span class="lineNum">     353 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl_loop.idl, &amp;ovsrec_interface_col_name);</span>
+<span class="lineNum">     354 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl_loop.idl, &amp;ovsrec_interface_col_type);</span>
+<span class="lineNum">     355 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl_loop.idl, &amp;ovsrec_interface_col_options);</span>
+<span class="lineNum">     356 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_table(ovs_idl_loop.idl, &amp;ovsrec_table_port);</span>
+<span class="lineNum">     357 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl_loop.idl, &amp;ovsrec_port_col_name);</span>
+<span class="lineNum">     358 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl_loop.idl, &amp;ovsrec_port_col_interfaces);</span>
+<span class="lineNum">     359 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl_loop.idl, &amp;ovsrec_port_col_external_ids);</span>
+<span class="lineNum">     360 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_table(ovs_idl_loop.idl, &amp;ovsrec_table_bridge);</span>
+<span class="lineNum">     361 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl_loop.idl, &amp;ovsrec_bridge_col_ports);</span>
+<span class="lineNum">     362 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl_loop.idl, &amp;ovsrec_bridge_col_name);</span>
+<span class="lineNum">     363 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl_loop.idl, &amp;ovsrec_bridge_col_fail_mode);</span>
+<span class="lineNum">     364 </span>                :<span class="lineCov">         44 :     ovsdb_idl_add_column(ovs_idl_loop.idl, &amp;ovsrec_bridge_col_other_config);</span>
+<span class="lineNum">     365 </span>                :<span class="lineCov">         44 :     chassis_register_ovs_idl(ovs_idl_loop.idl);</span>
+<span class="lineNum">     366 </span>                :<span class="lineCov">         44 :     encaps_register_ovs_idl(ovs_idl_loop.idl);</span>
+<span class="lineNum">     367 </span>                :<span class="lineCov">         44 :     binding_register_ovs_idl(ovs_idl_loop.idl);</span>
+<span class="lineNum">     368 </span>                :<span class="lineCov">         44 :     physical_register_ovs_idl(ovs_idl_loop.idl);</span>
+<span class="lineNum">     369 </span>                :<span class="lineCov">         44 :     ovsdb_idl_get_initial_snapshot(ovs_idl_loop.idl);</span>
+<span class="lineNum">     370 </span>                :            : 
+<span class="lineNum">     371 </span>                :            :     /* Connect to OVN SB database. */
+<span class="lineNum">     372 </span>                :<span class="lineCov">         44 :     char *ovnsb_remote = get_ovnsb_remote(ovs_idl_loop.idl);</span>
+<span class="lineNum">     373 </span>                :<span class="lineCov">         44 :     struct ovsdb_idl_loop ovnsb_idl_loop = OVSDB_IDL_LOOP_INITIALIZER(</span>
+<span class="lineNum">     374 </span>                :            :         ovsdb_idl_create(ovnsb_remote, &amp;sbrec_idl_class, true, true));
+<span class="lineNum">     375 </span>                :<span class="lineCov">         44 :     ovsdb_idl_omit_alert(ovnsb_idl_loop.idl, &amp;sbrec_chassis_col_nb_cfg);</span>
+<span class="lineNum">     376 </span>                :            : 
+<span class="lineNum">     377 </span>                :            :     /* Track the southbound idl. */
+<span class="lineNum">     378 </span>                :<span class="lineCov">         44 :     ovsdb_idl_track_add_all(ovnsb_idl_loop.idl);</span>
+<span class="lineNum">     379 </span>                :            : 
+<span class="lineNum">     380 </span>                :<span class="lineCov">         44 :     ovsdb_idl_get_initial_snapshot(ovnsb_idl_loop.idl);</span>
+<span class="lineNum">     381 </span>                :            : 
+<span class="lineNum">     382 </span>                :            :     /* Initialize connection tracking zones. */
+<span class="lineNum">     383 </span>                :<span class="lineCov">         44 :     struct simap ct_zones = SIMAP_INITIALIZER(&amp;ct_zones);</span>
+<span class="lineNum">     384 </span>                :            :     unsigned long ct_zone_bitmap[BITMAP_N_LONGS(MAX_CT_ZONES)];
+<span class="lineNum">     385 </span>                :<span class="lineCov">         44 :     memset(ct_zone_bitmap, 0, sizeof ct_zone_bitmap);</span>
+<span class="lineNum">     386 </span>                :<span class="lineCov">         44 :     bitmap_set1(ct_zone_bitmap, 0); /* Zone 0 is reserved. */</span>
+<span class="lineNum">     387 </span>                :<span class="lineCov">         44 :     unixctl_command_register(&quot;ct-zone-list&quot;, &quot;&quot;, 0, 0,</span>
+<span class="lineNum">     388 </span>                :            :                              ct_zone_list, &amp;ct_zones);
+<span class="lineNum">     389 </span>                :            : 
+<span class="lineNum">     390 </span>                :            :     /* Main loop. */
+<span class="lineNum">     391 </span>                :<span class="lineCov">         44 :     exiting = false;</span>
+<span class="lineNum">     392 </span>        [<span class="branchCov" title="Branch 0 was taken 3167 times"> + </span><span class="branchCov" title="Branch 1 was taken 44 times"> + </span>]:<span class="lineCov">       3211 :     while (!exiting) {</span>
+<span class="lineNum">     393 </span>                :            :         /* Check OVN SB database. */
+<span class="lineNum">     394 </span>                :<span class="lineCov">       3167 :         char *new_ovnsb_remote = get_ovnsb_remote(ovs_idl_loop.idl);</span>
+<span class="lineNum">     395 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 3165 times"> + </span>]:<span class="lineCov">       3167 :         if (strcmp(ovnsb_remote, new_ovnsb_remote)) {</span>
+<span class="lineNum">     396 </span>                :<span class="lineCov">          2 :             free(ovnsb_remote);</span>
+<span class="lineNum">     397 </span>                :<span class="lineCov">          2 :             ovnsb_remote = new_ovnsb_remote;</span>
+<span class="lineNum">     398 </span>                :<span class="lineCov">          2 :             ovsdb_idl_set_remote(ovnsb_idl_loop.idl, ovnsb_remote, true);</span>
+<span class="lineNum">     399 </span>                :            :         } else {
+<span class="lineNum">     400 </span>                :<span class="lineCov">       3165 :             free(new_ovnsb_remote);</span>
+<span class="lineNum">     401 </span>                :            :         }
+<span class="lineNum">     402 </span>                :            : 
+<span class="lineNum">     403 </span>                :<span class="lineCov">      12668 :         struct controller_ctx ctx = {</span>
+<span class="lineNum">     404 </span>                :<span class="lineCov">       3167 :             .ovs_idl = ovs_idl_loop.idl,</span>
+<span class="lineNum">     405 </span>                :<span class="lineCov">       3167 :             .ovs_idl_txn = ovsdb_idl_loop_run(&amp;ovs_idl_loop),</span>
+<span class="lineNum">     406 </span>                :<span class="lineCov">       3167 :             .ovnsb_idl = ovnsb_idl_loop.idl,</span>
+<span class="lineNum">     407 </span>                :<span class="lineCov">       3167 :             .ovnsb_idl_txn = ovsdb_idl_loop_run(&amp;ovnsb_idl_loop),</span>
+<span class="lineNum">     408 </span>                :            :         };
+<span class="lineNum">     409 </span>                :            : 
+<span class="lineNum">     410 </span>                :<span class="lineCov">       3167 :         update_probe_interval(&amp;ctx);</span>
+<span class="lineNum">     411 </span>                :            : 
+<span class="lineNum">     412 </span>                :            :         /* Contains &quot;struct local_datapath&quot; nodes whose hash values are the
+<span class="lineNum">     413 </span>                :            :          * tunnel_key of datapaths with at least one local port binding. */
+<span class="lineNum">     414 </span>                :<span class="lineCov">       3167 :         struct hmap local_datapaths = HMAP_INITIALIZER(&amp;local_datapaths);</span>
+<span class="lineNum">     415 </span>                :            : 
+<span class="lineNum">     416 </span>                :<span class="lineCov">       3167 :         struct hmap patched_datapaths = HMAP_INITIALIZER(&amp;patched_datapaths);</span>
+<span class="lineNum">     417 </span>                :<span class="lineCov">       3167 :         struct sset all_lports = SSET_INITIALIZER(&amp;all_lports);</span>
+<span class="lineNum">     418 </span>                :            : 
+<span class="lineNum">     419 </span>                :<span class="lineCov">       3167 :         const struct ovsrec_bridge *br_int = get_br_int(&amp;ctx);</span>
+<span class="lineNum">     420 </span>                :<span class="lineCov">       3167 :         const char *chassis_id = get_chassis_id(ctx.ovs_idl);</span>
+<span class="lineNum">     421 </span>                :            : 
+<span class="lineNum">     422 </span>                :<span class="lineCov">       3167 :         const struct sbrec_chassis *chassis = NULL;</span>
+<span class="lineNum">     423 </span>        [<span class="branchCov" title="Branch 0 was taken 3167 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       3167 :         if (chassis_id) {</span>
+<span class="lineNum">     424 </span>                :<span class="lineCov">       3167 :             chassis = chassis_run(&amp;ctx, chassis_id, br_int);</span>
+<span class="lineNum">     425 </span>                :<span class="lineCov">       3167 :             encaps_run(&amp;ctx, br_int, chassis_id);</span>
+<span class="lineNum">     426 </span>                :<span class="lineCov">       3167 :             binding_run(&amp;ctx, br_int, chassis_id, &amp;local_datapaths,</span>
+<span class="lineNum">     427 </span>                :            :                         &amp;all_lports);
+<span class="lineNum">     428 </span>                :            :         }
+<span class="lineNum">     429 </span>                :            : 
+<span class="lineNum">     430 </span>[<span class="branchCov" title="Branch 0 was taken 3167 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 3167 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">       3167 :         if (br_int &amp;&amp; chassis_id) {</span>
+<span class="lineNum">     431 </span>                :<span class="lineCov">       3167 :             patch_run(&amp;ctx, br_int, chassis_id, &amp;local_datapaths,</span>
+<span class="lineNum">     432 </span>                :            :                       &amp;patched_datapaths);
+<span class="lineNum">     433 </span>                :            : 
+<span class="lineNum">     434 </span>                :            :             static struct lport_index lports;
+<span class="lineNum">     435 </span>                :            :             static struct mcgroup_index mcgroups;
+<span class="lineNum">     436 </span>                :<span class="lineCov">       3167 :             lport_index_init(&amp;lports, ctx.ovnsb_idl);</span>
+<span class="lineNum">     437 </span>                :<span class="lineCov">       3167 :             mcgroup_index_init(&amp;mcgroups, ctx.ovnsb_idl);</span>
+<span class="lineNum">     438 </span>                :            : 
+<span class="lineNum">     439 </span>                :<span class="lineCov">       3167 :             enum mf_field_id mff_ovn_geneve = ofctrl_run(br_int);</span>
+<span class="lineNum">     440 </span>                :            : 
+<span class="lineNum">     441 </span>                :<span class="lineCov">       3167 :             pinctrl_run(&amp;ctx, &amp;lports, br_int, chassis_id, &amp;local_datapaths);</span>
+<span class="lineNum">     442 </span>                :<span class="lineCov">       3167 :             update_ct_zones(&amp;all_lports, &amp;patched_datapaths, &amp;ct_zones,</span>
+<span class="lineNum">     443 </span>                :            :                             ct_zone_bitmap);
+<span class="lineNum">     444 </span>                :            : 
+<span class="lineNum">     445 </span>                :<span class="lineCov">       3167 :             struct hmap flow_table = HMAP_INITIALIZER(&amp;flow_table);</span>
+<span class="lineNum">     446 </span>                :<span class="lineCov">       3167 :             lflow_run(&amp;ctx, &amp;lports, &amp;mcgroups, &amp;local_datapaths,</span>
+<span class="lineNum">     447 </span>                :            :                       &amp;patched_datapaths, &amp;group_table, &amp;ct_zones,
+<span class="lineNum">     448 </span>                :            :                       &amp;flow_table);
+<span class="lineNum">     449 </span>                :            : 
+<span class="lineNum">     450 </span>                :<span class="lineCov">       3167 :             physical_run(&amp;ctx, mff_ovn_geneve,</span>
+<span class="lineNum">     451 </span>                :            :                          br_int, chassis_id, &amp;ct_zones, &amp;flow_table,
+<span class="lineNum">     452 </span>                :            :                          &amp;local_datapaths, &amp;patched_datapaths);
+<span class="lineNum">     453 </span>                :            : 
+<span class="lineNum">     454 </span>                :<span class="lineCov">       3167 :             ofctrl_put(&amp;flow_table, get_nb_cfg(ctx.ovnsb_idl));</span>
+<span class="lineNum">     455 </span>                :<span class="lineCov">       3167 :             hmap_destroy(&amp;flow_table);</span>
+<span class="lineNum">     456 </span>        [<span class="branchCov" title="Branch 0 was taken 2670 times"> + </span><span class="branchCov" title="Branch 1 was taken 497 times"> + </span>]:<span class="lineCov">       3167 :             if (ctx.ovnsb_idl_txn) {</span>
+<span class="lineNum">     457 </span>                :<span class="lineCov">       2670 :                 int64_t cur_cfg = ofctrl_get_cur_cfg();</span>
+<span class="lineNum">     458 </span>[<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 2670 times"> + </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineCov">       2670 :                 if (cur_cfg &amp;&amp; cur_cfg != chassis-&gt;nb_cfg) {</span>
+<span class="lineNum">     459 </span>                :<span class="lineNoCov">          0 :                     sbrec_chassis_set_nb_cfg(chassis, cur_cfg);</span>
+<span class="lineNum">     460 </span>                :            :                 }
+<span class="lineNum">     461 </span>                :            :             }
+<span class="lineNum">     462 </span>                :<span class="lineCov">       3167 :             mcgroup_index_destroy(&amp;mcgroups);</span>
+<span class="lineNum">     463 </span>                :<span class="lineCov">       3167 :             lport_index_destroy(&amp;lports);</span>
+<span class="lineNum">     464 </span>                :            :         }
+<span class="lineNum">     465 </span>                :            : 
+<span class="lineNum">     466 </span>                :<span class="lineCov">       3167 :         sset_destroy(&amp;all_lports);</span>
+<span class="lineNum">     467 </span>                :            : 
+<span class="lineNum">     468 </span>                :            :         struct local_datapath *cur_node, *next_node;
+<span class="lineNum">     469 </span>[<span class="branchCov" title="Branch 1 was taken 3167 times"> + </span><span class="branchCov" title="Branch 2 was taken 5178 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 3167 times"> + </span>]:<span class="lineCov">       8345 :         HMAP_FOR_EACH_SAFE (cur_node, next_node, hmap_node, &amp;local_datapaths) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 6 was taken 5178 times"> + </span><span class="branchCov" title="Branch 7 was taken 3167 times"> + </span>]
+<span class="lineNum">     470 </span>                :<span class="lineCov">       5178 :             hmap_remove(&amp;local_datapaths, &amp;cur_node-&gt;hmap_node);</span>
+<span class="lineNum">     471 </span>                :<span class="lineCov">       5178 :             free(cur_node-&gt;logical_port);</span>
+<span class="lineNum">     472 </span>                :<span class="lineCov">       5178 :             free(cur_node);</span>
+<span class="lineNum">     473 </span>                :            :         }
+<span class="lineNum">     474 </span>                :<span class="lineCov">       3167 :         hmap_destroy(&amp;local_datapaths);</span>
+<span class="lineNum">     475 </span>                :            : 
+<span class="lineNum">     476 </span>                :            :         struct patched_datapath *pd_cur_node, *pd_next_node;
+<span class="lineNum">     477 </span>[<span class="branchCov" title="Branch 1 was taken 3167 times"> + </span><span class="branchCov" title="Branch 2 was taken 6986 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 3167 times"> + </span>]:<span class="lineCov">      10153 :         HMAP_FOR_EACH_SAFE (pd_cur_node, pd_next_node, hmap_node,</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 6 was taken 6986 times"> + </span><span class="branchCov" title="Branch 7 was taken 3167 times"> + </span>]
+<span class="lineNum">     478 </span>                :            :                 &amp;patched_datapaths) {
+<span class="lineNum">     479 </span>                :<span class="lineCov">       6986 :             hmap_remove(&amp;patched_datapaths, &amp;pd_cur_node-&gt;hmap_node);</span>
+<span class="lineNum">     480 </span>                :<span class="lineCov">       6986 :             free(pd_cur_node);</span>
+<span class="lineNum">     481 </span>                :            :         }
+<span class="lineNum">     482 </span>                :<span class="lineCov">       3167 :         hmap_destroy(&amp;patched_datapaths);</span>
+<span class="lineNum">     483 </span>                :            : 
+<span class="lineNum">     484 </span>                :<span class="lineCov">       3167 :         unixctl_server_run(unixctl);</span>
+<span class="lineNum">     485 </span>                :            : 
+<span class="lineNum">     486 </span>                :<span class="lineCov">       3167 :         unixctl_server_wait(unixctl);</span>
+<span class="lineNum">     487 </span>        [<span class="branchCov" title="Branch 0 was taken 44 times"> + </span><span class="branchCov" title="Branch 1 was taken 3123 times"> + </span>]:<span class="lineCov">       3167 :         if (exiting) {</span>
+<span class="lineNum">     488 </span>                :<span class="lineCov">         44 :             poll_immediate_wake();</span>
+<span class="lineNum">     489 </span>                :            :         }
+<span class="lineNum">     490 </span>                :            : 
+<span class="lineNum">     491 </span>        [<span class="branchCov" title="Branch 0 was taken 3167 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       3167 :         if (br_int) {</span>
+<span class="lineNum">     492 </span>                :<span class="lineCov">       3167 :             ofctrl_wait();</span>
+<span class="lineNum">     493 </span>                :<span class="lineCov">       3167 :             pinctrl_wait(&amp;ctx);</span>
+<span class="lineNum">     494 </span>                :            :         }
+<span class="lineNum">     495 </span>                :<span class="lineCov">       3167 :         ovsdb_idl_loop_commit_and_wait(&amp;ovnsb_idl_loop);</span>
+<span class="lineNum">     496 </span>                :<span class="lineCov">       3167 :         ovsdb_idl_loop_commit_and_wait(&amp;ovs_idl_loop);</span>
+<span class="lineNum">     497 </span>                :<span class="lineCov">       3167 :         ovsdb_idl_track_clear(ovnsb_idl_loop.idl);</span>
+<span class="lineNum">     498 </span>                :<span class="lineCov">       3167 :         ovsdb_idl_track_clear(ovs_idl_loop.idl);</span>
+<span class="lineNum">     499 </span>                :<span class="lineCov">       3167 :         poll_block();</span>
+<span class="lineNum">     500 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 3167 times"> + </span>]:<span class="lineCov">       3167 :         if (should_service_stop()) {</span>
+<span class="lineNum">     501 </span>                :<span class="lineCov">       3167 :             exiting = true;</span>
+<span class="lineNum">     502 </span>                :            :         }
+<span class="lineNum">     503 </span>                :            :     }
+<span class="lineNum">     504 </span>                :            : 
+<span class="lineNum">     505 </span>                :            :     /* It's time to exit.  Clean up the databases. */
+<span class="lineNum">     506 </span>                :<span class="lineCov">         44 :     bool done = false;</span>
+<span class="lineNum">     507 </span>        [<span class="branchCov" title="Branch 0 was taken 138 times"> + </span><span class="branchCov" title="Branch 1 was taken 44 times"> + </span>]:<span class="lineCov">        182 :     while (!done) {</span>
+<span class="lineNum">     508 </span>                :<span class="lineCov">        552 :         struct controller_ctx ctx = {</span>
+<span class="lineNum">     509 </span>                :<span class="lineCov">        138 :             .ovs_idl = ovs_idl_loop.idl,</span>
+<span class="lineNum">     510 </span>                :<span class="lineCov">        138 :             .ovs_idl_txn = ovsdb_idl_loop_run(&amp;ovs_idl_loop),</span>
+<span class="lineNum">     511 </span>                :<span class="lineCov">        138 :             .ovnsb_idl = ovnsb_idl_loop.idl,</span>
+<span class="lineNum">     512 </span>                :<span class="lineCov">        138 :             .ovnsb_idl_txn = ovsdb_idl_loop_run(&amp;ovnsb_idl_loop),</span>
+<span class="lineNum">     513 </span>                :            :         };
+<span class="lineNum">     514 </span>                :            : 
+<span class="lineNum">     515 </span>                :<span class="lineCov">        138 :         const struct ovsrec_bridge *br_int = get_br_int(&amp;ctx);</span>
+<span class="lineNum">     516 </span>                :<span class="lineCov">        138 :         const char *chassis_id = get_chassis_id(ctx.ovs_idl);</span>
+<span class="lineNum">     517 </span>                :            : 
+<span class="lineNum">     518 </span>                :            :         /* Run all of the cleanup functions, even if one of them returns false.
+<span class="lineNum">     519 </span>                :            :          * We're done if all of them return true. */
+<span class="lineNum">     520 </span>                :<span class="lineCov">        138 :         done = binding_cleanup(&amp;ctx, chassis_id);</span>
+<span class="lineNum">     521 </span>[<span class="branchCov" title="Branch 1 was taken 94 times"> + </span><span class="branchCov" title="Branch 2 was taken 44 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 50 times"> + </span><span class="branchCov" title="Branch 4 was taken 44 times"> + </span>]:<span class="lineCov">        138 :         done = chassis_cleanup(&amp;ctx, chassis_id) &amp;&amp; done;</span>
+<span class="lineNum">     522 </span>[<span class="branchCov" title="Branch 1 was taken 112 times"> + </span><span class="branchCov" title="Branch 2 was taken 26 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 44 times"> + </span><span class="branchCov" title="Branch 4 was taken 68 times"> + </span>]:<span class="lineCov">        138 :         done = encaps_cleanup(&amp;ctx, br_int) &amp;&amp; done;</span>
+<span class="lineNum">     523 </span>        [<span class="branchCov" title="Branch 0 was taken 44 times"> + </span><span class="branchCov" title="Branch 1 was taken 94 times"> + </span>]:<span class="lineCov">        138 :         if (done) {</span>
+<span class="lineNum">     524 </span>                :<span class="lineCov">         44 :             poll_immediate_wake();</span>
+<span class="lineNum">     525 </span>                :            :         }
+<span class="lineNum">     526 </span>                :            : 
+<span class="lineNum">     527 </span>                :<span class="lineCov">        138 :         ovsdb_idl_loop_commit_and_wait(&amp;ovnsb_idl_loop);</span>
+<span class="lineNum">     528 </span>                :<span class="lineCov">        138 :         ovsdb_idl_loop_commit_and_wait(&amp;ovs_idl_loop);</span>
+<span class="lineNum">     529 </span>                :<span class="lineCov">        138 :         poll_block();</span>
+<span class="lineNum">     530 </span>                :            :     }
+<span class="lineNum">     531 </span>                :            : 
+<span class="lineNum">     532 </span>                :<span class="lineCov">         44 :     unixctl_server_destroy(unixctl);</span>
+<span class="lineNum">     533 </span>                :<span class="lineCov">         44 :     lflow_destroy();</span>
+<span class="lineNum">     534 </span>                :<span class="lineCov">         44 :     ofctrl_destroy();</span>
+<span class="lineNum">     535 </span>                :<span class="lineCov">         44 :     pinctrl_destroy();</span>
+<span class="lineNum">     536 </span>                :            : 
+<span class="lineNum">     537 </span>                :<span class="lineCov">         44 :     simap_destroy(&amp;ct_zones);</span>
+<span class="lineNum">     538 </span>                :            : 
+<span class="lineNum">     539 </span>                :<span class="lineCov">         44 :     bitmap_free(group_table.group_ids);</span>
+<span class="lineNum">     540 </span>                :<span class="lineCov">         44 :     hmap_destroy(&amp;group_table.desired_groups);</span>
+<span class="lineNum">     541 </span>                :            : 
+<span class="lineNum">     542 </span>                :            :     struct group_info *installed, *next_group;
+<span class="lineNum">     543 </span>[<span class="branchCov" title="Branch 1 was taken 44 times"> + </span><span class="branchCov" title="Branch 2 was taken 6 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 44 times"> + </span>]:<span class="lineCov">         50 :     HMAP_FOR_EACH_SAFE(installed, next_group, hmap_node,</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 6 was taken 6 times"> + </span><span class="branchCov" title="Branch 7 was taken 44 times"> + </span>]
+<span class="lineNum">     544 </span>                :            :                        &amp;group_table.existing_groups) {
+<span class="lineNum">     545 </span>                :<span class="lineCov">          6 :         hmap_remove(&amp;group_table.existing_groups, &amp;installed-&gt;hmap_node);</span>
+<span class="lineNum">     546 </span>                :<span class="lineCov">          6 :         ds_destroy(&amp;installed-&gt;group);</span>
+<span class="lineNum">     547 </span>                :<span class="lineCov">          6 :         free(installed);</span>
+<span class="lineNum">     548 </span>                :            :     }
+<span class="lineNum">     549 </span>                :<span class="lineCov">         44 :     hmap_destroy(&amp;group_table.existing_groups);</span>
+<span class="lineNum">     550 </span>                :            : 
+<span class="lineNum">     551 </span>                :<span class="lineCov">         44 :     ovsdb_idl_loop_destroy(&amp;ovs_idl_loop);</span>
+<span class="lineNum">     552 </span>                :<span class="lineCov">         44 :     ovsdb_idl_loop_destroy(&amp;ovnsb_idl_loop);</span>
+<span class="lineNum">     553 </span>                :            : 
+<span class="lineNum">     554 </span>                :<span class="lineCov">         44 :     free(ovnsb_remote);</span>
+<span class="lineNum">     555 </span>                :<span class="lineCov">         44 :     free(ovs_remote);</span>
+<span class="lineNum">     556 </span>                :<span class="lineCov">         44 :     service_stop();</span>
+<span class="lineNum">     557 </span>                :            : 
+<span class="lineNum">     558 </span>                :<span class="lineCov">         44 :     exit(retval);</span>
+<span class="lineNum">     559 </span>                :            : }
+<a name="560"><span class="lineNum">     560 </span>                :            : </a>
+<span class="lineNum">     561 </span>                :            : static void
+<span class="lineNum">     562 </span>                :<span class="lineCov">         47 : parse_options(int argc, char *argv[])</span>
+<span class="lineNum">     563 </span>                :            : {
+<span class="lineNum">     564 </span>                :            :     enum {
+<span class="lineNum">     565 </span>                :            :         OPT_PEER_CA_CERT = UCHAR_MAX + 1,
+<span class="lineNum">     566 </span>                :            :         OPT_BOOTSTRAP_CA_CERT,
+<span class="lineNum">     567 </span>                :            :         VLOG_OPTION_ENUMS,
+<span class="lineNum">     568 </span>                :            :         DAEMON_OPTION_ENUMS
+<span class="lineNum">     569 </span>                :            :     };
+<span class="lineNum">     570 </span>                :            : 
+<span class="lineNum">     571 </span>                :            :     static struct option long_options[] = {
+<span class="lineNum">     572 </span>                :            :         {&quot;help&quot;, no_argument, NULL, 'h'},
+<span class="lineNum">     573 </span>                :            :         {&quot;version&quot;, no_argument, NULL, 'V'},
+<span class="lineNum">     574 </span>                :            :         VLOG_LONG_OPTIONS,
+<span class="lineNum">     575 </span>                :            :         DAEMON_LONG_OPTIONS,
+<span class="lineNum">     576 </span>                :            :         STREAM_SSL_LONG_OPTIONS,
+<span class="lineNum">     577 </span>                :            :         {&quot;peer-ca-cert&quot;, required_argument, NULL, OPT_PEER_CA_CERT},
+<span class="lineNum">     578 </span>                :            :         {&quot;bootstrap-ca-cert&quot;, required_argument, NULL, OPT_BOOTSTRAP_CA_CERT},
+<span class="lineNum">     579 </span>                :            :         {NULL, 0, NULL, 0}
+<span class="lineNum">     580 </span>                :            :     };
+<span class="lineNum">     581 </span>                :<span class="lineCov">         47 :     char *short_options = ovs_cmdl_long_options_to_short_options(long_options);</span>
+<span class="lineNum">     582 </span>                :            : 
+<span class="lineNum">     583 </span>                :            :     for (;;) {
+<span class="lineNum">     584 </span>                :            :         int c;
+<span class="lineNum">     585 </span>                :            : 
+<span class="lineNum">     586 </span>                :<span class="lineCov">        282 :         c = getopt_long(argc, argv, short_options, long_options, NULL);</span>
+<span class="lineNum">     587 </span>        [<span class="branchCov" title="Branch 0 was taken 47 times"> + </span><span class="branchCov" title="Branch 1 was taken 235 times"> + </span>]:<span class="lineCov">        282 :         if (c == -1) {</span>
+<span class="lineNum">     588 </span>                :<span class="lineCov">         47 :             break;</span>
+<span class="lineNum">     589 </span>                :            :         }
+<span class="lineNum">     590 </span>                :            : 
+<span class="lineNum">     591 </span>  [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 47 times"> + </span><span class="branchCov" title="Branch 3 was taken 47 times"> + </span> :<span class="lineCov">        235 :         switch (c) {</span>
+<span class="lineNum">         </span><span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchNoCov" title="Branch 5 was not taken"> - </span><span class="branchCov" title="Branch 6 was taken 47 times"> + </span><span class="branchNoCov" title="Branch 7 was not taken"> - </span><span class="branchCov" title="Branch 8 was taken 47 times"> + </span> 
+<span class="lineNum">         </span><span class="branchCov" title="Branch 9 was taken 47 times"> + </span><span class="branchNoCov" title="Branch 10 was not taken"> - </span><span class="branchNoCov" title="Branch 11 was not taken"> - </span><span class="branchNoCov" title="Branch 12 was not taken"> - </span><span class="branchNoCov" title="Branch 13 was not taken"> - </span> 
+<span class="lineNum">         </span><span class="branchNoCov" title="Branch 14 was not taken"> - </span><span class="branchNoCov" title="Branch 15 was not taken"> - </span><span class="branchNoCov" title="Branch 16 was not taken"> - </span><span class="branchNoCov" title="Branch 17 was not taken"> - </span><span class="branchNoCov" title="Branch 18 was not taken"> - </span> 
+<span class="lineNum">         </span>            <span class="branchNoCov" title="Branch 19 was not taken"> - </span>]
+<span class="lineNum">     592 </span>                :            :         case 'h':
+<span class="lineNum">     593 </span>                :<span class="lineNoCov">          0 :             usage();</span>
+<span class="lineNum">     594 </span>                :            : 
+<span class="lineNum">     595 </span>                :            :         case 'V':
+<span class="lineNum">     596 </span>                :<span class="lineNoCov">          0 :             ovs_print_version(OFP13_VERSION, OFP13_VERSION);</span>
+<span class="lineNum">     597 </span>                :<span class="lineNoCov">          0 :             exit(EXIT_SUCCESS);</span>
+<span class="lineNum">     598 </span>                :            : 
+<span class="lineNum">     599 </span>                :<span class="lineCov">         94 :         VLOG_OPTION_HANDLERS</span>
+<span class="lineNum">     600 </span>                :<span class="lineCov">        141 :         DAEMON_OPTION_HANDLERS</span>
+<span class="lineNum">     601 </span>                :<span class="lineNoCov">          0 :         STREAM_SSL_OPTION_HANDLERS</span>
+<span class="lineNum">     602 </span>                :            : 
+<span class="lineNum">     603 </span>                :            :         case OPT_PEER_CA_CERT:
+<span class="lineNum">     604 </span>                :<span class="lineNoCov">          0 :             stream_ssl_set_peer_ca_cert_file(optarg);</span>
+<span class="lineNum">     605 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     606 </span>                :            : 
+<span class="lineNum">     607 </span>                :            :         case OPT_BOOTSTRAP_CA_CERT:
+<span class="lineNum">     608 </span>                :<span class="lineNoCov">          0 :             stream_ssl_set_ca_cert_file(optarg, true);</span>
+<span class="lineNum">     609 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     610 </span>                :            : 
+<span class="lineNum">     611 </span>                :            :         case '?':
+<span class="lineNum">     612 </span>                :<span class="lineNoCov">          0 :             exit(EXIT_FAILURE);</span>
+<span class="lineNum">     613 </span>                :            : 
+<span class="lineNum">     614 </span>                :            :         default:
+<span class="lineNum">     615 </span>                :<span class="lineNoCov">          0 :             abort();</span>
+<span class="lineNum">     616 </span>                :            :         }
+<span class="lineNum">     617 </span>                :<span class="lineCov">        235 :     }</span>
+<span class="lineNum">     618 </span>                :<span class="lineCov">         47 :     free(short_options);</span>
+<span class="lineNum">     619 </span>                :            : 
+<span class="lineNum">     620 </span>                :<span class="lineCov">         47 :     argc -= optind;</span>
+<span class="lineNum">     621 </span>                :<span class="lineCov">         47 :     argv += optind;</span>
+<span class="lineNum">     622 </span>                :            : 
+<span class="lineNum">     623 </span>        [<span class="branchCov" title="Branch 0 was taken 47 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">         47 :     if (argc == 0) {</span>
+<span class="lineNum">     624 </span>                :<span class="lineCov">         47 :         ovs_remote = xasprintf(&quot;unix:%s/db.sock&quot;, ovs_rundir());</span>
+<span class="lineNum">     625 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :     } else if (argc == 1) {</span>
+<span class="lineNum">     626 </span>                :<span class="lineNoCov">          0 :         ovs_remote = xstrdup(argv[0]);</span>
+<span class="lineNum">     627 </span>                :            :     } else {
+<span class="lineNum">     628 </span>                :<span class="lineNoCov">          0 :         VLOG_FATAL(&quot;exactly zero or one non-option argument required; &quot;</span>
+<span class="lineNum">     629 </span>                :            :                    &quot;use --help for usage&quot;);
+<span class="lineNum">     630 </span>                :            :     }
+<span class="lineNum">     631 </span>                :<span class="lineCov">         47 : }</span>
+<a name="632"><span class="lineNum">     632 </span>                :            : </a>
+<span class="lineNum">     633 </span>                :            : static void
+<span class="lineNum">     634 </span>                :<span class="lineNoCov">          0 : usage(void)</span>
+<span class="lineNum">     635 </span>                :            : {
+<span class="lineNum">     636 </span>                :<span class="lineNoCov">          0 :     printf(&quot;%s: OVN controller\n&quot;</span>
+<span class="lineNum">     637 </span>                :            :            &quot;usage %s [OPTIONS] [OVS-DATABASE]\n&quot;
+<span class="lineNum">     638 </span>                :            :            &quot;where OVS-DATABASE is a socket on which the OVS OVSDB server is listening.\n&quot;,
+<span class="lineNum">     639 </span>                :            :                program_name, program_name);
+<span class="lineNum">     640 </span>                :<span class="lineNoCov">          0 :     stream_usage(&quot;OVS-DATABASE&quot;, true, false, false);</span>
+<span class="lineNum">     641 </span>                :<span class="lineNoCov">          0 :     daemon_usage();</span>
+<span class="lineNum">     642 </span>                :<span class="lineNoCov">          0 :     vlog_usage();</span>
+<span class="lineNum">     643 </span>                :<span class="lineNoCov">          0 :     printf(&quot;\nOther options:\n&quot;</span>
+<span class="lineNum">     644 </span>                :            :            &quot;  -h, --help              display this help message\n&quot;
+<span class="lineNum">     645 </span>                :            :            &quot;  -V, --version           display version information\n&quot;);
+<span class="lineNum">     646 </span>                :<span class="lineNoCov">          0 :     exit(EXIT_SUCCESS);</span>
+<span class="lineNum">     647 </span>                :            : }
+<a name="648"><span class="lineNum">     648 </span>                :            : </a>
+<span class="lineNum">     649 </span>                :            : static void
+<span class="lineNum">     650 </span>                :<span class="lineCov">         44 : ovn_controller_exit(struct unixctl_conn *conn, int argc OVS_UNUSED,</span>
+<span class="lineNum">     651 </span>                :            :              const char *argv[] OVS_UNUSED, void *exiting_)
+<span class="lineNum">     652 </span>                :            : {
+<span class="lineNum">     653 </span>                :<span class="lineCov">         44 :     bool *exiting = exiting_;</span>
+<span class="lineNum">     654 </span>                :<span class="lineCov">         44 :     *exiting = true;</span>
+<span class="lineNum">     655 </span>                :            : 
+<span class="lineNum">     656 </span>                :<span class="lineCov">         44 :     unixctl_command_reply(conn, NULL);</span>
+<span class="lineNum">     657 </span>                :<span class="lineCov">         44 : }</span>
+<a name="658"><span class="lineNum">     658 </span>                :            : </a>
+<span class="lineNum">     659 </span>                :            : static void
+<span class="lineNum">     660 </span>                :<span class="lineNoCov">          0 : ct_zone_list(struct unixctl_conn *conn, int argc OVS_UNUSED,</span>
+<span class="lineNum">     661 </span>                :            :              const char *argv[] OVS_UNUSED, void *ct_zones_)
+<span class="lineNum">     662 </span>                :            : {
+<span class="lineNum">     663 </span>                :<span class="lineNoCov">          0 :     struct simap *ct_zones = ct_zones_;</span>
+<span class="lineNum">     664 </span>                :<span class="lineNoCov">          0 :     struct ds ds = DS_EMPTY_INITIALIZER;</span>
+<span class="lineNum">     665 </span>                :            :     struct simap_node *zone;
+<span class="lineNum">     666 </span>                :            : 
+<span class="lineNum">     667 </span>[<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>][<span class="branchNoExec" title="Branch 4 was not executed"> # </span><span class="branchNoExec" title="Branch 5 was not executed"> # </span>]:<span class="lineNoCov">          0 :     SIMAP_FOR_EACH(zone, ct_zones) {</span>
+<span class="lineNum">     668 </span>                :<span class="lineNoCov">          0 :         ds_put_format(&amp;ds, &quot;%s %d\n&quot;, zone-&gt;name, zone-&gt;data);</span>
+<span class="lineNum">     669 </span>                :            :     }
+<span class="lineNum">     670 </span>                :            : 
+<span class="lineNum">     671 </span>                :<span class="lineNoCov">          0 :     unixctl_command_reply(conn, ds_cstr(&amp;ds));</span>
+<span class="lineNum">     672 </span>                :<span class="lineNoCov">          0 :     ds_destroy(&amp;ds);</span>
+<span class="lineNum">     673 </span>                :<span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     674 </span>                :            : 
+<span class="lineNum">     675 </span>                :            : /* Get the desired SB probe timer from the OVS database and configure it into
+<a name="676"><span class="lineNum">     676 </span>                :            :  * the SB database. */</a>
+<span class="lineNum">     677 </span>                :            : static void
+<span class="lineNum">     678 </span>                :<span class="lineCov">       3167 : update_probe_interval(struct controller_ctx *ctx)</span>
+<span class="lineNum">     679 </span>                :            : {
+<span class="lineNum">     680 </span>                :<span class="lineCov">       3167 :     const struct ovsrec_open_vswitch *cfg</span>
+<span class="lineNum">     681 </span>                :<span class="lineCov">       3167 :         = ovsrec_open_vswitch_first(ctx-&gt;ovs_idl);</span>
+<span class="lineNum">     682 </span>                :<span class="lineCov">       3167 :     int interval = (cfg</span>
+<span class="lineNum">     683 </span>                :<span class="lineCov">       3167 :                     ? smap_get_int(&amp;cfg-&gt;external_ids,</span>
+<span class="lineNum">     684 </span>                :            :                                    &quot;ovn-remote-probe-interval&quot;,
+<span class="lineNum">     685 </span>                :            :                                    DEFAULT_PROBE_INTERVAL_MSEC)
+<span class="lineNum">     686 </span>        [<span class="branchCov" title="Branch 0 was taken 3167 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">       3167 :                     : DEFAULT_PROBE_INTERVAL_MSEC);</span>
+<span class="lineNum">     687 </span>                :<span class="lineCov">       3167 :     ovsdb_idl_set_probe_interval(ctx-&gt;ovnsb_idl, interval);</span>
+<span class="lineNum">     688 </span>                :<span class="lineCov">       3167 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

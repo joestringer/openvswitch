@@ -1,0 +1,666 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/ccmap.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - ccmap.c<span style="font-size: 80%;"> (source / <a href="ccmap.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">198</td>
+            <td class="headerCovTableEntry">202</td>
+            <td class="headerCovTableEntryHi">98.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">41</td>
+            <td class="headerCovTableEntry">41</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">72</td>
+            <td class="headerCovTableEntry">82</td>
+            <td class="headerCovTableEntryMed">87.8 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2014, 2016 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;ccmap.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &quot;coverage.h&quot;
+<span class="lineNum">      20 </span>                :            : #include &quot;bitmap.h&quot;
+<span class="lineNum">      21 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      22 </span>                :            : #include &quot;ovs-rcu.h&quot;
+<span class="lineNum">      23 </span>                :            : #include &quot;random.h&quot;
+<a name="24"><span class="lineNum">      24 </span>                :            : #include &quot;util.h&quot;</a>
+<a name="25"><span class="lineNum">      25 </span>                :            : </a>
+<span class="lineNum">      26 </span>                :<span class="lineCov">     100890 : COVERAGE_DEFINE(ccmap_expand);</span>
+<span class="lineNum">      27 </span>                :<span class="lineCov">     434382 : COVERAGE_DEFINE(ccmap_shrink);</span>
+<span class="lineNum">      28 </span>                :            : 
+<span class="lineNum">      29 </span>                :            : /* A count-only version of the cmap. */
+<span class="lineNum">      30 </span>                :            : 
+<span class="lineNum">      31 </span>                :            : /* Allow protected access to the value without atomic semantics.  This makes
+<span class="lineNum">      32 </span>                :            :  * the exclusive writer somewhat faster. */
+<span class="lineNum">      33 </span>                :            : typedef union {
+<span class="lineNum">      34 </span>                :            :     unsigned long long         protected_value;
+<span class="lineNum">      35 </span>                :            :     ATOMIC(unsigned long long) atomic_value;
+<span class="lineNum">      36 </span>                :            : } ccmap_node_t;
+<span class="lineNum">      37 </span>                :            : BUILD_ASSERT_DECL(sizeof(ccmap_node_t) == sizeof(uint64_t));
+<a name="38"><span class="lineNum">      38 </span>                :            : </a>
+<span class="lineNum">      39 </span>                :            : static uint64_t
+<span class="lineNum">      40 </span>                :<span class="lineCov">  452120700 : ccmap_node_get(const ccmap_node_t *node)</span>
+<span class="lineNum">      41 </span>                :            : {
+<span class="lineNum">      42 </span>                :            :     uint64_t value;
+<span class="lineNum">      43 </span>                :            : 
+<span class="lineNum">      44 </span>                :<span class="lineCov">  452120700 :     atomic_read_relaxed(&amp;CONST_CAST(ccmap_node_t *, node)-&gt;atomic_value,</span>
+<span class="lineNum">      45 </span>                :            :                         &amp;value);
+<span class="lineNum">      46 </span>                :            : 
+<span class="lineNum">      47 </span>                :<span class="lineCov">  452120700 :     return value;</span>
+<span class="lineNum">      48 </span>                :            : }
+<span class="lineNum">      49 </span>                :            : 
+<a name="50"><span class="lineNum">      50 </span>                :            : /* It is safe to allow compiler optimize reads by the exclusive writer. */</a>
+<span class="lineNum">      51 </span>                :            : static uint64_t
+<span class="lineNum">      52 </span>                :<span class="lineCov">    2577192 : ccmap_node_get_protected(const ccmap_node_t *node)</span>
+<span class="lineNum">      53 </span>                :            : {
+<span class="lineNum">      54 </span>                :<span class="lineCov">    2577192 :     return node-&gt;protected_value;</span>
+<span class="lineNum">      55 </span>                :            : }
+<a name="56"><span class="lineNum">      56 </span>                :            : </a>
+<span class="lineNum">      57 </span>                :            : static void
+<span class="lineNum">      58 </span>                :<span class="lineCov">     207699 : ccmap_node_set_protected(ccmap_node_t *node, uint64_t value)</span>
+<span class="lineNum">      59 </span>                :            : {
+<span class="lineNum">      60 </span>                :<span class="lineCov">     207699 :     atomic_store_relaxed(&amp;node-&gt;atomic_value, value);</span>
+<span class="lineNum">      61 </span>                :<span class="lineCov">     207699 : }</span>
+<a name="62"><span class="lineNum">      62 </span>                :            : </a>
+<span class="lineNum">      63 </span>                :            : static uint64_t
+<span class="lineNum">      64 </span>                :<span class="lineCov">     207324 : ccmap_node(uint32_t count, uint32_t hash)</span>
+<span class="lineNum">      65 </span>                :            : {
+<span class="lineNum">      66 </span>                :<span class="lineCov">     207324 :     return (uint64_t)count &lt;&lt; 32 | hash;</span>
+<span class="lineNum">      67 </span>                :            : }
+<a name="68"><span class="lineNum">      68 </span>                :            : </a>
+<span class="lineNum">      69 </span>                :            : static uint32_t
+<span class="lineNum">      70 </span>                :<span class="lineCov">  453978663 : ccmap_node_hash(uint64_t node)</span>
+<span class="lineNum">      71 </span>                :            : {
+<span class="lineNum">      72 </span>                :<span class="lineCov">  453978663 :     return node;</span>
+<span class="lineNum">      73 </span>                :            : }
+<a name="74"><span class="lineNum">      74 </span>                :            : </a>
+<span class="lineNum">      75 </span>                :            : static uint32_t
+<span class="lineNum">      76 </span>                :<span class="lineCov">   19437092 : ccmap_node_count(uint64_t node)</span>
+<span class="lineNum">      77 </span>                :            : {
+<span class="lineNum">      78 </span>                :<span class="lineCov">   19437092 :     return node &gt;&gt; 32;</span>
+<span class="lineNum">      79 </span>                :            : }
+<span class="lineNum">      80 </span>                :            : 
+<span class="lineNum">      81 </span>                :            : /* Number of nodes per bucket. */
+<span class="lineNum">      82 </span>                :            : #define CCMAP_K (CACHE_LINE_SIZE / sizeof(ccmap_node_t))
+<span class="lineNum">      83 </span>                :            : 
+<span class="lineNum">      84 </span>                :            : /* A cuckoo hash bucket.  Designed to be cache-aligned and exactly one cache
+<span class="lineNum">      85 </span>                :            :  * line long. */
+<span class="lineNum">      86 </span>                :            : struct ccmap_bucket {
+<span class="lineNum">      87 </span>                :            :     /* Each node incudes both the hash (low 32-bits) and the count (high
+<span class="lineNum">      88 </span>                :            :      * 32-bits), allowing readers always getting a consistent pair. */
+<span class="lineNum">      89 </span>                :            :     ccmap_node_t nodes[CCMAP_K];
+<span class="lineNum">      90 </span>                :            : };
+<span class="lineNum">      91 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ccmap_bucket) == CACHE_LINE_SIZE);
+<span class="lineNum">      92 </span>                :            : 
+<span class="lineNum">      93 </span>                :            : /* Default maximum load factor (as a fraction of UINT32_MAX + 1) before
+<span class="lineNum">      94 </span>                :            :  * enlarging a ccmap.  Reasonable values lie between about 75% and 93%.  Smaller
+<span class="lineNum">      95 </span>                :            :  * values waste memory; larger values increase the average insertion time. */
+<span class="lineNum">      96 </span>                :            : #define CCMAP_MAX_LOAD ((uint32_t) (UINT32_MAX * .85))
+<span class="lineNum">      97 </span>                :            : 
+<span class="lineNum">      98 </span>                :            : /* Default minimum load factor (as a fraction of UINT32_MAX + 1) before
+<span class="lineNum">      99 </span>                :            :  * shrinking a ccmap.  Currently, the value is chosen to be 20%, this
+<span class="lineNum">     100 </span>                :            :  * means ccmap will have a 40% load factor after shrink. */
+<span class="lineNum">     101 </span>                :            : #define CCMAP_MIN_LOAD ((uint32_t) (UINT32_MAX * .20))
+<span class="lineNum">     102 </span>                :            : 
+<span class="lineNum">     103 </span>                :            : /* The implementation of a concurrent hash map. */
+<span class="lineNum">     104 </span>                :            : struct ccmap_impl {
+<span class="lineNum">     105 </span>                :            :     unsigned int n_unique;      /* Number of in-use nodes. */
+<span class="lineNum">     106 </span>                :            :     unsigned int n;             /* Number of hashes inserted. */
+<span class="lineNum">     107 </span>                :            :     unsigned int max_n;         /* Max nodes before enlarging. */
+<span class="lineNum">     108 </span>                :            :     unsigned int min_n;         /* Min nodes before shrinking. */
+<span class="lineNum">     109 </span>                :            :     uint32_t mask;              /* Number of 'buckets', minus one. */
+<span class="lineNum">     110 </span>                :            :     uint32_t basis;             /* Basis for rehashing client's hash values. */
+<span class="lineNum">     111 </span>                :            : 
+<span class="lineNum">     112 </span>                :            :     /* Padding to make ccmap_impl exactly one cache line long. */
+<span class="lineNum">     113 </span>                :            :     uint8_t pad[CACHE_LINE_SIZE - sizeof(unsigned int) * 6];
+<span class="lineNum">     114 </span>                :            : 
+<span class="lineNum">     115 </span>                :            :     struct ccmap_bucket buckets[];
+<span class="lineNum">     116 </span>                :            : };
+<span class="lineNum">     117 </span>                :            : BUILD_ASSERT_DECL(sizeof(struct ccmap_impl) == CACHE_LINE_SIZE);
+<span class="lineNum">     118 </span>                :            : 
+<span class="lineNum">     119 </span>                :            : static struct ccmap_impl *ccmap_rehash(struct ccmap *, uint32_t mask);
+<span class="lineNum">     120 </span>                :            : 
+<span class="lineNum">     121 </span>                :            : /* Given a rehashed value 'hash', returns the other hash for that rehashed
+<span class="lineNum">     122 </span>                :            :  * value.  This is symmetric: other_hash(other_hash(x)) == x.  (See also &quot;Hash
+<a name="123"><span class="lineNum">     123 </span>                :            :  * Functions&quot; at the top of cmap.c.) */</a>
+<span class="lineNum">     124 </span>                :            : static uint32_t
+<span class="lineNum">     125 </span>                :<span class="lineCov">   26221922 : other_hash(uint32_t hash)</span>
+<span class="lineNum">     126 </span>                :            : {
+<span class="lineNum">     127 </span>                :<span class="lineCov">   26221922 :     return (hash &lt;&lt; 16) | (hash &gt;&gt; 16);</span>
+<span class="lineNum">     128 </span>                :            : }
+<span class="lineNum">     129 </span>                :            : 
+<span class="lineNum">     130 </span>                :            : /* Returns the rehashed value for 'hash' within 'impl'.  (See also &quot;Hash
+<a name="131"><span class="lineNum">     131 </span>                :            :  * Functions&quot; at the top of this file.) */</a>
+<span class="lineNum">     132 </span>                :            : static uint32_t
+<span class="lineNum">     133 </span>                :<span class="lineCov">   42119932 : rehash(const struct ccmap_impl *impl, uint32_t hash)</span>
+<span class="lineNum">     134 </span>                :            : {
+<span class="lineNum">     135 </span>                :<span class="lineCov">   42119932 :     return hash_finish(impl-&gt;basis, hash);</span>
+<span class="lineNum">     136 </span>                :            : }
+<a name="137"><span class="lineNum">     137 </span>                :            : </a>
+<span class="lineNum">     138 </span>                :            : static struct ccmap_impl *
+<span class="lineNum">     139 </span>                :<span class="lineCov">   42223224 : ccmap_get_impl(const struct ccmap *ccmap)</span>
+<span class="lineNum">     140 </span>                :            : {
+<span class="lineNum">     141 </span>                :<span class="lineCov">   42223224 :     return ovsrcu_get(struct ccmap_impl *, &amp;ccmap-&gt;impl);</span>
+<span class="lineNum">     142 </span>                :            : }
+<a name="143"><span class="lineNum">     143 </span>                :            : </a>
+<span class="lineNum">     144 </span>                :            : static uint32_t
+<span class="lineNum">     145 </span>                :<span class="lineCov">     119374 : calc_max_n(uint32_t mask)</span>
+<span class="lineNum">     146 </span>                :            : {
+<span class="lineNum">     147 </span>                :<span class="lineCov">     119374 :     return ((uint64_t) (mask + 1) * CCMAP_K * CCMAP_MAX_LOAD) &gt;&gt; 32;</span>
+<span class="lineNum">     148 </span>                :            : }
+<a name="149"><span class="lineNum">     149 </span>                :            : </a>
+<span class="lineNum">     150 </span>                :            : static uint32_t
+<span class="lineNum">     151 </span>                :<span class="lineCov">     119374 : calc_min_n(uint32_t mask)</span>
+<span class="lineNum">     152 </span>                :            : {
+<span class="lineNum">     153 </span>                :<span class="lineCov">     119374 :     return ((uint64_t) (mask + 1) * CCMAP_K * CCMAP_MIN_LOAD) &gt;&gt; 32;</span>
+<span class="lineNum">     154 </span>                :            : }
+<a name="155"><span class="lineNum">     155 </span>                :            : </a>
+<span class="lineNum">     156 </span>                :            : static struct ccmap_impl *
+<span class="lineNum">     157 </span>                :<span class="lineCov">     119374 : ccmap_impl_create(uint32_t mask)</span>
+<span class="lineNum">     158 </span>                :            : {
+<span class="lineNum">     159 </span>                :            :     struct ccmap_impl *impl;
+<span class="lineNum">     160 </span>                :            : 
+<span class="lineNum">     161 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 119374 times"> + </span>]:<span class="lineCov">     119374 :     ovs_assert(is_pow2(mask + 1));</span>
+<span class="lineNum">     162 </span>                :            : 
+<span class="lineNum">     163 </span>                :<span class="lineCov">     119374 :     impl = xzalloc_cacheline(sizeof *impl</span>
+<span class="lineNum">     164 </span>                :<span class="lineCov">     119374 :                              + (mask + 1) * sizeof *impl-&gt;buckets);</span>
+<span class="lineNum">     165 </span>                :<span class="lineCov">     119374 :     impl-&gt;n_unique = 0;</span>
+<span class="lineNum">     166 </span>                :<span class="lineCov">     119374 :     impl-&gt;n = 0;</span>
+<span class="lineNum">     167 </span>                :<span class="lineCov">     119374 :     impl-&gt;max_n = calc_max_n(mask);</span>
+<span class="lineNum">     168 </span>                :<span class="lineCov">     119374 :     impl-&gt;min_n = calc_min_n(mask);</span>
+<span class="lineNum">     169 </span>                :<span class="lineCov">     119374 :     impl-&gt;mask = mask;</span>
+<span class="lineNum">     170 </span>                :<span class="lineCov">     119374 :     impl-&gt;basis = random_uint32();</span>
+<span class="lineNum">     171 </span>                :            : 
+<span class="lineNum">     172 </span>                :<span class="lineCov">     119374 :     return impl;</span>
+<span class="lineNum">     173 </span>                :            : }
+<span class="lineNum">     174 </span>                :            : 
+<a name="175"><span class="lineNum">     175 </span>                :            : /* Initializes 'ccmap' as an empty concurrent hash map. */</a>
+<span class="lineNum">     176 </span>                :            : void
+<span class="lineNum">     177 </span>                :<span class="lineCov">      61104 : ccmap_init(struct ccmap *ccmap)</span>
+<span class="lineNum">     178 </span>                :            : {
+<span class="lineNum">     179 </span>                :<span class="lineCov">      61104 :     ovsrcu_set(&amp;ccmap-&gt;impl, ccmap_impl_create(0));</span>
+<span class="lineNum">     180 </span>                :<span class="lineCov">      61104 : }</span>
+<span class="lineNum">     181 </span>                :            : 
+<span class="lineNum">     182 </span>                :            : /* Destroys 'ccmap'.
+<span class="lineNum">     183 </span>                :            :  *
+<span class="lineNum">     184 </span>                :            :  * The client is responsible for destroying any data previously held in
+<a name="185"><span class="lineNum">     185 </span>                :            :  * 'ccmap'. */</a>
+<span class="lineNum">     186 </span>                :            : void
+<span class="lineNum">     187 </span>                :<span class="lineCov">      60862 : ccmap_destroy(struct ccmap *ccmap)</span>
+<span class="lineNum">     188 </span>                :            : {
+<span class="lineNum">     189 </span>        [<span class="branchCov" title="Branch 0 was taken 60862 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">      60862 :     if (ccmap) {</span>
+<span class="lineNum">     190 </span>                :<span class="lineCov">      60862 :         ovsrcu_postpone(free_cacheline, ccmap_get_impl(ccmap));</span>
+<span class="lineNum">     191 </span>                :            :     }
+<span class="lineNum">     192 </span>                :<span class="lineCov">      60862 : }</span>
+<span class="lineNum">     193 </span>                :            : 
+<a name="194"><span class="lineNum">     194 </span>                :            : /* Returns the number of hashes inserted in 'ccmap', including duplicates. */</a>
+<span class="lineNum">     195 </span>                :            : size_t
+<span class="lineNum">     196 </span>                :<span class="lineCov">      12000 : ccmap_count(const struct ccmap *ccmap)</span>
+<span class="lineNum">     197 </span>                :            : {
+<span class="lineNum">     198 </span>                :<span class="lineCov">      12000 :     return ccmap_get_impl(ccmap)-&gt;n;</span>
+<span class="lineNum">     199 </span>                :            : }
+<span class="lineNum">     200 </span>                :            : 
+<a name="201"><span class="lineNum">     201 </span>                :            : /* Returns true if 'ccmap' is empty, false otherwise. */</a>
+<span class="lineNum">     202 </span>                :            : bool
+<span class="lineNum">     203 </span>                :<span class="lineCov">       6000 : ccmap_is_empty(const struct ccmap *ccmap)</span>
+<span class="lineNum">     204 </span>                :            : {
+<span class="lineNum">     205 </span>                :<span class="lineCov">       6000 :     return ccmap_count(ccmap) == 0;</span>
+<span class="lineNum">     206 </span>                :            : }
+<span class="lineNum">     207 </span>                :            : 
+<a name="208"><span class="lineNum">     208 </span>                :            : /* returns 0 if not found. Map does not contain zero counts. */</a>
+<span class="lineNum">     209 </span>                :            : static uint32_t
+<span class="lineNum">     210 </span>                :<span class="lineCov">   67924861 : ccmap_find_in_bucket(const struct ccmap_bucket *bucket, uint32_t hash)</span>
+<span class="lineNum">     211 </span>                :            : {
+<span class="lineNum">     212 </span>        [<span class="branchCov" title="Branch 0 was taken 452120697 times"> + </span><span class="branchCov" title="Branch 1 was taken 51063422 times"> + </span>]:<span class="lineCov">  503184119 :     for (int i = 0; i &lt; CCMAP_K; i++) {</span>
+<span class="lineNum">     213 </span>                :<span class="lineCov">  452120697 :         uint64_t node = ccmap_node_get(&amp;bucket-&gt;nodes[i]);</span>
+<span class="lineNum">     214 </span>                :            : 
+<span class="lineNum">     215 </span>        [<span class="branchCov" title="Branch 1 was taken 16861445 times"> + </span><span class="branchCov" title="Branch 2 was taken 435259258 times"> + </span>]:<span class="lineCov">  452120700 :         if (ccmap_node_hash(node) == hash) {</span>
+<span class="lineNum">     216 </span>                :<span class="lineCov">   16861445 :             return ccmap_node_count(node);</span>
+<span class="lineNum">     217 </span>                :            :         }
+<span class="lineNum">     218 </span>                :            :     }
+<span class="lineNum">     219 </span>                :<span class="lineCov">   51063422 :     return 0;</span>
+<span class="lineNum">     220 </span>                :            : }
+<span class="lineNum">     221 </span>                :            : 
+<span class="lineNum">     222 </span>                :            : /* Searches 'ccmap' for a node with the specified 'hash'.  If one is
+<span class="lineNum">     223 </span>                :            :  * found, returns the count associated with it, otherwise zero.
+<a name="224"><span class="lineNum">     224 </span>                :            :  */</a>
+<span class="lineNum">     225 </span>                :            : uint32_t
+<span class="lineNum">     226 </span>                :<span class="lineCov">   41911438 : ccmap_find(const struct ccmap *ccmap, uint32_t hash)</span>
+<span class="lineNum">     227 </span>                :            : {
+<span class="lineNum">     228 </span>                :<span class="lineCov">   41911438 :     const struct ccmap_impl *impl = ccmap_get_impl(ccmap);</span>
+<span class="lineNum">     229 </span>                :<span class="lineCov">   41911438 :     uint32_t h = rehash(impl, hash);</span>
+<span class="lineNum">     230 </span>                :            :     uint32_t count;
+<span class="lineNum">     231 </span>                :            : 
+<span class="lineNum">     232 </span>                :<span class="lineCov">   41911438 :     count = ccmap_find_in_bucket(&amp;impl-&gt;buckets[h &amp; impl-&gt;mask], hash);</span>
+<span class="lineNum">     233 </span>        [<span class="branchCov" title="Branch 0 was taken 26013428 times"> + </span><span class="branchCov" title="Branch 1 was taken 15898012 times"> + </span>]:<span class="lineCov">   41911440 :     if (!count) {</span>
+<span class="lineNum">     234 </span>                :<span class="lineCov">   26013428 :         h = other_hash(h);</span>
+<span class="lineNum">     235 </span>                :<span class="lineCov">   26013428 :         count = ccmap_find_in_bucket(&amp;impl-&gt;buckets[h &amp; impl-&gt;mask], hash);</span>
+<span class="lineNum">     236 </span>                :            :     }
+<span class="lineNum">     237 </span>                :<span class="lineCov">   41911438 :     return count;</span>
+<span class="lineNum">     238 </span>                :            : }
+<a name="239"><span class="lineNum">     239 </span>                :            : </a>
+<span class="lineNum">     240 </span>                :            : static int
+<span class="lineNum">     241 </span>                :<span class="lineCov">     310859 : ccmap_find_slot_protected(struct ccmap_bucket *b, uint32_t hash,</span>
+<span class="lineNum">     242 </span>                :            :                           uint32_t *count)
+<span class="lineNum">     243 </span>                :            : {
+<span class="lineNum">     244 </span>        [<span class="branchCov" title="Branch 0 was taken 1830124 times"> + </span><span class="branchCov" title="Branch 1 was taken 206672 times"> + </span>]:<span class="lineCov">    2036796 :     for (int i = 0; i &lt; CCMAP_K; i++) {</span>
+<span class="lineNum">     245 </span>                :<span class="lineCov">    1830124 :         uint64_t node = ccmap_node_get_protected(&amp;b-&gt;nodes[i]);</span>
+<span class="lineNum">     246 </span>                :            : 
+<span class="lineNum">     247 </span>                :<span class="lineCov">    1830124 :         *count = ccmap_node_count(node);</span>
+<span class="lineNum">     248 </span>[<span class="branchCov" title="Branch 1 was taken 105449 times"> + </span><span class="branchCov" title="Branch 2 was taken 1724675 times"> + </span>][<span class="branchCov" title="Branch 3 was taken 104187 times"> + </span><span class="branchCov" title="Branch 4 was taken 1262 times"> + </span>]:<span class="lineCov">    1830124 :         if (ccmap_node_hash(node) == hash &amp;&amp; *count) {</span>
+<span class="lineNum">     249 </span>                :<span class="lineCov">     104187 :             return i;</span>
+<span class="lineNum">     250 </span>                :            :         }
+<span class="lineNum">     251 </span>                :            :     }
+<span class="lineNum">     252 </span>                :<span class="lineCov">     206672 :     return -1;</span>
+<span class="lineNum">     253 </span>                :            : }
+<a name="254"><span class="lineNum">     254 </span>                :            : </a>
+<span class="lineNum">     255 </span>                :            : static int
+<span class="lineNum">     256 </span>                :<span class="lineCov">     105063 : ccmap_find_empty_slot_protected(struct ccmap_bucket *b)</span>
+<span class="lineNum">     257 </span>                :            : {
+<span class="lineNum">     258 </span>        [<span class="branchCov" title="Branch 0 was taken 230427 times"> + </span><span class="branchCov" title="Branch 1 was taken 1926 times"> + </span>]:<span class="lineCov">     232353 :     for (int i = 0; i &lt; CCMAP_K; i++) {</span>
+<span class="lineNum">     259 </span>                :<span class="lineCov">     230427 :         uint64_t node = ccmap_node_get_protected(&amp;b-&gt;nodes[i]);</span>
+<span class="lineNum">     260 </span>                :            : 
+<span class="lineNum">     261 </span>        [<span class="branchCov" title="Branch 1 was taken 103137 times"> + </span><span class="branchCov" title="Branch 2 was taken 127290 times"> + </span>]:<span class="lineCov">     230427 :         if (!ccmap_node_count(node)) {</span>
+<span class="lineNum">     262 </span>                :<span class="lineCov">     103137 :             return i;</span>
+<span class="lineNum">     263 </span>                :            :         }
+<span class="lineNum">     264 </span>                :            :     }
+<span class="lineNum">     265 </span>                :<span class="lineCov">       1926 :     return -1;</span>
+<span class="lineNum">     266 </span>                :            : }
+<a name="267"><span class="lineNum">     267 </span>                :            : </a>
+<span class="lineNum">     268 </span>                :            : static void
+<span class="lineNum">     269 </span>                :<span class="lineCov">     207324 : ccmap_set_bucket(struct ccmap_bucket *b, int i, uint32_t count, uint32_t hash)</span>
+<span class="lineNum">     270 </span>                :            : {
+<span class="lineNum">     271 </span>                :<span class="lineCov">     207324 :     ccmap_node_set_protected(&amp;b-&gt;nodes[i], ccmap_node(count, hash));</span>
+<span class="lineNum">     272 </span>                :<span class="lineCov">     207324 : }</span>
+<span class="lineNum">     273 </span>                :            : 
+<span class="lineNum">     274 </span>                :            : /* Searches 'b' for a node with the given 'hash'.  If it finds one, increments
+<span class="lineNum">     275 </span>                :            :  * the associated count by 'inc' and returns the new value. Otherwise returns
+<a name="276"><span class="lineNum">     276 </span>                :            :  * 0. */</a>
+<span class="lineNum">     277 </span>                :            : static uint32_t
+<span class="lineNum">     278 </span>                :<span class="lineCov">     220522 : ccmap_inc_bucket_existing(struct ccmap_bucket *b, uint32_t hash, uint32_t inc)</span>
+<span class="lineNum">     279 </span>                :            : {
+<span class="lineNum">     280 </span>                :            :     uint32_t count;
+<span class="lineNum">     281 </span>                :            : 
+<span class="lineNum">     282 </span>                :<span class="lineCov">     220522 :     int i = ccmap_find_slot_protected(b, hash, &amp;count);</span>
+<span class="lineNum">     283 </span>        [<span class="branchCov" title="Branch 0 was taken 206298 times"> + </span><span class="branchCov" title="Branch 1 was taken 14224 times"> + </span>]:<span class="lineCov">     220522 :     if (i &lt; 0) {</span>
+<span class="lineNum">     284 </span>                :<span class="lineCov">     206298 :         return 0;</span>
+<span class="lineNum">     285 </span>                :            :     }
+<span class="lineNum">     286 </span>                :<span class="lineCov">      14224 :     count += inc;</span>
+<span class="lineNum">     287 </span>                :<span class="lineCov">      14224 :     ccmap_set_bucket(b, i, count, hash);</span>
+<span class="lineNum">     288 </span>                :<span class="lineCov">     220522 :     return count;</span>
+<span class="lineNum">     289 </span>                :            : }
+<span class="lineNum">     290 </span>                :            : 
+<span class="lineNum">     291 </span>                :            : /* Searches 'b' for an empty slot.  If successful, stores 'inc' and 'hash' in
+<a name="292"><span class="lineNum">     292 </span>                :            :  * the slot and returns 'inc'.  Otherwise, returns 0. */</a>
+<span class="lineNum">     293 </span>                :            : static uint32_t
+<span class="lineNum">     294 </span>                :<span class="lineCov">     104490 : ccmap_inc_bucket_new(struct ccmap_bucket *b, uint32_t hash, uint32_t inc)</span>
+<span class="lineNum">     295 </span>                :            : {
+<span class="lineNum">     296 </span>                :<span class="lineCov">     104490 :     int i = ccmap_find_empty_slot_protected(b);</span>
+<span class="lineNum">     297 </span>        [<span class="branchCov" title="Branch 0 was taken 1724 times"> + </span><span class="branchCov" title="Branch 1 was taken 102766 times"> + </span>]:<span class="lineCov">     104490 :     if (i &lt; 0) {</span>
+<span class="lineNum">     298 </span>                :<span class="lineCov">       1724 :         return 0;</span>
+<span class="lineNum">     299 </span>                :            :     }
+<span class="lineNum">     300 </span>                :<span class="lineCov">     102766 :     ccmap_set_bucket(b, i, inc, hash);</span>
+<span class="lineNum">     301 </span>                :<span class="lineCov">     102766 :     return inc;</span>
+<span class="lineNum">     302 </span>                :            : }
+<span class="lineNum">     303 </span>                :            : 
+<span class="lineNum">     304 </span>                :            : /* Returns the other bucket that b-&gt;nodes[slot] could occupy in 'impl'.  (This
+<a name="305"><span class="lineNum">     305 </span>                :            :  * might be the same as 'b'.) */</a>
+<span class="lineNum">     306 </span>                :            : static struct ccmap_bucket *
+<span class="lineNum">     307 </span>                :<span class="lineCov">       1170 : other_bucket_protected(struct ccmap_impl *impl, struct ccmap_bucket *b, int slot)</span>
+<span class="lineNum">     308 </span>                :            : {
+<span class="lineNum">     309 </span>                :<span class="lineCov">       1170 :     uint64_t node = ccmap_node_get_protected(&amp;b-&gt;nodes[slot]);</span>
+<span class="lineNum">     310 </span>                :            : 
+<span class="lineNum">     311 </span>                :<span class="lineCov">       1170 :     uint32_t h1 = rehash(impl, ccmap_node_hash(node));</span>
+<span class="lineNum">     312 </span>                :<span class="lineCov">       1170 :     uint32_t h2 = other_hash(h1);</span>
+<span class="lineNum">     313 </span>                :<span class="lineCov">       1170 :     uint32_t b_idx = b - impl-&gt;buckets;</span>
+<span class="lineNum">     314 </span>        [<span class="branchCov" title="Branch 0 was taken 1145 times"> + </span><span class="branchCov" title="Branch 1 was taken 25 times"> + </span>]:<span class="lineCov">       1170 :     uint32_t other_h = (h1 &amp; impl-&gt;mask) == b_idx ? h2 : h1;</span>
+<span class="lineNum">     315 </span>                :            : 
+<span class="lineNum">     316 </span>                :<span class="lineCov">       1170 :     return &amp;impl-&gt;buckets[other_h &amp; impl-&gt;mask];</span>
+<span class="lineNum">     317 </span>                :            : }
+<span class="lineNum">     318 </span>                :            : 
+<span class="lineNum">     319 </span>                :            : /* Count 'inc' for 'hash' is to be inserted into 'impl', but both candidate
+<span class="lineNum">     320 </span>                :            :  * buckets 'b1' and 'b2' are full.  This function attempts to rearrange buckets
+<span class="lineNum">     321 </span>                :            :  * within 'impl' to make room for 'hash'.
+<span class="lineNum">     322 </span>                :            :  *
+<span class="lineNum">     323 </span>                :            :  * Returns 'inc' if the new count for the 'hash' was inserted, otherwise
+<span class="lineNum">     324 </span>                :            :  * returns 0.
+<span class="lineNum">     325 </span>                :            :  *
+<span class="lineNum">     326 </span>                :            :  * The implementation is a general-purpose breadth-first search.  At first
+<span class="lineNum">     327 </span>                :            :  * glance, this is more complex than a random walk through 'impl' (suggested by
+<span class="lineNum">     328 </span>                :            :  * some references), but random walks have a tendency to loop back through a
+<span class="lineNum">     329 </span>                :            :  * single bucket.  We have to move nodes backward along the path that we find,
+<span class="lineNum">     330 </span>                :            :  * so that no node actually disappears from the hash table, which means a
+<span class="lineNum">     331 </span>                :            :  * random walk would have to be careful to deal with loops.  By contrast, a
+<span class="lineNum">     332 </span>                :            :  * successful breadth-first search always finds a *shortest* path through the
+<span class="lineNum">     333 </span>                :            :  * hash table, and a shortest path will never contain loops, so it avoids that
+<span class="lineNum">     334 </span>                :            :  * problem entirely.
+<a name="335"><span class="lineNum">     335 </span>                :            :  */</a>
+<span class="lineNum">     336 </span>                :            : static uint32_t
+<span class="lineNum">     337 </span>                :<span class="lineCov">        371 : ccmap_inc_bfs(struct ccmap_impl *impl, uint32_t hash,</span>
+<span class="lineNum">     338 </span>                :            :               struct ccmap_bucket *b1, struct ccmap_bucket *b2, uint32_t inc)
+<span class="lineNum">     339 </span>                :            : {
+<span class="lineNum">     340 </span>                :            :     enum { MAX_DEPTH = 4 };
+<span class="lineNum">     341 </span>                :            : 
+<span class="lineNum">     342 </span>                :            :     /* A path from 'start' to 'end' via the 'n' steps in 'slots[]'.
+<span class="lineNum">     343 </span>                :            :      *
+<span class="lineNum">     344 </span>                :            :      * One can follow the path via:
+<span class="lineNum">     345 </span>                :            :      *
+<span class="lineNum">     346 </span>                :            :      *     struct ccmap_bucket *b;
+<span class="lineNum">     347 </span>                :            :      *     int i;
+<span class="lineNum">     348 </span>                :            :      *
+<span class="lineNum">     349 </span>                :            :      *     b = path-&gt;start;
+<span class="lineNum">     350 </span>                :            :      *     for (i = 0; i &lt; path-&gt;n; i++) {
+<span class="lineNum">     351 </span>                :            :      *         b = other_bucket_protected(impl, b, path-&gt;slots[i]);
+<span class="lineNum">     352 </span>                :            :      *     }
+<span class="lineNum">     353 </span>                :            :      *     ovs_assert(b == path-&gt;end);
+<span class="lineNum">     354 </span>                :            :      */
+<span class="lineNum">     355 </span>                :            :     struct ccmap_path {
+<span class="lineNum">     356 </span>                :            :         struct ccmap_bucket *start; /* First bucket along the path. */
+<span class="lineNum">     357 </span>                :            :         struct ccmap_bucket *end;   /* Last bucket on the path. */
+<span class="lineNum">     358 </span>                :            :         uint8_t slots[MAX_DEPTH];  /* Slots used for each hop. */
+<span class="lineNum">     359 </span>                :            :         int n;                     /* Number of slots[]. */
+<span class="lineNum">     360 </span>                :            :     };
+<span class="lineNum">     361 </span>                :            : 
+<span class="lineNum">     362 </span>                :            :     /* We need to limit the amount of work we do trying to find a path.  It
+<span class="lineNum">     363 </span>                :            :      * might actually be impossible to rearrange the ccmap, and after some time
+<span class="lineNum">     364 </span>                :            :      * it is likely to be easier to rehash the entire ccmap.
+<span class="lineNum">     365 </span>                :            :      *
+<span class="lineNum">     366 </span>                :            :      * This value of MAX_QUEUE is an arbitrary limit suggested by one of the
+<span class="lineNum">     367 </span>                :            :      * references.  Empirically, it seems to work OK. */
+<span class="lineNum">     368 </span>                :            :     enum { MAX_QUEUE = 500 };
+<span class="lineNum">     369 </span>                :            :     struct ccmap_path queue[MAX_QUEUE];
+<span class="lineNum">     370 </span>                :<span class="lineCov">        371 :     int head = 0;</span>
+<span class="lineNum">     371 </span>                :<span class="lineCov">        371 :     int tail = 0;</span>
+<span class="lineNum">     372 </span>                :            : 
+<span class="lineNum">     373 </span>                :            :     /* Add 'b1' and 'b2' as starting points for the search. */
+<span class="lineNum">     374 </span>                :<span class="lineCov">        371 :     queue[head].start = b1;</span>
+<span class="lineNum">     375 </span>                :<span class="lineCov">        371 :     queue[head].end = b1;</span>
+<span class="lineNum">     376 </span>                :<span class="lineCov">        371 :     queue[head].n = 0;</span>
+<span class="lineNum">     377 </span>                :<span class="lineCov">        371 :     head++;</span>
+<span class="lineNum">     378 </span>        [<span class="branchCov" title="Branch 0 was taken 151 times"> + </span><span class="branchCov" title="Branch 1 was taken 220 times"> + </span>]:<span class="lineCov">        371 :     if (b1 != b2) {</span>
+<span class="lineNum">     379 </span>                :<span class="lineCov">        151 :         queue[head].start = b2;</span>
+<span class="lineNum">     380 </span>                :<span class="lineCov">        151 :         queue[head].end = b2;</span>
+<span class="lineNum">     381 </span>                :<span class="lineCov">        151 :         queue[head].n = 0;</span>
+<span class="lineNum">     382 </span>                :<span class="lineCov">        151 :         head++;</span>
+<span class="lineNum">     383 </span>                :            :     }
+<span class="lineNum">     384 </span>                :            : 
+<span class="lineNum">     385 </span>        [<span class="branchCov" title="Branch 0 was taken 383 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">        383 :     while (tail &lt; head) {</span>
+<span class="lineNum">     386 </span>                :<span class="lineCov">        383 :         const struct ccmap_path *path = &amp;queue[tail++];</span>
+<span class="lineNum">     387 </span>                :<span class="lineCov">        383 :         struct ccmap_bucket *this = path-&gt;end;</span>
+<span class="lineNum">     388 </span>                :            :         int i;
+<span class="lineNum">     389 </span>                :            : 
+<span class="lineNum">     390 </span>        [<span class="branchCov" title="Branch 0 was taken 795 times"> + </span><span class="branchCov" title="Branch 1 was taken 12 times"> + </span>]:<span class="lineCov">        807 :         for (i = 0; i &lt; CCMAP_K; i++) {</span>
+<span class="lineNum">     391 </span>                :<span class="lineCov">        795 :             struct ccmap_bucket *next = other_bucket_protected(impl, this, i);</span>
+<span class="lineNum">     392 </span>                :            :             int j;
+<span class="lineNum">     393 </span>                :            : 
+<span class="lineNum">     394 </span>        [<span class="branchCov" title="Branch 0 was taken 222 times"> + </span><span class="branchCov" title="Branch 1 was taken 573 times"> + </span>]:<span class="lineCov">        795 :             if (this == next) {</span>
+<span class="lineNum">     395 </span>                :<span class="lineCov">        222 :                 continue;</span>
+<span class="lineNum">     396 </span>                :            :             }
+<span class="lineNum">     397 </span>                :            : 
+<span class="lineNum">     398 </span>                :<span class="lineCov">        573 :             j = ccmap_find_empty_slot_protected(next);</span>
+<span class="lineNum">     399 </span>        [<span class="branchCov" title="Branch 0 was taken 371 times"> + </span><span class="branchCov" title="Branch 1 was taken 202 times"> + </span>]:<span class="lineCov">        573 :             if (j &gt;= 0) {</span>
+<span class="lineNum">     400 </span>                :            :                 /* We've found a path along which we can rearrange the hash
+<span class="lineNum">     401 </span>                :            :                  * table:  Start at path-&gt;start, follow all the slots in
+<span class="lineNum">     402 </span>                :            :                  * path-&gt;slots[], then follow slot 'i', then the bucket you
+<span class="lineNum">     403 </span>                :            :                  * arrive at has slot 'j' empty. */
+<span class="lineNum">     404 </span>                :            :                 struct ccmap_bucket *buckets[MAX_DEPTH + 2];
+<span class="lineNum">     405 </span>                :            :                 int slots[MAX_DEPTH + 2];
+<span class="lineNum">     406 </span>                :            :                 int k;
+<span class="lineNum">     407 </span>                :            : 
+<span class="lineNum">     408 </span>                :            :                 /* Figure out the full sequence of slots. */
+<span class="lineNum">     409 </span>        [<span class="branchCov" title="Branch 0 was taken 4 times"> + </span><span class="branchCov" title="Branch 1 was taken 371 times"> + </span>]:<span class="lineCov">        375 :                 for (k = 0; k &lt; path-&gt;n; k++) {</span>
+<span class="lineNum">     410 </span>                :<span class="lineCov">          4 :                     slots[k] = path-&gt;slots[k];</span>
+<span class="lineNum">     411 </span>                :            :                 }
+<span class="lineNum">     412 </span>                :<span class="lineCov">        371 :                 slots[path-&gt;n] = i;</span>
+<span class="lineNum">     413 </span>                :<span class="lineCov">        371 :                 slots[path-&gt;n + 1] = j;</span>
+<span class="lineNum">     414 </span>                :            : 
+<span class="lineNum">     415 </span>                :            :                 /* Figure out the full sequence of buckets. */
+<span class="lineNum">     416 </span>                :<span class="lineCov">        371 :                 buckets[0] = path-&gt;start;</span>
+<span class="lineNum">     417 </span>        [<span class="branchCov" title="Branch 0 was taken 375 times"> + </span><span class="branchCov" title="Branch 1 was taken 371 times"> + </span>]:<span class="lineCov">        746 :                 for (k = 0; k &lt;= path-&gt;n; k++) {</span>
+<span class="lineNum">     418 </span>                :<span class="lineCov">        375 :                     buckets[k + 1] = other_bucket_protected(impl, buckets[k], slots[k]);</span>
+<span class="lineNum">     419 </span>                :            :                 }
+<span class="lineNum">     420 </span>                :            : 
+<span class="lineNum">     421 </span>                :            :                 /* Now the path is fully expressed.  One can start from
+<span class="lineNum">     422 </span>                :            :                  * buckets[0], go via slots[0] to buckets[1], via slots[1] to
+<span class="lineNum">     423 </span>                :            :                  * buckets[2], and so on.
+<span class="lineNum">     424 </span>                :            :                  *
+<span class="lineNum">     425 </span>                :            :                  * Move all the nodes across the path &quot;backward&quot;.  After each
+<span class="lineNum">     426 </span>                :            :                  * step some node appears in two buckets.  Thus, every node is
+<span class="lineNum">     427 </span>                :            :                  * always visible to a concurrent search. */
+<span class="lineNum">     428 </span>        [<span class="branchCov" title="Branch 0 was taken 375 times"> + </span><span class="branchCov" title="Branch 1 was taken 371 times"> + </span>]:<span class="lineCov">        746 :                 for (k = path-&gt;n + 1; k &gt; 0; k--) {</span>
+<span class="lineNum">     429 </span>                :<span class="lineCov">        375 :                     uint64_t node = ccmap_node_get_protected</span>
+<span class="lineNum">     430 </span>                :<span class="lineCov">        375 :                         (&amp;buckets[k - 1]-&gt;nodes[slots[k - 1]]);</span>
+<span class="lineNum">     431 </span>                :<span class="lineCov">        375 :                     ccmap_node_set_protected(&amp;buckets[k]-&gt;nodes[slots[k]],</span>
+<span class="lineNum">     432 </span>                :            :                                              node);
+<span class="lineNum">     433 </span>                :            :                 }
+<span class="lineNum">     434 </span>                :            : 
+<span class="lineNum">     435 </span>                :            :                 /* Finally, insert the count. */
+<span class="lineNum">     436 </span>                :<span class="lineCov">        371 :                 ccmap_set_bucket(buckets[0], slots[0], inc, hash);</span>
+<span class="lineNum">     437 </span>                :            : 
+<span class="lineNum">     438 </span>                :<span class="lineCov">        371 :                 return inc;</span>
+<span class="lineNum">     439 </span>                :            :             }
+<span class="lineNum">     440 </span>                :            : 
+<span class="lineNum">     441 </span>[<span class="branchCov" title="Branch 0 was taken 202 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>][<span class="branchCov" title="Branch 2 was taken 202 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        202 :             if (path-&gt;n &lt; MAX_DEPTH &amp;&amp; head &lt; MAX_QUEUE) {</span>
+<span class="lineNum">     442 </span>                :<span class="lineCov">        202 :                 struct ccmap_path *new_path = &amp;queue[head++];</span>
+<span class="lineNum">     443 </span>                :            : 
+<span class="lineNum">     444 </span>                :<span class="lineCov">        202 :                 *new_path = *path;</span>
+<span class="lineNum">     445 </span>                :<span class="lineCov">        202 :                 new_path-&gt;end = next;</span>
+<span class="lineNum">     446 </span>                :<span class="lineCov">        202 :                 new_path-&gt;slots[new_path-&gt;n++] = i;</span>
+<span class="lineNum">     447 </span>                :            :             }
+<span class="lineNum">     448 </span>                :            :         }
+<span class="lineNum">     449 </span>                :            :     }
+<span class="lineNum">     450 </span>                :            : 
+<span class="lineNum">     451 </span>                :<span class="lineCov">        371 :     return 0;</span>
+<span class="lineNum">     452 </span>                :            : }
+<span class="lineNum">     453 </span>                :            : 
+<a name="454"><span class="lineNum">     454 </span>                :            : /* Increments the count associated with 'hash', in 'impl', by 'inc'. */</a>
+<span class="lineNum">     455 </span>                :            : static uint32_t
+<span class="lineNum">     456 </span>                :<span class="lineCov">     117361 : ccmap_try_inc(struct ccmap_impl *impl, uint32_t hash, uint32_t inc)</span>
+<span class="lineNum">     457 </span>                :            : {
+<span class="lineNum">     458 </span>                :<span class="lineCov">     117361 :     uint32_t h1 = rehash(impl, hash);</span>
+<span class="lineNum">     459 </span>                :<span class="lineCov">     117361 :     uint32_t h2 = other_hash(h1);</span>
+<span class="lineNum">     460 </span>                :<span class="lineCov">     117361 :     struct ccmap_bucket *b1 = &amp;impl-&gt;buckets[h1 &amp; impl-&gt;mask];</span>
+<span class="lineNum">     461 </span>                :<span class="lineCov">     117361 :     struct ccmap_bucket *b2 = &amp;impl-&gt;buckets[h2 &amp; impl-&gt;mask];</span>
+<span class="lineNum">     462 </span>                :            :     uint32_t count;
+<span class="lineNum">     463 </span>                :            : 
+<span class="lineNum">     464 </span>                :<span class="lineCov">     117361 :     return OVS_UNLIKELY(count = ccmap_inc_bucket_existing(b1, hash, inc))</span>
+<span class="lineNum">     465 </span>        [<span class="branchCov" title="Branch 1 was taken 103161 times"> + </span><span class="branchCov" title="Branch 2 was taken 14200 times"> + </span>]:<span class="lineCov">     220522 :         ? count : OVS_UNLIKELY(count = ccmap_inc_bucket_existing(b2, hash, inc))</span>
+<span class="lineNum">     466 </span>        [<span class="branchCov" title="Branch 1 was taken 103137 times"> + </span><span class="branchCov" title="Branch 2 was taken 24 times"> + </span>]:<span class="lineCov">     206298 :         ? count : OVS_LIKELY(count = ccmap_inc_bucket_new(b1, hash, inc))</span>
+<span class="lineNum">     467 </span>        [<span class="branchCov" title="Branch 1 was taken 1353 times"> + </span><span class="branchCov" title="Branch 2 was taken 101784 times"> + </span>]:<span class="lineCov">     104490 :         ? count : OVS_LIKELY(count = ccmap_inc_bucket_new(b2, hash, inc))</span>
+<span class="lineNum">     468 </span>        [<span class="branchCov" title="Branch 1 was taken 371 times"> + </span><span class="branchCov" title="Branch 2 was taken 982 times"> + </span>]:<span class="lineCov">       1353 :         ? count : ccmap_inc_bfs(impl, hash, b1, b2, inc);</span>
+<span class="lineNum">     469 </span>                :            : }
+<span class="lineNum">     470 </span>                :            : 
+<span class="lineNum">     471 </span>                :            : /* Increments the count of 'hash' values in the 'ccmap'.  The caller must
+<span class="lineNum">     472 </span>                :            :  * ensure that 'ccmap' cannot change concurrently (from another thread).
+<span class="lineNum">     473 </span>                :            :  *
+<a name="474"><span class="lineNum">     474 </span>                :            :  * Returns the current count of the given hash value after the incremention. */</a>
+<span class="lineNum">     475 </span>                :            : uint32_t
+<span class="lineNum">     476 </span>                :<span class="lineCov">      90691 : ccmap_inc(struct ccmap *ccmap, uint32_t hash)</span>
+<span class="lineNum">     477 </span>                :            : {
+<span class="lineNum">     478 </span>                :<span class="lineCov">      90691 :     struct ccmap_impl *impl = ccmap_get_impl(ccmap);</span>
+<span class="lineNum">     479 </span>                :            :     uint32_t count;
+<span class="lineNum">     480 </span>                :            : 
+<span class="lineNum">     481 </span>        [<span class="branchCov" title="Branch 0 was taken 1344 times"> + </span><span class="branchCov" title="Branch 1 was taken 89347 times"> + </span>]:<span class="lineCov">      90691 :     if (OVS_UNLIKELY(impl-&gt;n_unique &gt;= impl-&gt;max_n)) {</span>
+<span class="lineNum">     482 </span>                :<span class="lineCov">       1344 :         COVERAGE_INC(ccmap_expand);</span>
+<span class="lineNum">     483 </span>                :<span class="lineCov">       1344 :         impl = ccmap_rehash(ccmap, (impl-&gt;mask &lt;&lt; 1) | 1);</span>
+<span class="lineNum">     484 </span>                :            :     }
+<span class="lineNum">     485 </span>                :            : 
+<span class="lineNum">     486 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 90691 times"> + </span>]:<span class="lineCov">      90691 :     while (OVS_UNLIKELY(!(count = ccmap_try_inc(impl, hash, 1)))) {</span>
+<span class="lineNum">     487 </span>                :<span class="lineNoCov">          0 :         impl = ccmap_rehash(ccmap, impl-&gt;mask);</span>
+<span class="lineNum">     488 </span>                :            :     }
+<span class="lineNum">     489 </span>                :<span class="lineCov">      90691 :     ++impl-&gt;n;</span>
+<span class="lineNum">     490 </span>        [<span class="branchCov" title="Branch 0 was taken 76467 times"> + </span><span class="branchCov" title="Branch 1 was taken 14224 times"> + </span>]:<span class="lineCov">      90691 :     if (count == 1) {</span>
+<span class="lineNum">     491 </span>                :<span class="lineCov">      76467 :         ++impl-&gt;n_unique;</span>
+<span class="lineNum">     492 </span>                :            :     }
+<span class="lineNum">     493 </span>                :<span class="lineCov">      90691 :     return count;</span>
+<span class="lineNum">     494 </span>                :            : }
+<span class="lineNum">     495 </span>                :            : 
+<span class="lineNum">     496 </span>                :            : /* Decrement the count associated with 'hash' in the bucket identified by
+<a name="497"><span class="lineNum">     497 </span>                :            :  * 'h'. Return the OLD count if successful, or 0. */</a>
+<span class="lineNum">     498 </span>                :            : static uint32_t
+<span class="lineNum">     499 </span>                :<span class="lineCov">      90337 : ccmap_dec__(struct ccmap_impl *impl, uint32_t hash, uint32_t h)</span>
+<span class="lineNum">     500 </span>                :            : {
+<span class="lineNum">     501 </span>                :<span class="lineCov">      90337 :     struct ccmap_bucket *b = &amp;impl-&gt;buckets[h &amp; impl-&gt;mask];</span>
+<span class="lineNum">     502 </span>                :            :     uint32_t count;
+<span class="lineNum">     503 </span>                :            : 
+<span class="lineNum">     504 </span>                :<span class="lineCov">      90337 :     int slot = ccmap_find_slot_protected(b, hash, &amp;count);</span>
+<span class="lineNum">     505 </span>        [<span class="branchCov" title="Branch 0 was taken 374 times"> + </span><span class="branchCov" title="Branch 1 was taken 89963 times"> + </span>]:<span class="lineCov">      90337 :     if (slot &lt; 0) {</span>
+<span class="lineNum">     506 </span>                :<span class="lineCov">        374 :         return 0;</span>
+<span class="lineNum">     507 </span>                :            :     }
+<span class="lineNum">     508 </span>                :            : 
+<span class="lineNum">     509 </span>                :<span class="lineCov">      89963 :     ccmap_set_bucket(b, slot, count - 1, hash);</span>
+<span class="lineNum">     510 </span>                :<span class="lineCov">      90337 :     return count;</span>
+<span class="lineNum">     511 </span>                :            : }
+<span class="lineNum">     512 </span>                :            : 
+<span class="lineNum">     513 </span>                :            : /* Decrements the count associated with 'hash'.  The caller must
+<span class="lineNum">     514 </span>                :            :  * ensure that 'ccmap' cannot change concurrently (from another thread).
+<span class="lineNum">     515 </span>                :            :  *
+<span class="lineNum">     516 </span>                :            :  * Returns the current count related to 'hash' in the ccmap after the
+<a name="517"><span class="lineNum">     517 </span>                :            :  * decrement. */</a>
+<span class="lineNum">     518 </span>                :            : uint32_t
+<span class="lineNum">     519 </span>                :<span class="lineCov">      89963 : ccmap_dec(struct ccmap *ccmap, uint32_t hash)</span>
+<span class="lineNum">     520 </span>                :            : {
+<span class="lineNum">     521 </span>                :<span class="lineCov">      89963 :     struct ccmap_impl *impl = ccmap_get_impl(ccmap);</span>
+<span class="lineNum">     522 </span>                :<span class="lineCov">      89963 :     uint32_t h1 = rehash(impl, hash);</span>
+<span class="lineNum">     523 </span>                :<span class="lineCov">      89963 :     uint32_t h2 = other_hash(h1);</span>
+<span class="lineNum">     524 </span>                :            : 
+<span class="lineNum">     525 </span>                :<span class="lineCov">      89963 :     uint32_t old_count = ccmap_dec__(impl, hash, h1);</span>
+<span class="lineNum">     526 </span>        [<span class="branchCov" title="Branch 0 was taken 374 times"> + </span><span class="branchCov" title="Branch 1 was taken 89589 times"> + </span>]:<span class="lineCov">      89963 :     if (!old_count) {</span>
+<span class="lineNum">     527 </span>                :<span class="lineCov">        374 :         old_count = ccmap_dec__(impl, hash, h2);</span>
+<span class="lineNum">     528 </span>                :            :     }
+<span class="lineNum">     529 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 89963 times"> + </span>]:<span class="lineCov">      89963 :     ovs_assert(old_count);</span>
+<span class="lineNum">     530 </span>                :            : 
+<span class="lineNum">     531 </span>                :<span class="lineCov">      89963 :     old_count--;</span>
+<span class="lineNum">     532 </span>                :            : 
+<span class="lineNum">     533 </span>        [<span class="branchCov" title="Branch 0 was taken 75979 times"> + </span><span class="branchCov" title="Branch 1 was taken 13984 times"> + </span>]:<span class="lineCov">      89963 :     if (old_count == 0) {</span>
+<span class="lineNum">     534 </span>                :<span class="lineCov">      75979 :         impl-&gt;n_unique--;</span>
+<span class="lineNum">     535 </span>        [<span class="branchCov" title="Branch 0 was taken 56926 times"> + </span><span class="branchCov" title="Branch 1 was taken 19053 times"> + </span>]:<span class="lineCov">      75979 :         if (OVS_UNLIKELY(impl-&gt;n_unique &lt; impl-&gt;min_n)) {</span>
+<span class="lineNum">     536 </span>                :<span class="lineCov">      56926 :             COVERAGE_INC(ccmap_shrink);</span>
+<span class="lineNum">     537 </span>                :<span class="lineCov">      56926 :             impl = ccmap_rehash(ccmap, impl-&gt;mask &gt;&gt; 1);</span>
+<span class="lineNum">     538 </span>                :            :         }
+<span class="lineNum">     539 </span>                :            :     }
+<span class="lineNum">     540 </span>                :<span class="lineCov">      89963 :     impl-&gt;n--;</span>
+<span class="lineNum">     541 </span>                :<span class="lineCov">      89963 :     return old_count;</span>
+<span class="lineNum">     542 </span>                :            : }
+<a name="543"><span class="lineNum">     543 </span>                :            : </a>
+<span class="lineNum">     544 </span>                :            : static bool
+<span class="lineNum">     545 </span>                :<span class="lineCov">      58270 : ccmap_try_rehash(const struct ccmap_impl *old, struct ccmap_impl *new)</span>
+<span class="lineNum">     546 </span>                :            : {
+<span class="lineNum">     547 </span>                :            :     const struct ccmap_bucket *b;
+<span class="lineNum">     548 </span>                :            : 
+<span class="lineNum">     549 </span>        [<span class="branchCov" title="Branch 0 was taken 64387 times"> + </span><span class="branchCov" title="Branch 1 was taken 58270 times"> + </span>]:<span class="lineCov">     122657 :     for (b = old-&gt;buckets; b &lt;= &amp;old-&gt;buckets[old-&gt;mask]; b++) {</span>
+<span class="lineNum">     550 </span>        [<span class="branchCov" title="Branch 0 was taken 515096 times"> + </span><span class="branchCov" title="Branch 1 was taken 64387 times"> + </span>]:<span class="lineCov">     579483 :         for (int i = 0; i &lt; CCMAP_K; i++) {</span>
+<span class="lineNum">     551 </span>                :<span class="lineCov">     515096 :             uint64_t node = ccmap_node_get_protected(&amp;b-&gt;nodes[i]);</span>
+<span class="lineNum">     552 </span>                :<span class="lineCov">     515096 :             uint32_t count = ccmap_node_count(node);</span>
+<span class="lineNum">     553 </span>                :            : 
+<span class="lineNum">     554 </span>[<span class="branchCov" title="Branch 0 was taken 26670 times"> + </span><span class="branchCov" title="Branch 1 was taken 488426 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 26670 times"> + </span>]:<span class="lineCov">     515096 :             if (count &amp;&amp; !ccmap_try_inc(new, ccmap_node_hash(node), count)) {</span>
+<span class="lineNum">     555 </span>                :<span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     556 </span>                :            :             }
+<span class="lineNum">     557 </span>                :            :         }
+<span class="lineNum">     558 </span>                :            :     }
+<span class="lineNum">     559 </span>                :<span class="lineCov">      58270 :     return true;</span>
+<span class="lineNum">     560 </span>                :            : }
+<a name="561"><span class="lineNum">     561 </span>                :            : </a>
+<span class="lineNum">     562 </span>                :            : static struct ccmap_impl *
+<span class="lineNum">     563 </span>                :<span class="lineCov">      58270 : ccmap_rehash(struct ccmap *ccmap, uint32_t mask)</span>
+<span class="lineNum">     564 </span>                :            : {
+<span class="lineNum">     565 </span>                :<span class="lineCov">      58270 :     struct ccmap_impl *old = ccmap_get_impl(ccmap);</span>
+<span class="lineNum">     566 </span>                :<span class="lineCov">      58270 :     struct ccmap_impl *new = ccmap_impl_create(mask);</span>
+<span class="lineNum">     567 </span>                :            : 
+<span class="lineNum">     568 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 58270 times"> + </span>]:<span class="lineCov">      58270 :     ovs_assert(old-&gt;n_unique &lt; new-&gt;max_n);</span>
+<span class="lineNum">     569 </span>                :            : 
+<span class="lineNum">     570 </span>        [<span class="branchNoCov" title="Branch 1 was not taken"> - </span><span class="branchCov" title="Branch 2 was taken 58270 times"> + </span>]:<span class="lineCov">      58270 :     while (!ccmap_try_rehash(old, new)) {</span>
+<span class="lineNum">     571 </span>                :<span class="lineNoCov">          0 :         memset(new-&gt;buckets, 0, (mask + 1) * sizeof *new-&gt;buckets);</span>
+<span class="lineNum">     572 </span>                :<span class="lineNoCov">          0 :         new-&gt;basis = random_uint32();</span>
+<span class="lineNum">     573 </span>                :            :     }
+<span class="lineNum">     574 </span>                :            : 
+<span class="lineNum">     575 </span>                :<span class="lineCov">      58270 :     new-&gt;n = old-&gt;n;</span>
+<span class="lineNum">     576 </span>                :<span class="lineCov">      58270 :     new-&gt;n_unique = old-&gt;n_unique;</span>
+<span class="lineNum">     577 </span>                :<span class="lineCov">      58270 :     ovsrcu_set(&amp;ccmap-&gt;impl, new);</span>
+<span class="lineNum">     578 </span>                :<span class="lineCov">      58270 :     ovsrcu_postpone(free_cacheline, old);</span>
+<span class="lineNum">     579 </span>                :            : 
+<span class="lineNum">     580 </span>                :<span class="lineCov">      58270 :     return new;</span>
+<span class="lineNum">     581 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

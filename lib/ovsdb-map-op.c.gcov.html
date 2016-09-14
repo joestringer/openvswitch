@@ -1,0 +1,258 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/ovsdb-map-op.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - ovsdb-map-op.c<span style="font-size: 80%;"> (source / <a href="ovsdb-map-op.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">53</td>
+            <td class="headerCovTableEntry">68</td>
+            <td class="headerCovTableEntryMed">77.9 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">11</td>
+            <td class="headerCovTableEntry">11</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">12</td>
+            <td class="headerCovTableEntry">24</td>
+            <td class="headerCovTableEntryLo">50.0 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /* Copyright (C) 2016 Hewlett Packard Enterprise Development LP</a>
+<span class="lineNum">       2 </span>                :            :  * All Rights Reserved.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;); you may
+<span class="lineNum">       5 </span>                :            :  * not use this file except in compliance with the License. You may obtain
+<span class="lineNum">       6 </span>                :            :  * a copy of the License at
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS, WITHOUT
+<span class="lineNum">      12 </span>                :            :  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+<span class="lineNum">      13 </span>                :            :  * License for the specific language governing permissions and limitations
+<span class="lineNum">      14 </span>                :            :  * under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;ovsdb-map-op.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      20 </span>                :            : #include &quot;openvswitch/hmap.h&quot;
+<span class="lineNum">      21 </span>                :            : #include &quot;hash.h&quot;
+<span class="lineNum">      22 </span>                :            : 
+<span class="lineNum">      23 </span>                :            : /* Map Operation: a Partial Map Update */
+<span class="lineNum">      24 </span>                :            : struct map_op {
+<span class="lineNum">      25 </span>                :            :     struct hmap_node node;
+<span class="lineNum">      26 </span>                :            :     struct ovsdb_datum *datum;
+<span class="lineNum">      27 </span>                :            :     enum map_op_type type;
+<span class="lineNum">      28 </span>                :            : };
+<span class="lineNum">      29 </span>                :            : 
+<span class="lineNum">      30 </span>                :            : /* List of Map Operations */
+<span class="lineNum">      31 </span>                :            : struct map_op_list {
+<span class="lineNum">      32 </span>                :            :     struct hmap hmap;
+<span class="lineNum">      33 </span>                :            : };
+<span class="lineNum">      34 </span>                :            : 
+<span class="lineNum">      35 </span>                :            : static void map_op_destroy_datum(struct map_op *, const struct ovsdb_type *);
+<span class="lineNum">      36 </span>                :            : static struct map_op *map_op_list_find(struct map_op_list *, struct map_op *,
+<span class="lineNum">      37 </span>                :            :                                        const struct ovsdb_type *, size_t);
+<a name="38"><span class="lineNum">      38 </span>                :            : </a>
+<span class="lineNum">      39 </span>                :            : struct map_op*
+<span class="lineNum">      40 </span>                :<span class="lineCov">          5 : map_op_create(struct ovsdb_datum *datum, enum map_op_type type)</span>
+<span class="lineNum">      41 </span>                :            : {
+<span class="lineNum">      42 </span>                :<span class="lineCov">          5 :     struct map_op *map_op = xmalloc(sizeof *map_op);</span>
+<span class="lineNum">      43 </span>                :<span class="lineCov">          5 :     map_op-&gt;node.hash = 0;</span>
+<span class="lineNum">      44 </span>                :<span class="lineCov">          5 :     map_op-&gt;node.next = HMAP_NODE_NULL;</span>
+<span class="lineNum">      45 </span>                :<span class="lineCov">          5 :     map_op-&gt;datum = datum;</span>
+<span class="lineNum">      46 </span>                :<span class="lineCov">          5 :     map_op-&gt;type = type;</span>
+<span class="lineNum">      47 </span>                :<span class="lineCov">          5 :     return map_op;</span>
+<span class="lineNum">      48 </span>                :            : }
+<a name="49"><span class="lineNum">      49 </span>                :            : </a>
+<span class="lineNum">      50 </span>                :            : static void
+<span class="lineNum">      51 </span>                :<span class="lineCov">          5 : map_op_destroy_datum(struct map_op *map_op, const struct ovsdb_type *type)</span>
+<span class="lineNum">      52 </span>                :            : {
+<span class="lineNum">      53 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 3 times"> + </span>]:<span class="lineCov">          5 :     if (map_op-&gt;type == MAP_OP_DELETE){</span>
+<span class="lineNum">      54 </span>                :<span class="lineCov">          2 :         struct ovsdb_type type_ = *type;</span>
+<span class="lineNum">      55 </span>                :<span class="lineCov">          2 :         type_.value.type = OVSDB_TYPE_VOID;</span>
+<span class="lineNum">      56 </span>                :<span class="lineCov">          2 :         ovsdb_datum_destroy(map_op-&gt;datum, &amp;type_);</span>
+<span class="lineNum">      57 </span>                :            :     } else {
+<span class="lineNum">      58 </span>                :<span class="lineCov">          3 :         ovsdb_datum_destroy(map_op-&gt;datum, type);</span>
+<span class="lineNum">      59 </span>                :            :     }
+<span class="lineNum">      60 </span>                :<span class="lineCov">          5 :     free(map_op-&gt;datum);</span>
+<span class="lineNum">      61 </span>                :<span class="lineCov">          5 :     map_op-&gt;datum = NULL;</span>
+<span class="lineNum">      62 </span>                :<span class="lineCov">          5 : }</span>
+<a name="63"><span class="lineNum">      63 </span>                :            : </a>
+<span class="lineNum">      64 </span>                :            : void
+<span class="lineNum">      65 </span>                :<span class="lineCov">          5 : map_op_destroy(struct map_op *map_op, const struct ovsdb_type *type)</span>
+<span class="lineNum">      66 </span>                :            : {
+<span class="lineNum">      67 </span>                :<span class="lineCov">          5 :     map_op_destroy_datum(map_op, type);</span>
+<span class="lineNum">      68 </span>                :<span class="lineCov">          5 :     free(map_op);</span>
+<span class="lineNum">      69 </span>                :<span class="lineCov">          5 : }</span>
+<a name="70"><span class="lineNum">      70 </span>                :            : </a>
+<span class="lineNum">      71 </span>                :            : struct ovsdb_datum*
+<span class="lineNum">      72 </span>                :<span class="lineCov">         10 : map_op_datum(const struct map_op *map_op)</span>
+<span class="lineNum">      73 </span>                :            : {
+<span class="lineNum">      74 </span>                :<span class="lineCov">         10 :     return map_op-&gt;datum;</span>
+<span class="lineNum">      75 </span>                :            : }
+<a name="76"><span class="lineNum">      76 </span>                :            : </a>
+<span class="lineNum">      77 </span>                :            : enum map_op_type
+<span class="lineNum">      78 </span>                :<span class="lineCov">         14 : map_op_type(const struct map_op *map_op)</span>
+<span class="lineNum">      79 </span>                :            : {
+<span class="lineNum">      80 </span>                :<span class="lineCov">         14 :     return map_op-&gt;type;</span>
+<span class="lineNum">      81 </span>                :            : }
+<a name="82"><span class="lineNum">      82 </span>                :            : </a>
+<span class="lineNum">      83 </span>                :            : struct map_op_list*
+<span class="lineNum">      84 </span>                :<span class="lineCov">          5 : map_op_list_create(void)</span>
+<span class="lineNum">      85 </span>                :            : {
+<span class="lineNum">      86 </span>                :<span class="lineCov">          5 :     struct map_op_list *list = xmalloc(sizeof *list);</span>
+<span class="lineNum">      87 </span>                :<span class="lineCov">          5 :     hmap_init(&amp;list-&gt;hmap);</span>
+<span class="lineNum">      88 </span>                :<span class="lineCov">          5 :     return list;</span>
+<span class="lineNum">      89 </span>                :            : }
+<a name="90"><span class="lineNum">      90 </span>                :            : </a>
+<span class="lineNum">      91 </span>                :            : void
+<span class="lineNum">      92 </span>                :<span class="lineCov">          5 : map_op_list_destroy(struct map_op_list *list, const struct ovsdb_type *type)</span>
+<span class="lineNum">      93 </span>                :            : {
+<span class="lineNum">      94 </span>                :            :     struct map_op *map_op, *next;
+<span class="lineNum">      95 </span>[<span class="branchCov" title="Branch 1 was taken 5 times"> + </span><span class="branchCov" title="Branch 2 was taken 5 times"> + </span>][<span class="branchNoCov" title="Branch 3 was not taken"> - </span><span class="branchCov" title="Branch 4 was taken 5 times"> + </span>]:<span class="lineCov">         10 :     HMAP_FOR_EACH_SAFE (map_op, next, node, &amp;list-&gt;hmap) {</span>
+<span class="lineNum">         </span>        [<span class="branchCov" title="Branch 6 was taken 5 times"> + </span><span class="branchCov" title="Branch 7 was taken 5 times"> + </span>]
+<span class="lineNum">      96 </span>                :<span class="lineCov">          5 :         map_op_destroy(map_op, type);</span>
+<span class="lineNum">      97 </span>                :            :     }
+<span class="lineNum">      98 </span>                :<span class="lineCov">          5 :     hmap_destroy(&amp;list-&gt;hmap);</span>
+<span class="lineNum">      99 </span>                :<span class="lineCov">          5 :     free(list);</span>
+<span class="lineNum">     100 </span>                :<span class="lineCov">          5 : }</span>
+<a name="101"><span class="lineNum">     101 </span>                :            : </a>
+<span class="lineNum">     102 </span>                :            : static struct map_op*
+<span class="lineNum">     103 </span>                :<span class="lineCov">          5 : map_op_list_find(struct map_op_list *list, struct map_op *map_op,</span>
+<span class="lineNum">     104 </span>                :            :                  const struct ovsdb_type *type, size_t hash)
+<span class="lineNum">     105 </span>                :            : {
+<span class="lineNum">     106 </span>                :<span class="lineCov">          5 :     struct map_op *found = NULL;</span>
+<span class="lineNum">     107 </span>                :            :     struct map_op *old;
+<span class="lineNum">     108 </span>[<span class="branchNoCov" title="Branch 2 was not taken"> - </span><span class="branchCov" title="Branch 3 was taken 5 times"> + </span>][<span class="branchNoCov" title="Branch 4 was not taken"> - </span><span class="branchCov" title="Branch 5 was taken 5 times"> + </span>]:<span class="lineCov">          5 :     HMAP_FOR_EACH_WITH_HASH(old, node, hash, &amp;list-&gt;hmap) {</span>
+<span class="lineNum">     109 </span>        [<span class="branchNoExec" title="Branch 1 was not executed"> # </span><span class="branchNoExec" title="Branch 2 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (ovsdb_atom_equals(&amp;old-&gt;datum-&gt;keys[0], &amp;map_op-&gt;datum-&gt;keys[0],</span>
+<span class="lineNum">     110 </span>                :            :                               type-&gt;key.type)) {
+<span class="lineNum">     111 </span>                :<span class="lineNoCov">          0 :             found = old;</span>
+<span class="lineNum">     112 </span>                :<span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     113 </span>                :            :         }
+<span class="lineNum">     114 </span>                :            :     }
+<span class="lineNum">     115 </span>                :<span class="lineCov">          5 :     return found;</span>
+<span class="lineNum">     116 </span>                :            : }
+<span class="lineNum">     117 </span>                :            : 
+<span class="lineNum">     118 </span>                :            : /* Inserts 'map_op' into 'list'. Makes sure that any conflict with a previous
+<span class="lineNum">     119 </span>                :            :  * map operation is resolved, so only one map operation is possible on each key
+<span class="lineNum">     120 </span>                :            :  * per transactions. 'type' must be the type of the column over which the map
+<a name="121"><span class="lineNum">     121 </span>                :            :  * operation will be applied. */</a>
+<span class="lineNum">     122 </span>                :            : void
+<span class="lineNum">     123 </span>                :<span class="lineCov">          5 : map_op_list_add(struct map_op_list *list, struct map_op *map_op,</span>
+<span class="lineNum">     124 </span>                :            :                 const struct ovsdb_type *type)
+<span class="lineNum">     125 </span>                :            : {
+<span class="lineNum">     126 </span>                :            :     /* Check if there is a previous update with the same key. */
+<span class="lineNum">     127 </span>                :            :     size_t hash;
+<span class="lineNum">     128 </span>                :            :     struct map_op *prev_map_op;
+<span class="lineNum">     129 </span>                :            : 
+<span class="lineNum">     130 </span>                :<span class="lineCov">          5 :     hash = ovsdb_atom_hash(&amp;map_op-&gt;datum-&gt;keys[0], type-&gt;key.type, 0);</span>
+<span class="lineNum">     131 </span>                :<span class="lineCov">          5 :     prev_map_op = map_op_list_find(list, map_op, type, hash);</span>
+<span class="lineNum">     132 </span>        [<span class="branchCov" title="Branch 0 was taken 5 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          5 :     if (prev_map_op == NULL){</span>
+<span class="lineNum">     133 </span>                :<span class="lineCov">          5 :         hmap_insert(&amp;list-&gt;hmap, &amp;map_op-&gt;node, hash);</span>
+<span class="lineNum">     134 </span>                :            :     } else {
+<span class="lineNum">     135 </span>[<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>][<span class="branchNoExec" title="Branch 2 was not executed"> # </span><span class="branchNoExec" title="Branch 3 was not executed"> # </span>]:<span class="lineNoCov">          0 :         if (prev_map_op-&gt;type == MAP_OP_INSERT &amp;&amp;</span>
+<span class="lineNum">     136 </span>                :<span class="lineNoCov">          0 :             map_op-&gt;type == MAP_OP_DELETE) {</span>
+<span class="lineNum">     137 </span>                :            :             /* These operations cancel each other out. */
+<span class="lineNum">     138 </span>                :<span class="lineNoCov">          0 :             hmap_remove(&amp;list-&gt;hmap, &amp;prev_map_op-&gt;node);</span>
+<span class="lineNum">     139 </span>                :<span class="lineNoCov">          0 :             map_op_destroy(prev_map_op, type);</span>
+<span class="lineNum">     140 </span>                :<span class="lineNoCov">          0 :             map_op_destroy(map_op, type);</span>
+<span class="lineNum">     141 </span>                :            :         } else {
+<span class="lineNum">     142 </span>                :            :             /* For any other case, the new update operation replaces
+<span class="lineNum">     143 </span>                :            :              * the previous update operation. */
+<span class="lineNum">     144 </span>                :<span class="lineNoCov">          0 :             map_op_destroy_datum(prev_map_op, type);</span>
+<span class="lineNum">     145 </span>                :<span class="lineNoCov">          0 :             prev_map_op-&gt;type = map_op-&gt;type;</span>
+<span class="lineNum">     146 </span>                :<span class="lineNoCov">          0 :             prev_map_op-&gt;datum = map_op-&gt;datum;</span>
+<span class="lineNum">     147 </span>                :<span class="lineNoCov">          0 :             free(map_op);</span>
+<span class="lineNum">     148 </span>                :            :         }
+<span class="lineNum">     149 </span>                :            :     }
+<span class="lineNum">     150 </span>                :<span class="lineCov">          5 : }</span>
+<a name="151"><span class="lineNum">     151 </span>                :            : </a>
+<span class="lineNum">     152 </span>                :            : struct map_op*
+<span class="lineNum">     153 </span>                :<span class="lineCov">          5 : map_op_list_first(struct map_op_list *list)</span>
+<span class="lineNum">     154 </span>                :            : {
+<span class="lineNum">     155 </span>                :<span class="lineCov">          5 :     struct hmap_node *node = hmap_first(&amp;list-&gt;hmap);</span>
+<span class="lineNum">     156 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 5 times"> + </span>]:<span class="lineCov">          5 :     if (node == NULL) {</span>
+<span class="lineNum">     157 </span>                :<span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     158 </span>                :            :     }
+<span class="lineNum">     159 </span>                :<span class="lineCov">          5 :     struct map_op *map_op = CONTAINER_OF(node, struct map_op, node);</span>
+<span class="lineNum">     160 </span>                :<span class="lineCov">          5 :     return map_op;</span>
+<span class="lineNum">     161 </span>                :            : }
+<a name="162"><span class="lineNum">     162 </span>                :            : </a>
+<span class="lineNum">     163 </span>                :            : struct map_op*
+<span class="lineNum">     164 </span>                :<span class="lineCov">          5 : map_op_list_next(struct map_op_list *list, struct map_op *map_op)</span>
+<span class="lineNum">     165 </span>                :            : {
+<span class="lineNum">     166 </span>                :<span class="lineCov">          5 :     struct hmap_node *node = hmap_next(&amp;list-&gt;hmap, &amp;map_op-&gt;node);</span>
+<span class="lineNum">     167 </span>        [<span class="branchCov" title="Branch 0 was taken 5 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">          5 :     if (node == NULL) {</span>
+<span class="lineNum">     168 </span>                :<span class="lineCov">          5 :         return NULL;</span>
+<span class="lineNum">     169 </span>                :            :     }
+<span class="lineNum">     170 </span>                :<span class="lineNoCov">          0 :     struct map_op *next = CONTAINER_OF(node, struct map_op, node);</span>
+<span class="lineNum">     171 </span>                :<span class="lineNoCov">          0 :     return next;</span>
+<span class="lineNum">     172 </span>                :            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

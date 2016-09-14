@@ -1,0 +1,375 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - lib/stream-fd.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">lib</a> - stream-fd.c<span style="font-size: 80%;"> (source / <a href="stream-fd.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">85</td>
+            <td class="headerCovTableEntry">89</td>
+            <td class="headerCovTableEntryHi">95.5 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2016-09-14 01:02:56</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">14</td>
+            <td class="headerCovTableEntry">14</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntry">24</td>
+            <td class="headerCovTableEntry">31</td>
+            <td class="headerCovTableEntryMed">77.4 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">           Branch data     Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>                :            : /*</a>
+<span class="lineNum">       2 </span>                :            :  * Copyright (c) 2008, 2009, 2010, 2012, 2013, 2014, 2015 Nicira, Inc.
+<span class="lineNum">       3 </span>                :            :  *
+<span class="lineNum">       4 </span>                :            :  * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+<span class="lineNum">       5 </span>                :            :  * you may not use this file except in compliance with the License.
+<span class="lineNum">       6 </span>                :            :  * You may obtain a copy of the License at:
+<span class="lineNum">       7 </span>                :            :  *
+<span class="lineNum">       8 </span>                :            :  *     http://www.apache.org/licenses/LICENSE-2.0
+<span class="lineNum">       9 </span>                :            :  *
+<span class="lineNum">      10 </span>                :            :  * Unless required by applicable law or agreed to in writing, software
+<span class="lineNum">      11 </span>                :            :  * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+<span class="lineNum">      12 </span>                :            :  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="lineNum">      13 </span>                :            :  * See the License for the specific language governing permissions and
+<span class="lineNum">      14 </span>                :            :  * limitations under the License.
+<span class="lineNum">      15 </span>                :            :  */
+<span class="lineNum">      16 </span>                :            : 
+<span class="lineNum">      17 </span>                :            : #include &lt;config.h&gt;
+<span class="lineNum">      18 </span>                :            : #include &quot;stream-fd.h&quot;
+<span class="lineNum">      19 </span>                :            : #include &lt;errno.h&gt;
+<span class="lineNum">      20 </span>                :            : #include &lt;poll.h&gt;
+<span class="lineNum">      21 </span>                :            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      22 </span>                :            : #include &lt;string.h&gt;
+<span class="lineNum">      23 </span>                :            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      24 </span>                :            : #include &lt;sys/types.h&gt;
+<span class="lineNum">      25 </span>                :            : #include &lt;unistd.h&gt;
+<span class="lineNum">      26 </span>                :            : #include &quot;fatal-signal.h&quot;
+<span class="lineNum">      27 </span>                :            : #include &quot;poll-loop.h&quot;
+<span class="lineNum">      28 </span>                :            : #include &quot;socket-util.h&quot;
+<span class="lineNum">      29 </span>                :            : #include &quot;util.h&quot;
+<span class="lineNum">      30 </span>                :            : #include &quot;stream-provider.h&quot;
+<span class="lineNum">      31 </span>                :            : #include &quot;stream.h&quot;
+<a name="32"><span class="lineNum">      32 </span>                :            : #include &quot;openvswitch/vlog.h&quot;</a>
+<span class="lineNum">      33 </span>                :            : 
+<span class="lineNum">      34 </span>                :<span class="lineCov">      53956 : VLOG_DEFINE_THIS_MODULE(stream_fd);</span>
+<span class="lineNum">      35 </span>                :            : 
+<span class="lineNum">      36 </span>                :            : /* Active file descriptor stream. */
+<span class="lineNum">      37 </span>                :            : 
+<span class="lineNum">      38 </span>                :            : struct stream_fd
+<span class="lineNum">      39 </span>                :            : {
+<span class="lineNum">      40 </span>                :            :     struct stream stream;
+<span class="lineNum">      41 </span>                :            :     int fd;
+<span class="lineNum">      42 </span>                :            :     int fd_type;
+<span class="lineNum">      43 </span>                :            : };
+<span class="lineNum">      44 </span>                :            : 
+<span class="lineNum">      45 </span>                :            : static const struct stream_class stream_fd_class;
+<span class="lineNum">      46 </span>                :            : 
+<span class="lineNum">      47 </span>                :            : static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(10, 25);
+<span class="lineNum">      48 </span>                :            : 
+<span class="lineNum">      49 </span>                :            : static void maybe_unlink_and_free(char *path);
+<span class="lineNum">      50 </span>                :            : 
+<span class="lineNum">      51 </span>                :            : /* Creates a new stream named 'name' that will send and receive data on 'fd'
+<span class="lineNum">      52 </span>                :            :  * and stores a pointer to the stream in '*streamp'.  Initial connection status
+<span class="lineNum">      53 </span>                :            :  * 'connect_status' is interpreted as described for stream_init(). 'fd_type'
+<span class="lineNum">      54 </span>                :            :  * tells whether the socket is TCP or Unix domain socket.
+<span class="lineNum">      55 </span>                :            :  *
+<span class="lineNum">      56 </span>                :            :  * Returns 0 if successful, otherwise a positive errno value.  (The current
+<a name="57"><span class="lineNum">      57 </span>                :            :  * implementation never fails.) */</a>
+<span class="lineNum">      58 </span>                :            : int
+<span class="lineNum">      59 </span>                :<span class="lineCov">      44682 : new_fd_stream(const char *name, int fd, int connect_status, int fd_type,</span>
+<span class="lineNum">      60 </span>                :            :               struct stream **streamp)
+<span class="lineNum">      61 </span>                :            : {
+<span class="lineNum">      62 </span>                :            :     struct stream_fd *s;
+<span class="lineNum">      63 </span>                :            : 
+<span class="lineNum">      64 </span>                :<span class="lineCov">      44682 :     s = xmalloc(sizeof *s);</span>
+<span class="lineNum">      65 </span>                :<span class="lineCov">      44682 :     stream_init(&amp;s-&gt;stream, &amp;stream_fd_class, connect_status, name);</span>
+<span class="lineNum">      66 </span>                :<span class="lineCov">      44682 :     s-&gt;fd = fd;</span>
+<span class="lineNum">      67 </span>                :<span class="lineCov">      44682 :     s-&gt;fd_type = fd_type;</span>
+<span class="lineNum">      68 </span>                :<span class="lineCov">      44682 :     *streamp = &amp;s-&gt;stream;</span>
+<span class="lineNum">      69 </span>                :<span class="lineCov">      44682 :     return 0;</span>
+<span class="lineNum">      70 </span>                :            : }
+<a name="71"><span class="lineNum">      71 </span>                :            : </a>
+<span class="lineNum">      72 </span>                :            : static struct stream_fd *
+<span class="lineNum">      73 </span>                :<span class="lineCov">    1898133 : stream_fd_cast(struct stream *stream)</span>
+<span class="lineNum">      74 </span>                :            : {
+<span class="lineNum">      75 </span>                :<span class="lineCov">    1898133 :     stream_assert_class(stream, &amp;stream_fd_class);</span>
+<span class="lineNum">      76 </span>                :<span class="lineCov">    1898133 :     return CONTAINER_OF(stream, struct stream_fd, stream);</span>
+<span class="lineNum">      77 </span>                :            : }
+<a name="78"><span class="lineNum">      78 </span>                :            : </a>
+<span class="lineNum">      79 </span>                :            : static void
+<span class="lineNum">      80 </span>                :<span class="lineCov">      44553 : fd_close(struct stream *stream)</span>
+<span class="lineNum">      81 </span>                :            : {
+<span class="lineNum">      82 </span>                :<span class="lineCov">      44553 :     struct stream_fd *s = stream_fd_cast(stream);</span>
+<span class="lineNum">      83 </span>                :<span class="lineCov">      44553 :     closesocket(s-&gt;fd);</span>
+<span class="lineNum">      84 </span>                :<span class="lineCov">      44553 :     free(s);</span>
+<span class="lineNum">      85 </span>                :<span class="lineCov">      44553 : }</span>
+<a name="86"><span class="lineNum">      86 </span>                :            : </a>
+<span class="lineNum">      87 </span>                :            : static int
+<span class="lineNum">      88 </span>                :<span class="lineCov">        218 : fd_connect(struct stream *stream)</span>
+<span class="lineNum">      89 </span>                :            : {
+<span class="lineNum">      90 </span>                :<span class="lineCov">        218 :     struct stream_fd *s = stream_fd_cast(stream);</span>
+<span class="lineNum">      91 </span>                :<span class="lineCov">        218 :     int retval = check_connection_completion(s-&gt;fd);</span>
+<span class="lineNum">      92 </span>[<span class="branchCov" title="Branch 0 was taken 160 times"> + </span><span class="branchCov" title="Branch 1 was taken 58 times"> + </span>][<span class="branchCov" title="Branch 2 was taken 160 times"> + </span><span class="branchNoCov" title="Branch 3 was not taken"> - </span>]:<span class="lineCov">        218 :     if (retval == 0 &amp;&amp; s-&gt;fd_type == AF_INET) {</span>
+<span class="lineNum">      93 </span>                :<span class="lineCov">        160 :         setsockopt_tcp_nodelay(s-&gt;fd);</span>
+<span class="lineNum">      94 </span>                :            :     }
+<span class="lineNum">      95 </span>                :<span class="lineCov">        218 :     return retval;</span>
+<span class="lineNum">      96 </span>                :            : }
+<a name="97"><span class="lineNum">      97 </span>                :            : </a>
+<span class="lineNum">      98 </span>                :            : static ssize_t
+<span class="lineNum">      99 </span>                :<span class="lineCov">    1204337 : fd_recv(struct stream *stream, void *buffer, size_t n)</span>
+<span class="lineNum">     100 </span>                :            : {
+<span class="lineNum">     101 </span>                :<span class="lineCov">    1204337 :     struct stream_fd *s = stream_fd_cast(stream);</span>
+<span class="lineNum">     102 </span>                :            :     ssize_t retval;
+<span class="lineNum">     103 </span>                :            :     int error;
+<span class="lineNum">     104 </span>                :            : 
+<span class="lineNum">     105 </span>                :<span class="lineCov">    1204337 :     retval = recv(s-&gt;fd, buffer, n, 0);</span>
+<span class="lineNum">     106 </span>        [<span class="branchCov" title="Branch 0 was taken 592795 times"> + </span><span class="branchCov" title="Branch 1 was taken 611542 times"> + </span>]:<span class="lineCov">    1204337 :     if (retval &lt; 0) {</span>
+<span class="lineNum">     107 </span>                :<span class="lineCov">     592795 :         error = sock_errno();</span>
+<span class="lineNum">     108 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     109 </span>                :            :         if (error == WSAEWOULDBLOCK) {
+<span class="lineNum">     110 </span>                :            :            error = EAGAIN;
+<span class="lineNum">     111 </span>                :            :         }
+<span class="lineNum">     112 </span>                :            : #endif
+<span class="lineNum">     113 </span>        [<span class="branchCov" title="Branch 0 was taken 18 times"> + </span><span class="branchCov" title="Branch 1 was taken 592777 times"> + </span>]:<span class="lineCov">     592795 :         if (error != EAGAIN) {</span>
+<span class="lineNum">     114 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 16 times"> + </span>]:<span class="lineCov">         18 :             VLOG_DBG_RL(&amp;rl, &quot;recv: %s&quot;, sock_strerror(error));</span>
+<span class="lineNum">     115 </span>                :            :         }
+<span class="lineNum">     116 </span>                :<span class="lineCov">     592795 :         return -error;</span>
+<span class="lineNum">     117 </span>                :            :     }
+<span class="lineNum">     118 </span>                :<span class="lineCov">     611542 :     return retval;</span>
+<span class="lineNum">     119 </span>                :            : }
+<a name="120"><span class="lineNum">     120 </span>                :            : </a>
+<span class="lineNum">     121 </span>                :            : static ssize_t
+<span class="lineNum">     122 </span>                :<span class="lineCov">     193351 : fd_send(struct stream *stream, const void *buffer, size_t n)</span>
+<span class="lineNum">     123 </span>                :            : {
+<span class="lineNum">     124 </span>                :<span class="lineCov">     193351 :     struct stream_fd *s = stream_fd_cast(stream);</span>
+<span class="lineNum">     125 </span>                :            :     ssize_t retval;
+<span class="lineNum">     126 </span>                :            :     int error;
+<span class="lineNum">     127 </span>                :            : 
+<span class="lineNum">     128 </span>                :<span class="lineCov">     193351 :     retval = send(s-&gt;fd, buffer, n, 0);</span>
+<span class="lineNum">     129 </span>        [<span class="branchCov" title="Branch 0 was taken 13330 times"> + </span><span class="branchCov" title="Branch 1 was taken 180021 times"> + </span>]:<span class="lineCov">     193351 :     if (retval &lt; 0) {</span>
+<span class="lineNum">     130 </span>                :<span class="lineCov">      13330 :         error = sock_errno();</span>
+<span class="lineNum">     131 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     132 </span>                :            :         if (error == WSAEWOULDBLOCK) {
+<span class="lineNum">     133 </span>                :            :            error = EAGAIN;
+<span class="lineNum">     134 </span>                :            :         }
+<span class="lineNum">     135 </span>                :            : #endif
+<span class="lineNum">     136 </span>        [<span class="branchCov" title="Branch 0 was taken 52 times"> + </span><span class="branchCov" title="Branch 1 was taken 13278 times"> + </span>]:<span class="lineCov">      13330 :         if (error != EAGAIN) {</span>
+<span class="lineNum">     137 </span>        [<span class="branchCov" title="Branch 0 was taken 2 times"> + </span><span class="branchCov" title="Branch 1 was taken 50 times"> + </span>]:<span class="lineCov">         52 :             VLOG_DBG_RL(&amp;rl, &quot;send: %s&quot;, sock_strerror(error));</span>
+<span class="lineNum">     138 </span>                :            :         }
+<span class="lineNum">     139 </span>                :<span class="lineCov">      13330 :         return -error;</span>
+<span class="lineNum">     140 </span>                :            :     }
+<span class="lineNum">     141 </span>        [<span class="branchCov" title="Branch 0 was taken 180021 times"> + </span><span class="branchNoCov" title="Branch 1 was not taken"> - </span>]:<span class="lineCov">     180021 :     return (retval &gt; 0 ? retval : -EAGAIN);</span>
+<span class="lineNum">     142 </span>                :            : }
+<a name="143"><span class="lineNum">     143 </span>                :            : </a>
+<span class="lineNum">     144 </span>                :            : static void
+<span class="lineNum">     145 </span>                :<span class="lineCov">     455674 : fd_wait(struct stream *stream, enum stream_wait_type wait)</span>
+<span class="lineNum">     146 </span>                :            : {
+<span class="lineNum">     147 </span>                :<span class="lineCov">     455674 :     struct stream_fd *s = stream_fd_cast(stream);</span>
+<span class="lineNum">     148 </span>     [<span class="branchCov" title="Branch 0 was taken 29975 times"> + </span><span class="branchCov" title="Branch 1 was taken 425699 times"> + </span><span class="branchNoCov" title="Branch 2 was not taken"> - </span>]:<span class="lineCov">     455674 :     switch (wait) {</span>
+<span class="lineNum">     149 </span>                :            :     case STREAM_CONNECT:
+<span class="lineNum">     150 </span>                :            :     case STREAM_SEND:
+<span class="lineNum">     151 </span>                :<span class="lineCov">      29975 :         poll_fd_wait(s-&gt;fd, POLLOUT);</span>
+<span class="lineNum">     152 </span>                :<span class="lineCov">      29975 :         break;</span>
+<span class="lineNum">     153 </span>                :            : 
+<span class="lineNum">     154 </span>                :            :     case STREAM_RECV:
+<span class="lineNum">     155 </span>                :<span class="lineCov">     425699 :         poll_fd_wait(s-&gt;fd, POLLIN);</span>
+<span class="lineNum">     156 </span>                :<span class="lineCov">     425699 :         break;</span>
+<span class="lineNum">     157 </span>                :            : 
+<span class="lineNum">     158 </span>                :            :     default:
+<span class="lineNum">     159 </span>                :<span class="lineNoCov">          0 :         OVS_NOT_REACHED();</span>
+<span class="lineNum">     160 </span>                :            :     }
+<span class="lineNum">     161 </span>                :<span class="lineCov">     455674 : }</span>
+<span class="lineNum">     162 </span>                :            : 
+<span class="lineNum">     163 </span>                :            : static const struct stream_class stream_fd_class = {
+<span class="lineNum">     164 </span>                :            :     &quot;fd&quot;,                       /* name */
+<span class="lineNum">     165 </span>                :            :     false,                      /* needs_probes */
+<span class="lineNum">     166 </span>                :            :     NULL,                       /* open */
+<span class="lineNum">     167 </span>                :            :     fd_close,                   /* close */
+<span class="lineNum">     168 </span>                :            :     fd_connect,                 /* connect */
+<span class="lineNum">     169 </span>                :            :     fd_recv,                    /* recv */
+<span class="lineNum">     170 </span>                :            :     fd_send,                    /* send */
+<span class="lineNum">     171 </span>                :            :     NULL,                       /* run */
+<span class="lineNum">     172 </span>                :            :     NULL,                       /* run_wait */
+<span class="lineNum">     173 </span>                :            :     fd_wait,                    /* wait */
+<span class="lineNum">     174 </span>                :            : };
+<span class="lineNum">     175 </span>                :            : 
+<span class="lineNum">     176 </span>                :            : /* Passive file descriptor stream. */
+<span class="lineNum">     177 </span>                :            : 
+<span class="lineNum">     178 </span>                :            : struct fd_pstream
+<span class="lineNum">     179 </span>                :            : {
+<span class="lineNum">     180 </span>                :            :     struct pstream pstream;
+<span class="lineNum">     181 </span>                :            :     int fd;
+<span class="lineNum">     182 </span>                :            :     int (*accept_cb)(int fd, const struct sockaddr_storage *, size_t ss_len,
+<span class="lineNum">     183 </span>                :            :                      struct stream **);
+<span class="lineNum">     184 </span>                :            :     char *unlink_path;
+<span class="lineNum">     185 </span>                :            : };
+<span class="lineNum">     186 </span>                :            : 
+<span class="lineNum">     187 </span>                :            : static const struct pstream_class fd_pstream_class;
+<a name="188"><span class="lineNum">     188 </span>                :            : </a>
+<span class="lineNum">     189 </span>                :            : static struct fd_pstream *
+<span class="lineNum">     190 </span>                :<span class="lineCov">    1158214 : fd_pstream_cast(struct pstream *pstream)</span>
+<span class="lineNum">     191 </span>                :            : {
+<span class="lineNum">     192 </span>                :<span class="lineCov">    1158214 :     pstream_assert_class(pstream, &amp;fd_pstream_class);</span>
+<span class="lineNum">     193 </span>                :<span class="lineCov">    1158214 :     return CONTAINER_OF(pstream, struct fd_pstream, pstream);</span>
+<span class="lineNum">     194 </span>                :            : }
+<span class="lineNum">     195 </span>                :            : 
+<span class="lineNum">     196 </span>                :            : /* Creates a new pstream named 'name' that will accept new socket connections
+<span class="lineNum">     197 </span>                :            :  * on 'fd' and stores a pointer to the stream in '*pstreamp'.
+<span class="lineNum">     198 </span>                :            :  *
+<span class="lineNum">     199 </span>                :            :  * When a connection has been accepted, 'accept_cb' will be called with the new
+<span class="lineNum">     200 </span>                :            :  * socket fd 'fd' and the remote address of the connection 'sa' and 'sa_len'.
+<span class="lineNum">     201 </span>                :            :  * accept_cb must return 0 if the connection is successful, in which case it
+<span class="lineNum">     202 </span>                :            :  * must initialize '*streamp' to the new stream, or a positive errno value on
+<span class="lineNum">     203 </span>                :            :  * error.  In either case accept_cb takes ownership of the 'fd' passed in.
+<span class="lineNum">     204 </span>                :            :  *
+<span class="lineNum">     205 </span>                :            :  * When '*pstreamp' is closed, then 'unlink_path' (if nonnull) will be passed
+<span class="lineNum">     206 </span>                :            :  * to fatal_signal_unlink_file_now() and freed with free().
+<span class="lineNum">     207 </span>                :            :  *
+<span class="lineNum">     208 </span>                :            :  * Returns 0 if successful, otherwise a positive errno value.  (The current
+<a name="209"><span class="lineNum">     209 </span>                :            :  * implementation never fails.) */</a>
+<span class="lineNum">     210 </span>                :            : int
+<span class="lineNum">     211 </span>                :<span class="lineCov">       5020 : new_fd_pstream(const char *name, int fd,</span>
+<span class="lineNum">     212 </span>                :            :                int (*accept_cb)(int fd, const struct sockaddr_storage *ss,
+<span class="lineNum">     213 </span>                :            :                                 size_t ss_len, struct stream **streamp),
+<span class="lineNum">     214 </span>                :            :                char *unlink_path, struct pstream **pstreamp)
+<span class="lineNum">     215 </span>                :            : {
+<span class="lineNum">     216 </span>                :<span class="lineCov">       5020 :     struct fd_pstream *ps = xmalloc(sizeof *ps);</span>
+<span class="lineNum">     217 </span>                :<span class="lineCov">       5020 :     pstream_init(&amp;ps-&gt;pstream, &amp;fd_pstream_class, name);</span>
+<span class="lineNum">     218 </span>                :<span class="lineCov">       5020 :     ps-&gt;fd = fd;</span>
+<span class="lineNum">     219 </span>                :<span class="lineCov">       5020 :     ps-&gt;accept_cb = accept_cb;</span>
+<span class="lineNum">     220 </span>                :<span class="lineCov">       5020 :     ps-&gt;unlink_path = unlink_path;</span>
+<span class="lineNum">     221 </span>                :<span class="lineCov">       5020 :     *pstreamp = &amp;ps-&gt;pstream;</span>
+<span class="lineNum">     222 </span>                :<span class="lineCov">       5020 :     return 0;</span>
+<span class="lineNum">     223 </span>                :            : }
+<a name="224"><span class="lineNum">     224 </span>                :            : </a>
+<span class="lineNum">     225 </span>                :            : static void
+<span class="lineNum">     226 </span>                :<span class="lineCov">       4907 : pfd_close(struct pstream *pstream)</span>
+<span class="lineNum">     227 </span>                :            : {
+<span class="lineNum">     228 </span>                :<span class="lineCov">       4907 :     struct fd_pstream *ps = fd_pstream_cast(pstream);</span>
+<span class="lineNum">     229 </span>                :<span class="lineCov">       4907 :     closesocket(ps-&gt;fd);</span>
+<span class="lineNum">     230 </span>                :<span class="lineCov">       4907 :     maybe_unlink_and_free(ps-&gt;unlink_path);</span>
+<span class="lineNum">     231 </span>                :<span class="lineCov">       4907 :     free(ps);</span>
+<span class="lineNum">     232 </span>                :<span class="lineCov">       4907 : }</span>
+<a name="233"><span class="lineNum">     233 </span>                :            : </a>
+<span class="lineNum">     234 </span>                :            : static int
+<span class="lineNum">     235 </span>                :<span class="lineCov">     584723 : pfd_accept(struct pstream *pstream, struct stream **new_streamp)</span>
+<span class="lineNum">     236 </span>                :            : {
+<span class="lineNum">     237 </span>                :<span class="lineCov">     584723 :     struct fd_pstream *ps = fd_pstream_cast(pstream);</span>
+<span class="lineNum">     238 </span>                :            :     struct sockaddr_storage ss;
+<span class="lineNum">     239 </span>                :<span class="lineCov">     584723 :     socklen_t ss_len = sizeof ss;</span>
+<span class="lineNum">     240 </span>                :            :     int new_fd;
+<span class="lineNum">     241 </span>                :            :     int retval;
+<span class="lineNum">     242 </span>                :            : 
+<span class="lineNum">     243 </span>                :<span class="lineCov">     584723 :     new_fd = accept(ps-&gt;fd, (struct sockaddr *) &amp;ss, &amp;ss_len);</span>
+<span class="lineNum">     244 </span>        [<span class="branchCov" title="Branch 0 was taken 562553 times"> + </span><span class="branchCov" title="Branch 1 was taken 22170 times"> + </span>]:<span class="lineCov">     584723 :     if (new_fd &lt; 0) {</span>
+<span class="lineNum">     245 </span>                :<span class="lineCov">     562553 :         retval = sock_errno();</span>
+<span class="lineNum">     246 </span>                :            : #ifdef _WIN32
+<span class="lineNum">     247 </span>                :            :         if (retval == WSAEWOULDBLOCK) {
+<span class="lineNum">     248 </span>                :            :             retval = EAGAIN;
+<span class="lineNum">     249 </span>                :            :         }
+<span class="lineNum">     250 </span>                :            : #endif
+<span class="lineNum">     251 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 562553 times"> + </span>]:<span class="lineCov">     562553 :         if (retval != EAGAIN) {</span>
+<span class="lineNum">     252 </span>        [<span class="branchNoExec" title="Branch 0 was not executed"> # </span><span class="branchNoExec" title="Branch 1 was not executed"> # </span>]:<span class="lineNoCov">          0 :             VLOG_DBG_RL(&amp;rl, &quot;accept: %s&quot;, sock_strerror(retval));</span>
+<span class="lineNum">     253 </span>                :            :         }
+<span class="lineNum">     254 </span>                :<span class="lineCov">     562553 :         return retval;</span>
+<span class="lineNum">     255 </span>                :            :     }
+<span class="lineNum">     256 </span>                :            : 
+<span class="lineNum">     257 </span>                :<span class="lineCov">      22170 :     retval = set_nonblocking(new_fd);</span>
+<span class="lineNum">     258 </span>        [<span class="branchNoCov" title="Branch 0 was not taken"> - </span><span class="branchCov" title="Branch 1 was taken 22170 times"> + </span>]:<span class="lineCov">      22170 :     if (retval) {</span>
+<span class="lineNum">     259 </span>                :<span class="lineNoCov">          0 :         closesocket(new_fd);</span>
+<span class="lineNum">     260 </span>                :<span class="lineNoCov">          0 :         return retval;</span>
+<span class="lineNum">     261 </span>                :            :     }
+<span class="lineNum">     262 </span>                :            : 
+<span class="lineNum">     263 </span>                :<span class="lineCov">     584723 :     return ps-&gt;accept_cb(new_fd, &amp;ss, ss_len, new_streamp);</span>
+<span class="lineNum">     264 </span>                :            : }
+<a name="265"><span class="lineNum">     265 </span>                :            : </a>
+<span class="lineNum">     266 </span>                :            : static void
+<span class="lineNum">     267 </span>                :<span class="lineCov">     568584 : pfd_wait(struct pstream *pstream)</span>
+<span class="lineNum">     268 </span>                :            : {
+<span class="lineNum">     269 </span>                :<span class="lineCov">     568584 :     struct fd_pstream *ps = fd_pstream_cast(pstream);</span>
+<span class="lineNum">     270 </span>                :<span class="lineCov">     568584 :     poll_fd_wait(ps-&gt;fd, POLLIN);</span>
+<span class="lineNum">     271 </span>                :<span class="lineCov">     568584 : }</span>
+<span class="lineNum">     272 </span>                :            : 
+<span class="lineNum">     273 </span>                :            : static const struct pstream_class fd_pstream_class = {
+<span class="lineNum">     274 </span>                :            :     &quot;pstream&quot;,
+<span class="lineNum">     275 </span>                :            :     false,
+<span class="lineNum">     276 </span>                :            :     NULL,
+<span class="lineNum">     277 </span>                :            :     pfd_close,
+<span class="lineNum">     278 </span>                :            :     pfd_accept,
+<span class="lineNum">     279 </span>                :            :     pfd_wait,
+<span class="lineNum">     280 </span>                :            : };
+<span class="lineNum">     281 </span>                :            : 
+<a name="282"><span class="lineNum">     282 </span>                :            : /* Helper functions. */</a>
+<span class="lineNum">     283 </span>                :            : static void
+<span class="lineNum">     284 </span>                :<span class="lineCov">       4907 : maybe_unlink_and_free(char *path)</span>
+<span class="lineNum">     285 </span>                :            : {
+<span class="lineNum">     286 </span>        [<span class="branchCov" title="Branch 0 was taken 4799 times"> + </span><span class="branchCov" title="Branch 1 was taken 108 times"> + </span>]:<span class="lineCov">       4907 :     if (path) {</span>
+<span class="lineNum">     287 </span>                :<span class="lineCov">       4799 :         fatal_signal_unlink_file_now(path);</span>
+<span class="lineNum">     288 </span>                :<span class="lineCov">       4799 :         free(path);</span>
+<span class="lineNum">     289 </span>                :            :     }
+<span class="lineNum">     290 </span>                :<span class="lineCov">       4907 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>
