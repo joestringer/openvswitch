@@ -1820,6 +1820,66 @@ should_revalidate(const struct udpif *udpif, uint64_t packets,
     return false;
 }
 
+struct reval_context {
+    /* Optional output parameters */
+    struct flow_wildcards *wc;
+    struct ofpbuf *odp_actions;
+    struct netflow **netflow;
+
+    /* Required output parameters */
+    struct xlate_out xout;
+    struct flow flow;
+};
+
+/* Translates 'ukey->key' into a flow, populating 'ctx' as it goes along.
+ *
+ * Returns 0 on success, otherwise a positive errno value.
+ *
+ * The caller is responsible for uninitializing ctx->xout on success.
+ */
+static int
+xlate_ukey(struct udpif *udpif, struct udpif_key *ukey,
+           const struct dpif_flow_stats *push, struct reval_context *ctx,
+           bool need_revalidate)
+    OVS_REQUIRES(ukey->mutex)
+{
+    struct ofproto_dpif *ofproto;
+    ofp_port_t ofp_in_port;
+    struct xlate_in xin;
+    int error;
+
+    if (odp_flow_key_to_flow(ukey->key, ukey->key_len, &ctx->flow)
+        == ODP_FIT_ERROR) {
+        return EINVAL;
+    }
+
+    error = xlate_lookup(udpif->backer, &ctx->flow, &ofproto, NULL, NULL,
+                         ctx->netflow, &ofp_in_port);
+    if (error) {
+        return error;
+    }
+
+    if (need_revalidate) {
+        xlate_cache_clear(ukey->xcache);
+    }
+    if (!ukey->xcache) {
+        ukey->xcache = xlate_cache_new();
+    }
+
+    xlate_in_init(&xin, ofproto, ofproto_dpif_get_tables_version(ofproto),
+                  &ctx->flow, ofp_in_port, NULL, push->tcp_flags,
+                  NULL, need_revalidate ? ctx->wc : NULL, ctx->odp_actions);
+    if (push->n_packets) {
+        xin.resubmit_stats = push;
+        xin.allow_side_effects = true;
+    }
+    xin.xcache = ukey->xcache;
+    xlate_actions(&xin, &ctx->xout);
+
+    return 0;
+}
+
+
 /* Verifies that the datapath actions of 'ukey' are still correct, and pushes
  * 'stats' for it.
  *
@@ -1845,18 +1905,18 @@ revalidate_ukey(struct udpif *udpif, struct udpif_key *ukey,
                 struct recirc_refs *recircs)
     OVS_REQUIRES(ukey->mutex)
 {
-    struct xlate_out xout, *xoutp;
+    struct xlate_out *xoutp;
     struct netflow *netflow;
-    struct ofproto_dpif *ofproto;
     struct dpif_flow_stats push;
-    struct flow flow;
     struct flow_wildcards dp_mask, wc;
     enum reval_result result;
-    ofp_port_t ofp_in_port;
-    struct xlate_in xin;
     long long int last_used;
-    int error;
     bool need_revalidate;
+    struct reval_context ctx = {
+        .odp_actions = odp_actions,
+        .netflow = &netflow,
+        .wc = &wc,
+    };
 
     result = UKEY_DELETE;
     xoutp = NULL;
@@ -1892,48 +1952,24 @@ revalidate_ukey(struct udpif *udpif, struct udpif_key *ukey,
         goto exit;
     }
 
-    if (odp_flow_key_to_flow(ukey->key, ukey->key_len, &flow)
-        == ODP_FIT_ERROR) {
+    if (xlate_ukey(udpif, ukey, &push, &ctx, need_revalidate)) {
         goto exit;
     }
-
-    error = xlate_lookup(udpif->backer, &flow, &ofproto, NULL, NULL, &netflow,
-                         &ofp_in_port);
-    if (error) {
-        goto exit;
-    }
-
-    if (need_revalidate) {
-        xlate_cache_clear(ukey->xcache);
-    }
-    if (!ukey->xcache) {
-        ukey->xcache = xlate_cache_new();
-    }
-
-    xlate_in_init(&xin, ofproto, ofproto_dpif_get_tables_version(ofproto),
-                  &flow, ofp_in_port, NULL, push.tcp_flags,
-                  NULL, need_revalidate ? &wc : NULL, odp_actions);
-    if (push.n_packets) {
-        xin.resubmit_stats = &push;
-        xin.allow_side_effects = true;
-    }
-    xin.xcache = ukey->xcache;
-    xlate_actions(&xin, &xout);
-    xoutp = &xout;
+    xoutp = &ctx.xout;
 
     if (!need_revalidate) {
         result = UKEY_KEEP;
         goto exit;
     }
 
-    if (xout.slow) {
+    if (xoutp->slow) {
         ofpbuf_clear(odp_actions);
-        compose_slow_path(udpif, &xout, &flow, flow.in_port.odp_port,
+        compose_slow_path(udpif, xoutp, &ctx.flow, ctx.flow.in_port.odp_port,
                           odp_actions);
     }
 
     if (odp_flow_key_to_mask(ukey->mask, ukey->mask_len, ukey->key,
-                             ukey->key_len, &dp_mask, &flow)
+                             ukey->key_len, &dp_mask, &ctx.flow)
         == ODP_FIT_ERROR) {
         goto exit;
     }
@@ -1943,7 +1979,7 @@ revalidate_ukey(struct udpif *udpif, struct udpif_key *ukey,
      * tells that the datapath flow is now too generic and must be narrowed
      * down.  Note that we do not know if the datapath has ignored any of the
      * wildcarded bits, so we may be overtly conservative here. */
-    if (flow_wildcards_has_extra(&dp_mask, &wc)) {
+    if (flow_wildcards_has_extra(&dp_mask, ctx.wc)) {
         goto exit;
     }
 
@@ -1964,7 +2000,7 @@ exit:
         ukey->reval_seq = reval_seq;
     }
     if (netflow && result == UKEY_DELETE) {
-        netflow_flow_clear(netflow, &flow);
+        netflow_flow_clear(netflow, &ctx.flow);
     }
     xlate_out_uninit(xoutp);
     return result;
