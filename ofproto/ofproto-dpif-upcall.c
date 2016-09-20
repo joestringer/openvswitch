@@ -1825,6 +1825,7 @@ struct reval_context {
     struct flow_wildcards *wc;
     struct ofpbuf *odp_actions;
     struct netflow **netflow;
+    struct xlate_cache *xcache;
 
     /* Required output parameters */
     struct xlate_out xout;
@@ -1838,10 +1839,8 @@ struct reval_context {
  * The caller is responsible for uninitializing ctx->xout on success.
  */
 static int
-xlate_ukey(struct udpif *udpif, struct udpif_key *ukey,
-           const struct dpif_flow_stats *push, struct reval_context *ctx,
-           bool need_revalidate)
-    OVS_REQUIRES(ukey->mutex)
+xlate_ukey(struct udpif *udpif, const struct udpif_key *ukey,
+           const struct dpif_flow_stats *push, struct reval_context *ctx)
 {
     struct ofproto_dpif *ofproto;
     ofp_port_t ofp_in_port;
@@ -1859,21 +1858,14 @@ xlate_ukey(struct udpif *udpif, struct udpif_key *ukey,
         return error;
     }
 
-    if (need_revalidate) {
-        xlate_cache_clear(ukey->xcache);
-    }
-    if (!ukey->xcache) {
-        ukey->xcache = xlate_cache_new();
-    }
-
     xlate_in_init(&xin, ofproto, ofproto_dpif_get_tables_version(ofproto),
                   &ctx->flow, ofp_in_port, NULL, push->tcp_flags,
-                  NULL, need_revalidate ? ctx->wc : NULL, ctx->odp_actions);
+                  NULL, ctx->wc, ctx->odp_actions);
     if (push->n_packets) {
         xin.resubmit_stats = push;
         xin.allow_side_effects = true;
     }
-    xin.xcache = ukey->xcache;
+    xin.xcache = ctx->xcache;
     xlate_actions(&xin, &ctx->xout);
 
     return 0;
@@ -1905,17 +1897,17 @@ revalidate_ukey(struct udpif *udpif, struct udpif_key *ukey,
                 struct recirc_refs *recircs)
     OVS_REQUIRES(ukey->mutex)
 {
+    bool need_revalidate = (ukey->reval_seq != reval_seq);
     struct xlate_out *xoutp;
     struct netflow *netflow;
     struct dpif_flow_stats push;
     struct flow_wildcards dp_mask, wc;
     enum reval_result result;
     long long int last_used;
-    bool need_revalidate;
     struct reval_context ctx = {
         .odp_actions = odp_actions,
         .netflow = &netflow,
-        .wc = &wc,
+        .wc = need_revalidate ? &wc : NULL,
     };
 
     result = UKEY_DELETE;
@@ -1923,7 +1915,6 @@ revalidate_ukey(struct udpif *udpif, struct udpif_key *ukey,
     netflow = NULL;
 
     ofpbuf_clear(odp_actions);
-    need_revalidate = (ukey->reval_seq != reval_seq);
     last_used = ukey->stats.used;
     push.used = stats->used;
     push.tcp_flags = stats->tcp_flags;
@@ -1952,7 +1943,14 @@ revalidate_ukey(struct udpif *udpif, struct udpif_key *ukey,
         goto exit;
     }
 
-    if (xlate_ukey(udpif, ukey, &push, &ctx, need_revalidate)) {
+    if (need_revalidate) {
+        xlate_cache_clear(ukey->xcache);
+    }
+    if (!ukey->xcache) {
+        ukey->xcache = xlate_cache_new();
+    }
+    ctx.xcache = ukey->xcache;
+    if (xlate_ukey(udpif, ukey, &push, &ctx)) {
         goto exit;
     }
     xoutp = &ctx.xout;
