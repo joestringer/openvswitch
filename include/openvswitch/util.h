@@ -144,7 +144,9 @@ OVS_NO_RETURN void ovs_assert_failure(const char *, const char *, const char *);
 #define ARRAY_SIZE(ARRAY) __ARRAY_SIZE(ARRAY)
 
 /* Returns X / Y, rounding up.  X must be nonnegative to round correctly. */
+#ifndef DIV_ROUND_UP
 #define DIV_ROUND_UP(X, Y) (((X) + ((Y) - 1)) / (Y))
+#endif
 
 /* Returns X rounded up to the nearest multiple of Y. */
 #define ROUND_UP(X, Y) (DIV_ROUND_UP(X, Y) * (Y))
