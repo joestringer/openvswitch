@@ -421,6 +421,7 @@ static const struct tc_ops tc_ops_sfq;
 static const struct tc_ops tc_ops_default;
 static const struct tc_ops tc_ops_noop;
 static const struct tc_ops tc_ops_other;
+static const struct tc_ops tc_ops_clsact;
 
 static const struct tc_ops *const tcs[] = {
     &tc_ops_htb,                /* Hierarchy token bucket (see tc-htb(8)). */
@@ -431,6 +432,7 @@ static const struct tc_ops *const tcs[] = {
     &tc_ops_noop,               /* Non operating qos type. */
     &tc_ops_default,            /* Default qdisc (see tc-pfifo_fast(8)). */
     &tc_ops_other,              /* Some other qdisc. */
+    &tc_ops_clsact,             /* Classifier with nested action. */
     NULL
 };
 
@@ -442,6 +444,7 @@ static struct tcmsg *netdev_linux_tc_make_request(const struct netdev *,
                                                   int type,
                                                   unsigned int flags,
                                                   struct ofpbuf *);
+static int clsact_install__(struct netdev *netdev_);
 static int tc_add_policer(struct netdev *,
                           uint32_t kbits_rate, uint32_t kbits_burst);
 
@@ -4629,6 +4632,74 @@ static const struct tc_ops tc_ops_other = {
     0,                          /* n_queues */
     NULL,                       /* tc_install */
     other_tc_load,
+    NULL,                       /* tc_destroy */
+    NULL,                       /* qdisc_get */
+    NULL,                       /* qdisc_set */
+    NULL,                       /* class_get */
+    NULL,                       /* class_set */
+    NULL,                       /* class_delete */
+    NULL,                       /* class_get_stats */
+    NULL                        /* class_dump_stats */
+};
+
+/* "linux-clsact" traffic control class. */
+static int
+clsact_setup_qdisc(struct netdev *netdev)
+{
+    struct ofpbuf request;
+    struct tcmsg *tcmsg;
+
+    tcmsg = netdev_linux_tc_make_request(netdev, RTM_NEWQDISC,
+                                         NLM_F_EXCL | NLM_F_CREATE, &request);
+    if (!tcmsg) {
+        return ENODEV;
+    }
+    tcmsg->tcm_handle = tc_make_handle(0xFFFF, 0);
+    tcmsg->tcm_parent = TC_H_INGRESS;
+    nl_msg_put_string(&request, TCA_KIND, "clsact");
+    nl_msg_put_unspec(&request, TCA_OPTIONS, NULL, 0);
+
+    return tc_transact(&request, NULL);
+}
+
+static int
+clsact_install__(struct netdev *netdev_)
+{
+    static const struct tc tc = TC_INITIALIZER(&tc, &tc_ops_clsact);
+    struct netdev_linux *netdev = netdev_linux_cast(netdev_);
+    int error;
+
+    error = clsact_setup_qdisc(netdev_);
+    if (error) {
+        return error;
+    }
+
+    /* Nothing but a tc class implementation is allowed to write to a tc.  This
+     * class never does that, so we can legitimately use a const tc object. */
+    netdev->tc = CONST_CAST(struct tc *, &tc);
+
+    return 0;
+}
+
+static int
+clsact_tc_install(struct netdev *netdev,
+                   const struct smap *details OVS_UNUSED)
+{
+    return clsact_install__(netdev);
+}
+
+static int
+clsact_tc_load(struct netdev *netdev, struct ofpbuf *nlmsg OVS_UNUSED)
+{
+    return clsact_install__(netdev);
+}
+
+static const struct tc_ops tc_ops_clsact = {
+    "clsact",                   /* linux_name */
+    "linux-clsact",             /* ovs_name */
+    0,                          /* n_queues */
+    clsact_tc_install,
+    clsact_tc_load,
     NULL,                       /* tc_destroy */
     NULL,                       /* qdisc_get */
     NULL,                       /* qdisc_set */
