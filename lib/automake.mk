@@ -353,6 +353,8 @@ lib_libopenvswitch_la_SOURCES += \
 	lib/dpif-netlink.h \
 	lib/tc.h \
 	lib/tc.c \
+	lib/hw-offload-policy.c \
+	lib/hw-offload-policy.h \
 	lib/dpif-hw-acc.c \
 	lib/dpif-hw-acc.h \
 	lib/if-notifier.c \

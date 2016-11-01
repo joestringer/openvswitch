@@ -42,6 +42,8 @@
 #include "openvswitch/vlog.h"
 #include "netdev-provider.h"
 #include "dpif-hw-acc.h"
+#include "tc.h"
+#include "hw-offload-policy.h"
 
 VLOG_DEFINE_THIS_MODULE(dpif_hw_acc);
 

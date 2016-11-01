@@ -31,5 +31,4 @@ struct ufid_handle_hash_data {
     struct netdev *netdev;
     odp_port_t port;
 };
-
 #endif
