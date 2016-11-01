@@ -17,6 +17,8 @@ struct dpif_hw_acc {
     struct hmap mask_to_prio;
     
     uint16_t last_prio;
+    uint64_t n_last_hits;
+    uint64_t n_last_flows;
 };
 
 struct mask_prio_data {

@@ -432,6 +432,15 @@ dpif_hw_tc_flow_to_dpif_flow(struct dpif_hw_acc *dpif,
     nl_msg_put_be16(outflow, OVS_KEY_ATTR_ETHERTYPE, tc_flow->eth_type);
     nl_msg_put_be16(mask, OVS_KEY_ATTR_ETHERTYPE, 0xFFFF);
 
+    if (tc_flow->eth_type == htons(ETH_P_8021Q)) {
+        nl_msg_put_u16(outflow, OVS_KEY_ATTR_VLAN, ntohs(tc_flow->vlan_id | (tc_flow->vlan_prio << 13) | VLAN_CFI));
+        nl_msg_put_u16(mask, OVS_KEY_ATTR_VLAN, UINT16_MAX);
+
+        size_t nested_encap_offset = nl_msg_start_nested(outflow, OVS_KEY_ATTR_ENCAP);
+        nl_msg_put_be16(outflow, OVS_KEY_ATTR_ETHERTYPE, tc_flow->encap_eth_type);
+	nl_msg_end_nested(outflow, nested_encap_offset);
+    }
+
     /* OVS_KEY_ATTR_IPV6 */
     if (tc_flow->eth_type == ntohs(ETH_P_IPV6)) {
         struct ovs_key_ipv6 *ipv6 =
@@ -535,6 +544,16 @@ dpif_hw_tc_flow_to_dpif_flow(struct dpif_hw_acc *dpif,
 
     size_t actions_offset =
         nl_msg_start_nested(outflow, OVS_FLOW_ATTR_ACTIONS);
+
+    if (tc_flow->vlan_pop)
+        nl_msg_put_flag(outflow, OVS_ACTION_ATTR_POP_VLAN);
+
+    if (tc_flow->vlan_push_id || tc_flow->vlan_push_prio) {
+	struct ovs_action_push_vlan *push = nl_msg_put_unspec_zero(outflow, OVS_ACTION_ATTR_PUSH_VLAN, sizeof(*push));
+	push->vlan_tpid = ntohs(ETH_TYPE_VLAN);
+
+        push->vlan_tci = ntohs(tc_flow->vlan_push_id | (tc_flow->vlan_push_prio << 13) | VLAN_CFI);
+    }
     if (tc_flow->ifindex_out) {
         /* TODO:  make this faster */
         int ovsport = get_ovs_port(dpif, tc_flow->ifindex_out);
@@ -623,6 +642,9 @@ dpif_hw_acc_open(const struct dpif_class *class OVS_UNUSED,
     struct netdev *netdev;
     struct dpif_port dpif_port;
     struct dpif_port_dump dump;
+    struct dpif_flow_dump_thread *flow_dump_thread;
+    struct dpif_flow_dump *flow_dump;
+    struct dpif_flow f;
     int error = 0;
 
     VLOG_DBG("%s %d %s: parameters name %s, create: %s\n", __FILE__, __LINE__,
@@ -671,6 +693,12 @@ dpif_hw_acc_open(const struct dpif_class *class OVS_UNUSED,
                 port_add(dpif, dpif_port.port_no, netdev);
             }
         }
+
+	flow_dump = dpif_flow_dump_create(*dpifp, true);
+	flow_dump_thread = dpif_flow_dump_thread_create(flow_dump);
+	while (dpif_flow_dump_next(flow_dump_thread, &f, 1));
+	dpif_flow_dump_thread_destroy(flow_dump_thread);
+	dpif_flow_dump_destroy(flow_dump);
     }
     VLOG_DBG("%s %d %s(%p) port dump end.\n", __FILE__, __LINE__, __func__,
              dpif);
@@ -707,9 +735,13 @@ dpif_hw_acc_get_stats(const struct dpif *dpif_,
                           struct dpif_dp_stats *stats)
 {
     struct dpif_hw_acc *dpif = dpif_hw_acc_cast(dpif_);
+    int error;
 
-    return dpif->lp_dpif_netlink->dpif_class->get_stats(dpif->lp_dpif_netlink,
-                                                        stats);
+    error = dpif->lp_dpif_netlink->dpif_class->get_stats(dpif->lp_dpif_netlink, stats);
+    stats->n_hit += dpif->n_last_hits;
+    stats->n_flows += dpif->n_last_flows;
+    return error;
+
 }
 
 static int
@@ -835,58 +867,238 @@ dpif_hw_acc_flow_flush(struct dpif *dpif_)
         flow_flush(dpif->lp_dpif_netlink);
 }
 
+struct dpif_hw_acc_flow_dump {
+    struct dpif_flow_dump up;
+    struct dpif_flow_dump *netlink_dump;
+    struct nl_dump *flow_dumps;
+    int num_dumps;
+    int given;
+    struct ovs_mutex lock;
+    odp_port_t ports[32];
+    struct netdev *netdevs[32];
+    uint64_t n_hits;
+    uint64_t n_flows;
+};
+
+static struct dpif_hw_acc_flow_dump *
+dpif_hw_acc_flow_dump_cast(struct dpif_flow_dump *dump)
+{
+    return CONTAINER_OF(dump, struct dpif_hw_acc_flow_dump, up);
+}
+
 static struct dpif_flow_dump *
 dpif_hw_acc_flow_dump_create(const struct dpif *dpif_, bool terse)
 {
-    struct dpif_flow_dump *dump;
+    struct dpif_hw_acc_flow_dump *dump;
     struct dpif_hw_acc *dpif = dpif_hw_acc_cast(dpif_);
+    struct nl_dump *flow_dumps = 0;
+    int count = 0;
 
-    dump =
+    int num_ports = hmap_count(&dpif->port_to_netdev);
+
+    dump = xzalloc(sizeof *dump);
+    dpif_flow_dump_init(&dump->up, dpif_);
+    dump->up.terse = terse;
+
+    if (num_ports) {
+        flow_dumps = xmalloc(sizeof (struct nl_dump) * num_ports);
+
+        struct port_netdev_hash_data *data;
+
+        HMAP_FOR_EACH(data, node, &dpif->port_to_netdev) {
+            if (data->netdev) {
+                dump->ports[count] = data->port;
+                dump->netdevs[count] = data->netdev;
+
+                tc_dump_flower_start(netdev_get_ifindex(data->netdev),
+                                     &flow_dumps[count]);
+                count++;
+            }
+        }
+    }
+
+    dump->netlink_dump =
         dpif->lp_dpif_netlink->dpif_class->
         flow_dump_create(dpif->lp_dpif_netlink, terse);
-    dump->dpif = CONST_CAST(struct dpif *, dpif_);
-
-    return dump;
-
+    dump->flow_dumps = flow_dumps;
+    dump->num_dumps = count;
+    dump->given = 0;
+    ovs_mutex_init(&dump->lock);
+    return &dump->up;
 }
 
 static int
 dpif_hw_acc_flow_dump_destroy(struct dpif_flow_dump *dump_)
 {
+    int error;
+    struct dpif_hw_acc_flow_dump *dump =
+        dpif_hw_acc_flow_dump_cast(dump_);
     struct dpif_hw_acc *dpif = dpif_hw_acc_cast(dump_->dpif);
 
-    dump_->dpif = dpif->lp_dpif_netlink;
-    return dpif->lp_dpif_netlink->dpif_class->flow_dump_destroy(dump_);
+    dpif->n_last_hits = dump->n_hits;
+    dpif->n_last_flows = dump->n_flows;
+    int cur = 0;
+
+    for (cur = 0; cur < dump->num_dumps; cur++) {
+        struct nl_dump *nl_dump = &dump->flow_dumps[cur];
+
+        int ret = nl_dump_done(nl_dump);
+
+        if (ret != 0)
+            VLOG_ERR("nl_dump_done error  ret[%d]: %d\n", cur, ret);
+    }
+
+    error =
+        dpif->lp_dpif_netlink->dpif_class->
+        flow_dump_destroy(dump->netlink_dump);
+
+    if (dump->flow_dumps)
+        free(dump->flow_dumps);
+    free(dump);
+
+    return error;
+}
+
+struct dpif_hw_acc_flow_dump_thread {
+    struct dpif_flow_dump_thread up;
+    struct dpif_flow_dump_thread *netlink_thread;
+    struct dpif_hw_acc_flow_dump *dump;
+    struct ofpbuf nl_flows;
+    struct ofpbuf temp_buf;
+    int current_dump;
+    int flower_done;
+};
+
+static void
+dpif_hw_acc_get_next_dump(struct dpif_hw_acc_flow_dump_thread *thread)
+{
+    /* TODO:Consider changing to a atomc dump->given... */
+
+    struct dpif_hw_acc_flow_dump *dump = thread->dump;
+
+    ovs_mutex_lock(&dump->lock);
+    /* if we haven't finished (dumped everything) */
+    if (dump->given < dump->num_dumps) {
+        /* if we are the first to find that given dump is finished (for race
+         * condition, e.g 3 finish dump 0 at the same time) */
+        if (thread->current_dump == dump->given) {
+            thread->current_dump = ++dump->given;
+            /* did we just finish the last dump? done. */
+            if (dump->given == dump->num_dumps) {
+                thread->flower_done = 1;
+            }
+        } else
+            /* otherwise, we are behind, catch up */
+            thread->current_dump = dump->given;
+    } else {
+        /* some other thread finished */
+        thread->flower_done = 1;
+    }
+    ovs_mutex_unlock(&dump->lock);
 }
 
 static struct dpif_flow_dump_thread *
 dpif_hw_acc_flow_dump_thread_create(struct dpif_flow_dump *dump_)
 {
+    struct dpif_hw_acc_flow_dump *dump =
+        dpif_hw_acc_flow_dump_cast(dump_);
     struct dpif_hw_acc *dpif = dpif_hw_acc_cast(dump_->dpif);
+    struct dpif_hw_acc_flow_dump_thread *thread;
 
-    return dpif->lp_dpif_netlink->dpif_class->flow_dump_thread_create(dump_);
+    thread = xmalloc(sizeof *thread);
+    dpif_flow_dump_thread_init(&thread->up, &dump->up);
+    thread->netlink_thread =
+        dpif->lp_dpif_netlink->dpif_class->
+        flow_dump_thread_create(dump->netlink_dump);
+    thread->dump = dump;
 
+    /* 
+     * A thread can be created at any time, 
+     * so another thread might finish the dump already (and advance dump->given), 
+     * so we might be done before we even started. 
+     */
+
+    ovs_mutex_lock(&dump->lock);
+    thread->current_dump = dump->given;
+    thread->flower_done = dump->given < dump->num_dumps ? 0 : 1;
+    ovs_mutex_unlock(&dump->lock);
+
+    if (!thread->flower_done) {
+        ofpbuf_init(&thread->nl_flows, NL_DUMP_BUFSIZE);        /* TODO:
+                                                                 * uninit
+                                                                 * where? */
+        ofpbuf_init(&thread->temp_buf, NL_DUMP_BUFSIZE);
+    }
+    /* another option is setting current to -1, and calling get_next_dump, but 
+     * its kinda ugly */
+    return &thread->up;
+
+}
+
+static struct dpif_hw_acc_flow_dump_thread *
+dpif_hw_acc_flow_dump_thread_cast(struct dpif_flow_dump_thread *thread)
+{
+    return CONTAINER_OF(thread, struct dpif_hw_acc_flow_dump_thread, up);
 }
 
 static void
 dpif_hw_acc_flow_dump_thread_destroy(struct dpif_flow_dump_thread *thread_)
 {
     struct dpif_hw_acc *dpif = dpif_hw_acc_cast(thread_->dpif);
+    struct dpif_hw_acc_flow_dump_thread *thread
+        = dpif_hw_acc_flow_dump_thread_cast(thread_);
 
-    thread_->dpif = dpif->lp_dpif_netlink;
-    return dpif->lp_dpif_netlink->
-        dpif_class->flow_dump_thread_destroy(thread_);
+    dpif->lp_dpif_netlink->dpif_class->
+        flow_dump_thread_destroy(thread->netlink_thread);
+
+    free(thread);
 }
 
 static int
 dpif_hw_acc_flow_dump_next(struct dpif_flow_dump_thread *thread_,
                                struct dpif_flow *flows, int max_flows)
 {
-    struct dpif_hw_acc *dpif = dpif_hw_acc_cast(thread_->dpif);
+    struct dpif_hw_acc_flow_dump_thread *thread
+        = dpif_hw_acc_flow_dump_thread_cast(thread_);
+    struct dpif_hw_acc_flow_dump *dump = thread->dump;
+    struct dpif_hw_acc *dpif = dpif_hw_acc_cast(thread->up.dpif);
+    int n_flows = 0;
 
-    thread_->dpif = dpif->lp_dpif_netlink;
-    return dpif->lp_dpif_netlink->dpif_class->flow_dump_next(thread_, flows,
-                                                             max_flows);
+    while (!thread->flower_done && n_flows < max_flows) {
+        int cur = thread->current_dump;
+        odp_port_t inport = dump->ports[cur];
+        struct netdev *indev = dump->netdevs[cur];
+        struct ofpbuf nl_flow;
+        struct nl_dump *nl_dump = &dump->flow_dumps[cur];
+
+        if (nl_dump_next(nl_dump, &nl_flow, &thread->nl_flows)) {
+            struct tc_flow tc_flow;
+
+            if (parse_tc_flow(&nl_flow, &tc_flow))
+                continue;
+
+            /* if we got handle, convert netlink flow to dpif_flow */
+            if (tc_flow.handle) {
+                struct dpif_flow *dpif_flow = &flows[n_flows++];
+		 dpif_hw_tc_flow_to_dpif_flow(dpif, &tc_flow, dpif_flow,
+                                             inport, &thread->temp_buf, indev);
+
+		dump->n_hits += dpif_flow->stats.n_packets;
+	    }
+        } else
+            dpif_hw_acc_get_next_dump(thread);
+    }
+    dump->n_flows += n_flows;
+
+    /* if we got here, flower done or got to max flows if flow done and not
+     * got got max, call kernel datapath to dump remaining flows */
+    if (thread->flower_done && n_flows < max_flows) {
+        return n_flows +
+            dpif->lp_dpif_netlink->dpif_class->
+            flow_dump_next(thread->netlink_thread, flows + n_flows,
+                           max_flows - n_flows);
+    }
+    return n_flows;
 }
 
 static bool
