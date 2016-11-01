@@ -40,15 +40,305 @@
 #include "unaligned.h"
 #include "util.h"
 #include "openvswitch/vlog.h"
+#include "netdev-provider.h"
 #include "dpif-hw-acc.h"
 
 VLOG_DEFINE_THIS_MODULE(dpif_hw_acc);
+
+static char *
+printufid(const ovs_u128 * ovs_ufid)
+{
+    static char ufid[64];
+
+    if (ovs_ufid)
+        sprintf(ufid, "%x%x%x%x", ovs_ufid->u32[0], ovs_ufid->u32[1],
+                ovs_ufid->u32[2], ovs_ufid->u32[3]);
+    else
+        sprintf(ufid, "(missing_ufid)");
+    return ufid;
+}
+
+static inline size_t
+hash_ufid(const ovs_u128 * ovs_ufid)
+{
+    return hash_words64((const uint64_t *) ovs_ufid,
+                        sizeof *ovs_ufid / sizeof (uint64_t), 0);
+}
+
+static inline size_t
+hash_port(odp_port_t port)
+{
+    return hash_int((int) port, 0);
+}
+
+static inline size_t
+hash_handle_prio_port(int handle, uint16_t prio, odp_port_t port)
+{
+    /* TODO: fix utint cast */
+    return hash_int((uint32_t) prio, hash_int(handle, hash_port(port)));
+}
+
+static struct netdev *
+port_find(struct dpif_hw_acc *dpif, odp_port_t port)
+{
+    struct port_netdev_hash_data *data;
+    size_t hash = hash_port(port);
+    struct netdev *res = 0;
+
+    ovs_mutex_lock(&dpif->hash_mutex);
+    HMAP_FOR_EACH_WITH_HASH(data, node, hash, &dpif->port_to_netdev) {
+        if (data->port == port)
+            break;
+    }
+    if (data) {
+        res = data->netdev;
+        VLOG_DBG
+            ("found port mapping: port number %d -> port name %s (pointer: %p)\n",
+             port, res->name, res);
+    }
+    ovs_mutex_unlock(&dpif->hash_mutex);
+
+    return res;
+}
+
+static int
+port_del_name(struct dpif_hw_acc *dpif, char *name)
+{
+    struct port_netdev_hash_data *data;
+
+    ovs_mutex_lock(&dpif->hash_mutex);
+    HMAP_FOR_EACH(data, node, &dpif->port_to_netdev) {
+        if (!strcmp(data->netdev->name, name))
+            break;
+    }
+    if (data)
+        hmap_remove(&dpif->port_to_netdev, &data->node);
+    ovs_mutex_unlock(&dpif->hash_mutex);
+
+    free(data);
+    return data ? 1 : 0;
+}
+
+static int
+port_del(struct dpif_hw_acc *dpif, odp_port_t port)
+{
+    struct port_netdev_hash_data *data;
+    size_t hash = hash_port(port);
+
+    ovs_mutex_lock(&dpif->hash_mutex);
+    HMAP_FOR_EACH_WITH_HASH(data, node, hash, &dpif->port_to_netdev) {
+        if (data->port == port)
+            break;
+    }
+    if (data)
+        hmap_remove(&dpif->port_to_netdev, &data->node);
+    ovs_mutex_unlock(&dpif->hash_mutex);
+
+    free(data);
+    return data ? 1 : 0;
+}
+
+static int
+port_add(struct dpif_hw_acc *dpif, odp_port_t port, struct netdev *netdev)
+{
+    struct port_netdev_hash_data *data;
+    size_t hash = hash_port(port);
+    int ret = 0;
+
+    if (!netdev || !netdev->name || !port)
+        return -1;
+
+    if (netdev->netdev_class == &netdev_internal_class) {
+        if (!strcmp(netdev->name, "skip_hw")) {
+            tc_set_skip_hw(true);
+        }
+        return -1;
+    }
+    if (port_del(dpif, port) || port_del_name(dpif, netdev->name)) {
+        VLOG_DBG
+            ("%s %d %s (%p)  port number %d name: %s, deleted to be replaced\n",
+             __FILE__, __LINE__, __func__, dpif, port, netdev->name);
+        ret = 1;
+    }
+
+    data = malloc(sizeof (struct port_netdev_hash_data));
+    data->netdev = netdev;
+    data->port = port;
+
+    VLOG_DBG
+        ("%s %d %s (%p): adding new port mapping: %d -> netdev %p name: %s, type: %s, ifindex: %d, hash: %lu\n",
+         __FILE__, __LINE__, __func__, dpif, port, netdev, netdev->name,
+         netdev->netdev_class->type, netdev_get_ifindex(netdev), hash);
+    ovs_mutex_lock(&dpif->hash_mutex);
+    hmap_insert(&dpif->port_to_netdev, &data->node, hash);
+    ovs_mutex_unlock(&dpif->hash_mutex);
+    return ret;
+}
+
+static int
+delhandle(struct dpif_hw_acc *dpif, const ovs_u128 * ovs_ufid)
+{
+    struct ufid_handle_hash_data *data;
+    size_t hash;
+
+    if (!ovs_ufid) {
+        VLOG_ERR("%s %d %s (%p) can't delete missing ufid\n", __FILE__,
+                 __LINE__, __func__, dpif);
+        return 0;
+    }
+    hash = hash_ufid(ovs_ufid);
+
+    VLOG_DBG("%s %d %s (%p): removing %s\n", __FILE__, __LINE__, __func__,
+             dpif, printufid(ovs_ufid));
+
+    ovs_mutex_lock(&dpif->hash_mutex);
+    HMAP_FOR_EACH_WITH_HASH(data, node_ufid, hash, &dpif->ufid_to_handle) {
+        if (!memcmp(&data->ovs_ufid, ovs_ufid, sizeof (*ovs_ufid)))
+            break;
+    }
+    if (data) {
+        VLOG_DBG("%s %d %s (%p)  ufid %s found! handle: %d, removing it\n",
+                 __FILE__, __LINE__, __func__, dpif, printufid(ovs_ufid),
+                 data->handle);
+        hmap_remove(&dpif->ufid_to_handle, &data->node_ufid);
+        hmap_remove(&dpif->handle_to_ufid, &data->node_handle);
+        free(data);
+    }
+    ovs_mutex_unlock(&dpif->hash_mutex);
+    return data ? 1 : 0;
+}
+
+static int
+puthandle(struct dpif_hw_acc *dpif, const ovs_u128 * ovs_ufid,
+          struct netdev *in, odp_port_t port, int handle, uint16_t prio)
+{
+    int ret = 0;
+    size_t hash_to_ufid = hash_handle_prio_port(handle, prio, port);
+
+    if (!ovs_ufid) {
+        VLOG_ERR("%s %d %s (%p) missing UFID!\n", __FILE__, __LINE__, __func__,
+                 dpif);
+        return 0;
+    }
+
+    if (delhandle(dpif, ovs_ufid))
+        ret = 1;
+
+    struct ufid_handle_hash_data *data =
+        malloc(sizeof (struct ufid_handle_hash_data));
+    data->ovs_ufid = *ovs_ufid;
+    data->handle = handle;
+    data->netdev = in;
+    data->port = port;
+    data->prio = prio;
+
+    ovs_mutex_lock(&dpif->hash_mutex);
+    hmap_insert(&dpif->ufid_to_handle, &data->node_ufid, hash_ufid(ovs_ufid));
+    hmap_insert(&dpif->handle_to_ufid, &data->node_handle, hash_to_ufid);
+    VLOG_DBG
+        ("%s %d %s (%p) added mapping %s <-> (handle: %d, prio: %d, port: %d, indev: %p)\n",
+         __FILE__, __LINE__, __func__, dpif, printufid(ovs_ufid), handle,
+         prio, port, in);
+    ovs_mutex_unlock(&dpif->hash_mutex);
+    return ret;
+}
+
+static ovs_u128 *
+findufid(struct dpif_hw_acc *dpif, odp_port_t port, int handle,
+         uint16_t prio)
+{
+    struct ufid_handle_hash_data *data;
+    size_t hash = hash_handle_prio_port(handle, prio, port);
+
+    VLOG_DBG
+        ("%s %d %s (%p) finding ufid of (handle: %d,  prio: %d,  port: %d), hash: %lu\n",
+         __FILE__, __LINE__, __func__, dpif, handle, prio, port, hash);
+
+    ovs_mutex_lock(&dpif->hash_mutex);
+    HMAP_FOR_EACH_WITH_HASH(data, node_handle, hash, &dpif->handle_to_ufid) {
+        if (data->handle == handle && data->port == port
+            && data->prio == prio)
+            break;
+    }
+    ovs_mutex_unlock(&dpif->hash_mutex);
+
+    return data ? &data->ovs_ufid : 0;
+}
+
+static int
+gethandle(struct dpif_hw_acc *dpif, const ovs_u128 * ovs_ufid,
+          struct netdev **in, uint16_t *prio, const char *func, int print)
+{
+    struct ufid_handle_hash_data *data;
+    int handle = 0;
+    size_t hash = 0;
+
+    if (in)
+        *in = 0;
+
+    if (!ovs_ufid) {
+        VLOG_DBG("%s %d %s (%p) called by %s without a ufid.\n", __FILE__,
+                 __LINE__, __func__, dpif, func);
+        return 0;
+    } else
+        hash = hash_ufid(ovs_ufid);
+
+    if (print)
+        VLOG_DBG("%s %d %s (%p) called by %s to find ufid %s\n", __FILE__,
+                 __LINE__, __func__, dpif, func, printufid(ovs_ufid));
+
+    ovs_mutex_lock(&dpif->hash_mutex);
+    HMAP_FOR_EACH_WITH_HASH(data, node_ufid, hash, &dpif->ufid_to_handle) {
+        if (!memcmp(&data->ovs_ufid, ovs_ufid, sizeof (*ovs_ufid)))
+            break;
+    }
+    ovs_mutex_unlock(&dpif->hash_mutex);
+
+    if (data && (!data->handle || !data->netdev || !data->prio)) {
+        VLOG_ERR
+            ("mising handle/dev/prio for ufid: %s, handle: %d, netdev: %p, prio: %d\n",
+             printufid(ovs_ufid), data->handle, data->netdev, data->prio);
+        return 0;
+    }
+    handle = data ? data->handle : 0;
+    if (in)
+        *in = data ? data->netdev : 0;
+    if (prio)
+        *prio = data ? data->prio : 0;
+    if (print && handle)
+        VLOG_DBG("found ufid: %s, handle: %d, prio: %d, netdev: %p\n",
+                 printufid(ovs_ufid), handle, data->prio, data->netdev);
+    return handle;
+}
+
+static int
+get_ovs_port(struct dpif_hw_acc *dpif, int ifindex)
+{
+    struct port_netdev_hash_data *data;
+
+    HMAP_FOR_EACH(data, node, &dpif->port_to_netdev) {
+        if (netdev_get_ifindex(data->netdev) == ifindex) {
+            return data->port;
+        }
+    }
+    return -1;
+}
 
 static struct dpif_hw_acc *
 dpif_hw_acc_cast(const struct dpif *dpif)
 {
     dpif_assert_class(dpif, &dpif_hw_acc_class);
     return CONTAINER_OF(dpif, struct dpif_hw_acc, dpif);
+}
+
+static int
+initmaps(struct dpif_hw_acc *dpif)
+{
+    hmap_init(&dpif->port_to_netdev);
+    hmap_init(&dpif->ufid_to_handle);
+    hmap_init(&dpif->handle_to_ufid);
+    ovs_mutex_init(&dpif->hash_mutex);
+    return 0;
 }
 
 static int
@@ -74,6 +364,8 @@ dpif_hw_acc_open(const struct dpif_class *class OVS_UNUSED,
         }
     }
     dpif = xzalloc(sizeof *dpif);
+
+    initmaps(dpif);
 
     *CONST_CAST(const char **, &dpif->name) = xstrdup(name);
     uint16_t netflow_id = hash_string(dpif->name, 0);
