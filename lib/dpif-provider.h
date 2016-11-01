@@ -427,6 +427,7 @@ struct dpif_class {
 
 extern const struct dpif_class dpif_netlink_class;
 extern const struct dpif_class dpif_netdev_class;
+extern const struct dpif_class dpif_hw_acc_class;
 
 #ifdef  __cplusplus
 }
