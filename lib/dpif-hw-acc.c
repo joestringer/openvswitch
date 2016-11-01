@@ -48,6 +48,76 @@
 
 VLOG_DEFINE_THIS_MODULE(dpif_hw_acc);
 
+extern bool SKIP_HW;
+
+static inline void *
+nla_data(const struct nlattr *nla)
+{
+    return (char *) nla + NLA_HDRLEN;
+}
+
+static char *
+attrname(int type)
+{
+    static char unkowntype[64];
+
+    switch (type) {
+    case OVS_KEY_ATTR_ENCAP:
+        return "OVS_KEY_ATTR_ENCAP";
+    case OVS_KEY_ATTR_PRIORITY:
+        return "OVS_KEY_ATTR_PRIORITY";
+    case OVS_KEY_ATTR_CT_LABELS:
+        return "OVS_KEY_ATTR_CT_LABELS";
+    case OVS_KEY_ATTR_IN_PORT:
+        return "OVS_KEY_ATTR_IN_PORT";
+    case OVS_KEY_ATTR_ETHERNET:
+        return "OVS_KEY_ATTR_ETHERNET";
+    case OVS_KEY_ATTR_VLAN:
+        return "OVS_KEY_ATTR_VLAN";
+    case OVS_KEY_ATTR_ETHERTYPE:
+        return "OVS_KEY_ATTR_ETHERTYPE";
+    case OVS_KEY_ATTR_IPV4:
+        return "OVS_KEY_ATTR_IPV4";
+    case OVS_KEY_ATTR_IPV6:
+        return "OVS_KEY_ATTR_IPV6";
+    case OVS_KEY_ATTR_TCP:
+        return "OVS_KEY_ATTR_TCP";
+    case OVS_KEY_ATTR_UDP:
+        return "OVS_KEY_ATTR_UDP";
+    case OVS_KEY_ATTR_ICMP:
+        return "OVS_KEY_ATTR_ICMP";
+    case OVS_KEY_ATTR_ICMPV6:
+        return "OVS_KEY_ATTR_ICMPV6";
+    case OVS_KEY_ATTR_ARP:
+        return "OVS_KEY_ATTR_ARP";
+    case OVS_KEY_ATTR_ND:
+        return "OVS_KEY_ATTR_ND";
+    case OVS_KEY_ATTR_SKB_MARK:
+        return "OVS_KEY_ATTR_SKB_MARK";
+    case OVS_KEY_ATTR_TUNNEL:
+        return "OVS_KEY_ATTR_TUNNEL";
+    case OVS_KEY_ATTR_SCTP:
+        return "OVS_KEY_ATTR_SCTP";
+    case OVS_KEY_ATTR_TCP_FLAGS:
+        return "OVS_KEY_ATTR_TCP_FLAGS";
+    case OVS_KEY_ATTR_DP_HASH:
+        return "OVS_KEY_ATTR_DP_HASH";
+    case OVS_KEY_ATTR_RECIRC_ID:
+        return "OVS_KEY_ATTR_RECIRC_ID";
+    case OVS_KEY_ATTR_MPLS:
+        return "OVS_KEY_ATTR_MPLS";
+    case OVS_KEY_ATTR_CT_STATE:
+        return "OVS_KEY_ATTR_CT_STATE";
+    case OVS_KEY_ATTR_CT_ZONE:
+        return "OVS_KEY_ATTR_CT_ZONE";
+    case OVS_KEY_ATTR_CT_MARK:
+        return "OVS_KEY_ATTR_CT_MARK";
+    default:
+        sprintf(unkowntype, "unkown_type(%d)\n", type);
+        return unkowntype;
+    }
+}
+
 static char *
 printufid(const ovs_u128 * ovs_ufid)
 {
@@ -539,6 +609,7 @@ initmaps(struct dpif_hw_acc *dpif)
     hmap_init(&dpif->port_to_netdev);
     hmap_init(&dpif->ufid_to_handle);
     hmap_init(&dpif->handle_to_ufid);
+    hmap_init(&dpif->mask_to_prio);
     ovs_mutex_init(&dpif->hash_mutex);
     return 0;
 }
@@ -818,13 +889,759 @@ dpif_hw_acc_flow_dump_next(struct dpif_flow_dump_thread *thread_,
                                                              max_flows);
 }
 
+static bool
+odp_mask_attr_is_wildcard(const struct nlattr *ma)
+{
+    return is_all_zeros(nl_attr_get(ma), nl_attr_get_size(ma));
+}
+
+static bool
+odp_mask_is_exact(enum ovs_key_attr attr, const void *mask, size_t size)
+{
+    if (attr == OVS_KEY_ATTR_TCP_FLAGS) {
+        return TCP_FLAGS(*(ovs_be16 *) mask) == TCP_FLAGS(OVS_BE16_MAX);
+    }
+    if (attr == OVS_KEY_ATTR_IPV6) {
+        const struct ovs_key_ipv6 *ipv6_mask = mask;
+
+        return ((ipv6_mask->ipv6_label & htonl(IPV6_LABEL_MASK))
+                == htonl(IPV6_LABEL_MASK))
+            && ipv6_mask->ipv6_proto == UINT8_MAX
+            && ipv6_mask->ipv6_tclass == UINT8_MAX
+            && ipv6_mask->ipv6_hlimit == UINT8_MAX
+            && ipv6_mask->ipv6_frag == UINT8_MAX
+            && ipv6_mask_is_exact((const struct in6_addr *)
+                                  ipv6_mask->ipv6_src)
+            && ipv6_mask_is_exact((const struct in6_addr *)
+                                  ipv6_mask->ipv6_dst);
+    }
+    if (attr == OVS_KEY_ATTR_TUNNEL) {
+        return false;
+    }
+
+    if (attr == OVS_KEY_ATTR_ARP) {
+        /* ARP key has padding, ignore it. */
+        BUILD_ASSERT_DECL(sizeof (struct ovs_key_arp) == 24);
+        BUILD_ASSERT_DECL(offsetof(struct ovs_key_arp, arp_tha) == 10 + 6);
+        size = offsetof(struct ovs_key_arp, arp_tha) + ETH_ADDR_LEN;
+
+        ovs_assert(((uint16_t *) mask)[size / 2] == 0);
+    }
+
+    return is_all_ones(mask, size);
+}
+
+static bool
+odp_mask_attr_is_exact(const struct nlattr *ma)
+{
+    enum ovs_key_attr attr = nl_attr_type(ma);
+    const void *mask;
+    size_t size;
+
+    if (attr == OVS_KEY_ATTR_TUNNEL) {
+        return false;
+    } else {
+        mask = nl_attr_get(ma);
+        size = nl_attr_get_size(ma);
+    }
+
+    return odp_mask_is_exact(attr, mask, size);
+}
+
+static int
+parse_to_tc_flow(struct dpif_hw_acc *dpif, struct tc_flow *tc_flow,
+                 const struct nlattr *key, int key_len,
+                 const struct nlattr *key_mask, int key_mask_len)
+{
+    size_t left;
+    const struct nlattr *a;
+    const struct nlattr *mask[__OVS_KEY_ATTR_MAX] = { 0 };
+
+    VLOG_DBG("parsing mask:\n");
+    NL_ATTR_FOR_EACH_UNSAFE(a, left, key_mask, key_mask_len) {
+        mask[nl_attr_type(a)] = a;
+    }
+
+    VLOG_DBG("parsing key attributes:\n");
+    NL_ATTR_FOR_EACH_UNSAFE(a, left, key, key_len) {
+        const struct nlattr *ma = mask[nl_attr_type(a)];
+        bool is_wildcard = false;
+        bool is_exact = true;
+
+        if (key_mask && key_mask_len) {
+            is_wildcard = ma ? odp_mask_attr_is_wildcard(ma) : true;
+            is_exact = ma ? odp_mask_attr_is_exact(ma) : false;
+        }
+
+        if (is_exact)
+            VLOG_DBG("mask: %s exact: %p\n", attrname(nl_attr_type(a)), ma);
+        else if (is_wildcard)
+            VLOG_DBG("mask: %s wildcard: %p\n", attrname(nl_attr_type(a)), ma);
+        else
+            VLOG_DBG("mask %s is partial, ma: %p\n", attrname(nl_attr_type(a)),
+                     ma);
+
+        switch (nl_attr_type(a)) {
+        case OVS_KEY_ATTR_UNSPEC:
+        case OVS_KEY_ATTR_PRIORITY:
+        case OVS_KEY_ATTR_SKB_MARK:
+        case OVS_KEY_ATTR_CT_STATE:
+        case OVS_KEY_ATTR_CT_ZONE:
+        case OVS_KEY_ATTR_CT_MARK:
+        case OVS_KEY_ATTR_CT_LABELS:
+        case OVS_KEY_ATTR_ND:
+        case OVS_KEY_ATTR_MPLS:
+        case OVS_KEY_ATTR_DP_HASH:
+        case OVS_KEY_ATTR_TUNNEL:
+        case OVS_KEY_ATTR_SCTP:
+        case OVS_KEY_ATTR_ICMP:
+        case OVS_KEY_ATTR_ARP:
+        case OVS_KEY_ATTR_ICMPV6:;
+            if (is_wildcard) {
+                VLOG_DBG("unsupported key attribute: %s is wildcard\n",
+                         attrname(nl_attr_type(a)));
+                break;
+            }
+            VLOG_ERR("unsupported key attribute: %s is not wildcard\n",
+                     attrname(nl_attr_type(a)));
+            return 1;
+            break;
+
+        case OVS_KEY_ATTR_TCP_FLAGS:
+        case OVS_KEY_ATTR_RECIRC_ID:
+            /* IGNORE this attributes for now, (might disable some of it in
+             * probe? */
+            VLOG_DBG
+                ("ignoring attribute %s -- fix me, exact: %s, wildcard: %s, partial: %s\n",
+                 attrname(nl_attr_type(a)), is_exact ? "yes" : "no",
+                 is_wildcard ? "yes" : "no", (!is_wildcard
+                                              && !is_exact) ? "yes" : "no");
+            break;
+
+        case OVS_KEY_ATTR_VLAN:{
+		ovs_be16 tci = nl_attr_get_be16(a);
+		ovs_be16 tci_mask = ma ? nl_attr_get_be16(ma) : OVS_BE16_MAX;
+		if (vlan_tci_to_vid(tci_mask) != VLAN_VID_MASK) {
+			/* Partially masked. */
+			VLOG_ERR("unsupported partial mask on vlan_vid attribute");
+			return 1;
+		}
+		VLOG_DBG("vid=%"PRIu16, vlan_tci_to_vid(tci));
+		tc_flow->vlan_id = vlan_tci_to_vid(tci);
+		if (vlan_tci_to_pcp(tci_mask) != (VLAN_PCP_MASK >> VLAN_PCP_SHIFT)) {
+			/* Partially masked. */
+			VLOG_ERR("unsupported partial mask on vlan_pcp attribute");
+			return 1;
+		}
+		VLOG_DBG("pcp/prio=%"PRIu16, vlan_tci_to_pcp(tci));
+		tc_flow->vlan_prio = vlan_tci_to_pcp(tci);
+                if (!(tci & htons(VLAN_CFI))) {
+			VLOG_ERR("unsupported partial mask on vlan cfi=0  attribute");
+			return 1;
+		}
+	}
+	break;
+        case OVS_KEY_ATTR_ENCAP:{
+		VLOG_DBG("ENCAP!\n.");
+		const struct nlattr *nested_encap = nl_attr_get(a);
+		const size_t encap_len = nl_attr_get_size(a);
+		const struct nlattr *nested_encap_mask = nl_attr_get(ma);
+		const size_t nested_encap_mask_len = nl_attr_get_size(ma);
+		struct tc_flow encap_flow;
+
+		int nested_cant_offload = parse_to_tc_flow(dpif, &encap_flow,
+                                                           nested_encap, encap_len,
+                                                           nested_encap_mask,
+                                                           nested_encap_mask_len);
+		VLOG_DBG("end of ENCAP!\n.");
+		if (nested_cant_offload) return 1;
+		tc_flow->encap_ip_proto = encap_flow.ip_proto;
+		tc_flow->encap_eth_type = encap_flow.eth_type;
+		memcpy(&tc_flow->encap_ipv4, &encap_flow.ipv4,
+                      (sizeof(encap_flow.ipv4) > sizeof(encap_flow.ipv6)?
+                           sizeof(encap_flow.ipv4) : sizeof(encap_flow.ipv6)));
+		VLOG_DBG("encap_eth_type(0x%x)", encap_flow.eth_type);
+		VLOG_DBG("encap ip proto (%d)", encap_flow.ip_proto);
+	}
+	break;
+
+        case OVS_KEY_ATTR_IN_PORT:{
+                if (!is_exact) {
+                    VLOG_ERR("%s isn't exact, can't offload!\n",
+                             attrname(nl_attr_type(a)));
+                    return 1;
+                }
+
+                VLOG_DBG("in_port(%d)\n", nl_attr_get_u32(a));
+                tc_flow->ovs_inport = nl_attr_get_u32(a);
+                tc_flow->indev = port_find(dpif, tc_flow->ovs_inport);
+                tc_flow->ifindex =
+                    tc_flow->indev ? netdev_get_ifindex(tc_flow->indev) : 0;
+                if (!tc_flow->ovs_inport || !tc_flow->ifindex) {
+                    VLOG_ERR
+                        ("RESULT: not found inport: %d or ifindex: %d for ovs in_port: %d\n",
+                         tc_flow->ovs_inport, tc_flow->ifindex,
+                         tc_flow->ovs_inport);
+                    return 1;
+                }
+            }
+            break;
+
+        case OVS_KEY_ATTR_ETHERNET:{
+                const struct ovs_key_ethernet *eth_key = 0;
+                struct ovs_key_ethernet full_mask;
+
+                memset(&full_mask, 0xFF, sizeof (full_mask));
+
+		/* TODO: fix masks on mac address (because of HW syndrome 0x3ad328) */
+                ma = 0;
+
+                const struct ovs_key_ethernet *eth_key_mask =
+                    ma ? nla_data(ma) : &full_mask;
+                eth_key = nla_data(a);
+
+                const struct eth_addr *src = &eth_key->eth_src;
+                const struct eth_addr *src_mask = &eth_key_mask->eth_src;
+                const struct eth_addr *dst = &eth_key->eth_dst;
+                const struct eth_addr *dst_mask = &eth_key_mask->eth_dst;
+
+                memcpy(&tc_flow->src_mac, src, sizeof (tc_flow->src_mac));
+                memcpy(&tc_flow->src_mac_mask, src_mask,
+                       sizeof (tc_flow->src_mac_mask));
+                memcpy(&tc_flow->dst_mac, dst, sizeof (tc_flow->dst_mac));
+                memcpy(&tc_flow->dst_mac_mask, dst_mask,
+                       sizeof (tc_flow->dst_mac_mask));
+
+                VLOG_DBG("eth(src=" ETH_ADDR_FMT ", src_mask=" ETH_ADDR_FMT
+                         ", dst=" ETH_ADDR_FMT ", dst_mask=" ETH_ADDR_FMT "\n",
+                         ETH_ADDR_ARGS(tc_flow->src_mac),
+                         ETH_ADDR_ARGS(tc_flow->src_mac_mask),
+                         ETH_ADDR_ARGS(tc_flow->dst_mac),
+                         ETH_ADDR_ARGS(tc_flow->dst_mac_mask));
+            }
+            break;
+        case OVS_KEY_ATTR_ETHERTYPE:{
+                if (!is_exact) {
+                    VLOG_ERR("attribute %s isn't exact, can't offload!\n",
+                             attrname(nl_attr_type(a)));
+                    return 1;
+                }
+
+                tc_flow->eth_type = nl_attr_get_be16(a);
+                VLOG_DBG("eth_type(0x%04x)\n", ntohs(tc_flow->eth_type));
+            }
+            break;
+	case OVS_KEY_ATTR_IPV6:{
+                const struct ovs_key_ipv6 *ipv6 = nla_data(a);
+                struct ovs_key_ipv6 full_mask;
+
+                memset(&full_mask, 0xFF, sizeof (full_mask));
+                const struct ovs_key_ipv6 *ipv6_mask =
+                    ma ? nla_data(ma) : &full_mask;
+
+                if (ipv6_mask->ipv6_frag) {	
+                    VLOG_WARN
+                        ("*** ignoring exact or partial mask on unsupported ipv6_frag, mask: %x",
+                         ipv6_mask->ipv6_frag);
+                }
+		if (ipv6_mask->ipv6_tclass || ipv6_mask->ipv6_hlimit || ipv6_mask->ipv6_label) {	
+                    VLOG_ERR
+                        ("ipv6 mask exact or partial one of unsupported sub attributes (tclass: %x, hlimit: %x, label: %x)\n",
+                         ipv6_mask->ipv6_tclass, ipv6_mask->ipv6_hlimit,
+                         ipv6_mask->ipv6_label);
+                    return 1;
+		}
+                if (ipv6_mask->ipv6_proto != 0
+                    && ipv6_mask->ipv6_proto != 0xFF) {
+                    VLOG_WARN
+                        ("*** ignoring partial mask on ipv6_proto, taking exact ip_proto: %d (%x)\n",
+                         ipv6_mask->ipv6_proto, ipv6->ipv6_proto);
+                }
+                /* If not wildcard out, take exact match for ipv6_proto
+                 * (ignoring mask) */
+                if (ipv6_mask->ipv6_proto != 0)
+                    tc_flow->ip_proto = ipv6->ipv6_proto;
+
+		memcpy(tc_flow->ipv6.ipv6_src, ipv6->ipv6_src, sizeof(ipv6->ipv6_src));
+		memcpy(tc_flow->ipv6.ipv6_src_mask, ipv6_mask->ipv6_src, sizeof(ipv6_mask->ipv6_src));
+
+		memcpy(tc_flow->ipv6.ipv6_dst, ipv6->ipv6_dst, sizeof(ipv6->ipv6_dst));
+		memcpy(tc_flow->ipv6.ipv6_dst_mask, ipv6_mask->ipv6_dst, sizeof(ipv6_mask->ipv6_dst));
+	    }
+            break;
+        case OVS_KEY_ATTR_IPV4:{
+                const struct ovs_key_ipv4 *ipv4 = nla_data(a);
+                struct ovs_key_ipv4 full_mask;
+
+                memset(&full_mask, 0xFF, sizeof (full_mask));
+                const struct ovs_key_ipv4 *ipv4_mask =
+                    ma ? nla_data(ma) : &full_mask;
+
+                if (ipv4_mask->ipv4_frag) {
+                    VLOG_WARN
+                        ("*** ignoring exact or partial mask on unsupported ipv4_frag, mask: %x",
+                         ipv4_mask->ipv4_frag);
+                }
+
+                if (ipv4_mask->ipv4_ttl || ipv4_mask->ipv4_tos) {
+                    VLOG_ERR
+                        ("ipv4 mask exact or partial one of unsupported sub attributes (ttl: %x, tos: %x, frag: %x)\n",
+                         ipv4_mask->ipv4_ttl, ipv4_mask->ipv4_tos,
+                         ipv4_mask->ipv4_frag);
+                    return 1;
+                }
+
+                if (ipv4_mask->ipv4_proto != 0
+                    && ipv4_mask->ipv4_proto != 0xFF) {
+                    VLOG_WARN
+                        ("*** ignoring partial mask on ipv4_proto, taking exact ip_proto: %d (%x)\n",
+                         ipv4_mask->ipv4_proto, ipv4->ipv4_proto);
+                }
+
+                /* If not wildcard out, take exact match for ipv4_proto
+                 * (ignoring mask) */
+                if (ipv4_mask->ipv4_proto != 0)
+                    tc_flow->ip_proto = ipv4->ipv4_proto;
+
+                if (ipv4_mask->ipv4_src) {
+                    tc_flow->ipv4.ipv4_src = ipv4->ipv4_src;
+                    tc_flow->ipv4.ipv4_src_mask = ipv4_mask->ipv4_src;
+                }
+                if (ipv4_mask->ipv4_dst) {
+                    tc_flow->ipv4.ipv4_dst = ipv4->ipv4_dst;
+                    tc_flow->ipv4.ipv4_dst_mask = ipv4_mask->ipv4_dst;
+                }
+            }
+            break;
+        case OVS_KEY_ATTR_TCP:{
+                struct ovs_key_tcp full_mask;
+
+                memset(&full_mask, 0xFF, sizeof (full_mask));
+                const struct ovs_key_tcp *tcp_mask =
+                    ma ? nla_data(ma) : &full_mask;
+                const struct ovs_key_tcp *tcp = nla_data(a);
+
+                if (tcp_mask->tcp_src) {
+                    tc_flow->src_port = tcp->tcp_src;
+                    tc_flow->src_port_mask = tcp_mask->tcp_src;
+                }
+                if (tcp_mask->tcp_dst) {
+                    tc_flow->dst_port = tcp->tcp_dst;
+                    tc_flow->dst_port_mask = tcp_mask->tcp_dst;
+                }
+
+                VLOG_DBG("tcp(src=%d, msk: 0x%x, dst=%d, msk: 0x%x)\n",
+                         htons(tcp->tcp_src), htons(tcp_mask->tcp_src),
+                         htons(tcp->tcp_dst), htons(tcp_mask->tcp_dst));
+            }
+            break;
+        case OVS_KEY_ATTR_UDP:{
+                struct ovs_key_udp full_mask;
+
+                memset(&full_mask, 0xFF, sizeof (full_mask));
+                const struct ovs_key_udp *udp_mask =
+                    ma ? nla_data(ma) : &full_mask;
+                const struct ovs_key_udp *udp = nla_data(a);
+
+                if (udp_mask->udp_src) {
+                    tc_flow->src_port = udp->udp_src;
+                    tc_flow->src_port_mask = udp_mask->udp_src;
+                }
+                if (udp_mask->udp_dst) {
+                    tc_flow->dst_port = udp->udp_dst;
+                    tc_flow->dst_port_mask = udp_mask->udp_dst;
+                }
+                VLOG_DBG("udp(src=%d/0x%x, dst=%d/0x%x)\n",
+                         htons(udp->udp_src), htons(udp_mask->udp_src),
+                         htons(udp->udp_dst), htons(udp_mask->udp_dst));
+            }
+            break;
+
+        case __OVS_KEY_ATTR_MAX:
+        default:
+            VLOG_ERR("unknown (default/max) key attribute: %s\n",
+                     attrname(nl_attr_type(a)));
+            return 1;
+        }
+    }
+    VLOG_DBG("--- finished parsing attr - can offload!\n");
+    return 0;
+
+}
+
+#define PRIO_ADD_TO_HASH(var) \
+do { \
+    hash_mask = hash_bytes(&var, sizeof(var), hash_mask); \
+    memcpy(&buf[i], &var, sizeof(var)); \
+    i+= sizeof(var); \
+} while (0)
+
+static uint16_t 
+get_new_prio(struct dpif_hw_acc *dpif, struct tc_flow *tc_flow) 
+{
+   struct mask_prio_data *data;
+   size_t hash_mask = 0;
+   char buf[128];
+   size_t i = 0;
+  
+   memset(buf, 0, sizeof(buf));
+
+   PRIO_ADD_TO_HASH(tc_flow->dst_mac_mask);
+   PRIO_ADD_TO_HASH(tc_flow->src_mac_mask);
+
+   PRIO_ADD_TO_HASH(tc_flow->src_port_mask);
+   PRIO_ADD_TO_HASH(tc_flow->dst_port_mask);
+
+   PRIO_ADD_TO_HASH(tc_flow->encap_ipv4.ipv4_src_mask);
+   PRIO_ADD_TO_HASH(tc_flow->encap_ipv4.ipv4_dst_mask);
+
+   PRIO_ADD_TO_HASH(tc_flow->encap_ipv6.ipv6_src_mask);
+   PRIO_ADD_TO_HASH(tc_flow->encap_ipv6.ipv6_dst_mask);
+
+   PRIO_ADD_TO_HASH(tc_flow->ipv4.ipv4_src_mask);
+   PRIO_ADD_TO_HASH(tc_flow->ipv4.ipv4_dst_mask);
+
+   PRIO_ADD_TO_HASH(tc_flow->ipv6.ipv6_src_mask);
+   PRIO_ADD_TO_HASH(tc_flow->ipv6.ipv6_dst_mask);
+
+   PRIO_ADD_TO_HASH(tc_flow->eth_type);
+
+   ovs_mutex_lock(&dpif->hash_mutex);
+   HMAP_FOR_EACH_WITH_HASH(data, node, hash_mask, &dpif->mask_to_prio) {
+       if (data->data && data->len == i &&
+               !memcmp(buf, data->data, data->len)) {
+                ovs_mutex_unlock(&dpif->hash_mutex);
+                return data->prio; 
+        }
+   }
+   
+   struct mask_prio_data *data_mask = malloc(sizeof(struct mask_prio_data)); 
+   memcpy(data_mask->data, buf, i);
+   data_mask->len = i;
+   data_mask->prio = ++dpif->last_prio;
+   hmap_insert(&dpif->mask_to_prio, &data_mask->node, hash_mask);
+   ovs_mutex_unlock(&dpif->hash_mutex);
+
+   return data_mask->prio;
+}
+
+static enum dpif_hw_offload_policy
+parse_flow_put(struct dpif_hw_acc *dpif, struct dpif_flow_put *put)
+{
+
+/*
+ * if this is a modify flow cmd and the policy changed: 
+ * 	delete the old one
+ * handle the new/modify flow
+ *
+ *
+*/
+    const struct nlattr *a;
+    size_t left;
+    struct netdev *in = 0;
+    enum dpif_hw_offload_policy policy;
+
+    int probe_feature = ((put->flags & DPIF_FP_PROBE) ? 1 : 0);
+
+    if (probe_feature) {
+        VLOG_DBG("\n.\nPROBE REQUEST!\n.\n");
+        /* see usage at dpif_probe_feature, we might want to intercept and
+         * disable some features */
+        return DPIF_HW_NO_OFFLAOAD;
+    }
+    int cmd =
+        put->flags & DPIF_FP_CREATE ? OVS_FLOW_CMD_NEW : OVS_FLOW_CMD_SET;
+    if (!put->ufid) {
+        VLOG_INFO
+            ("%s %d %s missing ufid for flow put, might be from dpctl add-flow.",
+             __FILE__, __LINE__, __func__);
+    }
+
+    policy = HW_offload_test_put(dpif, put);
+    uint16_t getprio = 0;
+    int handle = gethandle(dpif, put->ufid, &in, &getprio, "DPIF_OP_FLOW_PUT", 1);
+
+    if (policy == DPIF_HW_NO_OFFLAOAD)
+        return DPIF_HW_NO_OFFLAOAD;
+
+    if (cmd == OVS_FLOW_CMD_NEW)
+        VLOG_DBG("cmd is OVS_FLOW_CMD_NEW - create\n");
+    else
+        VLOG_DBG("cmd is OVS_FLOW_CMD_SET - modify\n");
+
+    if (put->flags & DPIF_FP_ZERO_STATS && cmd == OVS_FLOW_CMD_SET)
+        VLOG_WARN
+            ("We need to zero the stats of a modified flow, not implemented, ignored\n");
+
+    if (put->stats)
+        VLOG_WARN("FLOW PUT WANTS STATS\n");
+
+    /* if not present, and cmd == OVS_FLOW_CMD_SET, means don't modify ACTIONs 
+     * (which we wrongly parse as a drop rule) see include/odp-netlink.h +:490
+     * to clear actions with OVS_FLOW_CMD_SET, actions will be present but
+     * empty */
+    if (!put->key) {
+        VLOG_ERR("%s %d %s error ,missing key, cmd: %d!", __FILE__, __LINE__,
+                 __func__, cmd);
+        return DPIF_HW_NO_OFFLAOAD;
+    }
+    if (!put->actions) {
+        if (cmd == OVS_FLOW_CMD_SET) {
+            VLOG_WARN
+                ("%s %d %s missing actions on cmd modify, find and modify key only",
+                 __FILE__, __LINE__, __func__);
+            return DPIF_HW_NO_OFFLAOAD;
+        }
+    }
+
+    int outport_count = 0;
+
+    VLOG_DBG("parsing actions\n");
+    NL_ATTR_FOR_EACH_UNSAFE(a, left, put->actions, put->actions_len) {
+        if (nl_attr_type(a) == OVS_ACTION_ATTR_OUTPUT) {
+            VLOG_DBG("output to port: %d\n", nl_attr_get_u32(a));
+            outport_count++;
+        }
+    }
+    if (outport_count == 0)
+        VLOG_DBG("output to port: drop\n");
+
+    struct ds ds;
+
+    ds_init(&ds);
+    ds_clear(&ds);
+    if (put->ufid) {
+        odp_format_ufid(put->ufid, &ds);
+        ds_put_cstr(&ds, ", ");
+    }
+
+    ds_put_cstr(&ds, "verbose: ");
+    odp_flow_format(put->key, put->key_len, put->mask, put->mask_len, 0, &ds,
+                    true);
+    ds_put_cstr(&ds, ", not_verbose: ");
+    odp_flow_format(put->key, put->key_len, put->mask, put->mask_len, 0, &ds,
+                    false);
+
+    /* can also use dpif_flow_stats_format(&f->stats, ds) to print stats */
+
+    ds_put_cstr(&ds, ", actions:");
+    format_odp_actions(&ds, put->actions, put->actions_len);
+    VLOG_DBG("%s\n", ds_cstr(&ds));
+    ds_destroy(&ds);
+
+    /* parse tc_flow */
+    struct tc_flow tc_flow;
+
+    memset(&tc_flow, 0, sizeof (tc_flow));
+    tc_flow.handle = handle;
+    int cant_offload =
+        parse_to_tc_flow(dpif, &tc_flow, put->key, put->key_len, put->mask,
+                         put->mask_len);
+
+    int new = handle ? 0 : 1;
+
+    VLOG_DBG
+        ("cant_offload: %d ifindex: %d, eth_type: %x, ip_proto: %d,  outport_count: %d\n",
+         cant_offload, tc_flow.ifindex, ntohs(tc_flow.eth_type),
+         tc_flow.ip_proto, outport_count);
+    if (!cant_offload && tc_flow.ifindex && tc_flow.eth_type
+        && outport_count <= 1) {
+        uint16_t prio = get_new_prio(dpif, &tc_flow);
+
+        VLOG_DBG("RESULT: %p, ***** offloading (HW_ONLY!), prio: %d\n", dpif, prio);
+        if (cmd != OVS_FLOW_CMD_NEW && !handle) {
+            /* modify and flow is now offloadable, remove from kernel netlink
+             * datapath */
+            int error =
+                dpif_flow_del(dpif->lp_dpif_netlink, put->key, put->key_len,
+                              put->ufid, PMD_ID_NULL, NULL);
+
+            if (!error)
+                VLOG_DBG("modify, deleted old flow and offloading new\n");
+            else
+                VLOG_ERR("modify, error: %d\n", error);
+        }
+
+        int error = 0;
+
+        outport_count = 0;
+	/* TODO: actions_len = 0 <=> drop rule */
+        NL_ATTR_FOR_EACH_UNSAFE(a, left, put->actions, put->actions_len) {
+            if (nl_attr_type(a) == OVS_ACTION_ATTR_OUTPUT) {
+                outport_count++;
+
+                tc_flow.ovs_outport = nl_attr_get_u32(a);
+                tc_flow.outdev = port_find(dpif, tc_flow.ovs_outport);
+                tc_flow.ifindex_out =
+                    tc_flow.outdev ? netdev_get_ifindex(tc_flow.outdev) : 0;
+                if (tc_flow.ifindex_out) {
+                    VLOG_DBG
+                        (" **** handle: %d, new? %d, adding %d -> %d (ifindex: %d -> %d)\n",
+                         tc_flow.handle, new, tc_flow.ovs_inport,
+                         tc_flow.ovs_outport, tc_flow.ifindex,
+                         tc_flow.ifindex_out);
+        
+                    int error = tc_replace_flower(&tc_flow, prio);
+
+                    if (!error) {
+                        if (new)
+                            puthandle(dpif, put->ufid, tc_flow.indev,
+                                      tc_flow.ovs_inport, tc_flow.handle,
+                                      tc_flow.prio);
+
+                        VLOG_DBG(" **** offloaded! handle: %d (%x)\n",
+                                 tc_flow.handle, tc_flow.handle);
+                    } else
+                        VLOG_ERR
+                            (" **** error! adding fwd rule! tc error: %d\n",
+                             error);
+                } else {
+                    VLOG_ERR
+                        (" **** error! not found output port %d, ifindex: %d\n",
+                         tc_flow.ovs_outport, tc_flow.ifindex_out);
+                    break;
+                }
+            }
+            else if (nl_attr_type(a) == OVS_ACTION_ATTR_PUSH_VLAN) {
+		const struct ovs_action_push_vlan *vlan_push = nl_attr_get(a);
+		tc_flow.vlan_push_id = vlan_tci_to_vid(vlan_push->vlan_tci);
+		tc_flow.vlan_push_prio = vlan_tci_to_pcp(vlan_push->vlan_tci);
+	    }
+	    else if (nl_attr_type(a) == OVS_ACTION_ATTR_POP_VLAN) {
+		tc_flow.vlan_pop = 1;
+	    }
+	    else {
+		VLOG_ERR("Unsupported output type!\n");
+		return DPIF_HW_NO_OFFLAOAD;
+	    }
+        }
+        if (!outport_count) {
+            VLOG_DBG
+                (" ***** handle: %d, new? %d, adding %d -> DROP (ifindex: %d -> DROP)\n",
+                 tc_flow.handle, new, tc_flow.ovs_inport, tc_flow.ifindex);
+            error = tc_replace_flower(&tc_flow, prio);
+            if (!error) {
+                if (new)
+                    puthandle(dpif, put->ufid, tc_flow.indev,
+                              tc_flow.ovs_inport, tc_flow.handle,
+                              tc_flow.prio);
+
+                VLOG_DBG(" **** offloaded! handle: %d (%x)\n", tc_flow.handle,
+                         tc_flow.handle);
+            } else
+                VLOG_ERR(" **** error adding drop rule! tc error: %d\n",
+                         error);
+        }
+
+        if (error)
+            return DPIF_HW_NO_OFFLAOAD;
+        return DPIF_HW_OFFLOAD_ONLY;
+    }
+
+    VLOG_DBG("RESULT: SW\n");
+
+    return DPIF_HW_NO_OFFLAOAD;
+}
+
+static enum dpif_hw_offload_policy
+parse_flow_get(struct dpif_hw_acc *dpif, struct dpif_flow_get *get)
+{
+    struct netdev *in = 0;
+    uint16_t prio = 0;
+    int handle =
+        gethandle(dpif, get->ufid, &in, &prio, "DPIF_OP_FLOW_GET", 1);
+
+    if (handle && prio) {
+        struct tc_flow tc_flow;
+        int ifindex = netdev_get_ifindex(in);
+        int ovs_port = get_ovs_port(dpif, ifindex);
+        int error = ENOENT;
+
+        if (ovs_port != -1)
+            error = tc_get_flower(ifindex, handle, prio, &tc_flow);
+
+        if (!error) {
+            dpif_hw_tc_flow_to_dpif_flow(dpif, &tc_flow, get->flow, ovs_port,
+                                         get->buffer, in);
+            return DPIF_HW_OFFLOAD_ONLY;
+        }
+    }
+
+    return DPIF_HW_NO_OFFLAOAD;
+}
+
+static enum dpif_hw_offload_policy
+parse_flow_del(struct dpif_hw_acc *dpif, struct dpif_flow_del *del)
+{
+    struct netdev *in = 0;
+    uint16_t prio = 0;
+    int handle =
+        gethandle(dpif, del->ufid, &in, &prio, "DPIF_OP_FLOW_DEL", 1);
+
+    /* we delete the handle anyway (even if not deleted from tc) */
+    delhandle(dpif, del->ufid);
+
+    if (handle && prio) {
+        int ifindex = netdev_get_ifindex(in);
+
+        VLOG_DBG("deleting ufid %s, handle %d, prio: %d, ifindex: %d\n",
+                 printufid(del->ufid), handle, prio, ifindex);
+        int error = tc_del_flower(ifindex, handle, prio);
+
+        if (error)
+            VLOG_ERR("DELETE FAILED: tc error: %d\n", error);
+        else
+            VLOG_DBG("DELETE SUCCESS!\n");
+
+        if (error)
+            return DPIF_HW_NO_OFFLAOAD;
+
+        return DPIF_HW_OFFLOAD_ONLY;
+    }
+
+    VLOG_DBG("del with no handle/ufid/prio, SW only\n");
+    return DPIF_HW_NO_OFFLAOAD;
+}
+
+static enum dpif_hw_offload_policy
+parse_operate(struct dpif_hw_acc *dpif, struct dpif_op *op)
+{
+    switch (op->type) {
+    case DPIF_OP_FLOW_PUT:
+        VLOG_DBG("DPIF_OP_FLOW_PUT");
+        return parse_flow_put(dpif, &op->u.flow_put);
+    case DPIF_OP_FLOW_GET:
+        VLOG_DBG("DPIF_OP_FLOW_GET");
+        return parse_flow_get(dpif, &op->u.flow_get);
+    case DPIF_OP_FLOW_DEL:
+        VLOG_DBG("DPIF_OP_FLOW_DEL");
+        return parse_flow_del(dpif, &op->u.flow_del);
+
+    case DPIF_OP_EXECUTE:
+    default:
+        return DPIF_HW_NO_OFFLAOAD;
+    }
+    return DPIF_HW_NO_OFFLAOAD;
+}
+
 static void
 dpif_hw_acc_operate(struct dpif *dpif_, struct dpif_op **ops, size_t n_ops)
 {
     struct dpif_hw_acc *dpif = dpif_hw_acc_cast(dpif_);
 
-    return dpif->lp_dpif_netlink->dpif_class->operate(dpif->lp_dpif_netlink,
-                                                      ops, n_ops);
+    struct dpif_op **new_ops = xmalloc(sizeof (struct dpif_op *) * n_ops);
+    int n_new_ops = 0;
+    int i = 0;
+
+    for (i = 0; i < n_ops; i++) {
+        if (parse_operate(dpif, ops[i]) == DPIF_HW_OFFLOAD_ONLY) {
+            ops[i]->error = 0;
+        } else
+            new_ops[n_new_ops++] = ops[i];
+    }
+    dpif->lp_dpif_netlink->dpif_class->operate(dpif->lp_dpif_netlink, new_ops,
+                                               n_new_ops);
+    free(new_ops);
 }
 
 static int
