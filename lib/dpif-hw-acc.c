@@ -579,6 +579,31 @@ dpif_hw_acc_open(const struct dpif_class *class OVS_UNUSED,
 
     *dpifp = &dpif->dpif;
 
+    if (!create) {
+        VLOG_DBG
+            ("%s %d %s(%p) requesting existing port dump, from dpif-netlink only.\n",
+             __FILE__, __LINE__, __func__, dpif);
+        DPIF_PORT_FOR_EACH(&dpif_port, &dump, dpif->lp_dpif_netlink) {
+            VLOG_DBG("%s %d %s(%p) port: %s, type: %s\n", __FILE__, __LINE__,
+                     __func__, dpif, dpif_port.name, dpif_port.type);
+            if (dpif_port.type && !strcmp(dpif_port.type, "internal")) {
+                if (!strcmp(dpif_port.name, "skip_hw")) {
+                    tc_set_skip_hw(true);
+                }
+                continue;
+            }
+            if (!netdev_open(dpif_port.name, dpif_port.type, &netdev)) {
+                VLOG_DBG
+                    ("%s %d %s(%p) opened a new netdev: %s, type: %s, ifindex: %d\n",
+                     __FILE__, __LINE__, __func__, dpif, netdev->name,
+                     netdev->netdev_class->type, netdev_get_ifindex(netdev));
+                port_add(dpif, dpif_port.port_no, netdev);
+            }
+        }
+    }
+    VLOG_DBG("%s %d %s(%p) port dump end.\n", __FILE__, __LINE__, __func__,
+             dpif);
+
     return 0;
 }
 
@@ -620,19 +645,35 @@ static int
 dpif_hw_acc_port_add(struct dpif *dpif_, struct netdev *netdev,
                          odp_port_t * port_nop)
 {
+    int error;
     struct dpif_hw_acc *dpif = dpif_hw_acc_cast(dpif_);
 
-    return dpif->lp_dpif_netlink->dpif_class->port_add(dpif->lp_dpif_netlink,
-                                                       netdev, port_nop);
+    VLOG_DBG("%s %d %s (%p): request to add  netdev: %s\n", __FILE__, __LINE__,
+             __func__, dpif, netdev->name);
+    error =
+        dpif->lp_dpif_netlink->dpif_class->port_add(dpif->lp_dpif_netlink,
+                                                    netdev, port_nop);
+    if (!error)
+        port_add(dpif, *port_nop, netdev);
+    else
+        VLOG_ERR("%s %d %s (%p): failed to add port\n", __FILE__, __LINE__,
+                 __func__, dpif);
+
+    return error;
 }
 
 static int
 dpif_hw_acc_port_del(struct dpif *dpif_, odp_port_t port_no)
 {
+    int error;
     struct dpif_hw_acc *dpif = dpif_hw_acc_cast(dpif_);
 
-    return dpif->lp_dpif_netlink->dpif_class->port_del(dpif->lp_dpif_netlink,
-                                                       port_no);
+    error =
+        dpif->lp_dpif_netlink->dpif_class->port_del(dpif->lp_dpif_netlink,
+                                                    port_no);
+    if (!error)
+        port_del(dpif, port_no);
+    return error;
 }
 
 static int
