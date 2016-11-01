@@ -10,6 +10,7 @@
 #include <net/if.h>
 #include <linux/types.h>
 #include <linux/pkt_sched.h>
+#include <linux/if_ether.h>
 #include <poll.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -324,6 +325,205 @@ get_ovs_port(struct dpif_hw_acc *dpif, int ifindex)
         }
     }
     return -1;
+}
+
+static int
+dpif_hw_tc_flow_to_dpif_flow(struct dpif_hw_acc *dpif,
+                             struct tc_flow *tc_flow,
+                             struct dpif_flow *dpif_flow, odp_port_t inport,
+                             struct ofpbuf *outflow, struct netdev *indev)
+{
+    struct ofpbuf mask_d, *mask = &mask_d;
+
+    ofpbuf_init(mask, 512);
+
+    dpif_flow->pmd_id = PMD_ID_NULL;
+
+    size_t key_offset = nl_msg_start_nested(outflow, OVS_FLOW_ATTR_KEY);
+    size_t mask_offset = nl_msg_start_nested(mask, OVS_FLOW_ATTR_MASK);
+
+    nl_msg_put_u32(outflow, OVS_KEY_ATTR_IN_PORT, inport);
+    nl_msg_put_u32(mask, OVS_KEY_ATTR_IN_PORT, 0xFFFFFFFF);
+
+    /* OVS_KEY_ATTR_ETHERNET */
+    struct ovs_key_ethernet *eth_key =
+        nl_msg_put_unspec_uninit(outflow, OVS_KEY_ATTR_ETHERNET,
+                                 sizeof (*eth_key));
+    struct ovs_key_ethernet *eth_key_mask =
+        nl_msg_put_unspec_uninit(mask, OVS_KEY_ATTR_ETHERNET,
+                                 sizeof (*eth_key_mask));
+
+    memset(eth_key_mask, 0xFF, sizeof (*eth_key_mask));
+    eth_key->eth_src = tc_flow->src_mac;
+    eth_key->eth_dst = tc_flow->dst_mac;
+    eth_key_mask->eth_src = tc_flow->src_mac_mask;
+    eth_key_mask->eth_dst = tc_flow->dst_mac_mask;
+
+    nl_msg_put_be16(outflow, OVS_KEY_ATTR_ETHERTYPE, tc_flow->eth_type);
+    nl_msg_put_be16(mask, OVS_KEY_ATTR_ETHERTYPE, 0xFFFF);
+
+    /* OVS_KEY_ATTR_IPV6 */
+    if (tc_flow->eth_type == ntohs(ETH_P_IPV6)) {
+        struct ovs_key_ipv6 *ipv6 =
+            nl_msg_put_unspec_uninit(outflow, OVS_KEY_ATTR_IPV6,
+                                     sizeof (*ipv6));
+        struct ovs_key_ipv6 *ipv6_mask =
+            nl_msg_put_unspec_zero(mask, OVS_KEY_ATTR_IPV6,
+                                   sizeof (*ipv6_mask));
+
+        memset(&ipv6_mask->ipv6_proto, 0xFF, sizeof (ipv6_mask->ipv6_proto));
+        if (tc_flow->ip_proto) ipv6->ipv6_proto = tc_flow->ip_proto;
+	else ipv6_mask->ipv6_proto = 0;
+        ipv6_mask->ipv6_frag = 0;
+
+	memcpy(ipv6->ipv6_src, tc_flow->ipv6.ipv6_src, sizeof(tc_flow->ipv6.ipv6_src));
+	memcpy(ipv6_mask->ipv6_src, tc_flow->ipv6.ipv6_src_mask, sizeof(tc_flow->ipv6.ipv6_src_mask));
+	memcpy(ipv6->ipv6_dst, tc_flow->ipv6.ipv6_dst, sizeof(tc_flow->ipv6.ipv6_dst));
+	memcpy(ipv6_mask->ipv6_dst, tc_flow->ipv6.ipv6_dst_mask, sizeof(tc_flow->ipv6.ipv6_dst_mask));
+    }
+    /* OVS_KEY_ATTR_IPV4 */
+    if (tc_flow->eth_type == ntohs(ETH_P_IP)) {
+        struct ovs_key_ipv4 *ipv4 =
+            nl_msg_put_unspec_uninit(outflow, OVS_KEY_ATTR_IPV4,
+                                     sizeof (*ipv4));
+        struct ovs_key_ipv4 *ipv4_mask =
+            nl_msg_put_unspec_zero(mask, OVS_KEY_ATTR_IPV4,
+                                   sizeof (*ipv4_mask));
+
+        memset(&ipv4_mask->ipv4_proto, 0xFF, sizeof (ipv4_mask->ipv4_proto));
+        if (tc_flow->ip_proto) ipv4->ipv4_proto = tc_flow->ip_proto;
+	else ipv4_mask->ipv4_proto = 0;
+        ipv4_mask->ipv4_frag = 0;
+
+	if (tc_flow->ipv4.ipv4_src)
+		ipv4->ipv4_src = tc_flow->ipv4.ipv4_src;
+	if (tc_flow->ipv4.ipv4_src_mask)
+		ipv4_mask->ipv4_src = tc_flow->ipv4.ipv4_src_mask;
+	if (tc_flow->ipv4.ipv4_dst)
+		ipv4->ipv4_dst = tc_flow->ipv4.ipv4_dst;
+	if (tc_flow->ipv4.ipv4_dst_mask)
+		ipv4_mask->ipv4_dst = tc_flow->ipv4.ipv4_dst_mask;
+    }
+    if (tc_flow->ip_proto == IPPROTO_ICMPV6) {
+	    /* putting a masked out icmp */
+	    struct ovs_key_icmpv6 *icmp =
+		    nl_msg_put_unspec_uninit(outflow, OVS_KEY_ATTR_ICMPV6,
+				    sizeof (*icmp));
+	    struct ovs_key_icmpv6 *icmp_mask =
+		    nl_msg_put_unspec_uninit(mask, OVS_KEY_ATTR_ICMPV6,
+				    sizeof (*icmp_mask));
+
+	    icmp->icmpv6_type = 0;
+	    icmp->icmpv6_code = 0;
+	    memset(icmp_mask, 0, sizeof (*icmp_mask));
+    }
+    if (tc_flow->ip_proto == IPPROTO_ICMP) {
+	    /* putting a masked out icmp */
+	    struct ovs_key_icmp *icmp =
+		    nl_msg_put_unspec_uninit(outflow, OVS_KEY_ATTR_ICMP,
+				    sizeof (*icmp));
+	    struct ovs_key_icmp *icmp_mask =
+		    nl_msg_put_unspec_uninit(mask, OVS_KEY_ATTR_ICMP,
+				    sizeof (*icmp_mask));
+
+	    icmp->icmp_type = 0;
+	    icmp->icmp_code = 0;
+	    memset(icmp_mask, 0, sizeof (*icmp_mask));
+    }
+    if (tc_flow->ip_proto == IPPROTO_TCP) {
+	    struct ovs_key_tcp *tcp =
+		    nl_msg_put_unspec_uninit(outflow, OVS_KEY_ATTR_TCP,
+				    sizeof (*tcp));
+	    struct ovs_key_tcp *tcp_mask =
+		    nl_msg_put_unspec_uninit(mask, OVS_KEY_ATTR_TCP,
+				    sizeof (*tcp_mask));
+
+	    memset(tcp_mask, 0x00, sizeof (*tcp_mask));
+
+	    tcp->tcp_src = tc_flow->src_port;
+	    tcp_mask->tcp_src = tc_flow->src_port_mask;
+	    tcp->tcp_dst = tc_flow->dst_port;
+	    tcp_mask->tcp_dst = tc_flow->dst_port_mask;
+    }
+    if (tc_flow->ip_proto == IPPROTO_UDP) {
+	    struct ovs_key_udp *udp =
+		    nl_msg_put_unspec_uninit(outflow, OVS_KEY_ATTR_UDP,
+				    sizeof (*udp));
+	    struct ovs_key_udp *udp_mask =
+		    nl_msg_put_unspec_uninit(mask, OVS_KEY_ATTR_UDP,
+				    sizeof (*udp_mask));
+
+	    memset(udp_mask, 0xFF, sizeof (*udp_mask));
+
+	    udp->udp_src = tc_flow->src_port;
+	    udp_mask->udp_src = tc_flow->src_port_mask;
+	    udp->udp_dst = tc_flow->dst_port;
+	    udp_mask->udp_dst = tc_flow->dst_port_mask;
+    }
+    nl_msg_end_nested(outflow, key_offset);
+    nl_msg_end_nested(mask, mask_offset);
+
+    size_t actions_offset =
+        nl_msg_start_nested(outflow, OVS_FLOW_ATTR_ACTIONS);
+    if (tc_flow->ifindex_out) {
+        /* TODO:  make this faster */
+        int ovsport = get_ovs_port(dpif, tc_flow->ifindex_out);
+
+        nl_msg_put_u32(outflow, OVS_ACTION_ATTR_OUTPUT, ovsport);
+    }
+    nl_msg_end_nested(outflow, actions_offset);
+
+    struct nlattr *mask_attr =
+        ofpbuf_at_assert(mask, mask_offset, sizeof *mask_attr);
+    void *mask_data = ofpbuf_put_uninit(outflow, mask_attr->nla_len);
+
+    memcpy(mask_data, mask_attr, mask_attr->nla_len);
+    mask_attr = mask_data;
+
+    struct nlattr *key_attr =
+        ofpbuf_at_assert(outflow, key_offset, sizeof *key_attr);
+    struct nlattr *actions_attr =
+        ofpbuf_at_assert(outflow, actions_offset, sizeof *actions_attr);
+
+    dpif_flow->key = nl_attr_get(key_attr);
+    dpif_flow->key_len = nl_attr_get_size(key_attr);
+    dpif_flow->mask = nl_attr_get(mask_attr);
+    dpif_flow->mask_len = nl_attr_get_size(mask_attr);
+    dpif_flow->actions = nl_attr_get(actions_attr);
+    dpif_flow->actions_len = nl_attr_get_size(actions_attr);
+
+    if (tc_flow->stats.n_packets.hi || tc_flow->stats.n_packets.lo) {
+        dpif_flow->stats.used = tc_flow->lastused ? tc_flow->lastused : 0;
+        dpif_flow->stats.n_packets =
+            get_32aligned_u64(&tc_flow->stats.n_packets);
+        dpif_flow->stats.n_bytes = get_32aligned_u64(&tc_flow->stats.n_bytes);
+    } else {
+        dpif_flow->stats.used = 0;
+        dpif_flow->stats.n_packets = 0;
+        dpif_flow->stats.n_bytes = 0;
+    }
+    dpif_flow->stats.tcp_flags = 0;
+
+    dpif_flow->ufid_present = false;
+
+    ovs_u128 *ovs_ufid =
+        findufid(dpif, inport, tc_flow->handle, tc_flow->prio);
+    if (ovs_ufid) {
+        VLOG_DBG("Found UFID!, handle: %d, ufid: %s\n", tc_flow->handle,
+                 printufid(ovs_ufid));
+        dpif_flow->ufid = *ovs_ufid;
+        dpif_flow->ufid_present = true;
+    } else {
+        VLOG_DBG("Creating new UFID\n");
+        ovs_assert(dpif_flow->key && dpif_flow->key_len);
+        dpif_flow_hash(&dpif->dpif, dpif_flow->key, dpif_flow->key_len,
+                       &dpif_flow->ufid);
+        dpif_flow->ufid_present = true;
+        puthandle(dpif, &dpif_flow->ufid, indev, inport, tc_flow->handle,
+                  tc_flow->prio);
+    }
+
+    return 0;
 }
 
 static struct dpif_hw_acc *
