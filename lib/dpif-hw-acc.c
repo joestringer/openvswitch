@@ -862,7 +862,19 @@ static int
 dpif_hw_acc_flow_flush(struct dpif *dpif_)
 {
     struct dpif_hw_acc *dpif = dpif_hw_acc_cast(dpif_);
+    struct port_netdev_hash_data *data;
 
+    VLOG_DBG("%s %d %s, (%p) flush start\n", __FILE__, __LINE__, __func__,
+             dpif);
+    HMAP_FOR_EACH(data, node, &dpif->port_to_netdev) {
+        if (data->netdev) {
+            VLOG_DBG("%s %d %s, (%p) flusing port: %d, netdev: %p\n", __FILE__,
+                     __LINE__, __func__, dpif, data->port, data->netdev);
+            tc_flush_flower(netdev_get_ifindex(data->netdev));
+        }
+    }
+
+    VLOG_DBG("%s %d %s, (%p) flush end\n", __FILE__, __LINE__, __func__, dpif);
     return dpif->lp_dpif_netlink->dpif_class->
         flow_flush(dpif->lp_dpif_netlink);
 }
