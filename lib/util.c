@@ -33,6 +33,7 @@
 #include "ovs-rcu.h"
 #include "ovs-thread.h"
 #include "socket-util.h"
+#include "openvswitch/dynamic-string.h"
 #include "openvswitch/vlog.h"
 #ifdef HAVE_PTHREAD_SET_NAME_NP
 #include <pthread_np.h>
@@ -58,6 +59,7 @@ DEFINE_STATIC_PER_THREAD_DATA(struct { char s[128]; },
                               { "" });
 
 static char *xreadlink(const char *filename);
+static void ovs_emer_valist(int err_no, const char *format, va_list);
 
 void
 ovs_assert_failure(const char *where, const char *function,
@@ -323,6 +325,7 @@ ovs_abort(int err_no, const char *format, ...)
 {
     va_list args;
 
+    ovs_emer_valist(err_no, format, args);
     va_start(args, format);
     ovs_abort_valist(err_no, format, args);
 }
@@ -374,24 +377,45 @@ ovs_error(int err_no, const char *format, ...)
     va_end(args);
 }
 
+static void
+assemble_message(struct ds *ds, int err_no, const char *format, va_list args)
+{
+
+    const char *subprogram_name = get_subprogram_name();
+
+    if (subprogram_name[0]) {
+        ds_put_format(ds, "%s(%s): ", program_name, subprogram_name);
+    } else {
+        ds_put_format(ds, "%s: ", program_name);
+    }
+
+    ds_put_format_valist(ds, format, args);
+    if (err_no != 0) {
+        ds_put_format(ds, " (%s)", ovs_retval_to_string(err_no));
+    }
+    ds_put_char(ds, '\n');
+}
+
+static void
+ovs_emer_valist(int err_no, const char *format, va_list args)
+{
+    struct ds ds = DS_EMPTY_INITIALIZER;
+
+    assemble_message(&ds, err_no, format, args);
+    VLOG_EMER("%s", ds_cstr(&ds));
+    ds_destroy(&ds);
+}
+
 /* Same as ovs_error() except that the arguments are supplied as a va_list. */
 void
 ovs_error_valist(int err_no, const char *format, va_list args)
 {
-    const char *subprogram_name = get_subprogram_name();
+    struct ds ds = DS_EMPTY_INITIALIZER;
     int save_errno = errno;
 
-    if (subprogram_name[0]) {
-        fprintf(stderr, "%s(%s): ", program_name, subprogram_name);
-    } else {
-        fprintf(stderr, "%s: ", program_name);
-    }
-
-    vfprintf(stderr, format, args);
-    if (err_no != 0) {
-        fprintf(stderr, " (%s)", ovs_retval_to_string(err_no));
-    }
-    putc('\n', stderr);
+    assemble_message(&ds, err_no, format, args);
+    fprintf(stderr, "%s", ds_cstr(&ds));
+    ds_destroy(&ds);
 
     errno = save_errno;
 }
