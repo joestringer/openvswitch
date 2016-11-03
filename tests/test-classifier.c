@@ -480,7 +480,7 @@ pvector_verify(const struct pvector *pvec)
     PVECTOR_FOR_EACH (ptr, pvec) {
         int priority = cursor__.vector[cursor__.entry_idx].priority;
         if (priority > prev_priority) {
-            ovs_abort(0, "Priority vector is out of order (%u > %u)",
+            ovs_fatal(0, "Priority vector is out of order (%u > %u)",
                       priority, prev_priority);
         }
         prev_priority = priority;
@@ -546,14 +546,14 @@ check_tables(const struct classifier *cls, int n_tables, int n_rules,
         PVECTOR_FOR_EACH (iter, &cls->subtables) {
             if (iter == table) {
                 if (found) {
-                    ovs_abort(0, "Subtable %p duplicated in 'subtables'.",
+                    ovs_fatal(0, "Subtable %p duplicated in 'subtables'.",
                               table);
                 }
                 found = true;
             }
         }
         if (!found) {
-            ovs_abort(0, "Subtable %p not found from 'subtables'.", table);
+            ovs_fatal(0, "Subtable %p not found from 'subtables'.", table);
         }
 
         assert(!cmap_is_empty(&table->rules));
