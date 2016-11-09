@@ -107,7 +107,8 @@ def conf():
         pass  # Directory exists.
 
     os.chdir(BUILD_GCC)
-    _sh(*(configure + ["--with-linux=/lib/modules/%s/build" % uname()]))
+    # _sh(*(configure + ["--with-linux=/lib/modules/%s/build" % uname()]))
+    _sh(*(configure + ["--with-bpf=%s/../net-next/tools" % OVS_SRC]))
 
     try:
         _sh("clang --version", check=True)
@@ -127,7 +128,7 @@ def conf():
         except OSError:
             pass  # Directory exists.
 
-        ENV["CC"] = "clang"
+        ENV["CC"] = "clang-4.0"
         os.chdir(BUILD_CLANG)
         _sh(*configure)
 
