@@ -581,6 +581,12 @@ test_assert(struct ovs_cmdl_context *ctx OVS_UNUSED)
 }
 
 static void
+test_fatal(struct ovs_cmdl_context *ctx OVS_UNUSED)
+{
+    ovs_fatal(0, "Terminating due to direct ovs_fatal() call");
+}
+
+static void
 test_ovs_scan(struct ovs_cmdl_context *ctx OVS_UNUSED)
 {
     char str[16], str2[16], str3[16];
@@ -1162,6 +1168,7 @@ static const struct ovs_cmdl_command commands[] = {
     {"bitwise_rscan", NULL, 0, 0, test_bitwise_rscan, OVS_RO},
     {"follow-symlinks", NULL, 1, INT_MAX, test_follow_symlinks, OVS_RO},
     {"assert", NULL, 0, 0, test_assert, OVS_RO},
+    {"fatal", NULL, 0, 0, test_fatal, OVS_RO},
     {"ovs_scan", NULL, 0, 0, test_ovs_scan, OVS_RO},
     {"snprintf", NULL, 0, 0, test_snprintf, OVS_RO},
 #ifndef _WIN32
