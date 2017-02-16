@@ -352,6 +352,8 @@ if LINUX
 lib_libopenvswitch_la_SOURCES += \
 	lib/dpif-netlink.c \
 	lib/dpif-netlink.h \
+	lib/dpif-rtnetlink.c \
+	lib/dpif-rtnetlink.h \
 	lib/if-notifier.c \
 	lib/if-notifier.h \
 	lib/netdev-linux.c \
@@ -382,6 +384,7 @@ if WIN32
 lib_libopenvswitch_la_SOURCES += \
 	lib/dpif-netlink.c \
 	lib/dpif-netlink.h \
+	lib/dpif-rtnetlink.h \
 	lib/netdev-windows.c \
 	lib/netlink-conntrack.c \
 	lib/netlink-conntrack.h \
