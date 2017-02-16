@@ -214,6 +214,12 @@ static int ovs_packet_family;
  * Initialized by dpif_netlink_init(). */
 static unsigned int ovs_vport_mcgroup;
 
+/* If true, tunnel devices are created using OVS compat/genetlink.
+ * If false, tunnel devices are created with rtnetlink and using light weight
+ * tunnels. If we fail to create the tunnel the rtnetlink+LWT, then we fallback
+ * to using the compat interface. */
+static bool ovs_tunnels_out_of_tree = true;
+
 static int dpif_netlink_init(void);
 static int open_dpif(const struct dpif_netlink_dp *, struct dpif **);
 static uint32_t dpif_netlink_port_get_pid(const struct dpif *,
@@ -982,11 +988,13 @@ dpif_netlink_port_add(struct dpif *dpif_, struct netdev *netdev,
                       odp_port_t *port_nop)
 {
     struct dpif_netlink *dpif = dpif_netlink_cast(dpif_);
-    int error;
+    int error = EOPNOTSUPP;
 
     fat_rwlock_wrlock(&dpif->upcall_lock);
-    error = dpif_rtnetlink_port_create_and_add(dpif, netdev, port_nop);
-    if (error == EOPNOTSUPP) {
+    if (!ovs_tunnels_out_of_tree) {
+        error = dpif_rtnetlink_port_create_and_add(dpif, netdev, port_nop);
+    }
+    if (error) {
         error = dpif_netlink_port_add_compat(dpif, netdev, port_nop);
     }
     fat_rwlock_unlock(&dpif->upcall_lock);
@@ -2541,6 +2549,8 @@ dpif_netlink_init(void)
             error = nl_lookup_genl_mcgroup(OVS_VPORT_FAMILY, OVS_VPORT_MCGROUP,
                                            &ovs_vport_mcgroup);
         }
+
+        ovs_tunnels_out_of_tree = dpif_rtnetlink_probe_oot_tunnels();
 
         ovsthread_once_done(&once);
     }

@@ -24,6 +24,8 @@
 int dpif_rtnetlink_port_create(struct netdev *netdev);
 int dpif_rtnetlink_port_destroy(const char *name, const char *type);
 
+bool dpif_rtnetlink_probe_oot_tunnels(void);
+
 #ifndef __linux__
 /* Dummy implementations for non Linux builds.
  *
@@ -39,6 +41,11 @@ static inline int dpif_rtnetlink_port_destroy(const char *name OVS_UNUSED,
                                               const char *type OVS_UNUSED)
 {
     return EOPNOTSUPP;
+}
+
+static inline bool dpif_rtnetlink_probe_oot_tunnels(void)
+{
+    return true;
 }
 
 #endif
