@@ -22,7 +22,7 @@
 #include "netdev.h"
 
 int dpif_rtnetlink_port_create(struct netdev *netdev);
-int dpif_rtnetlink_port_destroy(const char *name OVS_UNUSED, const char *type);
+int dpif_rtnetlink_port_destroy(const char *name, const char *type);
 
 #ifndef __linux__
 /* Dummy implementations for non Linux builds.
