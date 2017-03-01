@@ -4734,6 +4734,7 @@ dp_execute_cb(void *aux_, struct dp_packet_batch *packets_,
 
     case OVS_ACTION_ATTR_CT: {
         const struct nlattr *b;
+        bool force = false;
         bool commit = false;
         unsigned int left;
         uint16_t zone = 0;
@@ -4747,6 +4748,7 @@ dp_execute_cb(void *aux_, struct dp_packet_batch *packets_,
 
             switch(sub_type) {
             case OVS_CT_ATTR_FORCE_COMMIT:
+                force = true;
                 /* fall through. */
             case OVS_CT_ATTR_COMMIT:
                 commit = true;
@@ -4770,8 +4772,8 @@ dp_execute_cb(void *aux_, struct dp_packet_batch *packets_,
             }
         }
 
-        conntrack_execute(&dp->conntrack, packets_, aux->flow->dl_type, commit,
-                          zone, setmark, setlabel, helper);
+        conntrack_execute(&dp->conntrack, packets_, aux->flow->dl_type, force,
+                          commit, zone, setmark, setlabel, helper);
         break;
     }
 
