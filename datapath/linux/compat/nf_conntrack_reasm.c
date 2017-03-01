@@ -54,7 +54,25 @@
 #include <linux/module.h>
 #include <net/netfilter/ipv6/nf_defrag_ipv6.h>
 
-#ifdef OVS_NF_DEFRAG6_BACKPORT
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,11,0) && \
+    !defined(OVS_NF_DEFRAG6_BACKPORT)
+static void rpl_skb_noop(struct sk_buff *skb) { }
+
+/* Ugh. On kernels earlier than 4.11, we can't tell whether upstream commit
+ * 48cac18ecf1d ("ipv6: orphan skbs in reassembly unit") or its backport has
+ * been applied, and unfortunately skb_orphan() is not idempotent. Perform
+ * the orphaning here, then prepare the skb so that if the upstream version of
+ * nf_ct_frag6_gather() ends up calling skb_orphan(), it's a no-op.
+ */
+int nf_ct_frag6_gather(struct net *net, struct sk_buff *skb, u32 user)
+{
+	skb_orphan(skb);
+	skb->destructor = rpl_skb_noop;
+#undef nf_ct_frag6_gather
+	return nf_ct_frag6_gather(net, skb, user);
+}
+
+#elif defined(OVS_NF_DEFRAG6_BACKPORT)
 
 static const char nf_frags_cache_name[] = "ovs-frag6";
 
@@ -530,6 +548,7 @@ int nf_ct_frag6_gather(struct net *net, struct sk_buff *skb, u32 user)
 	local_bh_enable();
 #endif
 
+	skb_orphan(skb);
 	fq = fq_find(net, fhdr->identification, user, &hdr->saddr, &hdr->daddr,
 		     ip6_frag_ecn(hdr));
 	if (fq == NULL)

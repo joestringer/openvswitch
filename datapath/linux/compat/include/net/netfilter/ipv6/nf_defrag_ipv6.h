@@ -4,6 +4,13 @@
 #include <linux/kconfig.h>
 #include_next <net/netfilter/ipv6/nf_defrag_ipv6.h>
 
+/* Earlier kernels may or may not have the bugfix commit
+ * 48cac18ecf1d ("ipv6: orphan skbs in reassembly unit"); handle both cases. */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,11,0)
+int rpl_nf_ct_frag6_gather(struct net *net, struct sk_buff *skb, u32 user);
+#define nf_ct_frag6_gather rpl_nf_ct_frag6_gather
+#endif /* 4.11 */
+
 /* Upstream commit 029f7f3b8701 ("netfilter: ipv6: nf_defrag: avoid/free clone
  * operations") changed the semantics of nf_ct_frag6_gather(), so we backport
  * it for all prior kernels.
@@ -11,9 +18,6 @@
 #if defined(HAVE_NF_CT_FRAG6_CONSUME_ORIG) || \
     defined(HAVE_NF_CT_FRAG6_OUTPUT)
 #define OVS_NF_DEFRAG6_BACKPORT 1
-int rpl_nf_ct_frag6_gather(struct net *net, struct sk_buff *skb, u32 user);
-#define nf_ct_frag6_gather rpl_nf_ct_frag6_gather
-
 /* If backporting IPv6 defrag, then init/exit functions need to be called from
  * compat_{in,ex}it() to prepare the backported fragmentation cache. In this
  * case we declare the functions which are defined in
