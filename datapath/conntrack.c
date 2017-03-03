@@ -289,7 +289,7 @@ static int ovs_ct_set_labels(struct sk_buff *skb, struct sw_flow_key *key,
 		cl = nf_ct_labels_find(ct);
 	}
 
-	if (!cl || ovs_ct_get_labels_len(cl) < OVS_CT_LABELS_LEN)
+	if (!cl)
 		return -ENOSPC;
 
 	if (nf_ct_is_confirmed(ct)) {
