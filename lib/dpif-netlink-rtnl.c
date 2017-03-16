@@ -40,6 +40,13 @@
 #define IFLA_VXLAN_COLLECT_METADATA 25
 #endif
 
+#ifndef IFLA_GRE_MAX
+#define IFLA_GRE_MAX 0
+#endif
+#if IFLA_GRE_MAX < 18
+#define IFLA_GRE_COLLECT_METADATA 18
+#endif
+
 static const struct nl_policy rtlink_policy[] = {
     [IFLA_LINKINFO] = { .type = NL_A_NESTED },
 };
@@ -68,6 +75,12 @@ dpif_netlink_rtnl_destroy(const char *name)
 
 static int
 dpif_netlink_rtnl_vxlan_destroy(const char *name)
+{
+    return dpif_netlink_rtnl_destroy(name);
+}
+
+static int
+dpif_netlink_rtnl_gre_destroy(const char *name)
 {
     return dpif_netlink_rtnl_destroy(name);
 }
@@ -191,6 +204,100 @@ dpif_netlink_rtnl_vxlan_create(struct netdev *netdev)
     return dpif_netlink_rtnl_vxlan_create_kind(netdev, "vxlan");
 }
 
+static int
+dpif_netlink_rtnl_gre_verify(struct netdev *netdev OVS_UNUSED,
+                             const char *name, const char *kind)
+{
+    int err;
+    struct ofpbuf request, *reply;
+    struct ifinfomsg *ifmsg;
+
+    static const struct nl_policy gre_policy[] = {
+        [IFLA_GRE_COLLECT_METADATA] = { .type = NL_A_FLAG },
+    };
+
+    ofpbuf_init(&request, 0);
+    nl_msg_put_nlmsghdr(&request, 0, RTM_GETLINK, NLM_F_REQUEST);
+    ofpbuf_put_zeros(&request, sizeof(struct ifinfomsg));
+    nl_msg_put_string(&request, IFLA_IFNAME, name);
+
+    err = nl_transact(NETLINK_ROUTE, &request, &reply);
+    ofpbuf_uninit(&request);
+
+    if (!err) {
+        struct nlattr *rtlink[ARRAY_SIZE(rtlink_policy)];
+        struct nlattr *linkinfo[ARRAY_SIZE(linkinfo_policy)];
+        struct nlattr *gre[ARRAY_SIZE(gre_policy)];
+
+        ifmsg = ofpbuf_at(reply, NLMSG_HDRLEN, sizeof *ifmsg);
+        if (!nl_policy_parse(reply, NLMSG_HDRLEN + sizeof *ifmsg,
+                             rtlink_policy, rtlink, ARRAY_SIZE(rtlink_policy))
+            || !nl_parse_nested(rtlink[IFLA_LINKINFO], linkinfo_policy,
+                                linkinfo, ARRAY_SIZE(linkinfo_policy))
+            || strcmp(nl_attr_get_string(linkinfo[IFLA_INFO_KIND]), kind)
+            || !nl_parse_nested(linkinfo[IFLA_INFO_DATA], gre_policy, gre,
+                                ARRAY_SIZE(gre_policy))) {
+            err = EINVAL;
+        }
+        if (!err) {
+            if (!nl_attr_get_flag(gre[IFLA_GRE_COLLECT_METADATA])) {
+                err = EINVAL;
+            }
+        }
+        ofpbuf_delete(reply);
+    }
+
+    return err;
+}
+
+static int
+dpif_netlink_rtnl_gre_create_kind(struct netdev *netdev, const char *kind)
+{
+    int err;
+    struct ofpbuf request;
+    size_t linkinfo_off, infodata_off;
+    char namebuf[NETDEV_VPORT_NAME_BUFSIZE];
+    const char *name = netdev_vport_get_dpif_port(netdev,
+                                                  namebuf, sizeof namebuf);
+    struct ifinfomsg *ifinfo;
+    const struct netdev_tunnel_config *tnl_cfg;
+    tnl_cfg = netdev_get_tunnel_config(netdev);
+    if (!tnl_cfg) {
+        return EINVAL;
+    }
+
+    ofpbuf_init(&request, 0);
+    nl_msg_put_nlmsghdr(&request, 0, RTM_NEWLINK,
+                        NLM_F_REQUEST | NLM_F_ACK | NLM_F_CREATE);
+    ifinfo = ofpbuf_put_zeros(&request, sizeof(struct ifinfomsg));
+    ifinfo->ifi_change = ifinfo->ifi_flags = IFF_UP;
+    nl_msg_put_string(&request, IFLA_IFNAME, name);
+    nl_msg_put_u32(&request, IFLA_MTU, UINT16_MAX);
+    linkinfo_off = nl_msg_start_nested(&request, IFLA_LINKINFO);
+    nl_msg_put_string(&request, IFLA_INFO_KIND, kind);
+    infodata_off = nl_msg_start_nested(&request, IFLA_INFO_DATA);
+
+    nl_msg_put_flag(&request, IFLA_GRE_COLLECT_METADATA);
+
+    nl_msg_end_nested(&request, infodata_off);
+    nl_msg_end_nested(&request, linkinfo_off);
+
+    err = nl_transact(NETLINK_ROUTE, &request, NULL);
+    ofpbuf_uninit(&request);
+
+    if (!err && (err = dpif_netlink_rtnl_gre_verify(netdev, name, kind))) {
+        dpif_netlink_rtnl_gre_destroy(name);
+    }
+
+    return err;
+}
+
+static int
+dpif_netlink_rtnl_gre_create(struct netdev *netdev)
+{
+    return dpif_netlink_rtnl_gre_create_kind(netdev, "gretap");
+}
+
 int
 dpif_netlink_rtnl_port_create(struct netdev *netdev)
 {
@@ -198,6 +305,7 @@ dpif_netlink_rtnl_port_create(struct netdev *netdev)
     case OVS_VPORT_TYPE_VXLAN:
         return dpif_netlink_rtnl_vxlan_create(netdev);
     case OVS_VPORT_TYPE_GRE:
+        return dpif_netlink_rtnl_gre_create(netdev);
     case OVS_VPORT_TYPE_GENEVE:
     case OVS_VPORT_TYPE_NETDEV:
     case OVS_VPORT_TYPE_INTERNAL:
@@ -218,6 +326,7 @@ dpif_netlink_rtnl_port_destroy(const char *name, const char *type)
     case OVS_VPORT_TYPE_VXLAN:
         return dpif_netlink_rtnl_vxlan_destroy(name);
     case OVS_VPORT_TYPE_GRE:
+        return dpif_netlink_rtnl_gre_destroy(name);
     case OVS_VPORT_TYPE_GENEVE:
     case OVS_VPORT_TYPE_NETDEV:
     case OVS_VPORT_TYPE_INTERNAL:
