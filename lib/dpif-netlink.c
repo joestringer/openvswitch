@@ -34,6 +34,7 @@
 
 #include "bitmap.h"
 #include "dpif-provider.h"
+#include "dpif-netlink-rtnl.h"
 #include "openvswitch/dynamic-string.h"
 #include "flow.h"
 #include "fat-rwlock.h"
@@ -60,9 +61,6 @@ VLOG_DEFINE_THIS_MODULE(dpif_netlink);
 #ifdef _WIN32
 #include "wmi.h"
 enum { WINDOWS = 1 };
-static int dpif_netlink_port_query__(const struct dpif_netlink *dpif,
-                                     odp_port_t port_no, const char *port_name,
-                                     struct dpif_port *dpif_port);
 #else
 enum { WINDOWS = 0 };
 #endif
@@ -224,6 +222,10 @@ static void dpif_netlink_vport_to_ofpbuf(const struct dpif_netlink_vport *,
                                          struct ofpbuf *);
 static int dpif_netlink_vport_from_ofpbuf(struct dpif_netlink_vport *,
                                           const struct ofpbuf *);
+static int dpif_netlink_port_query__(const struct dpif_netlink *dpif,
+                                     odp_port_t port_no, const char *port_name,
+                                     struct dpif_port *dpif_port);
+
 
 static struct dpif_netlink *
 dpif_netlink_cast(const struct dpif *dpif)
@@ -783,7 +785,7 @@ get_vport_type(const struct dpif_netlink_vport *vport)
     return "unknown";
 }
 
-static enum ovs_vport_type
+enum ovs_vport_type
 netdev_to_ovs_vport_type(const char *type)
 {
     if (!strcmp(type, "tap") || !strcmp(type, "system")) {
@@ -945,8 +947,34 @@ dpif_netlink_port_add_compat(struct dpif_netlink *dpif, struct netdev *netdev,
 
 }
 
+static int OVS_UNUSED
+dpif_netlink_rtnl_port_create_and_add(struct dpif_netlink *dpif,
+                                      struct netdev *netdev,
+                                      odp_port_t *port_nop)
+    OVS_REQ_WRLOCK(dpif->upcall_lock)
+{
+    int error;
+    char namebuf[NETDEV_VPORT_NAME_BUFSIZE];
+    static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 20);
+    const char *name = netdev_vport_get_dpif_port(netdev,
+                                                  namebuf, sizeof namebuf);
 
+    error = dpif_netlink_rtnl_port_create(netdev);
+    if (error) {
+        if (error != EOPNOTSUPP) {
+            VLOG_INFO_RL(&rl, "Failed to create %s with rtnetlink. error = %d",
+                         netdev_get_name(netdev), error);
+        }
+        return error;
+    }
 
+    error = dpif_netlink_port_add__(dpif, name, OVS_VPORT_TYPE_NETDEV, NULL,
+                                    port_nop);
+    if (error) {
+        dpif_netlink_rtnl_port_destroy(name, netdev_get_type(netdev));
+    }
+    return error;
+}
 
 static int
 dpif_netlink_port_add(struct dpif *dpif_, struct netdev *netdev,
@@ -967,25 +995,31 @@ dpif_netlink_port_del__(struct dpif_netlink *dpif, odp_port_t port_no)
     OVS_REQ_WRLOCK(dpif->upcall_lock)
 {
     struct dpif_netlink_vport vport;
+    struct dpif_port dpif_port;
     int error;
+
+    error = dpif_netlink_port_query__(dpif, port_no, NULL, &dpif_port);
+    if (error) {
+        return error;
+    }
 
     dpif_netlink_vport_init(&vport);
     vport.cmd = OVS_VPORT_CMD_DEL;
     vport.dp_ifindex = dpif->dp_ifindex;
     vport.port_no = port_no;
 #ifdef _WIN32
-    struct dpif_port temp_dpif_port;
-    dpif_netlink_port_query__(dpif, port_no, NULL, &temp_dpif_port);
-    if (!strcmp(temp_dpif_port.type, "internal")) {
-        if (!delete_wmi_port(temp_dpif_port.name)){
+    if (!strcmp(dpif_port.type, "internal")) {
+        if (!delete_wmi_port(dpif_port.name)) {
             VLOG_ERR("Could not delete wmi port with name: %s",
-                     temp_dpif_port.name);
+                     dpif_port.name);
         };
     }
 #endif
     error = dpif_netlink_vport_transact(&vport, NULL, NULL);
 
     vport_del_channels(dpif, port_no);
+
+    dpif_port_destroy(&dpif_port);
 
     return error;
 }
