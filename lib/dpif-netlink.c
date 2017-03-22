@@ -2079,7 +2079,17 @@ try_send_to_netdev(struct dpif_netlink *dpif, struct dpif_op *op)
                        (put->flags & DPIF_FP_MODIFY ? "PUT(MODIFY)" : "PUT"));
         return parse_flow_put(dpif, put);
     }
-    case DPIF_OP_FLOW_DEL:
+    case DPIF_OP_FLOW_DEL: {
+        struct dpif_flow_del *del = &op->u.flow_del;
+
+        if (!del->ufid) {
+            break;
+        }
+        dbg_print_flow(del->key, del->key_len, NULL, 0, NULL, 0,
+                       del->ufid, "DEL");
+        return netdev_ports_flow_del(DPIF_HMAP_KEY(&dpif->dpif), del->ufid,
+                                     del->stats);
+    }
     case DPIF_OP_FLOW_GET:
     case DPIF_OP_EXECUTE:
     default:
