@@ -190,6 +190,10 @@ struct netdev_flow_dump **netdev_ports_flow_dumps_create(const void *obj,
 void netdev_ports_flow_flush(const void *obj);
 int netdev_ports_flow_del(const void *obj, const ovs_u128 *ufid,
                           struct dpif_flow_stats *stats);
+int netdev_ports_flow_get(const void *obj, struct match *match,
+                          struct nlattr **actions,
+                          struct dpif_flow_stats *stats,
+                          const ovs_u128 *ufid, struct ofpbuf *buf);
 odp_port_t netdev_hmap_port_get_byifidx(int ifindex);
 
 /* native tunnel APIs */
