@@ -473,16 +473,326 @@ netdev_tc_flow_dump_next(struct netdev_flow_dump *dump,
     return false;
 }
 
-int
-netdev_tc_flow_put(struct netdev *netdev OVS_UNUSED,
-                   struct match *match OVS_UNUSED,
-                   struct nlattr *actions OVS_UNUSED,
-                   size_t actions_len OVS_UNUSED,
-                   struct dpif_flow_stats *stats OVS_UNUSED,
-                   const ovs_u128 *ufid OVS_UNUSED,
-                   struct offload_info *info OVS_UNUSED)
+static int
+parse_put_flow_set_action(struct tc_flower *flower, const struct nlattr *set,
+                          size_t set_len)
 {
-    return EOPNOTSUPP;
+    static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 20);
+    const struct nlattr *set_attr;
+    size_t set_left;
+
+    NL_ATTR_FOR_EACH_UNSAFE(set_attr, set_left, set, set_len) {
+        if (nl_attr_type(set_attr) == OVS_KEY_ATTR_TUNNEL) {
+            const struct nlattr *tunnel = nl_attr_get(set_attr);
+            const size_t tunnel_len = nl_attr_get_size(set_attr);
+            const struct nlattr *tun_attr;
+            size_t tun_left;
+
+            flower->set.set = true;
+            NL_ATTR_FOR_EACH_UNSAFE(tun_attr, tun_left, tunnel, tunnel_len) {
+                switch (nl_attr_type(tun_attr)) {
+                case OVS_TUNNEL_KEY_ATTR_ID: {
+                    flower->set.id = nl_attr_get_be64(tun_attr);
+                }
+                break;
+                case OVS_TUNNEL_KEY_ATTR_IPV4_SRC: {
+                    flower->set.ipv4.ipv4_src = nl_attr_get_be32(tun_attr);
+                }
+                break;
+                case OVS_TUNNEL_KEY_ATTR_IPV4_DST: {
+                    flower->set.ipv4.ipv4_dst = nl_attr_get_be32(tun_attr);
+                }
+                break;
+                case OVS_TUNNEL_KEY_ATTR_IPV6_SRC: {
+                    flower->set.ipv6.ipv6_src =
+                        nl_attr_get_in6_addr(tun_attr);
+                }
+                break;
+                case OVS_TUNNEL_KEY_ATTR_IPV6_DST: {
+                    flower->set.ipv6.ipv6_dst =
+                        nl_attr_get_in6_addr(tun_attr);
+                }
+                break;
+                case OVS_TUNNEL_KEY_ATTR_TP_SRC: {
+                    flower->set.tp_src = nl_attr_get_be16(tun_attr);
+                }
+                break;
+                case OVS_TUNNEL_KEY_ATTR_TP_DST: {
+                    flower->set.tp_dst = nl_attr_get_be16(tun_attr);
+                }
+                break;
+                }
+            }
+        } else {
+            VLOG_DBG_RL(&rl, "unsupported set action type: %d",
+                        nl_attr_type(set_attr));
+            return EOPNOTSUPP;
+        }
+    }
+    return 0;
+}
+
+static void
+test_key_and_mask(struct match *match) {
+    static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 20);
+    const struct flow_wildcards *wc = &match->wc;
+    const struct flow *f = &match->flow;
+
+    if (wc->masks.pkt_mark) {
+        VLOG_DBG_RL(&rl, "Ignoring pkt_mark");
+    }
+    if (wc->masks.recirc_id) {
+        VLOG_DBG_RL(&rl, "Ignoring recirc_id");
+    }
+    if (wc->masks.dp_hash) {
+        VLOG_DBG_RL(&rl, "Ignoring dp_hash");
+    }
+    if (wc->masks.conj_id) {
+        VLOG_DBG_RL(&rl, "Ignoring conj_id");
+    }
+    if (wc->masks.skb_priority) {
+        VLOG_DBG_RL(&rl, "Ignoring skb_priority");
+    }
+    if (wc->masks.actset_output) {
+        VLOG_DBG_RL(&rl, "Ignoring actset_output");
+    }
+    if (wc->masks.ct_state) {
+        VLOG_DBG_RL(&rl, "Ignoring ct_state");
+    }
+    if (wc->masks.ct_zone) {
+        VLOG_DBG_RL(&rl, "Ignoring ct_zone");
+    }
+    if (wc->masks.ct_mark) {
+        VLOG_DBG_RL(&rl, "Ignoring ct_zone");
+    }
+    if (!ovs_u128_is_zero(wc->masks.ct_label)) {
+        VLOG_DBG_RL(&rl, "Ignoring ct_lable");
+    }
+    for (int i = 0; i < FLOW_N_REGS; i++) {
+        if (wc->masks.regs[i]) {
+            VLOG_DBG_RL(&rl, "Ignoring regs[%d]", i);
+        }
+    }
+    if (wc->masks.metadata != htonll(0)) {
+        VLOG_DBG_RL(&rl, "Ignoring metadata");
+    }
+    if (wc->masks.nw_tos & IP_DSCP_MASK) {
+        VLOG_DBG_RL(&rl, "Ignoring nw_tos");
+    }
+    if (wc->masks.nw_tos & IP_ECN_MASK) {
+        VLOG_DBG_RL(&rl, "Ignoring nw_ecn");
+    }
+    if (wc->masks.nw_ttl) {
+        VLOG_DBG_RL(&rl, "Ignoring nw_ttl");
+    }
+    if (wc->masks.mpls_lse[0] & htonl(MPLS_LABEL_MASK)) {
+        VLOG_DBG_RL(&rl, "Ignoring mpls_lse");
+    }
+    if (wc->masks.mpls_lse[0] & htonl(MPLS_TC_MASK)) {
+        VLOG_DBG_RL(&rl, "Ignoring mpls_lse");
+    }
+    if (wc->masks.mpls_lse[0] & htonl(MPLS_TTL_MASK)) {
+        VLOG_DBG_RL(&rl, "Ignoring mpls_lse");
+    }
+    if (wc->masks.mpls_lse[0] & htonl(MPLS_BOS_MASK)) {
+        VLOG_DBG_RL(&rl, "Ignoring mpls_lse");
+    }
+    if (wc->masks.mpls_lse[1] != 0) {
+        VLOG_DBG_RL(&rl, "Ignoring mpls_lse");
+    }
+    if (wc->masks.mpls_lse[2] != 0) {
+        VLOG_DBG_RL(&rl, "Ignoring mpls_lse");
+    }
+    if (wc->masks.nw_frag) {
+        VLOG_DBG_RL(&rl, "Ignoring nw_frag");
+    }
+    if (f->dl_type == htons(ETH_TYPE_IP) &&
+        f->nw_proto == IPPROTO_ICMP) {
+        if (wc->masks.tp_src != htons(0)) {
+            VLOG_DBG_RL(&rl, "Ignoring icmp_type");
+        }
+        if (wc->masks.tp_dst != htons(0)) {
+            VLOG_DBG_RL(&rl, "Ignoring icmp_code");
+        }
+    } else if (f->dl_type == htons(ETH_TYPE_IP) &&
+               f->nw_proto == IPPROTO_IGMP) {
+        if (wc->masks.tp_src != htons(0)) {
+            VLOG_DBG_RL(&rl, "Ignoring igmp_type");
+        }
+        if (wc->masks.tp_dst != htons(0)) {
+            VLOG_DBG_RL(&rl, "Ignoring igmp_code");
+        }
+    } else if (f->dl_type == htons(ETH_TYPE_IPV6) &&
+               f->nw_proto == IPPROTO_ICMPV6) {
+        if (wc->masks.tp_src != htons(0)) {
+            VLOG_DBG_RL(&rl, "Ignoring icmp_type");
+        }
+        if (wc->masks.tp_dst != htons(0)) {
+            VLOG_DBG_RL(&rl, "Ignoring icmp_code");
+        }
+    }
+    if (is_ip_any(f) && f->nw_proto == IPPROTO_TCP && wc->masks.tcp_flags) {
+        if (TCP_FLAGS(wc->masks.tcp_flags)) {
+            VLOG_DBG_RL(&rl, "Ignoring tcp_flags");
+        }
+    }
+}
+
+int
+netdev_tc_flow_put(struct netdev *netdev,
+                   struct match *match,
+                   struct nlattr *actions,
+                   size_t actions_len,
+                   struct dpif_flow_stats *stats OVS_UNUSED,
+                   const ovs_u128 *ufid,
+                   struct offload_info *info)
+{
+    static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 20);
+    struct tc_flower flower;
+    struct flow *key = &match->flow;
+    struct flow *mask = &match->wc.masks;
+    const struct flow_tnl *tnl = &match->flow.tunnel;
+    struct nlattr *nla;
+    size_t left;
+    int prio = 0;
+    int handle;
+    int ifindex;
+    int err;
+
+    ifindex = netdev_get_ifindex(netdev);
+    if (ifindex < 0) {
+        VLOG_ERR_RL(&rl_err, "failed to get ifindex for %s: %s",
+                    netdev_get_name(netdev), ovs_strerror(-ifindex));
+        return -ifindex;
+    }
+
+    memset(&flower, 0, sizeof(flower));
+
+    if (tnl->tun_id) {
+        VLOG_DBG_RL(&rl,
+                    "tunnel: id %#" PRIx64 " src " IP_FMT
+                    " dst " IP_FMT " tp_src %d tp_dst %d",
+                    ntohll(tnl->tun_id),
+                    IP_ARGS(tnl->ip_src), IP_ARGS(tnl->ip_dst),
+                    ntohs(tnl->tp_src), ntohs(tnl->tp_dst));
+        flower.tunnel.id = tnl->tun_id;
+        flower.tunnel.ipv4.ipv4_src = tnl->ip_src;
+        flower.tunnel.ipv4.ipv4_dst = tnl->ip_dst;
+        flower.tunnel.ipv6.ipv6_src = tnl->ipv6_src;
+        flower.tunnel.ipv6.ipv6_dst = tnl->ipv6_dst;
+        flower.tunnel.tp_src = tnl->tp_src;
+        flower.tunnel.tp_dst = tnl->tp_dst;
+        flower.tunnel.tunnel = true;
+    }
+
+    flower.key.eth_type = key->dl_type;
+    flower.mask.eth_type = mask->dl_type;
+
+    if (mask->vlan_tci) {
+        ovs_be16 vid_mask = mask->vlan_tci & htons(VLAN_VID_MASK);
+        ovs_be16 pcp_mask = mask->vlan_tci & htons(VLAN_PCP_MASK);
+        ovs_be16 cfi = mask->vlan_tci & htons(VLAN_CFI);
+
+        if (cfi && key->vlan_tci & htons(VLAN_CFI)
+            && (!vid_mask || vid_mask == htons(VLAN_VID_MASK))
+            && (!pcp_mask || pcp_mask == htons(VLAN_PCP_MASK))
+            && (vid_mask || pcp_mask)) {
+            if (vid_mask) {
+                flower.key.vlan_id = vlan_tci_to_vid(key->vlan_tci);
+                VLOG_DBG_RL(&rl, "vlan_id: %d\n", flower.key.vlan_id);
+            }
+            if (pcp_mask) {
+                flower.key.vlan_prio = vlan_tci_to_pcp(key->vlan_tci);
+                VLOG_DBG_RL(&rl, "vlan_prio %d\n", flower.key.vlan_prio);
+            }
+            flower.key.encap_eth_type = key->dl_type;
+            flower.key.eth_type = htons(ETH_TYPE_VLAN);
+        } else if (mask->vlan_tci == htons(0xffff) &&
+                   ntohs(key->vlan_tci) == 0) {
+            /* exact && no vlan */
+        } else {
+            /* partial mask */
+            return EOPNOTSUPP;
+        }
+    }
+
+    flower.key.dst_mac = key->dl_dst;
+    memset(&flower.mask.dst_mac, 0xFF, sizeof(flower.mask.dst_mac));
+    flower.key.src_mac = key->dl_src;
+    flower.mask.src_mac = mask->dl_src;
+
+    if (flower.key.eth_type == htons(ETH_P_IP)
+        || flower.key.eth_type == htons(ETH_P_IPV6)) {
+        flower.key.ip_proto = key->nw_proto;
+        flower.mask.ip_proto = mask->nw_proto;
+    }
+    flower.key.ipv4.ipv4_src = key->nw_src;
+    flower.mask.ipv4.ipv4_src = mask->nw_src;
+    flower.key.ipv4.ipv4_dst = key->nw_dst;
+    flower.mask.ipv4.ipv4_dst = mask->nw_dst;
+
+    flower.key.ipv6.ipv6_src = key->ipv6_src;
+    flower.mask.ipv6.ipv6_src = mask->ipv6_src;
+    flower.key.ipv6.ipv6_dst = key->ipv6_dst;
+    flower.mask.ipv6.ipv6_dst = mask->ipv6_dst;
+
+    flower.key.dst_port = key->tp_dst;
+    flower.mask.dst_port = mask->tp_dst;
+    flower.key.src_port = key->tp_src;
+    flower.mask.src_port = mask->tp_src;
+
+    test_key_and_mask(match);
+
+    NL_ATTR_FOR_EACH(nla, left, actions, actions_len) {
+        if (nl_attr_type(nla) == OVS_ACTION_ATTR_OUTPUT) {
+            odp_port_t port = nl_attr_get_odp_port(nla);
+            struct netdev *outdev = netdev_hmap_port_get(port,
+                                                         info->port_hmap_obj);
+
+            flower.ifindex_out = netdev_get_ifindex(outdev);
+            flower.set.tp_dst = info->tp_dst_port;
+            netdev_close(outdev);
+        } else if (nl_attr_type(nla) == OVS_ACTION_ATTR_PUSH_VLAN) {
+            const struct ovs_action_push_vlan *vlan_push = nl_attr_get(nla);
+
+            flower.vlan_push_id = vlan_tci_to_vid(vlan_push->vlan_tci);
+            flower.vlan_push_prio = vlan_tci_to_pcp(vlan_push->vlan_tci);
+        } else if (nl_attr_type(nla) == OVS_ACTION_ATTR_POP_VLAN) {
+            flower.vlan_pop = 1;
+        } else if (nl_attr_type(nla) == OVS_ACTION_ATTR_SET) {
+            const struct nlattr *set = nl_attr_get(nla);
+            const size_t set_len = nl_attr_get_size(nla);
+
+            err = parse_put_flow_set_action(&flower, set, set_len);
+            if (err) {
+                return err;
+            }
+        } else {
+            VLOG_DBG_RL(&rl, "unsupported put action type: %d",
+                        nl_attr_type(nla));
+            return EOPNOTSUPP;
+        }
+    }
+
+    handle = get_ufid_tc_mapping(ufid, &prio, NULL);
+    if (handle && prio) {
+        VLOG_DBG_RL(&rl, "updating old handle: %d prio: %d", handle, prio);
+        tc_del_filter(ifindex, prio, handle);
+    }
+
+    if (!prio) {
+        prio = get_prio_for_tc_flower(&flower);
+    }
+
+    flower.act_cookie.data = ufid;
+    flower.act_cookie.len = sizeof *ufid;
+
+    err = tc_replace_flower(ifindex, prio, handle, &flower);
+    if (!err) {
+        add_ufid_tc_mapping(ufid, flower.prio, flower.handle, netdev, ifindex);
+    }
+
+    return err;
 }
 
 int
