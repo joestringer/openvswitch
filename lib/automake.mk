@@ -354,6 +354,8 @@ lib_libopenvswitch_la_SOURCES += \
 	lib/dpif-netlink.h \
 	lib/tc.h \
 	lib/tc.c \
+	lib/netdev-tc-offloads.h \
+	lib/netdev-tc-offloads.c \
 	lib/if-notifier.c \
 	lib/if-notifier.h \
 	lib/netdev-linux.c \

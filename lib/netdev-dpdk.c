@@ -3314,6 +3314,7 @@ unlock:
     RXQ_RECV,                                                 \
     NULL,                       /* rx_wait */                 \
     NULL,                       /* rxq_drain */               \
+    NO_OFFLOAD_API                                            \
 }
 
 static const struct netdev_class dpdk_class =
