@@ -2053,6 +2053,14 @@ netdev_linux_set_policing(struct netdev *netdev_,
     int error;
     int ifindex;
 
+    if (netdev_flow_api_enabled) {
+        if (kbits_rate) {
+            VLOG_WARN_RL(&rl, "%s: policing with offload isn't supported",
+                         netdev_name);
+        }
+        return EOPNOTSUPP;
+    }
+
     kbits_burst = (!kbits_rate ? 0       /* Force to 0 if no rate specified. */
                    : !kbits_burst ? 8000 /* Default to 8000 kbits if 0. */
                    : kbits_burst);       /* Stick with user-specified value. */
