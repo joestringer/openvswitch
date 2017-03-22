@@ -221,6 +221,44 @@ find_ufid(int prio, int handle, struct netdev *netdev, ovs_u128 *ufid)
     return (data != NULL);
 }
 
+struct prio_map_data {
+    struct hmap_node node;
+    struct tc_flower_key mask;
+    ovs_be16 protocol;
+    uint16_t prio;
+};
+
+static uint16_t
+get_prio_for_tc_flower(struct tc_flower *flower)
+{
+    static struct hmap prios = HMAP_INITIALIZER(&prios);
+    static struct ovs_mutex prios_lock = OVS_MUTEX_INITIALIZER;
+    static int last_prio = 0;
+    size_t key_len = sizeof(struct tc_flower_key);
+    size_t hash = hash_bytes(&flower->mask, key_len,
+                             (OVS_FORCE uint32_t) flower->key.eth_type);
+    struct prio_map_data *data;
+    struct prio_map_data *new_data;
+
+    ovs_mutex_lock(&prios_lock);
+    HMAP_FOR_EACH_WITH_HASH(data, node, hash, &prios) {
+        if (!memcmp(&flower->mask, &data->mask, key_len)
+            && data->protocol == flower->key.eth_type) {
+            ovs_mutex_unlock(&prios_lock);
+            return data->prio;
+        }
+    }
+
+    new_data = xzalloc(sizeof *new_data);
+    memcpy(&new_data->mask, &flower->mask, key_len);
+    new_data->prio = ++last_prio;
+    new_data->protocol = flower->key.eth_type;
+    hmap_insert(&prios, &new_data->node, hash);
+    ovs_mutex_unlock(&prios_lock);
+
+    return new_data->prio;
+}
+
 int
 netdev_tc_flow_flush(struct netdev *netdev)
 {
