@@ -75,10 +75,20 @@
 
 VLOG_DEFINE_THIS_MODULE(netdev_tc_offloads);
 
+static struct vlog_rate_limit rl_err = VLOG_RATE_LIMIT_INIT(9999, 5);
+
 int
-netdev_tc_flow_flush(struct netdev *netdev OVS_UNUSED)
+netdev_tc_flow_flush(struct netdev *netdev)
 {
-    return EOPNOTSUPP;
+    int ifindex = netdev_get_ifindex(netdev);
+
+    if (ifindex < 0) {
+        VLOG_ERR_RL(&rl_err, "failed to get ifindex for %s: %s",
+                    netdev_get_name(netdev), ovs_strerror(-ifindex));
+        return -ifindex;
+    }
+
+    return tc_flush(ifindex);
 }
 
 int
