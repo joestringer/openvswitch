@@ -355,7 +355,22 @@ do_open(const char *name, const char *type, bool create, struct dpif **dpifp)
     error = registered_class->dpif_class->open(registered_class->dpif_class,
                                                name, create, &dpif);
     if (!error) {
+        struct dpif_port_dump port_dump;
+        struct dpif_port dpif_port;
+
         ovs_assert(dpif->dpif_class == registered_class->dpif_class);
+
+        DPIF_PORT_FOR_EACH(&dpif_port, &port_dump, dpif) {
+            struct netdev *netdev;
+            int err = netdev_open(dpif_port.name, dpif_port.type, &netdev);
+
+            if (!err) {
+                netdev_hmap_port_add(netdev, DPIF_HMAP_KEY(dpif), &dpif_port);
+                netdev_close(netdev);
+            } else {
+                VLOG_WARN("could not open netdev %s type %s", name, type);
+            }
+        }
     } else {
         dp_class_unref(registered_class);
     }
@@ -548,6 +563,14 @@ dpif_port_add(struct dpif *dpif, struct netdev *netdev, odp_port_t *port_nop)
     if (!error) {
         VLOG_DBG_RL(&dpmsg_rl, "%s: added %s as port %"PRIu32,
                     dpif_name(dpif), netdev_name, port_no);
+
+        /* temp dpif_port, will be cloned in netdev_hmap_port_add */
+        struct dpif_port dpif_port;
+
+        dpif_port.type = CONST_CAST(char *, netdev_get_type(netdev));
+        dpif_port.name = CONST_CAST(char *, netdev_name);
+        dpif_port.port_no = port_no;
+        netdev_hmap_port_add(netdev, DPIF_HMAP_KEY(dpif), &dpif_port);
     } else {
         VLOG_WARN_RL(&error_rl, "%s: failed to add %s as port: %s",
                      dpif_name(dpif), netdev_name, ovs_strerror(error));
@@ -572,6 +595,8 @@ dpif_port_del(struct dpif *dpif, odp_port_t port_no)
     if (!error) {
         VLOG_DBG_RL(&dpmsg_rl, "%s: port_del(%"PRIu32")",
                     dpif_name(dpif), port_no);
+
+        netdev_hmap_port_del(port_no, DPIF_HMAP_KEY(dpif));
     } else {
         log_operation(dpif, "port_del", error);
     }
