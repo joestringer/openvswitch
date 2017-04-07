@@ -124,5 +124,6 @@ int tc_flush(int ifindex);
 int tc_dump_flower_start(int ifindex, struct nl_dump *dump);
 int parse_netlink_to_tc_flower(struct ofpbuf *reply,
                                struct tc_flower *flower);
+void tc_set_policy(const char *policy);
 
 #endif /* tc.h */
