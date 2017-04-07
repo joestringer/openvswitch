@@ -762,6 +762,7 @@ dpctl_dump_flows(int argc, const char *argv[], struct dpctl_params *dpctl_p)
     char *name;
 
     char *filter = NULL;
+    char *type = NULL;
     struct flow flow_filter;
     struct flow_wildcards wc_filter;
 
@@ -774,22 +775,29 @@ dpctl_dump_flows(int argc, const char *argv[], struct dpctl_params *dpctl_p)
     struct dpif_flow_dump *flow_dump;
     struct dpif_flow f;
     int pmd_id = PMD_ID_NULL;
+    int lastargc = 0;
     int error;
 
-    if (argc > 1 && !strncmp(argv[argc - 1], "filter=", 7)) {
-        filter = xstrdup(argv[--argc] + 7);
+    while (argc > 1 && lastargc != argc) {
+        lastargc = argc;
+        if (!strncmp(argv[argc - 1], "filter=", 7)) {
+            filter = xstrdup(argv[--argc] + 7);
+        } else if (!strncmp(argv[argc - 1], "type=", 5)) {
+            type = xstrdup(argv[--argc] + 5);
+        }
     }
+
     name = (argc == 2) ? xstrdup(argv[1]) : get_one_dp(dpctl_p);
     if (!name) {
         error = EINVAL;
-        goto out_freefilter;
+        goto out_free;
     }
 
     error = parsed_dpif_open(name, false, &dpif);
     free(name);
     if (error) {
         dpctl_error(dpctl_p, error, "opening datapath");
-        goto out_freefilter;
+        goto out_free;
     }
 
 
@@ -818,7 +826,7 @@ dpctl_dump_flows(int argc, const char *argv[], struct dpctl_params *dpctl_p)
     BUILD_ASSERT(PMD_ID_NULL != NON_PMD_CORE_ID);
 
     ds_init(&ds);
-    flow_dump = dpif_flow_dump_create(dpif, false);
+    flow_dump = dpif_flow_dump_create(dpif, false, (type ? type : "dpctl"));
     flow_dump_thread = dpif_flow_dump_thread_create(flow_dump);
     while (dpif_flow_dump_next(flow_dump_thread, &f, 1)) {
         if (filter) {
@@ -870,8 +878,9 @@ out_dpifclose:
     simap_destroy(&names_portno);
     hmap_destroy(&portno_names);
     dpif_close(dpif);
-out_freefilter:
+out_free:
     free(filter);
+    free(type);
     return error;
 }
 
