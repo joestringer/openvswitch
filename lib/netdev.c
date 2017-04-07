@@ -2227,6 +2227,18 @@ netdev_hmap_port_del(odp_port_t port_no, const void *obj)
     return ret;
 }
 
+void
+netdev_ports_flow_flush(const void *obj)
+{
+    struct port_to_netdev_data *data;
+
+    HMAP_FOR_EACH(data, node, &port_to_netdev) {
+        if (data->obj == obj) {
+            netdev_flow_flush(data->netdev);
+        }
+    }
+}
+
 bool netdev_flow_api_enabled = false;
 
 #ifdef __linux__

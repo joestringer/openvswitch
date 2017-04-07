@@ -187,6 +187,7 @@ struct netdev *netdev_hmap_port_get(odp_port_t port, const void *obj);
 int netdev_hmap_port_del(odp_port_t port, const void *obj);
 struct netdev_flow_dump **netdev_ports_flow_dumps_create(const void *obj,
                                                          int *ports);
+void netdev_ports_flow_flush(const void *obj);
 odp_port_t netdev_hmap_port_get_byifidx(int ifindex);
 
 /* native tunnel APIs */
