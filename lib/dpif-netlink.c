@@ -1941,6 +1941,8 @@ parse_flow_put(struct dpif_netlink *dpif, struct dpif_flow_put *put)
         return EOPNOTSUPP;
     }
 
+    memset(&match, 0, sizeof match);
+
     err = parse_key_and_mask_to_match(put->key, put->key_len, put->mask,
                                       put->mask_len, &match);
     if (err) {
@@ -2012,7 +2014,7 @@ parse_flow_put(struct dpif_netlink *dpif, struct dpif_flow_put *put)
 
         VLOG_DBG("added flow");
     } else if (err != EEXIST) {
-        VLOG_ERR_RL(&rl, "failed adding flow: %s", ovs_strerror(err));
+        VLOG_ERR_RL(&rl, "failed to offload flow: %s", ovs_strerror(err));
     }
 
 out:
