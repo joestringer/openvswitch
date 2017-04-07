@@ -73,6 +73,7 @@
 #include "openvswitch/vlog.h"
 #include "util.h"
 #include "tc.h"
+#include "netdev-tc-offloads.h"
 
 VLOG_DEFINE_THIS_MODULE(netdev_linux);
 
@@ -2762,7 +2763,8 @@ netdev_linux_update_flags(struct netdev *netdev_, enum netdev_flags off,
 }
 
 #define NETDEV_LINUX_CLASS(NAME, CONSTRUCT, GET_STATS,          \
-                           GET_FEATURES, GET_STATUS)            \
+                           GET_FEATURES, GET_STATUS,            \
+                           FLOW_OFFLOAD_API)                    \
 {                                                               \
     NAME,                                                       \
     false,                      /* is_pmd */                    \
@@ -2831,6 +2833,8 @@ netdev_linux_update_flags(struct netdev *netdev_, enum netdev_flags off,
     netdev_linux_rxq_recv,                                      \
     netdev_linux_rxq_wait,                                      \
     netdev_linux_rxq_drain,                                     \
+                                                                \
+    FLOW_OFFLOAD_API                                            \
 }
 
 const struct netdev_class netdev_linux_class =
@@ -2839,7 +2843,8 @@ const struct netdev_class netdev_linux_class =
         netdev_linux_construct,
         netdev_linux_get_stats,
         netdev_linux_get_features,
-        netdev_linux_get_status);
+        netdev_linux_get_status,
+        LINUX_FLOW_OFFLOAD_API);
 
 const struct netdev_class netdev_tap_class =
     NETDEV_LINUX_CLASS(
@@ -2847,7 +2852,8 @@ const struct netdev_class netdev_tap_class =
         netdev_linux_construct_tap,
         netdev_tap_get_stats,
         netdev_linux_get_features,
-        netdev_linux_get_status);
+        netdev_linux_get_status,
+        NO_OFFLOAD_API);
 
 const struct netdev_class netdev_internal_class =
     NETDEV_LINUX_CLASS(
@@ -2855,7 +2861,8 @@ const struct netdev_class netdev_internal_class =
         netdev_linux_construct,
         netdev_internal_get_stats,
         NULL,                  /* get_features */
-        netdev_internal_get_status);
+        netdev_internal_get_status,
+        NO_OFFLOAD_API);
 
 
 #define CODEL_N_QUEUES 0x0000
