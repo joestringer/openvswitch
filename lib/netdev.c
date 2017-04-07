@@ -2092,7 +2092,37 @@ netdev_init_flow_api(struct netdev *netdev)
 {
     const struct netdev_class *class = netdev->netdev_class;
 
+    if (!netdev_flow_api_enabled) {
+        return EOPNOTSUPP;
+    }
+
     return (class->init_flow_api
             ? class->init_flow_api(netdev)
             : EOPNOTSUPP);
 }
+
+bool netdev_flow_api_enabled = false;
+
+#ifdef __linux__
+void
+netdev_set_flow_api_enabled(const struct smap *ovs_other_config)
+{
+    if (smap_get_bool(ovs_other_config, "hw-offload", false)) {
+        static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
+
+        if (ovsthread_once_start(&once)) {
+            netdev_flow_api_enabled = true;
+
+            VLOG_INFO("netdev: Flow API Enabled");
+
+            ovsthread_once_done(&once);
+        }
+    }
+}
+#else
+void
+netdev_set_flow_api_enabled(const struct smap *ovs_other_config OVS_UNUSED)
+{
+    netdev_flow_api_enabled = false;
+}
+#endif
