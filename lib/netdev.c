@@ -2286,6 +2286,22 @@ netdev_ports_flow_del(const void *obj, const ovs_u128 *ufid,
     return ENOENT;
 }
 
+int
+netdev_ports_flow_get(const void *obj, struct match *match,
+                      struct nlattr **actions, struct dpif_flow_stats *stats,
+                      const ovs_u128 *ufid, struct ofpbuf *buf)
+{
+    struct port_to_netdev_data *data;
+
+    HMAP_FOR_EACH(data, node, &port_to_netdev) {
+        if (data->obj == obj && !netdev_flow_get(data->netdev, match, actions,
+                                                 stats, ufid, buf)) {
+            return 0;
+        }
+    }
+    return ENOENT;
+}
+
 bool netdev_flow_api_enabled = false;
 
 #ifdef __linux__
