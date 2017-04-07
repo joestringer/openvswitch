@@ -498,7 +498,8 @@ find_prev_fhdr(struct sk_buff *skb, u8 *prevhdrp, int *prevhoff, int *fhoff)
 	return 0;
 }
 
-int nf_ct_frag6_gather(struct net *net, struct sk_buff *skb, u32 user)
+#undef nf_ct_frag6_gather
+static int nf_ct_frag6_gather__(struct net *net, struct sk_buff *skb, u32 user)
 {
 	struct net_device *dev = skb->dev;
 	int fhoff, nhoff, ret;
@@ -530,6 +531,7 @@ int nf_ct_frag6_gather(struct net *net, struct sk_buff *skb, u32 user)
 	local_bh_enable();
 #endif
 
+	skb_orphan(skb);
 	fq = fq_find(net, fhdr->identification, user, &hdr->saddr, &hdr->daddr,
 		     ip6_frag_ecn(hdr));
 	if (fq == NULL)
@@ -555,6 +557,11 @@ out_unlock:
 	spin_unlock_bh(&fq->q.lock);
 	inet_frag_put(&fq->q, &nf_frags);
 	return ret;
+}
+
+int rpl_nf_ct_frag6_gather(struct net *net, struct sk_buff *skb, u32 user)
+{
+	return nf_ct_frag6_gather__(net, skb, user);
 }
 
 static void nf_ct_net_exit(struct net *net)
