@@ -64,30 +64,14 @@ static const struct nl_policy linkinfo_policy[] = {
 
 
 static int
-dpif_netlink_rtnl_destroy(const char *name)
+rtnl_transact(uint32_t type, uint32_t flags, const char *name,
+              struct ofpbuf **reply)
 {
     struct ofpbuf request;
     int err;
 
     ofpbuf_init(&request, 0);
-    nl_msg_put_nlmsghdr(&request, 0, RTM_DELLINK, NLM_F_REQUEST | NLM_F_ACK);
-    ofpbuf_put_zeros(&request, sizeof(struct ifinfomsg));
-    nl_msg_put_string(&request, IFLA_IFNAME, name);
-
-    err = nl_transact(NETLINK_ROUTE, &request, NULL);
-    ofpbuf_uninit(&request);
-
-    return err;
-}
-
-static int
-dpif_netlink_rtnl_getlink(const char *name, struct ofpbuf **reply)
-{
-    struct ofpbuf request;
-    int err;
-
-    ofpbuf_init(&request, 0);
-    nl_msg_put_nlmsghdr(&request, 0, RTM_GETLINK, NLM_F_REQUEST);
+    nl_msg_put_nlmsghdr(&request, 0, type, flags);
     ofpbuf_put_zeros(&request, sizeof(struct ifinfomsg));
     nl_msg_put_string(&request, IFLA_IFNAME, name);
 
@@ -96,6 +80,21 @@ dpif_netlink_rtnl_getlink(const char *name, struct ofpbuf **reply)
 
     return err;
 }
+
+static int
+dpif_netlink_rtnl_destroy(const char *name)
+{
+    return rtnl_transact(RTM_DELLINK, NLM_F_REQUEST | NLM_F_ACK, name, NULL);
+}
+
+static int
+dpif_netlink_rtnl_getlink(const char *name, struct ofpbuf **reply)
+{
+    return rtnl_transact(RTM_GETLINK, NLM_F_REQUEST, name, reply);
+}
+
+
+
 
 static int
 dpif_netlink_rtnl_vxlan_verify(struct netdev *netdev, const char *name,
