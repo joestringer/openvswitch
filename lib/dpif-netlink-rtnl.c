@@ -211,7 +211,12 @@ dpif_netlink_rtnl_vxlan_create_kind(struct netdev *netdev, const char *kind)
     err = nl_transact(NETLINK_ROUTE, &request, NULL);
     ofpbuf_uninit(&request);
 
-    if (!err && (err = dpif_netlink_rtnl_vxlan_verify(netdev, name, kind))) {
+    if (err) {
+        return err;
+    }
+
+    err = dpif_netlink_rtnl_vxlan_verify(netdev, name, kind);
+    if (err) {
         dpif_netlink_rtnl_destroy(name);
     }
 
@@ -288,7 +293,12 @@ dpif_netlink_rtnl_gre_create_kind(struct netdev *netdev, const char *kind)
     err = nl_transact(NETLINK_ROUTE, &request, NULL);
     ofpbuf_uninit(&request);
 
-    if (!err && (err = dpif_netlink_rtnl_gre_verify(netdev, name, kind))) {
+    if (err) {
+        return err;
+    }
+
+    err = dpif_netlink_rtnl_gre_verify(netdev, name, kind);
+    if (err) {
         dpif_netlink_rtnl_destroy(name);
     }
 
@@ -376,7 +386,12 @@ dpif_netlink_rtnl_geneve_create_kind(struct netdev *netdev, const char *kind)
     err = nl_transact(NETLINK_ROUTE, &request, NULL);
     ofpbuf_uninit(&request);
 
-    if (!err && (err = dpif_netlink_rtnl_geneve_verify(netdev, name, kind))) {
+    if (err) {
+        return err;
+    }
+
+    err = dpif_netlink_rtnl_geneve_verify(netdev, name, kind);
+    if (err) {
         dpif_netlink_rtnl_destroy(name);
     }
 
