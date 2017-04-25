@@ -126,17 +126,11 @@ rtnl_policy_parse(struct ofpbuf *reply, const char *kind,
 }
 
 static int
-dpif_netlink_rtnl_vxlan_verify(struct netdev *netdev, const char *name,
-                               const char *kind)
+dpif_netlink_rtnl_vxlan_verify(const char *name, const char *kind,
+                               const struct netdev_tunnel_config *tnl_cfg)
 {
-    const struct netdev_tunnel_config *tnl_cfg;
     struct ofpbuf *reply;
     int err;
-
-    tnl_cfg = netdev_get_tunnel_config(netdev);
-    if (!tnl_cfg) {
-        return EINVAL;
-    }
 
     err = dpif_netlink_rtnl_getlink(name, &reply);
 
@@ -151,8 +145,8 @@ dpif_netlink_rtnl_vxlan_verify(struct netdev *netdev, const char *name,
             if (0 != nl_attr_get_u8(vxlan[IFLA_VXLAN_LEARNING])
                 || 1 != nl_attr_get_u8(vxlan[IFLA_VXLAN_COLLECT_METADATA])
                 || 1 != nl_attr_get_u8(vxlan[IFLA_VXLAN_UDP_ZERO_CSUM6_RX])
-                || (tnl_cfg->dst_port !=
-                    nl_attr_get_be16(vxlan[IFLA_VXLAN_PORT]))) {
+                || (tnl_cfg->dst_port
+                    != nl_attr_get_be16(vxlan[IFLA_VXLAN_PORT]))) {
                 err = EINVAL;
             }
         }
@@ -215,7 +209,7 @@ dpif_netlink_rtnl_vxlan_create_kind(struct netdev *netdev, const char *kind)
         return err;
     }
 
-    err = dpif_netlink_rtnl_vxlan_verify(netdev, name, kind);
+    err = dpif_netlink_rtnl_vxlan_verify(name, kind, tnl_cfg);
     if (err) {
         dpif_netlink_rtnl_destroy(name);
     }
@@ -230,8 +224,7 @@ dpif_netlink_rtnl_vxlan_create(struct netdev *netdev)
 }
 
 static int
-dpif_netlink_rtnl_gre_verify(struct netdev *netdev OVS_UNUSED,
-                             const char *name, const char *kind)
+dpif_netlink_rtnl_gre_verify(const char *name, const char *kind)
 {
     struct ofpbuf *reply;
     int err;
@@ -297,7 +290,7 @@ dpif_netlink_rtnl_gre_create_kind(struct netdev *netdev, const char *kind)
         return err;
     }
 
-    err = dpif_netlink_rtnl_gre_verify(netdev, name, kind);
+    err = dpif_netlink_rtnl_gre_verify(name, kind);
     if (err) {
         dpif_netlink_rtnl_destroy(name);
     }
@@ -312,17 +305,11 @@ dpif_netlink_rtnl_gre_create(struct netdev *netdev)
 }
 
 static int
-dpif_netlink_rtnl_geneve_verify(struct netdev *netdev, const char *name,
-                             const char *kind)
+dpif_netlink_rtnl_geneve_verify(const char *name, const char *kind,
+                                const struct netdev_tunnel_config *tnl_cfg)
 {
-    const struct netdev_tunnel_config *tnl_cfg;
     struct ofpbuf *reply;
     int err;
-
-    tnl_cfg = netdev_get_tunnel_config(netdev);
-    if (!tnl_cfg) {
-        return EINVAL;
-    }
 
     err = dpif_netlink_rtnl_getlink(name, &reply);
 
@@ -336,8 +323,8 @@ dpif_netlink_rtnl_geneve_verify(struct netdev *netdev, const char *name,
         if (!err) {
             if (!nl_attr_get_flag(geneve[IFLA_GENEVE_COLLECT_METADATA])
                 || 1 != nl_attr_get_u8(geneve[IFLA_GENEVE_UDP_ZERO_CSUM6_RX])
-                || (tnl_cfg->dst_port !=
-                    nl_attr_get_be16(geneve[IFLA_GENEVE_PORT]))) {
+                || (tnl_cfg->dst_port
+                    != nl_attr_get_be16(geneve[IFLA_GENEVE_PORT]))) {
                 err = EINVAL;
             }
         }
@@ -390,7 +377,7 @@ dpif_netlink_rtnl_geneve_create_kind(struct netdev *netdev, const char *kind)
         return err;
     }
 
-    err = dpif_netlink_rtnl_geneve_verify(netdev, name, kind);
+    err = dpif_netlink_rtnl_geneve_verify(name, kind, tnl_cfg);
     if (err) {
         dpif_netlink_rtnl_destroy(name);
     }
