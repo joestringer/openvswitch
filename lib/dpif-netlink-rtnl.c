@@ -93,15 +93,30 @@ dpif_netlink_rtnl_getlink(const char *name, struct ofpbuf **reply)
     return rtnl_transact(RTM_GETLINK, NLM_F_REQUEST, name, reply);
 }
 
+static bool
+rtnl_policy_parse(struct ofpbuf *reply, const char *kind,
+                  const struct nl_policy *tunnel_policy,
+                  struct nlattr *tunnel[], int policy_size)
+{
+    struct nlattr *linkinfo[ARRAY_SIZE(linkinfo_policy)];
+    struct nlattr *rtlink[ARRAY_SIZE(rtlink_policy)];
+    struct ifinfomsg *ifmsg;
 
-
+    ifmsg = ofpbuf_at(reply, NLMSG_HDRLEN, sizeof *ifmsg);
+    return (nl_policy_parse(reply, NLMSG_HDRLEN + sizeof *ifmsg,
+                            rtlink_policy, rtlink, ARRAY_SIZE(rtlink_policy))
+            && nl_parse_nested(rtlink[IFLA_LINKINFO], linkinfo_policy,
+                               linkinfo, ARRAY_SIZE(linkinfo_policy))
+            && !strcmp(nl_attr_get_string(linkinfo[IFLA_INFO_KIND]), kind)
+            && nl_parse_nested(linkinfo[IFLA_INFO_DATA], tunnel_policy,
+                               tunnel, policy_size));
+}
 
 static int
 dpif_netlink_rtnl_vxlan_verify(struct netdev *netdev, const char *name,
                                const char *kind)
 {
     const struct netdev_tunnel_config *tnl_cfg;
-    struct ifinfomsg *ifmsg;
     struct ofpbuf *reply;
     int err;
 
@@ -120,18 +135,10 @@ dpif_netlink_rtnl_vxlan_verify(struct netdev *netdev, const char *name,
     err = dpif_netlink_rtnl_getlink(name, &reply);
 
     if (!err) {
-        struct nlattr *rtlink[ARRAY_SIZE(rtlink_policy)];
-        struct nlattr *linkinfo[ARRAY_SIZE(linkinfo_policy)];
         struct nlattr *vxlan[ARRAY_SIZE(vxlan_policy)];
 
-        ifmsg = ofpbuf_at(reply, NLMSG_HDRLEN, sizeof *ifmsg);
-        if (!nl_policy_parse(reply, NLMSG_HDRLEN + sizeof *ifmsg,
-                             rtlink_policy, rtlink, ARRAY_SIZE(rtlink_policy))
-            || !nl_parse_nested(rtlink[IFLA_LINKINFO], linkinfo_policy,
-                                linkinfo, ARRAY_SIZE(linkinfo_policy))
-            || strcmp(nl_attr_get_string(linkinfo[IFLA_INFO_KIND]), kind)
-            || !nl_parse_nested(linkinfo[IFLA_INFO_DATA], vxlan_policy, vxlan,
-                                ARRAY_SIZE(vxlan_policy))) {
+        if (!rtnl_policy_parse(reply, kind, vxlan_policy, vxlan,
+                               ARRAY_SIZE(vxlan_policy))) {
             err = EINVAL;
         }
         if (!err) {
@@ -215,7 +222,6 @@ static int
 dpif_netlink_rtnl_gre_verify(struct netdev *netdev OVS_UNUSED,
                              const char *name, const char *kind)
 {
-    struct ifinfomsg *ifmsg;
     struct ofpbuf *reply;
     int err;
 
@@ -226,18 +232,10 @@ dpif_netlink_rtnl_gre_verify(struct netdev *netdev OVS_UNUSED,
     err = dpif_netlink_rtnl_getlink(name, &reply);
 
     if (!err) {
-        struct nlattr *rtlink[ARRAY_SIZE(rtlink_policy)];
-        struct nlattr *linkinfo[ARRAY_SIZE(linkinfo_policy)];
         struct nlattr *gre[ARRAY_SIZE(gre_policy)];
 
-        ifmsg = ofpbuf_at(reply, NLMSG_HDRLEN, sizeof *ifmsg);
-        if (!nl_policy_parse(reply, NLMSG_HDRLEN + sizeof *ifmsg,
-                             rtlink_policy, rtlink, ARRAY_SIZE(rtlink_policy))
-            || !nl_parse_nested(rtlink[IFLA_LINKINFO], linkinfo_policy,
-                                linkinfo, ARRAY_SIZE(linkinfo_policy))
-            || strcmp(nl_attr_get_string(linkinfo[IFLA_INFO_KIND]), kind)
-            || !nl_parse_nested(linkinfo[IFLA_INFO_DATA], gre_policy, gre,
-                                ARRAY_SIZE(gre_policy))) {
+        if (!rtnl_policy_parse(reply, kind, gre_policy, gre,
+                               ARRAY_SIZE(gre_policy))) {
             err = EINVAL;
         }
         if (!err) {
@@ -306,7 +304,6 @@ dpif_netlink_rtnl_geneve_verify(struct netdev *netdev, const char *name,
                              const char *kind)
 {
     const struct netdev_tunnel_config *tnl_cfg;
-    struct ifinfomsg *ifmsg;
     struct ofpbuf *reply;
     int err;
 
@@ -324,18 +321,10 @@ dpif_netlink_rtnl_geneve_verify(struct netdev *netdev, const char *name,
     err = dpif_netlink_rtnl_getlink(name, &reply);
 
     if (!err) {
-        struct nlattr *rtlink[ARRAY_SIZE(rtlink_policy)];
-        struct nlattr *linkinfo[ARRAY_SIZE(linkinfo_policy)];
         struct nlattr *geneve[ARRAY_SIZE(geneve_policy)];
 
-        ifmsg = ofpbuf_at(reply, NLMSG_HDRLEN, sizeof *ifmsg);
-        if (!nl_policy_parse(reply, NLMSG_HDRLEN + sizeof *ifmsg,
-                             rtlink_policy, rtlink, ARRAY_SIZE(rtlink_policy))
-            || !nl_parse_nested(rtlink[IFLA_LINKINFO], linkinfo_policy,
-                                linkinfo, ARRAY_SIZE(linkinfo_policy))
-            || strcmp(nl_attr_get_string(linkinfo[IFLA_INFO_KIND]), kind)
-            || !nl_parse_nested(linkinfo[IFLA_INFO_DATA], geneve_policy,
-                                geneve, ARRAY_SIZE(geneve_policy))) {
+        if (!rtnl_policy_parse(reply, kind, geneve_policy, geneve,
+                               ARRAY_SIZE(geneve_policy))) {
             err = EINVAL;
         }
         if (!err) {
