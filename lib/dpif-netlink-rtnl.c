@@ -54,15 +54,6 @@
 #define IFLA_GENEVE_UDP_ZERO_CSUM6_RX 10
 #endif
 
-static const struct nl_policy rtlink_policy[] = {
-    [IFLA_LINKINFO] = { .type = NL_A_NESTED },
-};
-static const struct nl_policy linkinfo_policy[] = {
-    [IFLA_INFO_KIND] = { .type = NL_A_STRING },
-    [IFLA_INFO_DATA] = { .type = NL_A_NESTED },
-};
-
-
 static int
 rtnl_transact(uint32_t type, uint32_t flags, const char *name,
               struct ofpbuf **reply)
@@ -93,6 +84,28 @@ dpif_netlink_rtnl_getlink(const char *name, struct ofpbuf **reply)
     return rtnl_transact(RTM_GETLINK, NLM_F_REQUEST, name, reply);
 }
 
+static const struct nl_policy rtlink_policy[] = {
+    [IFLA_LINKINFO] = { .type = NL_A_NESTED },
+};
+static const struct nl_policy linkinfo_policy[] = {
+    [IFLA_INFO_KIND] = { .type = NL_A_STRING },
+    [IFLA_INFO_DATA] = { .type = NL_A_NESTED },
+};
+static const struct nl_policy geneve_policy[] = {
+    [IFLA_GENEVE_COLLECT_METADATA] = { .type = NL_A_FLAG },
+    [IFLA_GENEVE_UDP_ZERO_CSUM6_RX] = { .type = NL_A_U8 },
+    [IFLA_GENEVE_PORT] = { .type = NL_A_U16 },
+};
+static const struct nl_policy vxlan_policy[] = {
+    [IFLA_VXLAN_COLLECT_METADATA] = { .type = NL_A_U8 },
+    [IFLA_VXLAN_LEARNING] = { .type = NL_A_U8 },
+    [IFLA_VXLAN_UDP_ZERO_CSUM6_RX] = { .type = NL_A_U8 },
+    [IFLA_VXLAN_PORT] = { .type = NL_A_U16 },
+};
+static const struct nl_policy gre_policy[] = {
+    [IFLA_GRE_COLLECT_METADATA] = { .type = NL_A_FLAG },
+};
+
 static bool
 rtnl_policy_parse(struct ofpbuf *reply, const char *kind,
                   const struct nl_policy *tunnel_policy,
@@ -119,13 +132,6 @@ dpif_netlink_rtnl_vxlan_verify(struct netdev *netdev, const char *name,
     const struct netdev_tunnel_config *tnl_cfg;
     struct ofpbuf *reply;
     int err;
-
-    static const struct nl_policy vxlan_policy[] = {
-        [IFLA_VXLAN_COLLECT_METADATA] = { .type = NL_A_U8 },
-        [IFLA_VXLAN_LEARNING] = { .type = NL_A_U8 },
-        [IFLA_VXLAN_UDP_ZERO_CSUM6_RX] = { .type = NL_A_U8 },
-        [IFLA_VXLAN_PORT] = { .type = NL_A_U16 },
-    };
 
     tnl_cfg = netdev_get_tunnel_config(netdev);
     if (!tnl_cfg) {
@@ -225,10 +231,6 @@ dpif_netlink_rtnl_gre_verify(struct netdev *netdev OVS_UNUSED,
     struct ofpbuf *reply;
     int err;
 
-    static const struct nl_policy gre_policy[] = {
-        [IFLA_GRE_COLLECT_METADATA] = { .type = NL_A_FLAG },
-    };
-
     err = dpif_netlink_rtnl_getlink(name, &reply);
 
     if (!err) {
@@ -306,12 +308,6 @@ dpif_netlink_rtnl_geneve_verify(struct netdev *netdev, const char *name,
     const struct netdev_tunnel_config *tnl_cfg;
     struct ofpbuf *reply;
     int err;
-
-    static const struct nl_policy geneve_policy[] = {
-        [IFLA_GENEVE_COLLECT_METADATA] = { .type = NL_A_FLAG },
-        [IFLA_GENEVE_UDP_ZERO_CSUM6_RX] = { .type = NL_A_U8 },
-        [IFLA_GENEVE_PORT] = { .type = NL_A_U16 },
-    };
 
     tnl_cfg = netdev_get_tunnel_config(netdev);
     if (!tnl_cfg) {
