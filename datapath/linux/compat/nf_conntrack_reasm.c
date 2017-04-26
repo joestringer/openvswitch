@@ -561,9 +561,7 @@ out_unlock:
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0)
 static int nf_ct_net_init(struct net *net)
 {
-	nf_defrag_ipv6_enable(net);
-
-	return 0;
+	return nf_defrag_ipv6_enable(net);
 }
 #endif
 

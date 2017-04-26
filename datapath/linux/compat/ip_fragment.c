@@ -732,9 +732,7 @@ int rpl_ip_defrag(struct net *net, struct sk_buff *skb, u32 user)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0)
 static int __net_init ipv4_frags_init_net(struct net *net)
 {
-	nf_defrag_ipv4_enable(net);
-
-	return 0;
+	return nf_defrag_ipv4_enable(net);
 }
 #endif
 
