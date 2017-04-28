@@ -322,7 +322,8 @@ dnl Looks for STRUCTURE in FILE. If it is found, greps for REGEX within the
 dnl structure definition. If this is successful, runs IF-MATCH, otherwise
 dnl IF_NO_MATCH. If IF-MATCH is empty then it defines to
 dnl OVS_DEFINE(HAVE_<STRUCTURE>_WITH_<REGEX>), with <STRUCTURE> and <REGEX>
-dnl translated to uppercase.
+dnl translated to uppercase.  Note that this works equally well for finding
+dnl enum definitions.
 AC_DEFUN([OVS_FIND_FIELD_IFELSE], [
   AC_MSG_CHECKING([whether $2 has member $3 in $1])
   if test -f $1; then
@@ -551,6 +552,10 @@ AC_DEFUN([OVS_CHECK_LINUX_COMPAT], [
   OVS_GREP_IFELSE([$KSRC/include/net/netfilter/nf_nat.h], [nf_ct_nat_ext_add])
   OVS_GREP_IFELSE([$KSRC/include/net/netfilter/nf_nat.h], [nf_nat_alloc_null_binding])
   OVS_GREP_IFELSE([$KSRC/include/net/netfilter/nf_conntrack_seqadj.h], [nf_ct_seq_adjust])
+  OVS_FIND_FIELD_IFELSE([$KSRC/include/uapi/linux/netfilter/nf_conntrack_common.h],
+                        [ip_conntrack_events], [IPCT_LABEL],
+                        [AC_DEFINE([HAVE_IPCT_LABEL], [1],
+  [Define to 1 if the kernel headers have the IPCT_LABEL defined in enum ip_conntrack_events])])
 
   OVS_GREP_IFELSE([$KSRC/include/linux/random.h], [prandom_u32])
   OVS_GREP_IFELSE([$KSRC/include/linux/random.h], [prandom_u32_max])
