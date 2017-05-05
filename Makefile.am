@@ -100,6 +100,7 @@ dist_pkgdata_SCRIPTS =
 dist_sbin_SCRIPTS =
 dist_scripts_SCRIPTS =
 dist_scripts_DATA =
+dist_bpf_DATA =
 INSTALL_DATA_LOCAL =
 UNINSTALL_LOCAL =
 man_MANS =
@@ -117,6 +118,7 @@ sbin_SCRIPTS =
 scripts_SCRIPTS =
 completion_SCRIPTS =
 scripts_DATA =
+bpf_DATA =
 SUFFIXES =
 check_DATA =
 check_SCRIPTS =
@@ -126,6 +128,7 @@ FLAKE8_PYFILES =
 scriptsdir = $(pkgdatadir)/scripts
 completiondir = $(sysconfdir)/bash_completion.d
 pkgconfigdir = $(libdir)/pkgconfig
+bpfdir = $(pkgdatadir)/bpf
 
 # This ensures that files added to EXTRA_DIST are always distributed,
 # even if they are inside an Automake if...endif conditional block that is
@@ -225,7 +228,7 @@ config-h-check:
 	@cd $(srcdir); \
 	if test -e .git && (git --version) >/dev/null 2>&1 && \
 	  git --no-pager grep -L '#include <config\.h>' `git ls-files | grep '\.c$$' | \
-	    grep -vE '^datapath|^lib/sflow|^third-party|^datapath-windows|^python'`; \
+	    grep -vE '^bpf|^datapath|^lib/sflow|^third-party|^datapath-windows|^python'`; \
 	then \
 	  echo "See above for list of violations of the rule that"; \
 	  echo "every C source file must #include <config.h>."; \
@@ -246,7 +249,7 @@ printf-check:
 	@cd $(srcdir); \
 	if test -e .git && (git --version) >/dev/null 2>&1 && \
 	  git --no-pager grep -n -E -e '%[-+ #0-9.*]*([ztj]|hh)' --and --not -e 'ovs_scan' `git ls-files | grep '\.[ch]$$' | \
-	    grep -vE '^datapath|^lib/sflow|^third-party'`; \
+	    grep -vE '^bpf|^datapath|^lib/sflow|^third-party'`; \
 	then \
 	  echo "See above for list of violations of the rule that"; \
 	  echo "'z', 't', 'j', 'hh' printf() type modifiers are"; \
@@ -289,7 +292,7 @@ check-endian:
 	@if test -e $(srcdir)/.git && (git --version) >/dev/null 2>&1 && \
 	  (cd $(srcdir) && git --no-pager grep -l -E \
 	   -e 'BIG_ENDIAN|LITTLE_ENDIAN' --and --not -e 'BYTE_ORDER' | \
-	  $(EGREP) -v '^datapath/'); \
+	  $(EGREP) -v '^bpf/|^datapath/'); \
 	then \
 	  echo "See above for list of files that misuse LITTLE""_ENDIAN"; \
 	  echo "or BIG""_ENDIAN.  Please use WORDS_BIGENDIAN instead."; \
@@ -303,7 +306,7 @@ thread-safety-check:
 	if test -e .git && (git --version) >/dev/null 2>&1 && \
 	  grep -n -f build-aux/thread-safety-blacklist \
 	    `git ls-files | grep '\.[ch]$$' \
-	      | $(EGREP) -v '^datapath|^lib/sflow|^third-party'` /dev/null \
+	      | $(EGREP) -v '^bpf|^datapath|^lib/sflow|^third-party'` /dev/null \
 	      | $(EGREP) -v ':[ 	]*/?\*'; \
 	then \
 	  echo "See above for list of calls to functions that are"; \
@@ -424,6 +427,7 @@ dist-docs:
 
 include Documentation/automake.mk
 include m4/automake.mk
+include bpf/automake.mk
 include lib/automake.mk
 include ofproto/automake.mk
 include utilities/automake.mk
