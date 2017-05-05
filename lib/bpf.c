@@ -24,6 +24,7 @@
 #include <linux/bpf.h>
 #include <iproute2/bpf_elf.h>
 #include <sys/stat.h>
+#include <sys/resource.h>
 
 #include "bpf.h"
 #include "bpf/odp-bpf.h"
@@ -33,6 +34,7 @@
 
 #define BPF_FS_PATH "/sys/fs/bpf/ovs"
 
+#define MAX_BPF_PROG_ARRAY 64 //FIXME
 VLOG_DEFINE_THIS_MODULE(bpf);
 
 static void
@@ -91,10 +93,17 @@ format_upcalls(struct ds *ds, uint64_t key, void *value OVS_UNUSED)
     ds_put_format(ds, "cpu-%"PRIu64"\n", key);
 }
 
+static void
+format_tailcalls(struct ds *ds, uint64_t key, void *value_)
+{
+    uint32_t value = *(uint32_t *)value_;
+    ds_put_format(ds, "index-%"PRIu64"prog_fd-%d\n", key, value);
+}
+
 static int
 lookup_elem(int fd, void *key, size_t key_len, void *value)
 {
-    int err = bpf_lookup_elem(fd, (uint64_t *)key, (uint64_t *)value);
+    int err = bpf_map_lookup_elem(fd, (uint64_t *)key, (uint64_t *)value);
     if (err) {
         struct ds ds = DS_EMPTY_INITIALIZER;
 
@@ -125,7 +134,7 @@ lookup_elem(int fd, void *key, size_t key_len, void *value)
                 fmt(ds, key, &value);                                   \
             }                                                           \
         }                                                               \
-        while (!bpf_get_next_key(map->fd, &key, &key)) {                \
+        while (!bpf_map_get_next_key(map->fd, &key, &key)) {            \
             count++;                                                    \
             if (fmt) {                                                  \
                 if (!lookup_elem(map->fd, &key, sizeof key, &value)) {  \
@@ -142,6 +151,7 @@ lookup_elem(int fd, void *key, size_t key_len, void *value)
 MAP_FORMAT_FUNC(bpf_format_map_stats, uint64_t, uint64_t, false);
 MAP_FORMAT_FUNC(bpf_format_map_flows, uint64_t, struct bpf_flow, true);
 MAP_FORMAT_FUNC(bpf_format_map_upcalls, uint32_t, uint32_t, true);
+MAP_FORMAT_FUNC(bpf_format_map_tailcalls, uint32_t, uint32_t, true);//FIXME
 
 void
 bpf_format_state(struct ds *ds, struct bpf_state *state)
@@ -151,6 +161,7 @@ bpf_format_state(struct ds *ds, struct bpf_state *state)
     bpf_format_map_stats(ds, &state->datapath_stats, format_dp_stats);
     bpf_format_map_flows(ds, &state->flow_table, NULL);
     bpf_format_map_upcalls(ds, &state->upcalls, format_upcalls);
+    bpf_format_map_tailcalls(ds, &state->tailcalls, format_tailcalls);
     ds_put_cstr(ds, "programs:\n");
     bpf_format_prog(ds, &state->downcall);
     bpf_format_prog(ds, &state->egress);
@@ -170,19 +181,24 @@ bpf_get(struct bpf_state *state, bool verbose)
         int *fd;
         const char *path;
     } objs[] = {
-        {&state->ingress.fd, "progs/ingress_0"},
-        {&state->egress.fd, "progs/egress_0"},
-        {&state->downcall.fd, "progs/downcall_0"},
-        {&state->upcalls.fd, "maps/upcalls"},
-        {&state->flow_table.fd, "maps/flow_table"},
-        {&state->datapath_stats.fd, "maps/datapath_stats"}
+        // progs
+        {&state->ingress.fd, "ingress/0"},
+        {&state->egress.fd, "egress/0"},
+        {&state->downcall.fd, "downcall/0"},
+        // maps
+        {&state->upcalls.fd, "upcalls"},
+        {&state->flow_table.fd, "flow_table"},
+        {&state->datapath_stats.fd, "datapath_stats"},
+        {&state->tailcalls.fd, "tailcalls"},
     };
-    int i, error = 0;
+    int i, k, error = 0;
     char buf[BUFSIZ];
+    int prog_array_fd;
 
     for (i = 0; i < ARRAY_SIZE(objs); i++) {
         struct stat s;
 
+        //Failed to load /sys/fs/bpf/ovs/progs/ingress_0:
         snprintf(buf, ARRAY_SIZE(buf), "%s/%s", BPF_FS_PATH, objs[i].path);
         if (stat(buf, &s)) {
             error = errno;
@@ -200,6 +216,35 @@ bpf_get(struct bpf_state *state, bool verbose)
         }
     }
 
+    prog_array_fd = state->tailcalls.fd;
+
+    VLOG_DBG("start loading/pinning program array\n");
+    for (k = 0; k < BPF_MAX_PROG_ARRAY; k++) {
+        struct stat s;
+        int prog_fd;
+
+        state->tailarray[k].fd = 0;
+
+        snprintf(buf, ARRAY_SIZE(buf), "%s/tail-%d/0", BPF_FS_PATH, k);
+        if (stat(buf, &s)) {
+            continue;
+        }
+
+        prog_fd = bpf_obj_get(buf);
+        if (prog_fd > 0) {
+            VLOG_DBG("Loaded BPF object at %s", buf);
+            state->tailarray[k].fd = prog_fd;
+            error = bpf_map_update_elem(prog_array_fd, &k, &prog_fd, BPF_ANY);
+            if (error < 0) {
+                VLOG_ERR("Can not add %s into BPF_MAP_PROG_ARRAY\n", buf);
+                break;
+            }
+        } else {
+            error = errno;
+            break;
+        }
+    }
+
     if (error) {
         VLOG(verbose ? VLL_WARN : VLL_DBG, "Failed to load %s: %s",
              buf, ovs_strerror(error));
@@ -207,6 +252,11 @@ bpf_get(struct bpf_state *state, bool verbose)
         for (int j = 0; j < i; j++) {
             close(*objs[j].fd);
             *objs[j].fd = 0;
+        }
+
+        for (int j = 0; j < BPF_MAX_PROG_ARRAY; j++) {
+            if (state->tailarray[j].fd)
+                close(state->tailarray[j].fd);
         }
     }
 
@@ -220,6 +270,8 @@ bpf_get(struct bpf_state *state, bool verbose)
         state->upcalls.name = xstrdup("upcalls");
         state->flow_table.name = xstrdup("flow_table");
         state->datapath_stats.name = xstrdup("datapath_stats");
+        // add parser, lookup, action, deparser
+        state->tailcalls.name = xstrdup("tailcalls");
     }
 
     return error;
@@ -265,7 +317,7 @@ process(struct bpf_object *obj)
         int error;
 
         VLOG_DBG(" - %s\n",  title);
-        error = bpf_program__set_sched_cls(prog);
+        error = bpf_program__set_sched_cls(prog); // or sched_act?
         if (error) {
             VLOG_WARN("Failed to set '%s' prog type: %s\n", title,
                       ovs_strerror(error));
@@ -294,8 +346,14 @@ bpf_load(const char *path)
     struct bpf_state state;
     struct bpf_object *obj;
     long error;
+    struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
 
-    if (!bpf_get(&state, false)) {
+    if ((error = setrlimit(RLIMIT_MEMLOCK, &r))) {
+        VLOG_ERR("Failed to set rlimit %s", ovs_strerror(error));
+        return error;
+    }
+
+    if (!bpf_get(&state, true)) {
         /* XXX: Restart; Upgrade */
         VLOG_INFO("Re-using preloaded BPF datapath");
         bpf_put(&state);
@@ -314,11 +372,14 @@ bpf_load(const char *path)
         stage = "load";
         goto close;
     }
-    error = bpf_object__pin(obj, "ovs");
+    // need to load bpf fs first, otherwise mkdir fails
+    error = bpf_object__pin(obj, BPF_FS_PATH);
+    //error = bpf_object__pin(obj, "ovs");
     if (error) {
         stage = "pin";
         goto close;
     }
+
     error = bpf_object__unload(obj);
     if (error) {
         stage = "unload";

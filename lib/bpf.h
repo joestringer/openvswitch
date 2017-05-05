@@ -38,14 +38,19 @@ struct bpf_map {
 struct bpf_state;
 struct ds;
 
+#define BPF_MAX_PROG_ARRAY 64
 struct bpf_state {
     /* File descriptors for programs. */
     struct bpf_prog ingress;            /* BPF_PROG_TYPE_SCHED_CLS */
     struct bpf_prog egress;             /* BPF_PROG_TYPE_SCHED_CLS */
     struct bpf_prog downcall;           /* BPF_PROG_TYPE_SCHED_CLS */
+    struct bpf_prog tailarray[BPF_MAX_PROG_ARRAY];
+    // william: struct bpf_prog parser, deparser, action,
+
     struct bpf_map upcalls;             /* BPF_MAP_TYPE_PERF_ARRAY */
     struct bpf_map flow_table;          /* BPF_MAP_TYPE_HASH */
     struct bpf_map datapath_stats;      /* BPF_MAP_TYPE_ARRAY */
+    struct bpf_map tailcalls;           /* BPF_PROG_TYPE_PROG_ARRARY */
 };
 
 int bpf_get(struct bpf_state *state, bool verbose);

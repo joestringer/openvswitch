@@ -27,11 +27,26 @@
  */
 
 #include <linux/bpf.h>
-
+#include <stdint.h>
 #include <iproute2/bpf_elf.h>
 
+/* Two sets of BPF program are used here
+ * OVSBPF_ACTION_CALL: for executing OVS actions
+ * OVSBPF_INGRESS_CALL: for parse, match, lookup, and deparser
+ */
+#define OVSBPF_ACTION_CALLS     3 /* map id and its call index below */
+#define UNSPEC_CALL             0
+#define OUTPUT_CALL             1
+#define PUSH_VLAN_CALL          4
+
+#define OVSBPF_INGRESS_CALLS    4 /* map id and its call index below */
+#define PARSER_CALL             32
+#define MATCH_ACTION_CALL       33
+#define DEPARSER_CALL           34
+#define UPCALL_CALL             35
+
 #ifndef TC_ACT_OK
-#define TC_ACT_OK 0
+#define TC_ACT_OK               0
 #define TC_ACT_RECLASSIFY       1
 #define TC_ACT_SHOT             2
 #define TC_ACT_PIPE             3
@@ -91,8 +106,8 @@
 #endif
 
 #ifndef __section_tail
-# define __section_tail(ID, KEY)					\
-	__section(__stringify(ID) "/" __stringify(KEY))
+# define __section_tail(KEY)					\
+	__section("tail-" __stringify(KEY))
 #endif
 
 #ifndef __section_cls_entry
@@ -140,9 +155,22 @@
 		  PIN, MAX_ELEM)
 #endif
 
+/*
+#ifndef BPF_PERCPU_HASH
+# define BPF_PERCPU_HASH(NAME, ID, SIZE_KEY, SIZE_VALUE, PIN, MAX_ELEM)	\
+	__BPF_MAP(NAME, BPF_MAP_TYPE_PERCPU_HASH, ID, SIZE_KEY, SIZE_VALUE,	\
+		  PIN, MAX_ELEM)
+#endif
+*/
 #ifndef BPF_ARRAY
 # define BPF_ARRAY(NAME, ID, SIZE_VALUE, PIN, MAX_ELEM)			\
 	__BPF_MAP(NAME, BPF_MAP_TYPE_ARRAY, ID, sizeof(uint32_t), 	\
+		  SIZE_VALUE, PIN, MAX_ELEM)
+#endif
+
+#ifndef BPF_PERCPU_ARRAY
+# define BPF_PERCPU_ARRAY(NAME, ID, SIZE_VALUE, PIN, MAX_ELEM)			\
+	__BPF_MAP(NAME, BPF_MAP_TYPE_PERCPU_ARRAY, ID, sizeof(uint32_t), 	\
 		  SIZE_VALUE, PIN, MAX_ELEM)
 #endif
 

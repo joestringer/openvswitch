@@ -172,6 +172,7 @@ dpif_bpf_open(const struct dpif_class *dpif_class OVS_UNUSED,
 
     error = dpif_bpf_init();
     if (error) {
+        VLOG_WARN("dpif_bpf_init failed");
         return error;
     }
 
@@ -266,7 +267,7 @@ create_dpif_bpf(const char *name, struct dpif_bpf **dp)
     ovs_assert(datapath.bpf.upcalls.fd != -1);
 
     for (i = 0; i < dpif->n_channels; i++) {
-        error = bpf_update_elem(datapath.bpf.upcalls.fd, &i,
+        error = bpf_map_update_elem(datapath.bpf.upcalls.fd, &i,
                                 &dpif->channels[i].fd, 0);
         if (error) {
             VLOG_WARN("failed to insert channel fd on cpu=%d: %s",
@@ -323,13 +324,13 @@ dpif_bpf_get_stats(const struct dpif *dpif OVS_UNUSED,
 
     memset(stats, 0, sizeof(*stats));
     key = OVS_DP_STATS_HIT;
-    if (bpf_lookup_elem(datapath.bpf.datapath_stats.fd, &key,
+    if (bpf_map_lookup_elem(datapath.bpf.datapath_stats.fd, &key,
                         &stats->n_hit)) {
         VLOG_INFO("datapath_stats lookup failed (%d): %s", key,
                   ovs_strerror(errno));
     }
     key = OVS_DP_STATS_MISSED;
-    if (bpf_lookup_elem(datapath.bpf.datapath_stats.fd, &key,
+    if (bpf_map_lookup_elem(datapath.bpf.datapath_stats.fd, &key,
                         &stats->n_missed)) {
         VLOG_INFO("datapath_stats lookup failed (%d): %s", key,
                   ovs_strerror(errno));
@@ -756,13 +757,14 @@ dpif_bpf_port_poll_wait(const struct dpif *dpif_)
 static int
 dpif_bpf_flow_flush(struct dpif *dpif OVS_UNUSED)
 {
-    uint64_t key = 0;
+    struct bpf_flow_key key;
     int err = 0;
 
+    memset(&key, 0, sizeof key);
     do {
-        err = bpf_get_next_key(datapath.bpf.flow_table.fd, &key, &key);
+        err = bpf_map_get_next_key(datapath.bpf.flow_table.fd, &key, &key);
         if (!err) {
-            bpf_delete_elem(datapath.bpf.flow_table.fd, &key);
+            bpf_map_delete_elem(datapath.bpf.flow_table.fd, &key);
         }
     } while (!err);
 
@@ -772,7 +774,7 @@ dpif_bpf_flow_flush(struct dpif *dpif OVS_UNUSED)
 struct dpif_bpf_flow_dump {
     struct dpif_flow_dump up;
     int status;
-    uint64_t pos;
+    struct bpf_flow_key pos;
     struct ovs_mutex mutex;
 };
 
@@ -840,19 +842,39 @@ dpif_bpf_flow_dump_thread_destroy(struct dpif_flow_dump_thread *thread_)
 }
 
 static int
-fetch_flow(struct dpif_flow *flow OVS_UNUSED, uint64_t *position)
+fetch_flow(struct dpif_flow *flow OVS_UNUSED, struct bpf_flow_key *position)
 {
-    struct bpf_flow dp_flow;
+    struct bpf_flow dp_flow OVS_UNUSED;
+    struct bpf_action_batch action;
     int err;
 
-    err = bpf_lookup_elem(datapath.bpf.flow_table.fd, position,
-                          (uint64_t *)&dp_flow);
+    err = bpf_map_lookup_elem(datapath.bpf.flow_table.fd, position,
+                          &action);
     if (err) {
         return errno;
     }
 
     /* XXX: Extract 'dp_flow' into 'flow'. */
     return EOPNOTSUPP;
+}
+
+static int
+dpif_bpf_insert_flow(struct bpf_flow_key *flow_key,
+                     struct bpf_action_batch *actions)
+{
+    int err;
+
+    ovs_assert(datapath.bpf.flow_table.fd != -1);
+    err = bpf_map_update_elem(datapath.bpf.flow_table.fd,
+                              flow_key,
+                              actions, BPF_ANY);
+    if (err) {
+        VLOG_ERR("Failed to add flow into flow table, map fd %d, error %s",
+                    datapath.bpf.flow_table.fd,
+                    ovs_strerror(errno));
+        return errno;
+    }
+    return 0;
 }
 
 static int
@@ -871,7 +893,7 @@ dpif_bpf_flow_dump_next(struct dpif_flow_dump_thread *thread_,
     }
 
     while (n <= max_flows) {
-        err = bpf_get_next_key(datapath.bpf.flow_table.fd,
+        err = bpf_map_get_next_key(datapath.bpf.flow_table.fd,
                                &dump->pos, &dump->pos);
         if (err) {
             err = errno;
@@ -961,18 +983,86 @@ dpif_bpf_execute(struct dpif *dpif_, struct dpif_execute *execute)
 }
 
 static void
+dpif_bpf_flow_actions(struct dpif *dpif_,
+                      struct bpf_action_batch *action_batch,
+                      const struct nlattr *nlactions,
+                      size_t actions_len)
+{
+    const struct nlattr *a;
+    unsigned int left, count = 0;
+    struct bpf_action *actions;
+    struct dpif_bpf *dpif = dpif_bpf_cast(dpif_);
+
+    memset(action_batch, 0, sizeof(*action_batch));
+    actions = action_batch->actions;
+
+    NL_ATTR_FOR_EACH_UNSAFE (a, left, nlactions, actions_len) {
+        int type = nl_attr_type(a);
+        actions[count].type = type;
+
+        switch (type) {
+        case OVS_ACTION_ATTR_UNSPEC:
+            VLOG_ERR("unspec action");
+            break;
+        case OVS_ACTION_ATTR_OUTPUT: {
+            struct dpif_bpf_port *port;
+            odp_port_t port_no = nl_attr_get_odp_port(a);
+
+            ovs_mutex_lock(&dpif->port_mutex);
+            port = bpf_lookup_port(dpif, port_no);
+            if (port) {
+                VLOG_INFO("output action to port %d ifindex %d", port_no, port->ifindex);
+                actions[count].u.port = port->ifindex;
+            }
+            ovs_mutex_unlock(&dpif->port_mutex);
+            break;
+        }
+        default:
+            VLOG_WARN("action type %d",  nl_attr_type(a));
+            break;
+        }
+        count++;
+    }
+
+    VLOG_INFO("total number of BPF actions: %d", count);
+}
+
+static void
 dpif_bpf_operate(struct dpif *dpif, struct dpif_op **ops, size_t n_ops)
 {
     for (int i = 0; i < n_ops; i++) {
         struct dpif_op *op = ops[i];
+        struct dpif_flow_put *put;
+        struct dpif_flow_del *del OVS_UNUSED;
+        struct dpif_flow_get *get OVS_UNUSED;
+
+        struct bpf_flow_key *flow_key;
 
         switch (op->type) {
         case DPIF_OP_EXECUTE:
             op->error = dpif_bpf_execute(dpif, &op->u.execute);
             break;
-        case DPIF_OP_FLOW_PUT:
+        case DPIF_OP_FLOW_PUT: {
+            int error;
+            struct bpf_action_batch action_batch;
+
+            put = &op->u.flow_put;
+            flow_key = (struct bpf_flow_key *) put->key;
+            dpif_bpf_flow_actions(dpif, &action_batch, put->actions, put->actions_len);
+
+            error = dpif_bpf_insert_flow(flow_key, &action_batch);
+            if (error)
+                op->error = error;
+            break;
+        }
         case DPIF_OP_FLOW_GET:
+            VLOG_INFO("get bpf_flow_key and actions");
+            break;
         case DPIF_OP_FLOW_DEL:
+            /* XXX: need to construct bpf_flow_key and
+                    remove from flow_table map */
+            VLOG_INFO("del bpf_flow_key");
+            break;
         default:
             /* XXX: Implement */
             op->error = EOPNOTSUPP;
@@ -1122,14 +1212,17 @@ perf_sample_to_upcall(struct dpif_bpf *dp, struct ovs_ebpf_event *e,
     pkt_metadata_init(&upcall->packet.md, port_no);
     extract_key(&upcall->packet, buffer);
     ofpbuf_prealloc_tailroom(buffer, sizeof(struct bpf_downcall));
-
     memset(upcall, 0, sizeof *upcall);
     upcall->type = DPIF_UC_MISS;
     dp_packet_use_stub(&upcall->packet, buffer->header,
                        pkt_len + sizeof(struct bpf_downcall));
     dp_packet_set_size(&upcall->packet, pkt_len);
-    upcall->key = buffer->msg;
-    upcall->key_len = buffer->size - pre_key_len;
+
+    // convert bpf_flow_key to nlattr
+    //upcall->key = buffer->msg;
+    //upcall->key_len = buffer->size - pre_key_len;
+    upcall->key = (struct nlattr *) &(e->header.key);
+    upcall->key_len = sizeof(struct bpf_flow_key);
     dpif_flow_hash(&dp->dpif, upcall->key, upcall->key_len, &upcall->ufid);
 
     return 0;
