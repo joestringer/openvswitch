@@ -168,6 +168,7 @@ bool netdev_mtu_is_user_config(struct netdev *);
 int netdev_get_ifindex(const struct netdev *);
 int netdev_set_tx_multiq(struct netdev *, unsigned int n_txq);
 enum netdev_pt_mode netdev_get_pt_mode(const struct netdev *);
+uint32_t netdev_hash_port_no(odp_port_t port_no);
 
 /* Packet reception. */
 int netdev_rxq_open(struct netdev *, struct netdev_rxq **, int id);
