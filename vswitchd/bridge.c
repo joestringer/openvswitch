@@ -20,6 +20,7 @@
 #include <stdlib.h>
 
 #include "async-append.h"
+#include "bpf.h"
 #include "bfd.h"
 #include "bitmap.h"
 #include "cfm.h"
@@ -506,6 +507,21 @@ bridge_exit(bool delete_datapath)
         bridge_destroy(br, delete_datapath);
     }
     ovsdb_idl_destroy(idl);
+}
+
+static void
+init_ebpf(const struct ovsrec_open_vswitch *ovs_cfg OVS_UNUSED)
+{
+    static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
+
+    if (ovsthread_once_start(&once)) {
+        char *bpf_elf = xasprintf("%s/bpf/datapath.o", ovs_pkgdatadir());
+
+        bpf_init();
+        bpf_load(bpf_elf);
+        free(bpf_elf);
+        ovsthread_once_done(&once);
+    }
 }
 
 /* Looks at the list of managers in 'ovs_cfg' and extracts their remote IP
@@ -2953,6 +2969,7 @@ bridge_run(void)
     if (cfg) {
         netdev_set_flow_api_enabled(&cfg->other_config);
         dpdk_init(&cfg->other_config);
+        init_ebpf(cfg);
     }
 
     /* Initialize the ofproto library.  This only needs to run once, but
