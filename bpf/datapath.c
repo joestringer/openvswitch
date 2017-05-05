@@ -23,26 +23,18 @@
 #include "api.h"
 #include "odp-bpf.h"
 
+/* Instead of having multiple BPF object files,
+ * include all headers and generate one datapath.o
+ */
+#include "maps.h"
+#include "parser.h"
+#include "lookup.h"
+#include "deparser.h"
+#include "action.h"
+
 /* We don't rely on specific versions of the kernel; however libbpf requires
  * this to be both specified and non-zero. */
 static const __maybe_unused __section("version") uint32_t version = 0x1;
-
-BPF_HASH(flow_table,
-         0,
-         sizeof(uint64_t),
-         sizeof(struct bpf_flow),
-         PIN_GLOBAL_NS,
-         1
-);
-BPF_PERF_OUTPUT(upcalls, PIN_GLOBAL_NS);
-
-/* XXX: Percpu */
-BPF_ARRAY(datapath_stats,
-          0,
-          sizeof(uint64_t),
-          PIN_GLOBAL_NS,
-          __OVS_DP_STATS_MAX
-);
 
 static inline void __maybe_unused
 bpf_debug(struct __sk_buff *skb, enum ovs_dbg_subtype subtype, int error)
@@ -76,18 +68,38 @@ stats_account(enum ovs_bpf_dp_stats index)
     }
 }
 
-static inline int process(struct __sk_buff *skb, int ifindex)
+__section_tail(UPCALL_CALL)
+static inline int process_upcall(struct __sk_buff *skb) //remove ifindex
 {
     uint64_t flags = skb->len;
     struct bpf_upcall md = {
         .type = OVS_UPCALL_MISS,
-        .ifindex = ifindex,
         .skb_len = skb->len,
+        .ifindex = skb->ingress_ifindex,
     };
     int stat, err;
+    struct ebpf_headers_t *hdrs = bpf_get_headers();
+    struct ebpf_metadata_t *mds = bpf_get_mds();
+
+    if (!skb)
+        return TC_ACT_OK;
+
+    if (!hdrs || !mds) {
+        printt("headers/mds is NULL\n");
+        return TC_ACT_OK;
+    }
+
+    if (hdrs->icmp.valid)
+        printk("upcall ICMP packet\n");
+
+    // memset(&md, 0, sizeof(md));
+    memcpy(&md.key.headers, hdrs, sizeof(struct ebpf_headers_t));
+    memcpy(&md.key.mds, mds, sizeof(struct ebpf_metadata_t));
 
     flags <<= 32;
     flags |= BPF_F_CURRENT_CPU;
+
+    printt("upcall skb->len %d md len %d\n", skb->len, sizeof(md));
 
     err = skb_event_output(skb, &upcalls, flags, &md, sizeof(md));
     stat = !err ? OVS_DP_STATS_MISSED
@@ -97,18 +109,33 @@ static inline int process(struct __sk_buff *skb, int ifindex)
     return TC_ACT_OK;
 }
 
+static void cb_init(struct __sk_buff *skb)
+{
+    int i;
+    for (i = 0; i < 5; i++)
+        skb->cb[i] = 0;
+}
+
+/* ENTRY POINT */
 __section("ingress")
 static int to_stack(struct __sk_buff *skb)
 {
     printt("ingress from %d (%d)\n", skb->ingress_ifindex, skb->ifindex);
-    return process(skb, skb->ingress_ifindex);
+
+    cb_init(skb);
+    bpf_tail_call(skb, &tailcalls, PARSER_CALL);
+
+    printt("[ERROR] tail call fail\n");
+    return TC_ACT_OK;
 }
 
 __section("egress")
 static int from_stack(struct __sk_buff *skb)
 {
     printt("egress from %d (%d)\n", skb->ingress_ifindex, skb->ifindex);
-    return process(skb, skb->ifindex);
+    bpf_tail_call(skb, &tailcalls, UPCALL_CALL);
+    printt("[ERROR] tail call fail\n");
+    return 0;
 }
 
 __section("downcall")
