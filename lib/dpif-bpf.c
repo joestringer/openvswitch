@@ -1017,8 +1017,17 @@ dpif_bpf_flow_actions(struct dpif *dpif_,
             ovs_mutex_unlock(&dpif->port_mutex);
             break;
         }
+        case OVS_ACTION_ATTR_PUSH_VLAN: {
+            const struct ovs_action_push_vlan *vlan = nl_attr_get(a);
+            actions[count].u.push_vlan = *vlan;
+            VLOG_DBG("push vlan tpid %x tci %x", vlan->vlan_tpid, vlan->vlan_tci);
+            break;
+        }
+        case OVS_ACTION_ATTR_POP_VLAN:
+            VLOG_DBG("pop vlan");
+            break;
         default:
-            VLOG_WARN("action type %d",  nl_attr_type(a));
+            VLOG_WARN("Unsupported action type %d",  nl_attr_type(a));
             break;
         }
         count++;
