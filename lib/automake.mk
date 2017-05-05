@@ -9,6 +9,7 @@ lib_LTLIBRARIES += lib/libopenvswitch.la
 
 lib_libopenvswitch_la_LIBADD = $(SSL_LIBS)
 lib_libopenvswitch_la_LIBADD += $(CAPNG_LDADD)
+lib_libopenvswitch_la_LIBADD += $(BPF_LDADD)
 
 if WIN32
 lib_libopenvswitch_la_LIBADD += ${PTHREAD_LIBS}
@@ -374,6 +375,14 @@ lib_libopenvswitch_la_SOURCES += \
 	lib/route-table.h \
 	lib/tc.c \
 	lib/tc.h
+endif
+
+if HAVE_BPF
+lib_libopenvswitch_la_SOURCES += \
+	lib/bpf.c \
+	lib/dpif-bpf.c \
+	lib/perf-event.h \
+	lib/perf-event.c
 endif
 
 if DPDK_NETDEV
