@@ -177,7 +177,9 @@ static int tail_action_push_vlan(struct __sk_buff *skb)
         return TC_ACT_SHOT;
 
     printt("vlan push tci %d\n", action->u.push_vlan.vlan_tci);
-    bpf_skb_vlan_push(skb, 0x0081, action->u.push_vlan.vlan_tci & ~VLAN_TAG_PRESENT);
+    printt("vlan push tpid %d\n", action->u.push_vlan.vlan_tpid);
+    bpf_skb_vlan_push(skb, action->u.push_vlan.vlan_tpid,
+                           action->u.push_vlan.vlan_tci & ~VLAN_TAG_PRESENT);
 
     post_tail_action(skb, batch);
     return TC_ACT_SHOT;
