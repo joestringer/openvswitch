@@ -1412,12 +1412,6 @@ dp_netdev_reload_pmd__(struct dp_netdev_pmd_thread *pmd)
     ovs_mutex_unlock(&pmd->cond_mutex);
 }
 
-static uint32_t
-hash_port_no(odp_port_t port_no)
-{
-    return hash_int(odp_to_u32(port_no), 0);
-}
-
 static int
 port_create(const char *devname, const char *type,
             odp_port_t port_no, struct dp_netdev_port **portp)
@@ -1485,7 +1479,7 @@ do_add_port(struct dp_netdev *dp, const char *devname, const char *type,
         return error;
     }
 
-    hmap_insert(&dp->ports, &port->node, hash_port_no(port_no));
+    hmap_insert(&dp->ports, &port->node, netdev_hash_port_no(port_no));
     seq_change(dp->port_seq);
 
     reconfigure_datapath(dp);
@@ -1555,7 +1549,8 @@ dp_netdev_lookup_port(const struct dp_netdev *dp, odp_port_t port_no)
 {
     struct dp_netdev_port *port;
 
-    HMAP_FOR_EACH_WITH_HASH (port, node, hash_port_no(port_no), &dp->ports) {
+    HMAP_FOR_EACH_WITH_HASH (port, node, netdev_hash_port_no(port_no),
+                             &dp->ports) {
         if (port->port_no == port_no) {
             return port;
         }
@@ -1715,7 +1710,7 @@ dp_netdev_pmd_lookup_dpcls(struct dp_netdev_pmd_thread *pmd,
                            odp_port_t in_port)
 {
     struct dpcls *cls;
-    uint32_t hash = hash_port_no(in_port);
+    uint32_t hash = netdev_hash_port_no(in_port);
     CMAP_FOR_EACH_WITH_HASH (cls, node, hash, &pmd->classifiers) {
         if (cls->in_port == in_port) {
             /* Port classifier exists already */
@@ -1731,7 +1726,7 @@ dp_netdev_pmd_find_dpcls(struct dp_netdev_pmd_thread *pmd,
     OVS_REQUIRES(pmd->flow_mutex)
 {
     struct dpcls *cls = dp_netdev_pmd_lookup_dpcls(pmd, in_port);
-    uint32_t hash = hash_port_no(in_port);
+    uint32_t hash = netdev_hash_port_no(in_port);
 
     if (!cls) {
         /* Create new classifier for in_port */
@@ -3117,7 +3112,7 @@ tx_port_lookup(const struct hmap *hmap, odp_port_t port_no)
 {
     struct tx_port *tx;
 
-    HMAP_FOR_EACH_IN_BUCKET (tx, node, hash_port_no(port_no), hmap) {
+    HMAP_FOR_EACH_IN_BUCKET (tx, node, netdev_hash_port_no(port_no), hmap) {
         if (tx->port->port_no == port_no) {
             return tx;
         }
@@ -3672,13 +3667,13 @@ pmd_load_cached_ports(struct dp_netdev_pmd_thread *pmd)
         if (netdev_has_tunnel_push_pop(tx_port->port->netdev)) {
             tx_port_cached = xmemdup(tx_port, sizeof *tx_port_cached);
             hmap_insert(&pmd->tnl_port_cache, &tx_port_cached->node,
-                        hash_port_no(tx_port_cached->port->port_no));
+                        netdev_hash_port_no(tx_port_cached->port->port_no));
         }
 
         if (netdev_n_txq(tx_port->port->netdev)) {
             tx_port_cached = xmemdup(tx_port, sizeof *tx_port_cached);
             hmap_insert(&pmd->send_port_cache, &tx_port_cached->node,
-                        hash_port_no(tx_port_cached->port->port_no));
+                        netdev_hash_port_no(tx_port_cached->port->port_no));
         }
     }
 }
@@ -4379,7 +4374,8 @@ dp_netdev_add_port_tx_to_pmd(struct dp_netdev_pmd_thread *pmd,
     tx->port = port;
     tx->qid = -1;
 
-    hmap_insert(&pmd->tx_ports, &tx->node, hash_port_no(tx->port->port_no));
+    hmap_insert(&pmd->tx_ports, &tx->node,
+                netdev_hash_port_no(tx->port->port_no));
     pmd->need_reload = true;
 }
 
@@ -5476,7 +5472,7 @@ dpif_dummy_change_port_number(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
     /* Reinsert with new port number. */
     port->port_no = port_no;
-    hmap_insert(&dp->ports, &port->node, hash_port_no(port_no));
+    hmap_insert(&dp->ports, &port->node, netdev_hash_port_no(port_no));
     reconfigure_datapath(dp);
 
     seq_change(dp->port_seq);
