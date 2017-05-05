@@ -72,6 +72,9 @@ static const struct dpif_class *base_dpif_classes[] = {
     &dpif_netlink_class,
 #endif
     &dpif_netdev_class,
+#if HAVE_BPF  /* XXX: Linux 4.9+ */
+    &dpif_bpf_class,
+#endif
 };
 
 struct registered_dpif_class {

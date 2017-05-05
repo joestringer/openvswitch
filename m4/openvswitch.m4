@@ -569,7 +569,7 @@ TEST_ATOMIC_TYPE(unsigned long long int);
 dnl OVS_CHECK_ATOMIC_ALWAYS_LOCK_FREE(SIZE)
 dnl
 dnl Checks __atomic_always_lock_free(SIZE, 0)
-AC_DEFUN([OVS_CHECK_ATOMIC_ALWAYS_LOCK_FREE], 
+AC_DEFUN([OVS_CHECK_ATOMIC_ALWAYS_LOCK_FREE],
   [AC_CACHE_CHECK(
     [value of __atomic_always_lock_free($1)],
     [ovs_cv_atomic_always_lock_free_$1],
