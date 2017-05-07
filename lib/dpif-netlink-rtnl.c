@@ -45,6 +45,15 @@
 #define IFLA_GRE_COLLECT_METADATA 18
 #endif
 
+#ifndef IFLA_GENEVE_MAX
+#define IFLA_GENEVE_MAX 0
+#endif
+#if IFLA_GENEVE_MAX < 10
+#define IFLA_GENEVE_PORT 5
+#define IFLA_GENEVE_COLLECT_METADATA 6
+#define IFLA_GENEVE_UDP_ZERO_CSUM6_RX 10
+#endif
+
 static const struct nl_policy rtlink_policy[] = {
     [IFLA_LINKINFO] = { .type = NL_A_NESTED },
 };
@@ -60,6 +69,11 @@ static const struct nl_policy vxlan_policy[] = {
 };
 static const struct nl_policy gre_policy[] = {
     [IFLA_GRE_COLLECT_METADATA] = { .type = NL_A_FLAG },
+};
+static const struct nl_policy geneve_policy[] = {
+    [IFLA_GENEVE_COLLECT_METADATA] = { .type = NL_A_FLAG },
+    [IFLA_GENEVE_UDP_ZERO_CSUM6_RX] = { .type = NL_A_U8 },
+    [IFLA_GENEVE_PORT] = { .type = NL_A_U16 },
 };
 
 static int
@@ -178,6 +192,34 @@ dpif_netlink_rtnl_gre_verify(const struct netdev_tunnel_config OVS_UNUSED *tnl,
 }
 
 static int
+dpif_netlink_rtnl_geneve_verify(const struct netdev_tunnel_config *tnl_cfg,
+                                const char *name, const char *kind)
+{
+    struct ofpbuf *reply;
+    int err;
+
+    err = dpif_netlink_rtnl_getlink(name, &reply);
+
+    if (!err) {
+        struct nlattr *geneve[ARRAY_SIZE(geneve_policy)];
+
+        err = rtnl_policy_parse(kind, reply, geneve_policy, geneve,
+                                ARRAY_SIZE(geneve_policy));
+        if (!err) {
+            if (!nl_attr_get_flag(geneve[IFLA_GENEVE_COLLECT_METADATA])
+                || 1 != nl_attr_get_u8(geneve[IFLA_GENEVE_UDP_ZERO_CSUM6_RX])
+                || (tnl_cfg->dst_port
+                    != nl_attr_get_be16(geneve[IFLA_GENEVE_PORT]))) {
+                err = EINVAL;
+            }
+        }
+        ofpbuf_delete(reply);
+    }
+
+    return err;
+}
+
+static int
 dpif_netlink_rtnl_verify(const struct netdev_tunnel_config *tnl_cfg,
                          enum ovs_vport_type type, const char *name)
 {
@@ -187,6 +229,7 @@ dpif_netlink_rtnl_verify(const struct netdev_tunnel_config *tnl_cfg,
     case OVS_VPORT_TYPE_GRE:
         return dpif_netlink_rtnl_gre_verify(tnl_cfg, name, "gretap");
     case OVS_VPORT_TYPE_GENEVE:
+        return dpif_netlink_rtnl_geneve_verify(tnl_cfg, name, "geneve");
     case OVS_VPORT_TYPE_NETDEV:
     case OVS_VPORT_TYPE_INTERNAL:
     case OVS_VPORT_TYPE_LISP:
@@ -235,6 +278,10 @@ dpif_netlink_rtnl_create(const struct netdev_tunnel_config *tnl_cfg,
         nl_msg_put_flag(&request, IFLA_GRE_COLLECT_METADATA);
         break;
     case OVS_VPORT_TYPE_GENEVE:
+        nl_msg_put_flag(&request, IFLA_GENEVE_COLLECT_METADATA);
+        nl_msg_put_u8(&request, IFLA_GENEVE_UDP_ZERO_CSUM6_RX, 1);
+        nl_msg_put_be16(&request, IFLA_GENEVE_PORT, tnl_cfg->dst_port);
+        break;
     case OVS_VPORT_TYPE_NETDEV:
     case OVS_VPORT_TYPE_INTERNAL:
     case OVS_VPORT_TYPE_LISP:
@@ -286,6 +333,8 @@ try_again:
         err = dpif_netlink_rtnl_create(tnl_cfg, name, type, "gretap", flags);
         break;
     case OVS_VPORT_TYPE_GENEVE:
+        err = dpif_netlink_rtnl_create(tnl_cfg, name, type, "geneve", flags);
+        break;
     case OVS_VPORT_TYPE_NETDEV:
     case OVS_VPORT_TYPE_INTERNAL:
     case OVS_VPORT_TYPE_LISP:
@@ -317,8 +366,8 @@ dpif_netlink_rtnl_port_destroy(const char *name, const char *type)
     switch (netdev_to_ovs_vport_type(type)) {
     case OVS_VPORT_TYPE_VXLAN:
     case OVS_VPORT_TYPE_GRE:
-        return dpif_netlink_rtnl_destroy(name);
     case OVS_VPORT_TYPE_GENEVE:
+        return dpif_netlink_rtnl_destroy(name);
     case OVS_VPORT_TYPE_NETDEV:
     case OVS_VPORT_TYPE_INTERNAL:
     case OVS_VPORT_TYPE_LISP:
