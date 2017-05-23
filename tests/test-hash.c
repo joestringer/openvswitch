@@ -39,16 +39,15 @@ set_bit(uint32_t array[3], int bit)
 static void
 set_bit128(ovs_u128 *values, int bit, int n_bits)
 {
-    assert(bit >= 0 && bit <= 2048);
-    memset(values, 0, n_bits/8);
-    if (bit < n_bits) {
-        int b = bit % 128;
+    int b = bit % 128;
 
-        if (b < 64) {
-            values[bit / 128].u64.lo = UINT64_C(1) << (b % 64);
-        } else {
-            values[bit / 128].u64.hi = UINT64_C(1) << (b % 64);
-        }
+    assert(bit >= 0 && bit < 2048);
+    memset(values, 0, n_bits/8);
+
+    if (b < 64) {
+        values[bit / 128].u64.lo = UINT64_C(1) << (b % 64);
+    } else {
+        values[bit / 128].u64.hi = UINT64_C(1) << (b % 64);
     }
 }
 
@@ -149,7 +148,7 @@ check_hash_bytes128(void (*hash)(const void *, size_t, uint32_t, ovs_u128 *),
     const int n_bits = sizeof(ovs_u128) * 8;
     int i, j;
 
-    for (i = 0; i <= n_bits; i++) {
+    for (i = 0; i < n_bits; i++) {
         OVS_PACKED(struct offset_ovs_u128 {
             uint32_t a;
             ovs_u128 b;
@@ -168,7 +167,7 @@ check_hash_bytes128(void (*hash)(const void *, size_t, uint32_t, ovs_u128 *),
                    name, out0.u64.lo, out0.u64.hi, out1.u64.lo, out1.u64.hi);
         }
 
-        for (j = i + 1; j <= n_bits; j++) {
+        for (j = i + 1; j < n_bits; j++) {
             ovs_u128 in2;
             ovs_u128 out2;
             int ofs;
@@ -201,7 +200,7 @@ check_256byte_hash(void (*hash)(const void *, size_t, uint32_t, ovs_u128 *),
     const int n_bits = sizeof(ovs_u128) * 8 * 16;
     int i, j;
 
-    for (i = 0; i <= n_bits; i++) {
+    for (i = 0; i < n_bits; i++) {
         OVS_PACKED(struct offset_ovs_u128 {
             uint32_t a;
             ovs_u128 b[16];
@@ -220,7 +219,7 @@ check_256byte_hash(void (*hash)(const void *, size_t, uint32_t, ovs_u128 *),
                    name, out0.u64.lo, out0.u64.hi, out1.u64.lo, out1.u64.hi);
         }
 
-        for (j = i + 1; j <= n_bits; j++) {
+        for (j = i + 1; j < n_bits; j++) {
             ovs_u128 in2[16];
             ovs_u128 out2;
 
