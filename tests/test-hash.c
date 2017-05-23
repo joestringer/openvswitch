@@ -25,6 +25,12 @@
 #include "jhash.h"
 #include "ovstest.h"
 
+OVS_PACKED(struct offset_ovs_u128
+{
+    uint32_t a;
+    ovs_u128 b;
+});
+
 static void
 set_bit(uint32_t array[3], int bit)
 {
@@ -48,6 +54,21 @@ set_bit128(ovs_u128 *values, int bit, int n_bits)
         values[bit / 128].u64.lo = UINT64_C(1) << (b % 64);
     } else {
         values[bit / 128].u64.hi = UINT64_C(1) << (b % 64);
+    }
+}
+
+static void
+set_bit128_unaligned(struct offset_ovs_u128 *values, int bit, int n_bits)
+{
+    int b = bit % 128;
+
+    assert(bit >= 0 && bit < 2048);
+    memset(values, 0, n_bits/8 + sizeof(values->a));
+
+    if (b < 64) {
+        values->b.u64.lo = UINT64_C(1) << (b % 64);
+    } else {
+        values->b.u64.hi = UINT64_C(1) << (b % 64);
     }
 }
 
@@ -149,17 +170,16 @@ check_hash_bytes128(void (*hash)(const void *, size_t, uint32_t, ovs_u128 *),
     int i, j;
 
     for (i = 0; i < n_bits; i++) {
-        OVS_PACKED(struct offset_ovs_u128 {
-            uint32_t a;
-            ovs_u128 b;
-        }) in0_data;
-        ovs_u128 *in0, in1;
+        struct offset_ovs_u128 in0;
         ovs_u128 out0, out1;
+        uint32_t *in0p;
+        ovs_u128 in1;
 
-        in0 = &in0_data.b;
-        set_bit128(in0, i, n_bits);
+        in0p = &in0.b.u32[0];
+        set_bit128_unaligned(&in0, i, n_bits);
         set_bit128(&in1, i, n_bits);
-        hash(in0, sizeof(ovs_u128), 0, &out0);
+        assert(ovs_u128_equals(in0.b, in1));
+        hash(in0p, sizeof(ovs_u128), 0, &out0);
         hash(&in1, sizeof(ovs_u128), 0, &out1);
         if (!ovs_u128_equals(out0, out1)) {
             printf("%s hash not the same for non-64 aligned data "
