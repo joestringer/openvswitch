@@ -48,6 +48,21 @@ ether_addr_copy_masked(struct eth_addr *dst, const struct eth_addr src,
 }
 
 static void
+ether_addrs_copy_masked(struct eth_header *hdr,
+                        const struct eth_addr src, const struct eth_addr smask,
+                        const struct eth_addr dst, const struct eth_addr dmask)
+{
+    int i;
+
+    for (i = 0; i < ARRAY_SIZE(src.be16); i++) {
+        hdr->eth_src.be16[i] = src.be16[i]
+                             | (hdr->eth_src.be16[i] & ~smask.be16[i]);
+        hdr->eth_dst.be16[i] = dst.be16[i]
+                             | (hdr->eth_dst.be16[i] & ~dmask.be16[i]);
+    }
+}
+
+static void
 odp_eth_set_addrs(struct dp_packet *packet, const struct ovs_key_ethernet *key,
                   const struct ovs_key_ethernet *mask)
 {
@@ -58,8 +73,8 @@ odp_eth_set_addrs(struct dp_packet *packet, const struct ovs_key_ethernet *key,
             eh->eth_src = key->eth_src;
             eh->eth_dst = key->eth_dst;
         } else {
-            ether_addr_copy_masked(&eh->eth_src, key->eth_src, mask->eth_src);
-            ether_addr_copy_masked(&eh->eth_dst, key->eth_dst, mask->eth_dst);
+            ether_addrs_copy_masked(eh, key->eth_src, mask->eth_src,
+                                    key->eth_dst, mask->eth_dst);
         }
     }
 }
