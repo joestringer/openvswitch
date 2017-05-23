@@ -2287,13 +2287,15 @@ rstp_send_bpdu_cb(struct dp_packet *pkt, void *ofport_, void *ofproto_)
     struct ofproto_dpif *ofproto = ofproto_;
     struct ofport_dpif *ofport = ofport_;
     struct eth_header *eth = dp_packet_eth(pkt);
+    struct eth_addr mac;
 
-    netdev_get_etheraddr(ofport->up.netdev, &eth->eth_src);
-    if (eth_addr_is_zero(eth->eth_src)) {
+    netdev_get_etheraddr(ofport->up.netdev, &mac);
+    if (eth_addr_is_zero(mac)) {
         VLOG_WARN_RL(&rl, "%s port %d: cannot send RSTP BPDU on a port which "
                      "does not have a configured source MAC address.",
                      ofproto->up.name, ofp_to_u16(ofport->up.ofp_port));
     } else {
+        eth->eth_src = mac;
         ofproto_dpif_send_packet(ofport, false, pkt);
     }
     dp_packet_delete(pkt);
@@ -2312,12 +2314,14 @@ send_bpdu_cb(struct dp_packet *pkt, int port_num, void *ofproto_)
                      ofproto->up.name, port_num);
     } else {
         struct eth_header *eth = dp_packet_eth(pkt);
+        struct eth_addr mac;
 
-        netdev_get_etheraddr(ofport->up.netdev, &eth->eth_src);
-        if (eth_addr_is_zero(eth->eth_src)) {
+        netdev_get_etheraddr(ofport->up.netdev, &mac);
+        if (eth_addr_is_zero(mac)) {
             VLOG_WARN_RL(&rl, "%s: cannot send BPDU on port %d "
                          "with unknown MAC", ofproto->up.name, port_num);
         } else {
+            eth->eth_src = mac;
             ofproto_dpif_send_packet(ofport, false, pkt);
         }
     }
