@@ -1873,7 +1873,11 @@ dpif_meter_set(struct dpif *dpif, ofproto_meter_id *meter_id,
 
     COVERAGE_INC(dpif_meter_set);
 
-    error = dpif->dpif_class->meter_set(dpif, meter_id, config);
+    if (dpif->dpif_class->meter_set) {
+        error = dpif->dpif_class->meter_set(dpif, meter_id, config);
+    } else {
+        error = EFBIG;
+    }
     if (!error) {
         VLOG_DBG_RL(&dpmsg_rl, "%s: DPIF meter %"PRIu32" set",
                     dpif_name(dpif), meter_id->uint32);
@@ -1893,7 +1897,11 @@ dpif_meter_get(const struct dpif *dpif, ofproto_meter_id meter_id,
 
     COVERAGE_INC(dpif_meter_get);
 
-    error = dpif->dpif_class->meter_get(dpif, meter_id, stats, n_bands);
+    if (dpif->dpif_class->meter_get) {
+        error = dpif->dpif_class->meter_get(dpif, meter_id, stats, n_bands);
+    } else {
+        error = EFBIG;
+    }
     if (!error) {
         VLOG_DBG_RL(&dpmsg_rl, "%s: DPIF meter %"PRIu32" get stats",
                     dpif_name(dpif), meter_id.uint32);
@@ -1916,7 +1924,11 @@ dpif_meter_del(struct dpif *dpif, ofproto_meter_id meter_id,
 
     COVERAGE_INC(dpif_meter_del);
 
-    error = dpif->dpif_class->meter_del(dpif, meter_id, stats, n_bands);
+    if (dpif->dpif_class->meter_del) {
+        error = dpif->dpif_class->meter_del(dpif, meter_id, stats, n_bands);
+    } else {
+        error = EFBIG;
+    }
     if (!error) {
         VLOG_DBG_RL(&dpmsg_rl, "%s: DPIF meter %"PRIu32" deleted",
                     dpif_name(dpif), meter_id.uint32);
