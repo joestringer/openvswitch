@@ -42,7 +42,6 @@
 #include "uuid.h"
 #include "openvswitch/vlog.h"
 #include "openvswitch/match.h"
-#include "bpf/odp-bpf.h"
 
 VLOG_DEFINE_THIS_MODULE(odp_util);
 
@@ -5580,32 +5579,6 @@ odp_flow_key_to_flow(const struct nlattr *key, size_t key_len,
    return odp_flow_key_to_flow__(key, key_len, flow, flow);
 }
 
-enum odp_key_fitness
-odp_bpf_flow_key_to_flow(struct bpf_flow_key *key, size_t key_len OVS_UNUSED,
-                         struct flow *flow)
-{
-    struct pkt_metadata_t md;
-
-    memset(flow, 0, sizeof *flow);
-    md = key->mds.md;
-
-    /* metadata parsing */
-    flow->in_port.odp_port
-        = u32_to_odp(md.in_port);
-    flow->recirc_id = md.recirc_id;
-    flow->dp_hash = md.dp_hash;
-    flow->skb_priority = md.skb_priority;
-    flow->pkt_mark = md.pkt_mark;
-    flow->ct_state = md.ct_state;
-    flow->ct_zone = md.ct_zone;
-    flow->ct_mark = md.ct_mark;
-    /* TODO */
-    /*
-    flow->ct_label = md.ct_label;
-    flow_tnl_copy__()
-    */
-    return 0;
-}
 /* Converts the 'mask_key_len' bytes of OVS_KEY_ATTR_* attributes in 'mask_key'
  * to a mask structure in 'mask'.  'flow' must be a previously translated flow
  * corresponding to 'mask' and similarly flow_key/flow_key_len must be the

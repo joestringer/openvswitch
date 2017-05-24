@@ -28,6 +28,7 @@
 #include "dirs.h"
 #include "dpif.h"
 #include "dpif-provider.h"
+#include "dpif-bpf-odp.h"
 #include "fat-rwlock.h"
 #include "netdev.h"
 #include "netdev-provider.h"
@@ -36,6 +37,7 @@
 #include "ovs-numa.h"
 #include "perf-event.h"
 #include "poll-loop.h"
+#include "sset.h"
 
 VLOG_DEFINE_THIS_MODULE(dpif_bpf);
 static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(60, 60);
@@ -57,6 +59,7 @@ struct bpf_handler {
 struct dpif_bpf {
     struct dpif dpif;
     const char *const name;
+    struct ovs_refcount ref_cnt;
 
     /* Ports.
      *
@@ -156,6 +159,21 @@ dpif_bpf_init(void)
     return error;
 }
 
+static int
+dpif_bpf_enumerate(struct sset *all_dps,
+                   const struct dpif_class *dpif_class OVS_UNUSED)
+{
+    struct shash_node *node;
+
+    ovs_mutex_lock(&bpf_datapath_mutex);
+    SHASH_FOR_EACH(node, &bpf_datapaths) {
+        sset_add(all_dps, node->name);
+    }
+    ovs_mutex_unlock(&bpf_datapath_mutex);
+
+    return 0;
+}
+
 static const char
 *dpif_bpf_port_open_type(const struct dpif_class *dpif_class OVS_UNUSED,
                          const char *type)
@@ -185,6 +203,9 @@ dpif_bpf_open(const struct dpif_class *dpif_class OVS_UNUSED,
         error = create ? EEXIST : 0;
     }
     if (!error) {
+        if (!create) {
+            ovs_refcount_ref(&dp->ref_cnt);
+        }
         *dpifp = &dp->dpif;
     }
     ovs_mutex_unlock(&bpf_datapath_mutex);
@@ -223,15 +244,17 @@ dpif_bpf_free(struct dpif_bpf *dpif)
 {
     shash_find_and_delete(&bpf_datapaths, dpif->name);
 
-    ovs_mutex_destroy(&dpif->port_mutex);
-    seq_destroy(dpif->port_seq);
-    fat_rwlock_destroy(&dpif->upcall_lock);
-    hmap_destroy(&dpif->ports_by_ifindex);
-    hmap_destroy(&dpif->ports_by_odp);
-    if (dpif->n_handlers) {
-        free(dpif->handlers);
+    if (ovs_refcount_read(&dpif->ref_cnt) == 0) {
+        ovs_mutex_destroy(&dpif->port_mutex);
+        seq_destroy(dpif->port_seq);
+        fat_rwlock_destroy(&dpif->upcall_lock);
+        hmap_destroy(&dpif->ports_by_ifindex);
+        hmap_destroy(&dpif->ports_by_odp);
+        if (dpif->n_handlers) {
+            free(dpif->handlers);
+        }
+        free(dpif);
     }
-    free(dpif);
 }
 
 int
@@ -246,6 +269,7 @@ create_dpif_bpf(const char *name, struct dpif_bpf **dp)
 
     dpif = xzalloc(sizeof *dpif + max_cpu * sizeof(struct perf_channel));
     dpif_init(&dpif->dpif, &dpif_bpf_class, name, netflow_id >> 8, netflow_id);
+    ovs_refcount_init(&dpif->ref_cnt);
     hmap_init(&dpif->ports_by_odp);
     hmap_init(&dpif->ports_by_ifindex);
     fat_rwlock_init(&dpif->upcall_lock);
@@ -256,7 +280,8 @@ create_dpif_bpf(const char *name, struct dpif_bpf **dp)
     dpif->n_channels = max_cpu;
     dpif->last_seq = seq_read(dpif->port_seq);
 
-    shash_add(&bpf_datapaths, name, dpif);
+    *CONST_CAST(const char **, &dpif->name) = xstrdup(name);
+    shash_add(&bpf_datapaths, name, dpif); /* XXX */
 
     error = perf_event_channels_init(dpif);
     if (error) {
@@ -291,22 +316,28 @@ static void
 dpif_bpf_close(struct dpif *dpif_)
 {
     struct dpif_bpf *dpif = dpif_bpf_cast(dpif_);
-    struct dpif_bpf_port *port, *next;
-    int i;
 
-    fat_rwlock_wrlock(&dpif->upcall_lock);
-    for (i = 0; i < dpif->n_channels; i++) {
-        struct perf_channel *channel = &dpif->channels[i];
+    ovs_mutex_lock(&bpf_datapath_mutex);
+    if (ovs_refcount_unref_relaxed(&dpif->ref_cnt) == 1) {
+        struct dpif_bpf_port *port, *next;
+        int i;
 
-        perf_channel_close(channel);
+        fat_rwlock_wrlock(&dpif->upcall_lock);
+        for (i = 0; i < dpif->n_channels; i++) {
+            struct perf_channel *channel = &dpif->channels[i];
+
+            perf_channel_close(channel);
+        }
+        fat_rwlock_unlock(&dpif->upcall_lock);
+
+        ovs_mutex_lock(&dpif->port_mutex);
+        HMAP_FOR_EACH_SAFE (port, next, odp_node, &dpif->ports_by_odp) {
+            do_del_port(dpif, port);
+        }
+        ovs_mutex_unlock(&dpif->port_mutex);
+        dpif_bpf_free(dpif);
     }
-    fat_rwlock_unlock(&dpif->upcall_lock);
-
-    ovs_mutex_lock(&dpif->port_mutex);
-    HMAP_FOR_EACH_SAFE (port, next, odp_node, &dpif->ports_by_odp) {
-        do_del_port(dpif, port);
-    }
-    ovs_mutex_unlock(&dpif->port_mutex);
+    ovs_mutex_unlock(&bpf_datapath_mutex);
 }
 
 static int
@@ -431,8 +462,29 @@ static bool output_to_local_stack(struct netdev *netdev)
     return !strcmp(netdev_get_type(netdev), "tap");
 }
 
-/* Modelled after dpif-netdev 'port_create', minus pmd and txq logic, plus
- * bpf filter set. */
+static uint32_t
+get_port_flags(struct netdev *netdev)
+{
+    return output_to_local_stack(netdev) ? OVS_BPF_FLAGS_TX_STACK : 0;
+}
+
+static uint16_t
+odp_port_to_ifindex(struct dpif_bpf *dp, odp_port_t port_no, uint32_t *flags)
+    OVS_REQUIRES(dp->port_mutex)
+{
+    struct dpif_bpf_port *port = bpf_lookup_port(dp, port_no);
+
+    if (port) {
+        if (flags) {
+            *flags = get_port_flags(port->netdev);
+        }
+        return port->ifindex;
+    }
+    return 0;
+}
+
+/* Modelled after dpif-netdev 'port_create', minus pmd and txq logic, plus bpf
+ * filter set. */
 static int
 port_create(const char *devname, const char *type,
             odp_port_t port_no, struct dpif_bpf_port **portp)
@@ -813,6 +865,7 @@ dpif_bpf_flow_dump_destroy(struct dpif_flow_dump *dump_)
 struct dpif_bpf_flow_dump_thread {
     struct dpif_flow_dump_thread up;
     struct dpif_bpf_flow_dump *dump;
+    struct ofpbuf buf;  /* Stores key,mask,acts for a particular dump. */
 };
 
 static struct dpif_bpf_flow_dump_thread *
@@ -830,6 +883,7 @@ dpif_bpf_flow_dump_thread_create(struct dpif_flow_dump *dump_)
     thread = xmalloc(sizeof *thread);
     dpif_flow_dump_thread_init(&thread->up, &dump->up);
     thread->dump = dump;
+    ofpbuf_init(&thread->buf, 1024);
     return &thread->up;
 }
 
@@ -838,24 +892,57 @@ dpif_bpf_flow_dump_thread_destroy(struct dpif_flow_dump_thread *thread_)
 {
     struct dpif_bpf_flow_dump_thread *thread =
         dpif_bpf_flow_dump_thread_cast(thread_);
+    ofpbuf_uninit(&thread->buf);
     free(thread);
 }
 
 static int
-fetch_flow(struct dpif_flow *flow OVS_UNUSED, struct bpf_flow_key *position)
+fetch_flow(struct dpif_bpf *dpif, struct dpif_flow *flow,
+           struct ofpbuf *out, struct bpf_flow_key *key)
 {
-    struct bpf_flow dp_flow OVS_UNUSED;
+    struct flow f;
+    struct odp_flow_key_parms parms = {
+        .flow = &f,
+    };
     struct bpf_action_batch action;
     int err;
 
-    err = bpf_map_lookup_elem(datapath.bpf.flow_table.fd, position,
-                          &action);
+    memset(flow, 0, sizeof *flow);
+
+    err = bpf_map_lookup_elem(datapath.bpf.flow_table.fd, key, &action);
     if (err) {
         return errno;
     }
 
     /* XXX: Extract 'dp_flow' into 'flow'. */
-    return EOPNOTSUPP;
+    if (bpf_flow_key_to_flow(key, &f) == ODP_FIT_ERROR) {
+        VLOG_WARN("%s: bpf flow key parsing error", __func__);
+        return EINVAL;
+    }
+    f.in_port.odp_port = ifindex_to_odp(dpif, f.in_port.odp_port);
+
+    /* Translate BPF flow into netlink format. */
+    ofpbuf_clear(out);
+
+    /* Use 'out->header' to point to the flow key, 'out->msg' for actions */
+    out->header = out->data;
+    odp_flow_key_from_flow(&parms, out);
+    out->msg = ofpbuf_tail(out);
+    err = bpf_actions_to_odp_actions(&action, out);
+    if (err) {
+        return err;
+    }
+
+    flow->key = out->header;
+    flow->key_len = ofpbuf_headersize(out);
+    flow->actions = out->msg;
+    flow->actions_len = ofpbuf_msgsize(out);
+    dpif_flow_hash(&dpif->dpif, flow->key, flow->key_len, &flow->ufid);
+    flow->ufid_present = false; /* XXX */
+
+    /* XXX: stats */
+
+    return 0;
 }
 
 static int
@@ -877,11 +964,33 @@ dpif_bpf_insert_flow(struct bpf_flow_key *flow_key,
 }
 
 static int
+dpif_bpf_delete_flow(struct bpf_flow_key *flow_key,
+                     struct dpif_flow_stats *stats)
+{
+    int err;
+
+    ovs_assert(datapath.bpf.flow_table.fd != -1);
+    err = bpf_map_delete_elem(datapath.bpf.flow_table.fd, flow_key);
+    if (err) {
+        VLOG_ERR("Failed to del flow into flow table, map fd %d: %s",
+                 datapath.bpf.flow_table.fd, ovs_strerror(errno));
+        return errno;
+    }
+
+    if (stats) {
+        /* XXX: Stats */
+        memset(stats, 0, sizeof *stats);
+    }
+    return 0;
+}
+
+static int
 dpif_bpf_flow_dump_next(struct dpif_flow_dump_thread *thread_,
                         struct dpif_flow *flows, int max_flows)
 {
-    struct dpif_bpf_flow_dump *dump =
-        dpif_bpf_flow_dump_thread_cast(thread_)->dump;
+    struct dpif_bpf_flow_dump_thread *thread =
+        dpif_bpf_flow_dump_thread_cast(thread_);
+    struct dpif_bpf_flow_dump *dump = thread->dump;
     int n = 0;
     int err;
 
@@ -892,13 +1001,15 @@ dpif_bpf_flow_dump_next(struct dpif_flow_dump_thread *thread_,
     }
 
     while (n <= max_flows) {
+        struct dpif_bpf *dpif = dpif_bpf_cast(dump->up.dpif);
+
         err = bpf_map_get_next_key(datapath.bpf.flow_table.fd,
-                               &dump->pos, &dump->pos);
+                                   &dump->pos, &dump->pos);
         if (err) {
             err = errno;
             break;
         }
-        err = fetch_flow(&flows[n], &dump->pos);
+        err = fetch_flow(dpif, &flows[n], &thread->buf, &dump->pos);
         if (err == ENOENT) {
             /* Flow disappeared. Oh well, we tried. */
             continue;
@@ -914,7 +1025,8 @@ unlock:
 }
 
 static int
-dpif_bpf_output(struct dp_packet *packet, int ifindex, uint32_t flags)
+dpif_bpf_output(struct dp_packet *packet, const struct flow *flow, int ifindex,
+                uint32_t flags)
 {
     struct dp_packet_batch batch;
     struct bpf_downcall md = {
@@ -926,8 +1038,11 @@ dpif_bpf_output(struct dp_packet *packet, int ifindex, uint32_t flags)
     int error;
 
     /* XXX: Check that ovs-system device MTU is large enough to include md. */
+    bpf_metadata_from_flow(flow, &md.md);
+    md.md.md.in_port = ifindex;
     dp_packet_put(packet, &md, sizeof md);
     dp_packet_batch_init_packet(&batch, packet);
+    VLOG_INFO("Sending packet");
     error = netdev_send(datapath.outport, queue, &batch, false, false);
     dp_packet_set_size(packet, dp_packet_size(packet) - sizeof md);
 
@@ -941,40 +1056,22 @@ dpif_bpf_execute(struct dpif *dpif_, struct dpif_execute *execute)
     const struct nlattr *a;
     int left, error = 0;
 
-    /* XXX: Need to provide the list of actions to the kernel somehow. Perhaps
-     * have a dedicated map for execution, then put a short lookup key on the
-     * front of the packet which the downcall BPF program will interpret,
-     * perform lookup, and start tail calls.
-     *
-     * Little bit tricky because if there's a separate map from flow table then
-     * the pre_tail_action() lookup needs to be done on the execute map for
-     * these packets.
-     *
-     * The below hack just allows basic "actions=output[,output][,output]" to
-     * execute correctly, but anything else will break.
-     */
+    VLOG_INFO("%s", __func__);
 
     NL_ATTR_FOR_EACH_UNSAFE (a, left, execute->actions, execute->actions_len) {
         int type = nl_attr_type(a);
 
+        VLOG_INFO("%s: Action %d, bytes remaining %d", __func__, type, left);
         switch(type) {
         case OVS_ACTION_ATTR_OUTPUT: {
             odp_port_t port_no = nl_attr_get_odp_port(a);
-            struct dpif_bpf_port *port;
             uint32_t flags;
             int ifindex;
 
-            ovs_mutex_lock(&dpif->port_mutex);
-            port = bpf_lookup_port(dpif, port_no);
-            if (port) {
-                ifindex = port->ifindex;
-                flags = output_to_local_stack(port->netdev)
-                        ? OVS_BPF_FLAGS_TX_STACK : 0;
-            }
-            ovs_mutex_unlock(&dpif->port_mutex);
-
-            if (port) {
-                error = dpif_bpf_output(execute->packet, ifindex, flags);
+            ifindex = odp_port_to_ifindex(dpif, port_no, &flags);
+            if (ifindex) {
+                error = dpif_bpf_output(execute->packet, execute->flow,
+                                        ifindex, flags);
             } else {
                 VLOG_WARN_RL(&rl, "execute output on unknown port %d", port_no);
                 error = ENODEV;
@@ -994,87 +1091,181 @@ dpif_bpf_execute(struct dpif *dpif_, struct dpif_execute *execute)
     return error;
 }
 
-static void
-dpif_bpf_flow_actions(struct dpif *dpif_,
-                      struct bpf_action_batch *action_batch,
-                      const struct nlattr *nlactions,
-                      size_t actions_len)
+static int
+dpif_bpf_serialize_actions(struct dpif_bpf *dpif,
+                           struct bpf_action_batch *action_batch,
+                           const struct nlattr *nlactions,
+                           size_t actions_len)
 {
+
     const struct nlattr *a;
-    unsigned int left, count = 0;
+    unsigned int left, count = 0, skipped = 0;
     struct bpf_action *actions;
-    struct dpif_bpf *dpif = dpif_bpf_cast(dpif_);
 
     memset(action_batch, 0, sizeof(*action_batch));
     actions = action_batch->actions;
 
     NL_ATTR_FOR_EACH_UNSAFE (a, left, nlactions, actions_len) {
-        int type = nl_attr_type(a);
+        enum ovs_action_attr type = nl_attr_type(a);
         actions[count].type = type;
 
-        switch (type) {
-        case OVS_ACTION_ATTR_UNSPEC:
-            VLOG_ERR("unspec action");
-            break;
-        case OVS_ACTION_ATTR_OUTPUT: {
+        if (type == OVS_ACTION_ATTR_OUTPUT) {
             struct dpif_bpf_port *port;
             odp_port_t port_no = nl_attr_get_odp_port(a);
 
             ovs_mutex_lock(&dpif->port_mutex);
             port = bpf_lookup_port(dpif, port_no);
             if (port) {
-                VLOG_INFO("output action to port %d ifindex %d", port_no, port->ifindex);
-                actions[count].u.port = port->ifindex;
+                VLOG_INFO("output action to port %d ifindex %d", port_no,
+                          port->ifindex);
+                actions[count].u.out.port = port->ifindex;
+                actions[count].u.out.flags = get_port_flags(port->netdev);
             }
             ovs_mutex_unlock(&dpif->port_mutex);
-            break;
-        }
-        default:
-            VLOG_WARN("action type %d",  nl_attr_type(a));
-            break;
+        } else {
+            if (odp_action_to_bpf_action(a, &actions[count])) {
+                skipped++;
+            }
         }
         count++;
     }
 
-    VLOG_INFO("total number of BPF actions: %d", count);
+    VLOG_INFO("Processing flow actions (%d/%d skipped)", skipped, count);
+    if (skipped) {
+        /* XXX: VLOG actions that couldn't be processed */
+    }
+    return 0;
+}
+
+/* Translates 'port' into an ifindex and sets it inside 'key'.
+ *
+ * Returns 0 on success, or a positive errno otherwise. */
+static int
+set_in_port(struct dpif_bpf *dpif, struct bpf_flow_key *key, odp_port_t port)
+{
+    uint16_t ifindex;
+
+    ifindex = odp_port_to_ifindex(dpif, port, NULL);
+    if (!ifindex && port) {
+        VLOG_WARN("Could not find ifindex corresponding to port %"PRIu32,
+                  port);
+        return ENODEV;
+    }
+
+    key->mds.md.in_port = ifindex;
+    return 0;
+}
+
+/* Converts 'key' (of size 'key_len') into a bpf flow key in 'key_out', and
+ * optionally 'actions' (of size 'actions_len') into 'batch'. 'mask' (of size
+ * 'mask_len') may optionally be used for logging, of which the verbosity is
+ * controlled by 'verbose'.
+ *
+ * Returns 0 on success, or a positive errno otherwise.
+ */
+static int
+prepare_bpf_flow__(struct dpif_bpf *dpif,
+                   const struct nlattr *key, size_t key_len,
+                   const struct nlattr *mask, size_t mask_len,
+                   const struct nlattr *actions, size_t actions_len,
+                   struct bpf_flow_key *key_out, struct bpf_action_batch *batch,
+                   bool verbose)
+{
+    odp_port_t in_port;
+    int err = EINVAL;
+
+    memset(key_out, 0, sizeof *key_out);
+    if (odp_key_to_bpf_flow_key(key, key_len, key_out, &in_port, verbose)) {
+        if (verbose) {
+            struct ds ds = DS_EMPTY_INITIALIZER;
+            struct hmap *portnames = NULL;
+
+            /* XXX portnames */
+            /* XXX: Use dpif_format_flow()? */
+            odp_flow_format(key, key_len, mask, mask_len, portnames, &ds,
+                            true);
+            VLOG_WARN("Failed to translate odp key to bpf key:\n%s",
+                      ds_cstr(&ds));
+            ds_destroy(&ds);
+        }
+        return err;
+    }
+    err = set_in_port(dpif, key_out, in_port);
+    if (err) {
+        return err;
+    }
+    if (batch) {
+        err = dpif_bpf_serialize_actions(dpif, batch, actions, actions_len);
+        if (err) {
+            return err;
+        }
+    }
+    return 0;
+}
+
+static int
+prepare_bpf_flow(struct dpif_bpf *dpif, const struct nlattr *key,
+                 size_t key_len, struct bpf_flow_key *key_out, bool verbose)
+{
+    return prepare_bpf_flow__(dpif, key, key_len, NULL, 0, NULL, 0, key_out,
+                              NULL, verbose);
 }
 
 static void
-dpif_bpf_operate(struct dpif *dpif, struct dpif_op **ops, size_t n_ops)
+dpif_bpf_operate(struct dpif *dpif_, struct dpif_op **ops, size_t n_ops)
 {
+    struct dpif_bpf *dpif = dpif_bpf_cast(dpif_);
+
     for (int i = 0; i < n_ops; i++) {
         struct dpif_op *op = ops[i];
-        struct dpif_flow_put *put;
         struct dpif_flow_del *del OVS_UNUSED;
         struct dpif_flow_get *get OVS_UNUSED;
 
-        struct bpf_flow_key *flow_key;
-
         switch (op->type) {
         case DPIF_OP_EXECUTE:
-            op->error = dpif_bpf_execute(dpif, &op->u.execute);
+            op->error = dpif_bpf_execute(dpif_, &op->u.execute);
             break;
         case DPIF_OP_FLOW_PUT: {
-            int error;
+            struct dpif_flow_put *put = &op->u.flow_put;
+            bool verbose = !(put->flags & DPIF_FP_PROBE);
             struct bpf_action_batch action_batch;
+            struct bpf_flow_key key;
+            int err;
 
-            put = &op->u.flow_put;
-            flow_key = (struct bpf_flow_key *) put->key;
-            dpif_bpf_flow_actions(dpif, &action_batch, put->actions, put->actions_len);
-
-            error = dpif_bpf_insert_flow(flow_key, &action_batch);
-            if (error)
-                op->error = error;
+            err = prepare_bpf_flow__(dpif, put->key, put->key_len,
+                                     put->mask, put->mask_len,
+                                     put->actions, put->actions_len,
+                                     &key, &action_batch, verbose);
+            if (!err) {
+                err = dpif_bpf_insert_flow(&key, &action_batch);
+            }
+            op->error = err;
             break;
         }
-        case DPIF_OP_FLOW_GET:
-            VLOG_INFO("get bpf_flow_key and actions");
+        case DPIF_OP_FLOW_GET: {
+            struct dpif_flow_get *get = &op->u.flow_get;
+            struct bpf_flow_key key;
+            int err;
+
+            err = prepare_bpf_flow(dpif, get->key, get->key_len, &key, true);
+            if (!err) {
+                err = fetch_flow(dpif, get->flow, get->buffer, &key);
+            }
+            op->error = err;
             break;
-        case DPIF_OP_FLOW_DEL:
-            /* XXX: need to construct bpf_flow_key and
-                    remove from flow_table map */
-            VLOG_INFO("del bpf_flow_key");
+        }
+        case DPIF_OP_FLOW_DEL: {
+            struct dpif_flow_del *del = &op->u.flow_del;
+            struct bpf_flow_key key;
+            int err;
+
+            err = prepare_bpf_flow(dpif, del->key, del->key_len, &key, true);
+            if (!err) {
+                err = dpif_bpf_delete_flow(&key, del->stats);
+            }
+            op->error = err;
             break;
+        }
         default:
             OVS_NOT_REACHED();
         }
@@ -1159,21 +1350,29 @@ dpif_bpf_handlers_set(struct dpif *dpif_, uint32_t n_handlers)
     return error;
 }
 
-static void
-extract_key(struct dp_packet *packet, struct ofpbuf *buf)
+static int
+extract_key(struct dpif_bpf *dpif, const struct bpf_flow_key *key,
+            struct dp_packet *packet, struct ofpbuf *buf)
 {
-    uint64_t key_stub[1024 / 8];
-    struct ofpbuf key_buf;
     struct flow flow;
     struct odp_flow_key_parms parms = {
         .flow = &flow,
-        .key_buf = &key_buf,
     };
 
-    ofpbuf_use_stub(&key_buf, &key_stub, sizeof key_stub);
+    {
+        struct ds ds = DS_EMPTY_INITIALIZER;
+
+        bpf_flow_key_format(&ds, key);
+        VLOG_INFO("%s\n%s", __func__, ds_cstr(&ds));
+        ds_destroy(&ds);
+    }
+
+    bpf_flow_key_extract_metadata(key, &flow);
+    flow.in_port.odp_port = ifindex_to_odp(dpif, flow.in_port.odp_port);
     flow_extract(packet, &flow);
     odp_flow_key_from_flow(&parms, buf);
-    ofpbuf_uninit(&key_buf);
+
+    return 0;
 }
 
 struct ovs_ebpf_event {
@@ -1194,6 +1393,7 @@ perf_sample_to_upcall(struct dpif_bpf *dp, struct ovs_ebpf_event *e,
     size_t pkt_len = e->header.skb_len;
     size_t pre_key_len;
     odp_port_t port_no;
+    int err;
 
     if (pkt_len < ETH_HEADER_LEN) {
         VLOG_WARN_RL(&rl, "Unexpectedly short packet (%"PRIuSIZE")", pkt_len);
@@ -1214,26 +1414,27 @@ perf_sample_to_upcall(struct dpif_bpf *dp, struct ovs_ebpf_event *e,
     }
 
     /* Use buffer->header to point to the packet, and buffer->msg to point to
-     * the extracted flow key. */
+     * the extracted flow key. Therefore, when extract_key() reallocates
+     * 'buffer', we can easily get pointers back to the packet and start of
+     * extracted key. */
     buffer->header = e->data;
     buffer->msg = ofpbuf_tail(buffer);
-
-    /* XXX: Receive flow key from BPF metadata */
     pre_key_len = buffer->size;
+
     pkt_metadata_init(&upcall->packet.md, port_no);
-    extract_key(&upcall->packet, buffer);
+    err = extract_key(dp, &e->header.key, &upcall->packet, buffer);
+    if (err) {
+        return err;
+    }
     ofpbuf_prealloc_tailroom(buffer, sizeof(struct bpf_downcall));
+
     memset(upcall, 0, sizeof *upcall);
     upcall->type = DPIF_UC_MISS;
     dp_packet_use_stub(&upcall->packet, buffer->header,
                        pkt_len + sizeof(struct bpf_downcall));
     dp_packet_set_size(&upcall->packet, pkt_len);
-
-    // convert bpf_flow_key to nlattr
-    //upcall->key = buffer->msg;
-    //upcall->key_len = buffer->size - pre_key_len;
-    upcall->key = (struct nlattr *) &(e->header.key);
-    upcall->key_len = sizeof(struct bpf_flow_key);
+    upcall->key = buffer->msg;
+    upcall->key_len = buffer->size - pre_key_len;
     dpif_flow_hash(&dp->dpif, upcall->key, upcall->key_len, &upcall->ufid);
 
     return 0;
@@ -1351,7 +1552,7 @@ dpif_bpf_recv_purge(struct dpif *dpif_)
 const struct dpif_class dpif_bpf_class = {
     "bpf",
     dpif_bpf_init,
-    NULL,                       /* enumerate */
+    dpif_bpf_enumerate,
     dpif_bpf_port_open_type,
     dpif_bpf_open,
     dpif_bpf_close,

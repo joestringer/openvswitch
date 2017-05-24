@@ -28,26 +28,6 @@
 
 VLOG_DEFINE_THIS_MODULE(dpif_bpf_odp);
 
-static void
-ct_action_to_bpf(const struct nlattr *ct, struct bpf_action *dst)
-{
-    const struct nlattr *nla;
-    int left;
-
-    VLOG_DBG("push ct action");
-    NL_ATTR_FOR_EACH_UNSAFE(nla, left, ct, ct->nla_len) {
-        switch (nla->nla_type) {
-        case OVS_CT_ATTR_COMMIT:
-            VLOG_INFO("Found CT commit");
-            dst->u.ct.commit = true;
-            break;
-        default:
-            VLOG_INFO("Ignoring CT attribute %d", nla->nla_type);
-            break;
-        }
-    }
-}
-
 /* Converts the OVS netlink-formatted action 'src' into a BPF action in 'dst'.
  *
  * Returns 0 on success, or a positive errno value on failure.
@@ -64,9 +44,6 @@ odp_action_to_bpf_action(const struct nlattr *src, struct bpf_action *dst)
         VLOG_DBG("push vlan tpid %x tci %x", vlan->vlan_tpid, vlan->vlan_tci);
         break;
     }
-    case OVS_ACTION_ATTR_CT:
-        ct_action_to_bpf(nl_attr_get(src), dst);
-        break;
     case OVS_ACTION_ATTR_USERSPACE:
     case OVS_ACTION_ATTR_SET:
     case OVS_ACTION_ATTR_POP_VLAN:
@@ -76,6 +53,7 @@ odp_action_to_bpf_action(const struct nlattr *src, struct bpf_action *dst)
     case OVS_ACTION_ATTR_PUSH_MPLS:
     case OVS_ACTION_ATTR_POP_MPLS:
     case OVS_ACTION_ATTR_SET_MASKED:
+    case OVS_ACTION_ATTR_CT:
     case OVS_ACTION_ATTR_TRUNC:
     case OVS_ACTION_ATTR_PUSH_ETH:
     case OVS_ACTION_ATTR_POP_ETH:
@@ -91,6 +69,68 @@ odp_action_to_bpf_action(const struct nlattr *src, struct bpf_action *dst)
         OVS_NOT_REACHED();
     }
 
+    return 0;
+}
+
+int
+bpf_actions_to_odp_actions(struct bpf_action_batch *batch, struct ofpbuf *out)
+{
+    int i;
+
+    for (i = 0; i < BPF_DP_MAX_ACTION; i++) {
+        struct bpf_action *act = &batch->actions[i];
+        enum ovs_action_attr type = act->type;
+
+        switch (type) {
+        case OVS_ACTION_ATTR_UNSPEC:
+            /* End of actions list. */
+            return 0;
+
+        case OVS_ACTION_ATTR_OUTPUT: {
+            /* XXX: ifindex to odp translation */
+            nl_msg_put_u32(out, type, act->u.out.port);
+            break;
+        }
+        case OVS_ACTION_ATTR_PUSH_VLAN: {
+            nl_msg_put_unspec(out, type, &act->u.push_vlan,
+                              sizeof act->u.push_vlan);
+            break;
+        }
+        case OVS_ACTION_ATTR_RECIRC:
+            nl_msg_put_u32(out, type, act->u.recirc_id);
+            break;
+        case OVS_ACTION_ATTR_TRUNC:
+            nl_msg_put_unspec(out, type, &act->u.trunc, sizeof act->u.trunc);
+            break;
+        case OVS_ACTION_ATTR_HASH:
+            nl_msg_put_unspec(out, type, &act->u.hash, sizeof act->u.hash);
+            break;
+        case OVS_ACTION_ATTR_PUSH_MPLS:
+            nl_msg_put_unspec(out, type, &act->u.mpls, sizeof act->u.mpls);
+            break;
+        case OVS_ACTION_ATTR_POP_MPLS:
+            nl_msg_put_be16(out, type, act->u.ethertype);
+            break;
+        case OVS_ACTION_ATTR_CT:
+        case OVS_ACTION_ATTR_USERSPACE:
+        case OVS_ACTION_ATTR_SET:
+        case OVS_ACTION_ATTR_POP_VLAN:
+        case OVS_ACTION_ATTR_SAMPLE:
+        case OVS_ACTION_ATTR_SET_MASKED:
+        case OVS_ACTION_ATTR_PUSH_ETH:
+        case OVS_ACTION_ATTR_POP_ETH:
+        case OVS_ACTION_ATTR_TUNNEL_PUSH:
+        case OVS_ACTION_ATTR_TUNNEL_POP:
+        case OVS_ACTION_ATTR_CLONE:
+        case OVS_ACTION_ATTR_METER:
+            VLOG_WARN("Unexpected action type %d", type);
+            return EOPNOTSUPP;
+        case __OVS_ACTION_ATTR_MAX:
+        default:
+            OVS_NOT_REACHED();
+            break;
+        }
+    }
     return 0;
 }
 
@@ -126,14 +166,86 @@ bpf_flow_key_extract_metadata(const struct bpf_flow_key *key,
     */
 }
 
+/* XXX The caller must perform in_port translation. */
+void
+bpf_metadata_from_flow(const struct flow *flow, struct ebpf_metadata_t *md)
+{
+    if (flow->packet_type != htonl(PT_ETH)) {
+        VLOG_WARN("Cannot convert flow to bpf metadata: non-ethernet");
+    }
+    md->md.in_port = odp_to_u32(flow->in_port.odp_port); /* XXX */
+    md->md.recirc_id = flow->recirc_id;
+    md->md.dp_hash = flow->dp_hash;
+    md->md.skb_priority = flow->skb_priority;
+    md->md.pkt_mark = flow->pkt_mark;
+    md->md.ct_state = flow->ct_state;
+    md->md.ct_zone = flow->ct_zone;
+    md->md.ct_mark = flow->ct_mark;
+    /* TODO */
+    /*
+    md->md.ct_label = flow.ct_label;
+    flow_tnl_copy__()
+    */
+}
+
 enum odp_key_fitness
 bpf_flow_key_to_flow(const struct bpf_flow_key *key, struct flow *flow)
 {
+    const struct ebpf_headers_t *hdrs = &key->headers;
+
     memset(flow, 0, sizeof *flow);
-
-    /* XXX: Populate key. */
-
     bpf_flow_key_extract_metadata(key, flow);
+
+    /* L2 */
+    if (hdrs->ethernet.valid) {
+        memcpy(&flow->dl_dst, &hdrs->ethernet.dstAddr, sizeof(struct eth_addr));
+        memcpy(&flow->dl_src, &hdrs->ethernet.srcAddr, sizeof(struct eth_addr));
+        flow->dl_type = htons(hdrs->ethernet.etherType);
+    }
+    if (hdrs->vlan.valid) {
+        uint16_t tci = hdrs->vlan.vid | hdrs->vlan.cfi | hdrs->vlan.pcp;
+
+        flow->vlans[0].tpid = htons(hdrs->vlan.etherType);
+        flow->vlans[0].tci = htons(tci);
+    }
+
+    /* L3 */
+    if (hdrs->ipv4.valid) {
+        ovs_be16 frags = htons(hdrs->ipv4.flags | hdrs->ipv4.fragOffset);
+
+        flow->nw_src = htons(hdrs->ipv4.srcAddr);
+        flow->nw_dst = htons(hdrs->ipv4.dstAddr);
+        flow->nw_frag = ip_frag_to_flow_frag(frags);
+        flow->nw_tos = hdrs->ipv4.diffserv;
+        flow->nw_ttl = hdrs->ipv4.ttl;
+        flow->nw_proto = hdrs->ipv4.protocol;
+    } else if (hdrs->ipv6.valid) {
+        memcpy(&flow->ipv6_src, &hdrs->ipv6.srcAddr, sizeof flow->ipv6_src);
+        memcpy(&flow->ipv6_dst, &hdrs->ipv6.dstAddr, sizeof flow->ipv6_dst);
+        flow->ipv6_label = ntohl(hdrs->ipv6.flowLabel);
+        /* XXX: flow->nw_frag */
+        flow->nw_tos = hdrs->ipv6.trafficClass;
+        flow->nw_ttl = hdrs->ipv6.hopLimit;
+        flow->nw_proto = hdrs->ipv6.nextHdr;
+    } else if (hdrs->arp.valid) {
+        flow->nw_proto = hdrs->arp.opcode & 0xFF;
+        /* XXX: flow->arp_sha */
+        /* XXX: flow->arp_tha */
+    }
+
+    /* L4 */
+    if (hdrs->tcp.valid) {
+        flow->tcp_flags = htons(hdrs->tcp.flags);
+        flow->tp_src = htons(hdrs->tcp.srcPort);
+        flow->tp_dst = htons(hdrs->tcp.dstPort);
+    } else if (hdrs->udp.valid) {
+        flow->tp_src = htons(hdrs->udp.srcPort);
+        flow->tp_dst = htons(hdrs->udp.dstPort);
+    } else if (hdrs->icmp.valid) {
+        /* XXX: validate */
+        flow->tp_src = htons(hdrs->icmp.typeCode & 0x00FF);
+        flow->tp_dst = htons(hdrs->icmp.typeCode & 0xFF00);
+    } /* XXX: IGMP */
 
     return ODP_FIT_PERFECT;
 }
@@ -153,7 +265,7 @@ odp_key_to_bpf_flow_key(const struct nlattr *nla, size_t nla_len,
     const struct nlattr *a;
     size_t left;
 
-    NL_ATTR_FOR_EACH_UNSAFE(a, left, nla, nla_len) {
+    NL_ATTR_FOR_EACH(a, left, nla, nla_len) {
         enum ovs_key_attr type = nl_attr_type(a);
 
         switch (type) {
@@ -284,6 +396,13 @@ odp_key_to_bpf_flow_key(const struct nlattr *nla, size_t nla_len,
             memcpy(&key->mds.md.ct_label, nl_attr_get(a),
                    sizeof(key->mds.md.ct_label));
             break;
+        case OVS_KEY_ATTR_PACKET_TYPE: {
+            ovs_be32 pt = nl_attr_get_be32(a);
+            if (pt != htonl(PT_ETH)) {
+                return ODP_FIT_ERROR;
+            }
+            break;
+        }
         case OVS_KEY_ATTR_ENCAP:
         case OVS_KEY_ATTR_ICMPV6:
         case OVS_KEY_ATTR_ND:
@@ -291,9 +410,15 @@ odp_key_to_bpf_flow_key(const struct nlattr *nla, size_t nla_len,
         case OVS_KEY_ATTR_SCTP:
         case OVS_KEY_ATTR_MPLS:
         case OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV4:
-        case OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV6:
-        case OVS_KEY_ATTR_PACKET_TYPE:
+        case OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV6: {
+            static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 20);
+            struct ds ds = DS_EMPTY_INITIALIZER;
+
+            odp_format_key_attr(a, NULL, NULL, &ds, verbose);
+            VLOG_INFO_RL(&rl, "Cannot convert \'%s\'", ds_cstr(&ds));
+            ds_destroy(&ds);
             return ODP_FIT_ERROR;
+        }
         case OVS_KEY_ATTR_UNSPEC:
         case __OVS_KEY_ATTR_MAX:
         default:
@@ -306,11 +431,14 @@ odp_key_to_bpf_flow_key(const struct nlattr *nla, size_t nla_len,
     }
 
     if (verbose) {
+        static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 20);
         struct ds ds = DS_EMPTY_INITIALIZER;
 
+        ds_put_format(&ds, "%s\nODP:\n", __func__);
+        odp_flow_key_format(nla, nla_len, &ds);
+        ds_put_cstr(&ds, "\nBPF:\n");
         bpf_flow_key_format(&ds, key);
-        VLOG_INFO("%s\n%s", __func__, ds_cstr(&ds));
-
+        VLOG_INFO_RL(&rl, "%s", ds_cstr(&ds));
         ds_destroy(&ds);
     }
 

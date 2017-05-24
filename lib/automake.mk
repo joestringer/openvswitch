@@ -381,8 +381,10 @@ if HAVE_BPF
 lib_libopenvswitch_la_SOURCES += \
 	lib/bpf.c \
 	lib/dpif-bpf.c \
-	lib/perf-event.h \
-	lib/perf-event.c
+	lib/dpif-bpf-odp.c \
+	lib/dpif-bpf-odp.h \
+	lib/perf-event.c \
+	lib/perf-event.h
 endif
 
 if DPDK_NETDEV
