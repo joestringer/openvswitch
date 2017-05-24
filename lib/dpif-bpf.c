@@ -1190,7 +1190,7 @@ perf_sample_to_upcall(struct dpif_bpf *dp, struct ovs_ebpf_event *e,
 {
     size_t sample_len = e->sample.size - sizeof e->header;
     size_t pkt_len = e->header.skb_len;
-    size_t pre_key_len;
+    //size_t pre_key_len;
     odp_port_t port_no;
 
     if (pkt_len < ETH_HEADER_LEN) {
@@ -1217,7 +1217,7 @@ perf_sample_to_upcall(struct dpif_bpf *dp, struct ovs_ebpf_event *e,
     buffer->msg = ofpbuf_tail(buffer);
 
     /* XXX: Receive flow key from BPF metadata */
-    pre_key_len = buffer->size;
+    //pre_key_len = buffer->size;
     pkt_metadata_init(&upcall->packet.md, port_no);
     extract_key(&upcall->packet, buffer);
     ofpbuf_prealloc_tailroom(buffer, sizeof(struct bpf_downcall));
