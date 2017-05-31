@@ -335,7 +335,7 @@ AC_DEFUN([OVS_CHECK_BPF], [
     have_bpf=no
   else
     AC_MSG_RESULT([yes])
-    CFLAGS="$CFLAGS -I${with_bpf}/lib"
+    CFLAGS="$CFLAGS -I${with_bpf}/lib -I${with_bpf}/include/uapi"
     LDFLAGS="$LDFLAGS -L${with_bpf}/lib/bpf"
     AC_SEARCH_LIBS([elf_begin],[elf],[],
                    [AC_MSG_ERROR([unable to find libelf, install the dependency package])])
