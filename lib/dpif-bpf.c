@@ -855,7 +855,8 @@ fetch_flow(struct dpif_flow *flow OVS_UNUSED, struct bpf_flow_key *position)
     }
 
     /* XXX: Extract 'dp_flow' into 'flow'. */
-    return EOPNOTSUPP;
+    //return EOPNOTSUPP;
+    return 0;
 }
 
 static int
