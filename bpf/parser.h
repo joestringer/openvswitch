@@ -27,11 +27,6 @@
 #include "helpers.h"
 #include "maps.h"
 
-static bool
-first_parse(struct __sk_buff *skb) {
-    return skb->cb[OVS_CB_INDEX] == 0;
-}
-
 /* first function called after tc ingress */
 __section_tail(PARSER_CALL)
 static int ovs_parser(struct __sk_buff* ebpf_packet) {
@@ -498,12 +493,9 @@ end:
     if (ebpf_headers.icmp.valid)
         printt("receive icmp packet\n");
 
-    if (first_parse(ebpf_packet)) {
+    if (ovs_cb_is_initial_parse(ebpf_packet)) {
         bpf_map_update_elem(&percpu_metadata,
                             &ebpf_zero, &ebpf_metadata, BPF_ANY);
-    } else {
-        printt("recirc, don't update metadata, index %d\n",
-               ebpf_packet->cb[OVS_CB_INDEX]);
     }
 
     /* tail call next stage */

@@ -31,14 +31,14 @@
 static inline struct bpf_action *pre_tail_action(struct __sk_buff *skb,
     struct bpf_action_batch **__batch)
 {
-    uint32_t index = skb->cb[OVS_CB_INDEX];
+    uint32_t index = ovs_cb_get_action_index(skb);
     struct bpf_action *action = NULL;
     struct bpf_action_batch *batch;
     struct ebpf_headers_t *headers;
     struct ebpf_metadata_t *mds;
     struct bpf_flow_key flow_key;
 
-    printt("process %dth actions\n", skb->cb[OVS_CB_INDEX]);
+    printt("process %dth action\n", index);
 
     headers = bpf_get_headers();
     if (!headers) {
@@ -76,14 +76,15 @@ static inline struct bpf_action *pre_tail_action(struct __sk_buff *skb,
 static inline int post_tail_action(struct __sk_buff *skb,
     struct bpf_action_batch *batch)
 {
-    uint32_t index;
+    struct ovs_cb *cb = (struct ovs_cb *)skb->cb;
     struct bpf_action *next_action;
+    uint32_t index;
 
     if (!batch)
         return TC_ACT_SHOT;
 
-    skb->cb[OVS_CB_INDEX] += 1;
-    index = skb->cb[OVS_CB_INDEX];
+    cb->act_idx += 1;
+    index = cb->act_idx;
 
     if (index >= BPF_DP_MAX_ACTION)
         return TC_ACT_SHOT;
@@ -99,7 +100,7 @@ static inline int post_tail_action(struct __sk_buff *skb,
 __section_tail(OVS_ACTION_ATTR_UNSPEC)
 static int tail_action_unspec(struct __sk_buff *skb)
 {
-    int index = skb->cb[OVS_CB_INDEX];
+    int index = ovs_cb_get_action_index(skb);
     printt("action index = %d, end of processing\n", index);
 
     /* if index == 0, this is the first action,

@@ -1,6 +1,7 @@
 bpf_sources = bpf/datapath.c
 bpf_headers = \
 	bpf/api.h \
+	bpf/datapath.h \
 	bpf/odp-bpf.h \
     bpf/ovs-p4.h \
     bpf/helpers.h \

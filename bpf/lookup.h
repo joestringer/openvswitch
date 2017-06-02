@@ -32,7 +32,6 @@ static inline void ovs_execute_actions(struct __sk_buff *skb,
     int type;
 
     type = action->type;
-    skb->cb[OVS_CB_INDEX] = 0;
 
     printt("action type %d\n", type);
 	/* note: this isn't a for loop, tail call won't return. */

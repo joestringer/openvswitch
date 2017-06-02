@@ -22,6 +22,7 @@
 
 #include "api.h"
 #include "odp-bpf.h"
+#include "datapath.h"
 
 /* Instead of having multiple BPF object files,
  * include all headers and generate one datapath.o
@@ -75,7 +76,7 @@ static inline int process_upcall(struct __sk_buff *skb) //remove ifindex
     struct bpf_upcall md = {
         .type = OVS_UPCALL_MISS,
         .skb_len = skb->len,
-        .ifindex = skb->ingress_ifindex,
+        .ifindex = ovs_cb_get_ifindex(skb),
     };
     int stat, err;
     struct ebpf_headers_t *hdrs = bpf_get_headers();
@@ -109,20 +110,13 @@ static inline int process_upcall(struct __sk_buff *skb) //remove ifindex
     return TC_ACT_OK;
 }
 
-static void cb_init(struct __sk_buff *skb)
-{
-    int i;
-    for (i = 0; i < 5; i++)
-        skb->cb[i] = 0;
-}
-
 /* ENTRY POINT */
 __section("ingress")
 static int to_stack(struct __sk_buff *skb)
 {
     printt("ingress from %d (%d)\n", skb->ingress_ifindex, skb->ifindex);
 
-    cb_init(skb);
+    ovs_cb_init(skb, true);
     bpf_tail_call(skb, &tailcalls, PARSER_CALL);
 
     printt("[ERROR] tail call fail\n");
@@ -133,9 +127,12 @@ __section("egress")
 static int from_stack(struct __sk_buff *skb)
 {
     printt("egress from %d (%d)\n", skb->ingress_ifindex, skb->ifindex);
+
+    ovs_cb_init(skb, false);
     bpf_tail_call(skb, &tailcalls, UPCALL_CALL);
+
     printt("[ERROR] tail call fail\n");
-    return 0;
+    return TC_ACT_OK;
 }
 
 __section("downcall")
