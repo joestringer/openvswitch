@@ -16,57 +16,46 @@
  * 02110-1301, USA
  */
 
-#include "openvswitch/compiler.h"
 #include "odp-bpf.h"
 
 #define SKB_CB_U32S 5   /* According to linux/bpf.h. */
 
-struct ovs_cb {
-    uint8_t act_idx;    /* Next action to process in action batch. */
-    bool ingress;    /* 0 = egress; nonzero = ingress. */
+enum ovs_cb_idx {
+    OVS_CB_ACT_IDX,     /* Next action to process in action batch. */
+    OVS_CB_INGRESS,     /* 0 = egress; nonzero = ingress. */
 };
-BUILD_ASSERT_DECL(sizeof(struct ovs_cb) < sizeof(__u32) * SKB_CB_U32S);
-BUILD_ASSERT_DECL(BPF_DP_MAX_ACTION < 256); /* uint8_t act_idx */
 
 static void
 ovs_cb_init(struct __sk_buff *skb, bool ingress OVS_UNUSED)
 {
-    struct ovs_cb *cb = (struct ovs_cb *)skb->cb;
-    int i;
-
-    for (i = 0; i < SKB_CB_U32S; i++)
+    for (int i = 0; i < SKB_CB_U32S; i++)
         skb->cb[i] = 0;
-    cb->ingress = ingress;
+    skb->cb[OVS_CB_INGRESS] = ingress;
 }
 
 static bool
 ovs_cb_is_initial_parse(struct __sk_buff *skb) {
-    struct ovs_cb *cb = (struct ovs_cb *)skb->cb;
+    int index = skb->cb[OVS_CB_ACT_IDX];
 
-    if (cb->act_idx != 0) {
-        printt("recirc, don't update metadata, index %d\n", cb->act_idx);
+    if (index != 0) {
+        printt("recirc, don't update metadata, index %d\n", index);
     }
-    return cb->act_idx == 0;
+    return index == 0;
 }
 
 static uint32_t
 ovs_cb_get_action_index(struct __sk_buff *skb)
 {
-    struct ovs_cb *cb = (struct ovs_cb *)skb->cb;
-
-    return cb->act_idx;
+    return skb->cb[OVS_CB_ACT_IDX];
 }
 
 static uint32_t
 ovs_cb_get_ifindex(struct __sk_buff *skb)
 {
-    struct ovs_cb *cb;
-
     if (!skb)
         return 0;
 
-    cb = (struct ovs_cb *)skb->cb;
-    if (cb->ingress) {
+    if (skb->cb[OVS_CB_INGRESS]) {
         return skb->ingress_ifindex;
     }
 

@@ -471,7 +471,14 @@ static int ovs_parser(struct __sk_buff* ebpf_packet) {
         struct bpf_tunnel_key key;
 
         ebpf_metadata.md.skb_priority = ebpf_packet->priority;
-        ebpf_metadata.md.in_port = ebpf_packet->ifindex;
+        /* Don't use ovs_cb_get_ifindex(), that gets optimized into something
+         * that can't be verified. >:( */
+        if (ebpf_packet->cb[OVS_CB_INGRESS]) {
+            ebpf_metadata.md.in_port = ebpf_packet->ingress_ifindex;
+        }
+        if (!ebpf_packet->cb[OVS_CB_INGRESS]) {
+            ebpf_metadata.md.in_port = ebpf_packet->ifindex;
+        }
         ebpf_metadata.md.pkt_mark = ebpf_packet->mark;
 
         ret = bpf_skb_get_tunnel_key(ebpf_packet, &key, sizeof(key), 0);

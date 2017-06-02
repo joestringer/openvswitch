@@ -76,15 +76,14 @@ static inline struct bpf_action *pre_tail_action(struct __sk_buff *skb,
 static inline int post_tail_action(struct __sk_buff *skb,
     struct bpf_action_batch *batch)
 {
-    struct ovs_cb *cb = (struct ovs_cb *)skb->cb;
     struct bpf_action *next_action;
     uint32_t index;
 
     if (!batch)
         return TC_ACT_SHOT;
 
-    cb->act_idx += 1;
-    index = cb->act_idx;
+    index = skb->cb[OVS_CB_ACT_IDX] + 1;
+    skb->cb[OVS_CB_ACT_IDX] = index;
 
     if (index >= BPF_DP_MAX_ACTION)
         return TC_ACT_SHOT;
