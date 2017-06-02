@@ -989,7 +989,7 @@ dpif_bpf_flow_actions(struct dpif *dpif_,
                       size_t actions_len)
 {
     const struct nlattr *a;
-    unsigned int left, count = 0;
+    unsigned int left, count = 0, skipped = 0;
     struct bpf_action *actions;
     struct dpif_bpf *dpif = dpif_bpf_cast(dpif_);
 
@@ -1003,6 +1003,7 @@ dpif_bpf_flow_actions(struct dpif *dpif_,
         switch (type) {
         case OVS_ACTION_ATTR_UNSPEC:
             VLOG_ERR("unspec action");
+            skipped++;
             break;
         case OVS_ACTION_ATTR_OUTPUT: {
             struct dpif_bpf_port *port;
@@ -1025,15 +1026,17 @@ dpif_bpf_flow_actions(struct dpif *dpif_,
         }
         case OVS_ACTION_ATTR_POP_VLAN:
             VLOG_DBG("pop vlan");
+            skipped++;
             break;
         default:
             VLOG_WARN("Unsupported action type %d",  nl_attr_type(a));
+            skipped++;
             break;
         }
         count++;
     }
 
-    VLOG_INFO("total number of BPF actions: %d", count);
+    VLOG_INFO("Processing flow actions (%d/%d skipped)", skipped, count);
 }
 
 static void
