@@ -1055,25 +1055,25 @@ dpif_bpf_operate(struct dpif *dpif, struct dpif_op **ops, size_t n_ops)
             op->error = dpif_bpf_execute(dpif, &op->u.execute);
             break;
         case DPIF_OP_FLOW_PUT: {
-            int error;
             struct bpf_action_batch action_batch;
 
             put = &op->u.flow_put;
+            /* XXX: This is completely broken */
             flow_key = (struct bpf_flow_key *) put->key;
             dpif_bpf_flow_actions(dpif, &action_batch, put->actions, put->actions_len);
 
-            error = dpif_bpf_insert_flow(flow_key, &action_batch);
-            if (error)
-                op->error = error;
+            op->error = dpif_bpf_insert_flow(flow_key, &action_batch);
             break;
         }
         case DPIF_OP_FLOW_GET:
             VLOG_INFO("get bpf_flow_key and actions");
+            op->error = EOPNOTSUPP;
             break;
         case DPIF_OP_FLOW_DEL:
             /* XXX: need to construct bpf_flow_key and
                     remove from flow_table map */
             VLOG_INFO("del bpf_flow_key");
+            op->error = EOPNOTSUPP;
             break;
         default:
             /* XXX: Implement */
