@@ -1044,12 +1044,11 @@ static void
 dpif_bpf_operate(struct dpif *dpif, struct dpif_op **ops, size_t n_ops)
 {
     for (int i = 0; i < n_ops; i++) {
+        struct bpf_flow_key *flow_key;
         struct dpif_op *op = ops[i];
         struct dpif_flow_put *put;
         struct dpif_flow_del *del OVS_UNUSED;
         struct dpif_flow_get *get OVS_UNUSED;
-
-        struct bpf_flow_key *flow_key;
 
         switch (op->type) {
         case DPIF_OP_EXECUTE:
@@ -1067,13 +1066,11 @@ dpif_bpf_operate(struct dpif *dpif, struct dpif_op **ops, size_t n_ops)
             break;
         }
         case DPIF_OP_FLOW_GET:
-            VLOG_INFO("get bpf_flow_key and actions");
             op->error = EOPNOTSUPP;
             break;
         case DPIF_OP_FLOW_DEL:
             /* XXX: need to construct bpf_flow_key and
                     remove from flow_table map */
-            VLOG_INFO("del bpf_flow_key");
             op->error = EOPNOTSUPP;
             break;
         default:
