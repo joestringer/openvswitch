@@ -88,7 +88,7 @@ static inline int process_upcall(struct __sk_buff *skb) //remove ifindex
     }
 
     if (hdrs->icmp.valid)
-        printk("upcall ICMP packet\n");
+        printt("upcall ICMP packet\n");
 
     // memset(&md, 0, sizeof(md));
     memcpy(&md.key.headers, hdrs, sizeof(struct ebpf_headers_t));

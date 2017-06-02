@@ -158,7 +158,7 @@ static int tail_action_tunnel_set(struct __sk_buff *skb)
      *     bpf_skb_set_tunnel_opt();
      */
     if (ret < 0)
-        printk("[ERROR] setting tunnel key\n");
+        printt("[ERROR] setting tunnel key\n");
 
     post_tail_action(skb, batch);
     return TC_ACT_SHOT;
@@ -225,12 +225,12 @@ static int tail_action_recirc(struct __sk_buff *skb)
      * now always re-parsing the header.
      */
     recirc_id = action->u.recirc_id;
-    printk("recirc id = %d\n", recirc_id);
+    printt("recirc id = %d\n", recirc_id);
 
     /* update metadata */
     ebpf_md = bpf_get_mds();
     if (!ebpf_md) {
-        printk("lookup metadata failed\n");
+        printt("lookup metadata failed\n");
         return TC_ACT_SHOT;
     }
     ebpf_md->md.recirc_id = recirc_id;
@@ -289,15 +289,15 @@ static int tail_action_set_masked(struct __sk_buff *skb)
     if (!action)
         return TC_ACT_SHOT;
 
-    printk("set masked action type = %d\n", action->u.mset.key_type);
+    printt("set masked action type = %d\n", action->u.mset.key_type);
 #if 0
     switch(action->u.mset.key_type) {
     case OVS_KEY_ATTR_ETHERNET: {
-        printk("set ethernet\n");
+        printt("set ethernet\n");
         struct ovs_key_ethernet *ether = &action->u.mset.key.ether;
 //        struct ovs_key_ethernet *mask = &action->u.mset.mask.ether;
         if (!ether ) {
-            printk("this action is skipped\n");
+            printt("this action is skipped\n");
             goto skip;
         }
 
@@ -315,11 +315,11 @@ static int tail_action_set_masked(struct __sk_buff *skb)
     }
     case OVS_KEY_ATTR_PRIORITY:
     case OVS_KEY_ATTR_SKB_MARK:
-        printk("update skb mark at both md and skb?\n");
+        printt("update skb mark at both md and skb?\n");
     case OVS_KEY_ATTR_IPV4:
-        printk("update ipv4\n");
+        printt("update ipv4\n");
     default:
-        printk("field in set mased not supported\n");
+        printt("field in set mased not supported\n");
         break;
     }
 skip:
@@ -338,7 +338,7 @@ static int tail_action_trunc(struct __sk_buff *skb)
     if (!action)
         return TC_ACT_SHOT;
 
-    printk("truncate to %d\n", action->u.trunc.max_len);
+    printt("truncate to %d\n", action->u.trunc.max_len);
 
     /* The helper will resize the skb to the given new size */
     bpf_skb_change_tail(skb, action->u.trunc.max_len, 0);
