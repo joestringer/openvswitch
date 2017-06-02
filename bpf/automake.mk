@@ -31,7 +31,7 @@ bpf/datapath.o: $(bpf_sources) $(bpf_headers)
 	$(MKDIR_P) $(dir $@)
 	@which clang >/dev/null 2>&1 || \
 		(echo "Unable to find clang, Install clang (>=3.7) package"; exit 1)
-	clang $(bpf_CFLAGS) -c $< -o $@
+	$(AM_V_CC) clang $(bpf_CFLAGS) -c $< -o $@
 
 EXTRA_DIST += $(dist_sources) $(dist_headers) $(bpf_extra)
 if HAVE_BPF
