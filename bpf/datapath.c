@@ -82,9 +82,6 @@ static inline int process_upcall(struct __sk_buff *skb) //remove ifindex
     struct ebpf_headers_t *hdrs = bpf_get_headers();
     struct ebpf_metadata_t *mds = bpf_get_mds();
 
-    if (!skb)
-        return TC_ACT_OK;
-
     if (!hdrs || !mds) {
         printt("headers/mds is NULL\n");
         return TC_ACT_OK;
