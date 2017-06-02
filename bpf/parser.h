@@ -27,11 +27,6 @@
 #include "helpers.h"
 #include "maps.h"
 
-static bool
-first_parse(struct __sk_buff *skb) {
-    return skb->cb[OVS_CB_INDEX] == 0;
-}
-
 /* first function called after tc ingress */
 __section_tail(PARSER_CALL)
 static int ovs_parser(struct __sk_buff* ebpf_packet) {
@@ -164,13 +159,15 @@ static int ovs_parser(struct __sk_buff* ebpf_packet) {
             ebpf_error = p4_pe_header_too_short;
             goto end;
         }
-        ebpf_headers.ipv4.version = ((load_byte(ebpf_packet, (ebpf_packetOffsetInBits + 0) / 8)) >> (4)) & EBPF_MASK(u8, 4);
+        //ebpf_headers.ipv4.version = ((load_byte(ebpf_packet, (ebpf_packetOffsetInBits + 0) / 8)) >> (4)) & EBPF_MASK(u8, 4);
+        ebpf_headers.ipv4.version = 0;
         ebpf_packetOffsetInBits += 4;
         if (ebpf_packet->len < BYTES(ebpf_packetOffsetInBits + 4)) {
             ebpf_error = p4_pe_header_too_short;
             goto end;
         }
-        ebpf_headers.ipv4.ihl = ((load_byte(ebpf_packet, (ebpf_packetOffsetInBits + 0) / 8)) >> (0)) & EBPF_MASK(u8, 4);
+        //ebpf_headers.ipv4.ihl = ((load_byte(ebpf_packet, (ebpf_packetOffsetInBits + 0) / 8)) >> (0)) & EBPF_MASK(u8, 4);
+        ebpf_headers.ipv4.ihl = 0;
         ebpf_packetOffsetInBits += 4;
         if (ebpf_packet->len < BYTES(ebpf_packetOffsetInBits + 8)) {
             ebpf_error = p4_pe_header_too_short;
@@ -476,7 +473,14 @@ static int ovs_parser(struct __sk_buff* ebpf_packet) {
         struct bpf_tunnel_key key;
 
         ebpf_metadata.md.skb_priority = ebpf_packet->priority;
-        ebpf_metadata.md.in_port = ebpf_packet->ifindex;
+        /* Don't use ovs_cb_get_ifindex(), that gets optimized into something
+         * that can't be verified. >:( */
+        if (ebpf_packet->cb[OVS_CB_INGRESS]) {
+            ebpf_metadata.md.in_port = ebpf_packet->ingress_ifindex;
+        }
+        if (!ebpf_packet->cb[OVS_CB_INGRESS]) {
+            ebpf_metadata.md.in_port = ebpf_packet->ifindex;
+        }
         ebpf_metadata.md.pkt_mark = ebpf_packet->mark;
 
         ret = bpf_skb_get_tunnel_key(ebpf_packet, &key, sizeof(key), 0);
@@ -498,13 +502,11 @@ end:
     if (ebpf_headers.icmp.valid)
         printt("receive icmp packet\n");
 
-    if (first_parse(ebpf_packet)) {
+    if (ovs_cb_is_initial_parse(ebpf_packet)) {
         bpf_map_update_elem(&percpu_metadata,
                             &ebpf_zero, &ebpf_metadata, BPF_ANY);
-    } else {
-        printt("recirc, don't update metadata, index %d\n",
-               ebpf_packet->cb[OVS_CB_INDEX]);
     }
+    ebpf_packet->cb[OVS_CB_ACT_IDX] = 0;
 
     /* tail call next stage */
     printt("tail call match+lookup stage\n");

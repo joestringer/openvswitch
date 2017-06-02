@@ -22,6 +22,7 @@
 
 #include "api.h"
 #include "odp-bpf.h"
+#include "datapath.h"
 
 /* Instead of having multiple BPF object files,
  * include all headers and generate one datapath.o
@@ -75,14 +76,11 @@ static inline int process_upcall(struct __sk_buff *skb) //remove ifindex
     struct bpf_upcall md = {
         .type = OVS_UPCALL_MISS,
         .skb_len = skb->len,
-        .ifindex = skb->ingress_ifindex,
+        .ifindex = ovs_cb_get_ifindex(skb),
     };
     int stat, err;
     struct ebpf_headers_t *hdrs = bpf_get_headers();
     struct ebpf_metadata_t *mds = bpf_get_mds();
-
-    if (!skb)
-        return TC_ACT_OK;
 
     if (!hdrs || !mds) {
         printt("headers/mds is NULL\n");
@@ -90,7 +88,7 @@ static inline int process_upcall(struct __sk_buff *skb) //remove ifindex
     }
 
     if (hdrs->icmp.valid)
-        printk("upcall ICMP packet\n");
+        printt("upcall ICMP packet\n");
 
     // memset(&md, 0, sizeof(md));
     memcpy(&md.key.headers, hdrs, sizeof(struct ebpf_headers_t));
@@ -109,20 +107,13 @@ static inline int process_upcall(struct __sk_buff *skb) //remove ifindex
     return TC_ACT_OK;
 }
 
-static void cb_init(struct __sk_buff *skb)
-{
-    int i;
-    for (i = 0; i < 5; i++)
-        skb->cb[i] = 0;
-}
-
 /* ENTRY POINT */
 __section("ingress")
 static int to_stack(struct __sk_buff *skb)
 {
     printt("ingress from %d (%d)\n", skb->ingress_ifindex, skb->ifindex);
 
-    cb_init(skb);
+    ovs_cb_init(skb, true);
     bpf_tail_call(skb, &tailcalls, PARSER_CALL);
 
     printt("[ERROR] tail call fail\n");
@@ -133,15 +124,19 @@ __section("egress")
 static int from_stack(struct __sk_buff *skb)
 {
     printt("egress from %d (%d)\n", skb->ingress_ifindex, skb->ifindex);
-    bpf_tail_call(skb, &tailcalls, UPCALL_CALL);
+
+    ovs_cb_init(skb, false);
+    bpf_tail_call(skb, &tailcalls, PARSER_CALL);
+
     printt("[ERROR] tail call fail\n");
-    return 0;
+    return TC_ACT_OK;
 }
 
 __section("downcall")
 static int execute(struct __sk_buff *skb)
 {
     struct bpf_downcall md;
+    u32 ebpf_zero = 0;
     int flags, ofs;
 
     ofs = skb->len - sizeof(md);
@@ -151,8 +146,13 @@ static int execute(struct __sk_buff *skb)
     printt("downcall from %d -> %d (%d)\n", skb->ingress_ifindex, md.ifindex,
            flags);
 
-    skb_change_tail(skb, ofs, 0);
+    bpf_map_update_elem(&percpu_metadata, &ebpf_zero, &md.md, BPF_ANY);
 
+    skb_change_tail(skb, ofs, 0);
+    skb->cb[OVS_CB_ACT_IDX] = -1; /* Skip writing the BPF metadata in parser */
+
+    /* Redirect to the device this packet came from, so it's as though the
+     * packet was freshly received. This should execute PARSER_CALL. */
     return redirect(md.ifindex, flags);
 }
 

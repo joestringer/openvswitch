@@ -32,64 +32,47 @@ static inline void ovs_execute_actions(struct __sk_buff *skb,
     int type;
 
     type = action->type;
-    skb->cb[OVS_CB_INDEX] = 0;
 
     printt("action type %d\n", type);
 	/* note: this isn't a for loop, tail call won't return. */
     switch (type) {
     case OVS_ACTION_ATTR_UNSPEC:    //0
         printt("end of action processing\n");
-        bpf_tail_call(skb, &tailcalls, OVS_ACTION_ATTR_UNSPEC);
         break;
 
     case OVS_ACTION_ATTR_OUTPUT: {  //1
-        printt("output action port = %d\n", action->u.port);
-        bpf_tail_call(skb, &tailcalls, OVS_ACTION_ATTR_OUTPUT);
-        break;
-    }
-    case OVS_ACTION_ATTR_USERSPACE: { //2
-        printt("userspace? do we need this? \n");
+        printt("output action port = %d\n", action->u.out.port);
         break;
     }
     case OVS_ACTION_ATTR_PUSH_VLAN: { //4
         printt("vlan push tci %d\n", action->u.push_vlan.vlan_tci);
-        bpf_tail_call(skb, &tailcalls, OVS_ACTION_ATTR_PUSH_VLAN);
         break;
     }
     case OVS_ACTION_ATTR_POP_VLAN: { //5
         printt("vlan pop\n");
-        bpf_tail_call(skb, &tailcalls, OVS_ACTION_ATTR_POP_VLAN);
-        break;
-    }
-    case OVS_ACTION_ATTR_SAMPLE: { //6
-        printt("sample\n");
         break;
     }
     case OVS_ACTION_ATTR_RECIRC: { //7
         printt("recirc\n");
-        bpf_tail_call(skb, &tailcalls, OVS_ACTION_ATTR_RECIRC);
         break;
     }
     case OVS_ACTION_ATTR_HASH: { //8
         printt("hash\n");
-        bpf_tail_call(skb, &tailcalls, OVS_ACTION_ATTR_HASH);
         break;
     }
     case OVS_ACTION_ATTR_SET_MASKED: { //11
         printt("set masked\n");
-        bpf_tail_call(skb, &tailcalls, OVS_ACTION_ATTR_SET_MASKED);
         break;
     }
     case OVS_ACTION_ATTR_TRUNC: { //13
         printt("truncate\n");
-        bpf_tail_call(skb, &tailcalls, OVS_ACTION_ATTR_TRUNC);
         break;
     }
-    case OVS_ACTION_ATTR_SET: //tunnel
     default:
         printt("action type %d not support\n", type);
         break;
     }
+    bpf_tail_call(skb, &tailcalls, type);
     return;
 }
 

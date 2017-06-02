@@ -58,12 +58,6 @@ enum {
 #define BPF_MAP_ID_MAX  __BPF_MAP_ID_MAX
 };
 
-enum ovs_cb_type {
-    OVS_CB_OFFSET,
-    OVS_CB_INDEX, // action tail call index
-    OVS_CB_HASH,
-};
-
 /* ---------------------*/
 /*    BPF Program Map   */
 /* ---------------------*/
