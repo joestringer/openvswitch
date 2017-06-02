@@ -5585,24 +5585,23 @@ odp_flow_key_to_flow(const struct nlattr *key, size_t key_len,
 }
 
 enum odp_key_fitness
-odp_bpf_flow_key_to_flow(struct bpf_flow_key *key, size_t key_len OVS_UNUSED,
-                         struct flow *flow)
+odp_bpf_flow_key_to_flow(const struct bpf_flow_key *key, struct flow *flow)
 {
-    struct pkt_metadata_t md;
+    const struct pkt_metadata_t *md = &key->mds.md;
 
     memset(flow, 0, sizeof *flow);
-    md = key->mds.md;
+
+    /* XXX: Populate key. */
 
     /* metadata parsing */
-    flow->in_port.odp_port
-        = u32_to_odp(md.in_port);
-    flow->recirc_id = md.recirc_id;
-    flow->dp_hash = md.dp_hash;
-    flow->skb_priority = md.skb_priority;
-    flow->pkt_mark = md.pkt_mark;
-    flow->ct_state = md.ct_state;
-    flow->ct_zone = md.ct_zone;
-    flow->ct_mark = md.ct_mark;
+    flow->in_port.odp_port = u32_to_odp(md->in_port);
+    flow->recirc_id = md->recirc_id;
+    flow->dp_hash = md->dp_hash;
+    flow->skb_priority = md->skb_priority;
+    flow->pkt_mark = md->pkt_mark;
+    flow->ct_state = md->ct_state;
+    flow->ct_zone = md->ct_zone;
+    flow->ct_mark = md->ct_mark;
     /* TODO */
     /*
     flow->ct_label = md.ct_label;

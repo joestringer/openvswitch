@@ -1158,8 +1158,8 @@ dpif_bpf_handlers_set(struct dpif *dpif_, uint32_t n_handlers)
     return error;
 }
 
-static void
-extract_key(struct dp_packet *packet, struct ofpbuf *buf)
+static int
+extract_key(const struct bpf_flow_key *key, struct ofpbuf *buf)
 {
     uint64_t key_stub[1024 / 8];
     struct ofpbuf key_buf;
@@ -1169,10 +1169,16 @@ extract_key(struct dp_packet *packet, struct ofpbuf *buf)
         .key_buf = &key_buf,
     };
 
+    if (odp_bpf_flow_key_to_flow(key, &flow) == ODP_FIT_ERROR) {
+        VLOG_WARN("bpf flow key parsing error");
+        return EINVAL;
+    }
+
     ofpbuf_use_stub(&key_buf, &key_stub, sizeof key_stub);
-    flow_extract(packet, &flow);
     odp_flow_key_from_flow(&parms, buf);
     ofpbuf_uninit(&key_buf);
+
+    return 0;
 }
 
 struct ovs_ebpf_event {
@@ -1191,8 +1197,9 @@ perf_sample_to_upcall(struct dpif_bpf *dp, struct ovs_ebpf_event *e,
 {
     size_t sample_len = e->sample.size - sizeof e->header;
     size_t pkt_len = e->header.skb_len;
-    //size_t pre_key_len;
+    size_t pre_key_len;
     odp_port_t port_no;
+    int err;
 
     if (pkt_len < ETH_HEADER_LEN) {
         VLOG_WARN_RL(&rl, "Unexpectedly short packet (%"PRIuSIZE")", pkt_len);
@@ -1213,26 +1220,26 @@ perf_sample_to_upcall(struct dpif_bpf *dp, struct ovs_ebpf_event *e,
     }
 
     /* Use buffer->header to point to the packet, and buffer->msg to point to
-     * the extracted flow key. */
+     * the extracted flow key. Therefore, when extract_key() reallocates
+     * 'buffer', we can easily get pointers back to the packet and start of
+     * extracted key. */
     buffer->header = e->data;
     buffer->msg = ofpbuf_tail(buffer);
+    pre_key_len = buffer->size;
 
-    /* XXX: Receive flow key from BPF metadata */
-    //pre_key_len = buffer->size;
-    pkt_metadata_init(&upcall->packet.md, port_no);
-    extract_key(&upcall->packet, buffer);
+    err = extract_key(&e->header.key, buffer);
+    if (err) {
+        return err;
+    }
     ofpbuf_prealloc_tailroom(buffer, sizeof(struct bpf_downcall));
+
     memset(upcall, 0, sizeof *upcall);
     upcall->type = DPIF_UC_MISS;
     dp_packet_use_stub(&upcall->packet, buffer->header,
                        pkt_len + sizeof(struct bpf_downcall));
     dp_packet_set_size(&upcall->packet, pkt_len);
-
-    // convert bpf_flow_key to nlattr
-    //upcall->key = buffer->msg;
-    //upcall->key_len = buffer->size - pre_key_len;
-    upcall->key = (struct nlattr *) &(e->header.key);
-    upcall->key_len = sizeof(struct bpf_flow_key);
+    upcall->key = buffer->msg;
+    upcall->key_len = buffer->size - pre_key_len;
     dpif_flow_hash(&dp->dpif, upcall->key, upcall->key_len, &upcall->ufid);
 
     return 0;
