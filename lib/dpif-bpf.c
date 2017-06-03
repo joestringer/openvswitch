@@ -930,6 +930,7 @@ dpif_bpf_output(struct dp_packet *packet, int ifindex, uint32_t flags)
     /* XXX: Check that ovs-system device MTU is large enough to include md. */
     dp_packet_put(packet, &md, sizeof md);
     dp_packet_batch_init_packet(&batch, packet);
+    VLOG_INFO("Sending packet");
     error = netdev_send(datapath.outport, queue, &batch, false, false);
     dp_packet_set_size(packet, dp_packet_size(packet) - sizeof md);
 
@@ -943,9 +944,12 @@ dpif_bpf_execute(struct dpif *dpif_, struct dpif_execute *execute)
     const struct nlattr *a;
     int left, error = 0;
 
+    VLOG_INFO("%s", __func__);
+
     NL_ATTR_FOR_EACH_UNSAFE (a, left, execute->actions, execute->actions_len) {
         int type = nl_attr_type(a);
 
+        VLOG_INFO("%s: Action %d, bytes remaining %d", __func__, type, left);
         switch(type) {
         case OVS_ACTION_ATTR_OUTPUT: {
             odp_port_t port_no = nl_attr_get_odp_port(a);
