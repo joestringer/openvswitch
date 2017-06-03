@@ -28,6 +28,7 @@
 #include "dirs.h"
 #include "dpif.h"
 #include "dpif-provider.h"
+#include "dpif-bpf-odp.h"
 #include "fat-rwlock.h"
 #include "netdev.h"
 #include "netdev-provider.h"
@@ -987,12 +988,13 @@ dpif_bpf_execute(struct dpif *dpif_, struct dpif_execute *execute)
     return error;
 }
 
-static void
-dpif_bpf_flow_actions(struct dpif *dpif_,
-                      struct bpf_action_batch *action_batch,
-                      const struct nlattr *nlactions,
-                      size_t actions_len)
+static int
+dpif_bpf_serialize_actions(struct dpif *dpif_,
+                           struct bpf_action_batch *action_batch,
+                           const struct nlattr *nlactions,
+                           size_t actions_len)
 {
+
     const struct nlattr *a;
     unsigned int left, count = 0, skipped = 0;
     struct bpf_action *actions;
@@ -1002,46 +1004,34 @@ dpif_bpf_flow_actions(struct dpif *dpif_,
     actions = action_batch->actions;
 
     NL_ATTR_FOR_EACH_UNSAFE (a, left, nlactions, actions_len) {
-        int type = nl_attr_type(a);
+        enum ovs_action_attr type = nl_attr_type(a);
         actions[count].type = type;
 
-        switch (type) {
-        case OVS_ACTION_ATTR_UNSPEC:
-            VLOG_ERR("unspec action");
-            skipped++;
-            break;
-        case OVS_ACTION_ATTR_OUTPUT: {
+        if (type == OVS_ACTION_ATTR_OUTPUT) {
             struct dpif_bpf_port *port;
             odp_port_t port_no = nl_attr_get_odp_port(a);
 
             ovs_mutex_lock(&dpif->port_mutex);
             port = bpf_lookup_port(dpif, port_no);
             if (port) {
-                VLOG_INFO("output action to port %d ifindex %d", port_no, port->ifindex);
+                VLOG_INFO("output action to port %d ifindex %d", port_no,
+                          port->ifindex);
                 actions[count].u.port = port->ifindex;
             }
             ovs_mutex_unlock(&dpif->port_mutex);
-            break;
-        }
-        case OVS_ACTION_ATTR_PUSH_VLAN: {
-            const struct ovs_action_push_vlan *vlan = nl_attr_get(a);
-            actions[count].u.push_vlan = *vlan;
-            VLOG_DBG("push vlan tpid %x tci %x", vlan->vlan_tpid, vlan->vlan_tci);
-            break;
-        }
-        case OVS_ACTION_ATTR_POP_VLAN:
-            VLOG_DBG("pop vlan");
-            skipped++;
-            break;
-        default:
-            VLOG_WARN("Unsupported action type %d",  nl_attr_type(a));
-            skipped++;
-            break;
+        } else {
+            if (odp_action_to_bpf_action(a, &actions[count])) {
+                skipped++;
+            }
         }
         count++;
     }
 
     VLOG_INFO("Processing flow actions (%d/%d skipped)", skipped, count);
+    if (skipped) {
+        /* XXX: VLOG actions that couldn't be processed */
+    }
+    return 0;
 }
 
 static void
@@ -1060,11 +1050,16 @@ dpif_bpf_operate(struct dpif *dpif, struct dpif_op **ops, size_t n_ops)
             break;
         case DPIF_OP_FLOW_PUT: {
             struct bpf_action_batch action_batch;
+            int err;
 
             put = &op->u.flow_put;
-            /* XXX: This is completely broken */
             flow_key = (struct bpf_flow_key *) put->key;
-            dpif_bpf_flow_actions(dpif, &action_batch, put->actions, put->actions_len);
+            err = dpif_bpf_serialize_actions(dpif, &action_batch, put->actions,
+                                             put->actions_len);
+            if (err) {
+                op->error = err;
+                break;
+            }
 
             op->error = dpif_bpf_insert_flow(flow_key, &action_batch);
             break;
@@ -1174,7 +1169,7 @@ extract_key(const struct bpf_flow_key *key, struct dp_packet *packet,
         .key_buf = &key_buf,
     };
 
-    if (odp_bpf_flow_key_to_flow(key, &flow) == ODP_FIT_ERROR) {
+    if (bpf_flow_key_to_flow(key, &flow) == ODP_FIT_ERROR) {
         VLOG_WARN("bpf flow key parsing error");
         return EINVAL;
     }
