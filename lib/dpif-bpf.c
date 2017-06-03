@@ -1159,7 +1159,8 @@ dpif_bpf_handlers_set(struct dpif *dpif_, uint32_t n_handlers)
 }
 
 static int
-extract_key(const struct bpf_flow_key *key, struct ofpbuf *buf)
+extract_key(const struct bpf_flow_key *key, struct dp_packet *packet,
+            struct ofpbuf *buf)
 {
     uint64_t key_stub[1024 / 8];
     struct ofpbuf key_buf;
@@ -1175,6 +1176,7 @@ extract_key(const struct bpf_flow_key *key, struct ofpbuf *buf)
     }
 
     ofpbuf_use_stub(&key_buf, &key_stub, sizeof key_stub);
+    flow_extract(packet, &flow);
     odp_flow_key_from_flow(&parms, buf);
     ofpbuf_uninit(&key_buf);
 
@@ -1227,7 +1229,8 @@ perf_sample_to_upcall(struct dpif_bpf *dp, struct ovs_ebpf_event *e,
     buffer->msg = ofpbuf_tail(buffer);
     pre_key_len = buffer->size;
 
-    err = extract_key(&e->header.key, buffer);
+    pkt_metadata_init(&upcall->packet.md, port_no);
+    err = extract_key(&e->header.key, &upcall->packet, buffer);
     if (err) {
         return err;
     }
