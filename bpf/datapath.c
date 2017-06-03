@@ -126,7 +126,7 @@ static int from_stack(struct __sk_buff *skb)
     printt("egress from %d (%d)\n", skb->ingress_ifindex, skb->ifindex);
 
     ovs_cb_init(skb, false);
-    bpf_tail_call(skb, &tailcalls, UPCALL_CALL);
+    bpf_tail_call(skb, &tailcalls, PARSER_CALL);
 
     printt("[ERROR] tail call fail\n");
     return TC_ACT_OK;
