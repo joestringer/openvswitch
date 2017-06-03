@@ -427,6 +427,15 @@ ifindex_to_odp(struct dpif_bpf *dp, int ifindex)
     return port->port_no;
 }
 
+static uint16_t
+odp_port_to_ifindex(struct dpif_bpf *dp, odp_port_t port_no)
+    OVS_REQUIRES(dp->port_mutex)
+{
+    struct dpif_bpf_port *port = bpf_lookup_port(dp, port_no);
+
+    return port ? port->ifindex : 0;
+}
+
 static bool output_to_local_stack(struct netdev *netdev)
 {
     return !strcmp(netdev_get_type(netdev), "tap");
@@ -989,7 +998,7 @@ dpif_bpf_execute(struct dpif *dpif_, struct dpif_execute *execute)
 }
 
 static int
-dpif_bpf_serialize_actions(struct dpif *dpif_,
+dpif_bpf_serialize_actions(struct dpif_bpf *dpif,
                            struct bpf_action_batch *action_batch,
                            const struct nlattr *nlactions,
                            size_t actions_len)
@@ -998,7 +1007,6 @@ dpif_bpf_serialize_actions(struct dpif *dpif_,
     const struct nlattr *a;
     unsigned int left, count = 0, skipped = 0;
     struct bpf_action *actions;
-    struct dpif_bpf *dpif = dpif_bpf_cast(dpif_);
 
     memset(action_batch, 0, sizeof(*action_batch));
     actions = action_batch->actions;
@@ -1035,10 +1043,11 @@ dpif_bpf_serialize_actions(struct dpif *dpif_,
 }
 
 static void
-dpif_bpf_operate(struct dpif *dpif, struct dpif_op **ops, size_t n_ops)
+dpif_bpf_operate(struct dpif *dpif_, struct dpif_op **ops, size_t n_ops)
 {
+    struct dpif_bpf *dpif = dpif_bpf_cast(dpif_);
+
     for (int i = 0; i < n_ops; i++) {
-        struct bpf_flow_key *flow_key;
         struct dpif_op *op = ops[i];
         struct dpif_flow_put *put;
         struct dpif_flow_del *del OVS_UNUSED;
@@ -1046,14 +1055,39 @@ dpif_bpf_operate(struct dpif *dpif, struct dpif_op **ops, size_t n_ops)
 
         switch (op->type) {
         case DPIF_OP_EXECUTE:
-            op->error = dpif_bpf_execute(dpif, &op->u.execute);
+            op->error = dpif_bpf_execute(dpif_, &op->u.execute);
             break;
         case DPIF_OP_FLOW_PUT: {
             struct bpf_action_batch action_batch;
+            struct bpf_flow_key key;
+            odp_port_t in_port;
+            uint16_t ifindex;
             int err;
 
+            /* XXX: Use dpif_format_flow()? */
+            memset(&key, 0, sizeof key);
             put = &op->u.flow_put;
-            flow_key = (struct bpf_flow_key *) put->key;
+            if (odp_key_to_bpf_flow_key(put->key, put->key_len, &key,
+                                        &in_port)) {
+                struct ds ds = DS_EMPTY_INITIALIZER;
+                struct hmap *portnames = NULL;
+
+                op->error = EINVAL;
+                odp_flow_format(put->key, put->key_len, put->mask,
+                                put->mask_len, portnames, &ds, true);
+                VLOG_WARN("Failed to translate odp key to bpf key:\n%s",
+                          ds_cstr(&ds));
+                ds_destroy(&ds);
+                break;
+            }
+            ifindex = odp_port_to_ifindex(dpif, in_port);
+            if (!ifindex) {
+                VLOG_WARN("Could not find ifindex corresponding to port %"
+                          PRIu32, in_port);
+                op->error = ENODEV;
+                break;
+            }
+            key.mds.md.in_port = ifindex;
             err = dpif_bpf_serialize_actions(dpif, &action_batch, put->actions,
                                              put->actions_len);
             if (err) {
@@ -1061,7 +1095,7 @@ dpif_bpf_operate(struct dpif *dpif, struct dpif_op **ops, size_t n_ops)
                 break;
             }
 
-            op->error = dpif_bpf_insert_flow(flow_key, &action_batch);
+            op->error = dpif_bpf_insert_flow(&key, &action_batch);
             break;
         }
         case DPIF_OP_FLOW_GET:

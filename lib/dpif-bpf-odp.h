@@ -27,4 +27,7 @@ struct bpf_action;
 int odp_action_to_bpf_action(const struct nlattr *, struct bpf_action *);
 enum odp_key_fitness bpf_flow_key_to_flow(const struct bpf_flow_key *,
                                           struct flow *);
+enum odp_key_fitness odp_key_to_bpf_flow_key(const struct nlattr *, size_t,
+                                             struct bpf_flow_key *,
+                                             odp_port_t *in_port);
 #endif /* dpif-bpf-odp.h */

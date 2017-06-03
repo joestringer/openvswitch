@@ -101,3 +101,172 @@ bpf_flow_key_to_flow(const struct bpf_flow_key *key, struct flow *flow)
     */
     return ODP_FIT_PERFECT;
 }
+
+/* Converts the 'nla_len' bytes of OVS netlink-formatted flow key in 'nla' into
+ * the bpf flow structure in 'key'. Returns an ODP_FIT_* value that indicates
+ * how well 'nla' fits into the BPF flow key format. On success, 'in_port' will
+ * be populated with the in_port specified by 'nla', which the caller must
+ * convert from an ODP port number into an ifindex and place into 'key'.
+ */
+enum odp_key_fitness
+odp_key_to_bpf_flow_key(const struct nlattr *nla, size_t nla_len,
+                        struct bpf_flow_key *key, odp_port_t *in_port)
+{
+    bool found_in_port = false;
+    const struct nlattr *a;
+    size_t left;
+
+    NL_ATTR_FOR_EACH_UNSAFE(a, left, nla, nla_len) {
+        enum ovs_key_attr type = nl_attr_type(a);
+
+        switch (type) {
+        case OVS_KEY_ATTR_PRIORITY:
+            key->mds.md.skb_priority = nl_attr_get_u32(a);
+            break;
+        case OVS_KEY_ATTR_IN_PORT: {
+            /* The caller must convert the ODP port number into ifindex. */
+            *in_port = nl_attr_get_odp_port(a);
+            found_in_port = true;
+            break;
+        }
+        case OVS_KEY_ATTR_ETHERNET: {
+            const struct ovs_key_ethernet *eth = nl_attr_get(a);
+
+            for (int i = 0; i < ARRAY_SIZE(eth->eth_dst.ea); i++) {
+                key->headers.ethernet.dstAddr[i] = eth->eth_dst.ea[i];
+                key->headers.ethernet.srcAddr[i] = eth->eth_src.ea[i];
+            }
+            key->headers.ethernet.valid = 1;
+            break;
+        }
+        case OVS_KEY_ATTR_VLAN: {
+            ovs_be16 tci = nl_attr_get_be16(a);
+
+            key->headers.vlan.pcp = vlan_tci_to_pcp(tci);
+            key->headers.vlan.cfi = vlan_tci_to_cfi(tci);
+            key->headers.vlan.vid = vlan_tci_to_vid(tci);
+            /* XXX: Ethertype */
+            key->headers.vlan.valid = 1;
+            break;
+        }
+        case OVS_KEY_ATTR_ETHERTYPE:
+            /* XXX: etherType to set depends on encapsulation. */
+            key->headers.ethernet.etherType = ntohs(nl_attr_get_be16(a));
+            key->headers.ethernet.valid = 1;
+            break;
+        case OVS_KEY_ATTR_IPV4: {
+            const struct ovs_key_ipv4 *ipv4 = nl_attr_get(a);
+
+            key->headers.ipv4.srcAddr = ntohl(ipv4->ipv4_src);
+            key->headers.ipv4.dstAddr = ntohl(ipv4->ipv4_dst);
+            key->headers.ipv4.protocol = ipv4->ipv4_proto;
+            key->headers.ipv4.diffserv = ipv4->ipv4_tos;
+            key->headers.ipv4.ttl = ipv4->ipv4_ttl;
+            /* XXX: ipv4->ipv4_frag; One of OVS_FRAG_TYPE_*. */
+            key->headers.ipv4.valid = 1;
+            break;
+        }
+        case OVS_KEY_ATTR_IPV6: {
+            const struct ovs_key_ipv6 *ipv6 = nl_attr_get(a);
+
+            memcpy(&key->headers.ipv6.srcAddr, &ipv6->ipv6_src,
+                   ARRAY_SIZE(key->headers.ipv6.srcAddr));
+            memcpy(&key->headers.ipv6.dstAddr, &ipv6->ipv6_dst,
+                   ARRAY_SIZE(key->headers.ipv6.dstAddr));
+            key->headers.ipv6.flowLabel = ntohl(ipv6->ipv6_label);
+	    key->headers.ipv6.nextHdr = ipv6->ipv6_proto;
+	    key->headers.ipv6.trafficClass = ipv6->ipv6_tclass;
+	    key->headers.ipv6.hopLimit = ipv6->ipv6_hlimit;
+	    /* XXX: ipv6_frag;	One of OVS_FRAG_TYPE_*. */
+            key->headers.ipv6.valid = 1;
+            break;
+        }
+        case OVS_KEY_ATTR_TCP: {
+            const struct ovs_key_tcp *tcp = nl_attr_get(a);
+
+            key->headers.tcp.srcPort = ntohs(tcp->tcp_src);
+            key->headers.tcp.dstPort = ntohs(tcp->tcp_dst);
+            key->headers.tcp.valid = 1;
+            break;
+        }
+        case OVS_KEY_ATTR_UDP: {
+            const struct ovs_key_udp *udp = nl_attr_get(a);
+
+            key->headers.udp.srcPort = ntohs(udp->udp_src);
+            key->headers.udp.dstPort = ntohs(udp->udp_dst);
+            key->headers.udp.valid = 1;
+            break;
+        }
+        case OVS_KEY_ATTR_ICMP: {
+            const struct ovs_key_icmp *icmp = nl_attr_get(a);
+
+            /* XXX: Double-check */
+            key->headers.icmp.typeCode = icmp->icmp_code;
+            key->headers.icmp.typeCode |= (uint16_t)icmp->icmp_type << 8;
+            key->headers.icmp.valid = 1;
+            break;
+        }
+        case OVS_KEY_ATTR_ARP: {
+            const struct ovs_key_arp *arp = nl_attr_get(a);
+
+	    key->headers.arp.opcode = ntohs(arp->arp_op);
+	    /* arp->arp_sip; */
+	    /* arp->arp_tip; */
+	    /* arp->arp_sha; */
+	    /* arp->arp_tha; */
+            return ODP_FIT_ERROR;
+        }
+        case OVS_KEY_ATTR_SKB_MARK:
+            key->mds.md.pkt_mark = nl_attr_get_u32(a);
+            break;
+        case OVS_KEY_ATTR_TCP_FLAGS: {
+            ovs_be16 flags_be = nl_attr_get_be16(a);
+            uint16_t flags = htons(flags_be);
+
+            key->headers.tcp.flags = flags;
+            key->headers.tcp.res = flags >> 8;
+            key->headers.tcp.valid = 1;
+            break;
+        }
+        case OVS_KEY_ATTR_DP_HASH:
+            key->mds.md.dp_hash = nl_attr_get_u32(a);
+            break;
+        case OVS_KEY_ATTR_RECIRC_ID:
+            key->mds.md.recirc_id = nl_attr_get_u32(a);
+            break;
+        case OVS_KEY_ATTR_CT_STATE:
+            key->mds.md.ct_state = nl_attr_get_u32(a);
+            break;
+        case OVS_KEY_ATTR_CT_ZONE:
+            key->mds.md.ct_zone = nl_attr_get_u16(a);
+            break;
+        case OVS_KEY_ATTR_CT_MARK:
+            key->mds.md.ct_mark = nl_attr_get_u32(a);
+            break;
+        case OVS_KEY_ATTR_CT_LABELS:
+            memcpy(&key->mds.md.ct_label, nl_attr_get(a),
+                   sizeof(key->mds.md.ct_label));
+            break;
+        case OVS_KEY_ATTR_ENCAP:
+        case OVS_KEY_ATTR_ICMPV6:
+        case OVS_KEY_ATTR_ND:
+        case OVS_KEY_ATTR_TUNNEL:
+        case OVS_KEY_ATTR_SCTP:
+        case OVS_KEY_ATTR_MPLS:
+        case OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV4:
+        case OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV6:
+        case OVS_KEY_ATTR_PACKET_TYPE:
+            return ODP_FIT_ERROR;
+        case OVS_KEY_ATTR_UNSPEC:
+        case __OVS_KEY_ATTR_MAX:
+        default:
+            OVS_NOT_REACHED();
+        }
+    }
+
+    if (!found_in_port) {
+        return ODP_FIT_ERROR;
+    }
+
+    return ODP_FIT_PERFECT;
+}
