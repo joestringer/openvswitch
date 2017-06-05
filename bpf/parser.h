@@ -159,13 +159,15 @@ static int ovs_parser(struct __sk_buff* ebpf_packet) {
             ebpf_error = p4_pe_header_too_short;
             goto end;
         }
-        ebpf_headers.ipv4.version = ((load_byte(ebpf_packet, (ebpf_packetOffsetInBits + 0) / 8)) >> (4)) & EBPF_MASK(u8, 4);
+        //ebpf_headers.ipv4.version = ((load_byte(ebpf_packet, (ebpf_packetOffsetInBits + 0) / 8)) >> (4)) & EBPF_MASK(u8, 4);
+        ebpf_headers.ipv4.version = 0;
         ebpf_packetOffsetInBits += 4;
         if (ebpf_packet->len < BYTES(ebpf_packetOffsetInBits + 4)) {
             ebpf_error = p4_pe_header_too_short;
             goto end;
         }
-        ebpf_headers.ipv4.ihl = ((load_byte(ebpf_packet, (ebpf_packetOffsetInBits + 0) / 8)) >> (0)) & EBPF_MASK(u8, 4);
+        //ebpf_headers.ipv4.ihl = ((load_byte(ebpf_packet, (ebpf_packetOffsetInBits + 0) / 8)) >> (0)) & EBPF_MASK(u8, 4);
+        ebpf_headers.ipv4.ihl = 0;
         ebpf_packetOffsetInBits += 4;
         if (ebpf_packet->len < BYTES(ebpf_packetOffsetInBits + 8)) {
             ebpf_error = p4_pe_header_too_short;
