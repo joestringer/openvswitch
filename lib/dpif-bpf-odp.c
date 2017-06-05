@@ -268,5 +268,20 @@ odp_key_to_bpf_flow_key(const struct nlattr *nla, size_t nla_len,
         return ODP_FIT_ERROR;
     }
 
+    {
+        struct ds ds = DS_EMPTY_INITIALIZER;
+
+        bpf_flow_key_format(&ds, key);
+        VLOG_INFO("%s\n%s", __func__, ds_cstr(&ds));
+
+        ds_destroy(&ds);
+    }
+
     return ODP_FIT_PERFECT;
+}
+
+void
+bpf_flow_key_format(struct ds *ds, const struct bpf_flow_key *key)
+{
+    ds_put_hex_dump(ds, key, sizeof(*key), 0, true);
 }

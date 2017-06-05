@@ -1203,6 +1203,15 @@ extract_key(const struct bpf_flow_key *key, struct dp_packet *packet,
         .key_buf = &key_buf,
     };
 
+    {
+        struct ds ds = DS_EMPTY_INITIALIZER;
+
+        bpf_flow_key_format(&ds, key);
+        VLOG_INFO("%s\n%s", __func__, ds_cstr(&ds));
+
+        ds_destroy(&ds);
+    }
+
     if (bpf_flow_key_to_flow(key, &flow) == ODP_FIT_ERROR) {
         VLOG_WARN("bpf flow key parsing error");
         return EINVAL;
