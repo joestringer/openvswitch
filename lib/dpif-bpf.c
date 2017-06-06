@@ -1049,7 +1049,6 @@ dpif_bpf_operate(struct dpif *dpif_, struct dpif_op **ops, size_t n_ops)
 
     for (int i = 0; i < n_ops; i++) {
         struct dpif_op *op = ops[i];
-        struct dpif_flow_put *put;
         struct dpif_flow_del *del OVS_UNUSED;
         struct dpif_flow_get *get OVS_UNUSED;
 
@@ -1058,6 +1057,8 @@ dpif_bpf_operate(struct dpif *dpif_, struct dpif_op **ops, size_t n_ops)
             op->error = dpif_bpf_execute(dpif_, &op->u.execute);
             break;
         case DPIF_OP_FLOW_PUT: {
+            struct dpif_flow_put *put = &op->u.flow_put;
+            bool verbose = !(put->flags & DPIF_FP_PROBE);
             struct bpf_action_batch action_batch;
             struct bpf_flow_key key;
             odp_port_t in_port;
@@ -1066,9 +1067,8 @@ dpif_bpf_operate(struct dpif *dpif_, struct dpif_op **ops, size_t n_ops)
 
             /* XXX: Use dpif_format_flow()? */
             memset(&key, 0, sizeof key);
-            put = &op->u.flow_put;
             if (odp_key_to_bpf_flow_key(put->key, put->key_len, &key,
-                                        &in_port)) {
+                                        &in_port, verbose)) {
                 struct ds ds = DS_EMPTY_INITIALIZER;
                 struct hmap *portnames = NULL;
 
@@ -1081,7 +1081,10 @@ dpif_bpf_operate(struct dpif *dpif_, struct dpif_op **ops, size_t n_ops)
                 break;
             }
             ifindex = odp_port_to_ifindex(dpif, in_port);
-            if (!ifindex) {
+            if (ifindex) {
+                VLOG_INFO("Installing flow from port %"PRIu32" (ifindex %"
+                          PRIu16")", in_port, ifindex);
+            } else if (in_port) {
                 VLOG_WARN("Could not find ifindex corresponding to port %"
                           PRIu32, in_port);
                 op->error = ENODEV;

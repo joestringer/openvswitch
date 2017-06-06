@@ -110,7 +110,8 @@ bpf_flow_key_to_flow(const struct bpf_flow_key *key, struct flow *flow)
  */
 enum odp_key_fitness
 odp_key_to_bpf_flow_key(const struct nlattr *nla, size_t nla_len,
-                        struct bpf_flow_key *key, odp_port_t *in_port)
+                        struct bpf_flow_key *key, odp_port_t *in_port,
+                        bool verbose)
 {
     bool found_in_port = false;
     const struct nlattr *a;
@@ -268,7 +269,7 @@ odp_key_to_bpf_flow_key(const struct nlattr *nla, size_t nla_len,
         return ODP_FIT_ERROR;
     }
 
-    {
+    if (verbose) {
         struct ds ds = DS_EMPTY_INITIALIZER;
 
         bpf_flow_key_format(&ds, key);
@@ -280,8 +281,167 @@ odp_key_to_bpf_flow_key(const struct nlattr *nla, size_t nla_len,
     return ODP_FIT_PERFECT;
 }
 
+#define TABSPACE "  "
+
+static void
+indent(struct ds *ds, struct ds *tab, const char *string)
+{
+    ds_put_format(ds, "%s%s", ds_cstr(tab), string);
+    ds_put_cstr(tab, TABSPACE);
+}
+
+static void
+trim(struct ds *ds, struct ds *tab)
+{
+    ds_chomp(ds, '\n');
+    ds_put_char(ds, '\n');
+    ds_truncate(tab, tab->length ? tab->length - strlen(TABSPACE) : 0);
+}
+
+#define PUT_FIELD(STRUCT, NAME, FORMAT)                               \
+    if (STRUCT->NAME)                                                   \
+        ds_put_format(ds, #NAME"=%"FORMAT",", STRUCT->NAME)
+
 void
 bpf_flow_key_format(struct ds *ds, const struct bpf_flow_key *key)
 {
-    ds_put_hex_dump(ds, key, sizeof(*key), 0, true);
+    struct ds tab = DS_EMPTY_INITIALIZER;
+
+    indent(ds, &tab, "headers:\n");
+    {
+        if (key->headers.ethernet.valid) {
+            const struct ethernet_t *eth = &key->headers.ethernet;
+            const struct eth_addr *src = (struct eth_addr *)&eth->srcAddr;
+            const struct eth_addr *dst = (struct eth_addr *)&eth->dstAddr;
+
+            ds_put_format(ds, "%sethernet(", ds_cstr(&tab));
+            PUT_FIELD(eth, etherType, "#"PRIx16);
+            ds_put_format(ds, "dst="ETH_ADDR_FMT",", ETH_ADDR_ARGS(*dst));
+            ds_put_format(ds, "src="ETH_ADDR_FMT",", ETH_ADDR_ARGS(*src));
+            ds_chomp(ds, ',');
+            ds_put_format(ds, ")\n");
+        }
+        if (key->headers.ipv4.valid) {
+            const struct ipv4_t *ipv4 = &key->headers.ipv4;
+
+            ds_put_format(ds, "%sipv4(", ds_cstr(&tab));
+            PUT_FIELD(ipv4, version, "#"PRIx8);
+            PUT_FIELD(ipv4, version, "#"PRIx8);
+            PUT_FIELD(ipv4, ihl, "#"PRIx8);
+            PUT_FIELD(ipv4, diffserv, "#"PRIx8);
+            PUT_FIELD(ipv4, totalLen, "#"PRIx16);
+            PUT_FIELD(ipv4, identification, "#"PRIx16);
+            PUT_FIELD(ipv4, flags, "#"PRIx8);
+            PUT_FIELD(ipv4, fragOffset, "#"PRIx16);
+            PUT_FIELD(ipv4, ttl, "#"PRIx8);
+            PUT_FIELD(ipv4, protocol, "#"PRIx8);
+            PUT_FIELD(ipv4, hdrChecksum, "#"PRIx16);
+            ds_put_format(ds, "srcAddr="IP_FMT",", IP_ARGS(ipv4->srcAddr));
+            ds_put_format(ds, "dstAddr="IP_FMT",", IP_ARGS(ipv4->dstAddr));
+            ds_chomp(ds, ',');
+            ds_put_format(ds, ")\n");
+        }
+        if (key->headers.ipv6.valid) {
+            const struct ipv6_t *ipv6 = &key->headers.ipv6;
+
+            ds_put_format(ds, "%sipv6(", ds_cstr(&tab));
+            PUT_FIELD(ipv6, version, "#"PRIx8);
+            PUT_FIELD(ipv6, trafficClass, "#"PRIx8);
+            PUT_FIELD(ipv6, flowLabel, "#"PRIx32);
+            PUT_FIELD(ipv6, payloadLen, "#"PRIx16);
+            PUT_FIELD(ipv6, nextHdr, "#"PRIx8);
+            PUT_FIELD(ipv6, hopLimit, "#"PRIx8);
+            ds_put_cstr(ds, "src=");
+            ipv6_format_addr((struct in6_addr *)&ipv6->srcAddr, ds);
+            ds_put_cstr(ds, ",dst=");
+            ipv6_format_addr((struct in6_addr *)&ipv6->dstAddr, ds);
+            ds_chomp(ds, ',');
+            ds_put_format(ds, ")\n");
+        }
+        if (key->headers.arp.valid) {
+            const struct arp_rarp_t *arp = &key->headers.arp;
+
+            ds_put_format(ds, "%sarp(", ds_cstr(&tab));
+            PUT_FIELD(arp, hwType, "#"PRIx16);
+            PUT_FIELD(arp, protoType, "#"PRIx16);
+            PUT_FIELD(arp, hwAddrLen, "#"PRIx8);
+            PUT_FIELD(arp, protoAddrLen, "#"PRIx8);
+            PUT_FIELD(arp, opcode, "#"PRIx16);
+            ds_chomp(ds, ',');
+            ds_put_format(ds, ")\n");
+        }
+        if (key->headers.tcp.valid) {
+            const struct tcp_t *tcp = &key->headers.tcp;
+
+            ds_put_format(ds, "%stcp(", ds_cstr(&tab));
+            PUT_FIELD(tcp, srcPort, PRIu16);
+            PUT_FIELD(tcp, dstPort, PRIu16);
+            PUT_FIELD(tcp, seqNo, "#"PRIx32);
+            PUT_FIELD(tcp, ackNo, "#"PRIx32);
+            PUT_FIELD(tcp, dataOffset, "#"PRIx8);
+            PUT_FIELD(tcp, res, "#"PRIx8);
+            PUT_FIELD(tcp, flags, "#"PRIx8);
+            PUT_FIELD(tcp, window, "#"PRIx16);
+            PUT_FIELD(tcp, checksum, "#"PRIx16);
+            PUT_FIELD(tcp, urgentPtr, "#"PRIx16);
+            ds_chomp(ds, ',');
+            ds_put_format(ds, ")\n");
+        }
+        if (key->headers.udp.valid) {
+            const struct udp_t *udp = &key->headers.udp;
+
+            ds_put_format(ds, "%sudp(", ds_cstr(&tab));
+            PUT_FIELD(udp, srcPort, PRIu16);
+            PUT_FIELD(udp, dstPort, PRIu16);
+            PUT_FIELD(udp, length_, "#"PRIx16);
+            PUT_FIELD(udp, checksum, "#"PRIx16);
+            ds_chomp(ds, ',');
+            ds_put_format(ds, ")\n");
+        }
+        if (key->headers.icmp.valid) {
+            const struct icmp_t *icmp = &key->headers.icmp;
+
+            ds_put_format(ds, "%sicmp(", ds_cstr(&tab));
+            PUT_FIELD(icmp, typeCode, "#"PRIx16);
+            PUT_FIELD(icmp, hdrChecksum, "#"PRIx16);
+            ds_chomp(ds, ',');
+            ds_put_format(ds, ")\n");
+        }
+        if (key->headers.vlan.valid) {
+            const struct vlan_tag_t *vlan = &key->headers.vlan;
+
+            ds_put_format(ds, "%svlan(", ds_cstr(&tab));
+            PUT_FIELD(vlan, pcp, "#"PRIx8);
+            PUT_FIELD(vlan, cfi, "#"PRIx8);
+            PUT_FIELD(vlan, vid, "#"PRIx16);
+            PUT_FIELD(vlan, etherType, "#"PRIx16);
+            ds_chomp(ds, ',');
+            ds_put_format(ds, ")\n");
+        }
+    }
+    trim(ds, &tab);
+    indent(ds, &tab, "metadata:\n");
+    {
+        indent(ds, &tab, "standard_metadata:\n");
+        {
+            ds_put_hex_dump(ds, &key->mds.standard_metadata,
+                            sizeof key->mds.standard_metadata, 0, false);
+        }
+        trim(ds, &tab);
+        indent(ds, &tab, "md:\n");
+        {
+            ds_put_hex_dump(ds, &key->mds.md, sizeof key->mds.md, 0, false);
+        }
+        trim(ds, &tab);
+        indent(ds, &tab, "tnl_md:\n");
+        {
+            ds_put_hex_dump(ds, &key->mds.tnl_md, sizeof key->mds.tnl_md, 0,
+                            false);
+        }
+        trim(ds, &tab);
+    }
+    trim(ds, &tab);
+    ds_chomp(ds, '\n');
+
+    ds_destroy(&tab);
 }
