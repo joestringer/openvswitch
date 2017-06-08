@@ -974,6 +974,12 @@ dpif_bpf_output(struct dp_packet *packet, int ifindex, uint32_t flags)
     return error;
 }
 
+static uint32_t
+get_port_flags(struct netdev *netdev)
+{
+    return output_to_local_stack(netdev) ? OVS_BPF_FLAGS_TX_STACK : 0;
+}
+
 static int
 dpif_bpf_execute(struct dpif *dpif_, struct dpif_execute *execute)
 {
@@ -998,8 +1004,7 @@ dpif_bpf_execute(struct dpif *dpif_, struct dpif_execute *execute)
             port = bpf_lookup_port(dpif, port_no);
             if (port) {
                 ifindex = port->ifindex;
-                flags = output_to_local_stack(port->netdev)
-                        ? OVS_BPF_FLAGS_TX_STACK : 0;
+                flags = get_port_flags(port->netdev);
             }
             ovs_mutex_unlock(&dpif->port_mutex);
 
@@ -1051,7 +1056,8 @@ dpif_bpf_serialize_actions(struct dpif_bpf *dpif,
             if (port) {
                 VLOG_INFO("output action to port %d ifindex %d", port_no,
                           port->ifindex);
-                actions[count].u.port = port->ifindex;
+                actions[count].u.out.port = port->ifindex;
+                actions[count].u.out.flags = get_port_flags(port->netdev);
             }
             ovs_mutex_unlock(&dpif->port_mutex);
         } else {
