@@ -852,20 +852,46 @@ dpif_bpf_flow_dump_thread_destroy(struct dpif_flow_dump_thread *thread_)
 }
 
 static int
-fetch_flow(struct dpif_flow *flow OVS_UNUSED, struct bpf_flow_key *position)
+fetch_flow(struct dpif *dpif, struct dpif_flow *flow,
+           struct bpf_flow_key *key)
 {
-    struct bpf_flow dp_flow OVS_UNUSED;
+    struct flow f;
+    struct odp_flow_key_parms parms = {
+        .flow = &f,
+    };
     struct bpf_action_batch action;
+    struct ofpbuf buf;
     int err;
 
-    err = bpf_map_lookup_elem(datapath.bpf.flow_table.fd, position,
-                          &action);
+    err = bpf_map_lookup_elem(datapath.bpf.flow_table.fd, key, &action);
     if (err) {
         return errno;
     }
 
     /* XXX: Extract 'dp_flow' into 'flow'. */
-    //return EOPNOTSUPP;
+    if (bpf_flow_key_to_flow(key, &f) == ODP_FIT_ERROR) {
+        VLOG_WARN("%s: bpf flow key parsing error", __func__);
+        return EINVAL;
+    }
+
+    /* Translate BPF flow into netlink format. */
+    ofpbuf_init(&buf, 1024); /* XXX: Memory leak. Put this in percpu dump. */
+
+    /* Use 'buf.header' to point to the flow key, 'buf.msg' for actions */
+    odp_flow_key_from_flow(&parms, &buf);
+    buf.header = buf.data;
+    buf.msg = ofpbuf_tail(&buf);
+    /* XXX: Serialize BPF acts -> NL */
+
+    flow->key = buf.header;
+    flow->key_len = ofpbuf_headersize(&buf);
+    flow->actions = buf.msg;
+    flow->actions_len = ofpbuf_msgsize(&buf);
+    dpif_flow_hash(dpif, flow->key, flow->key_len, &flow->ufid);
+    flow->ufid_present = false; /* XXX */
+
+    /* XXX: stats */
+
     return 0;
 }
 
@@ -905,12 +931,12 @@ dpif_bpf_flow_dump_next(struct dpif_flow_dump_thread *thread_,
 
     while (n <= max_flows) {
         err = bpf_map_get_next_key(datapath.bpf.flow_table.fd,
-                               &dump->pos, &dump->pos);
+                                   &dump->pos, &dump->pos);
         if (err) {
             err = errno;
             break;
         }
-        err = fetch_flow(&flows[n], &dump->pos);
+        err = fetch_flow(dump->up.dpif, &flows[n], &dump->pos);
         if (err == ENOENT) {
             /* Flow disappeared. Oh well, we tried. */
             continue;
