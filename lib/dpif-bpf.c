@@ -873,6 +873,7 @@ fetch_flow(struct dpif *dpif, struct dpif_flow *flow,
         VLOG_WARN("%s: bpf flow key parsing error", __func__);
         return EINVAL;
     }
+    /* XXX: in_port translation */
 
     /* Translate BPF flow into netlink format. */
     ofpbuf_init(&buf, 1024); /* XXX: Memory leak. Put this in percpu dump. */
@@ -1239,6 +1240,7 @@ extract_key(const struct bpf_flow_key *key, struct dp_packet *packet,
     }
 
     bpf_flow_key_extract_metadata(key, &flow);
+    /* XXX: in_port translation */
     flow_extract(packet, &flow);
     odp_flow_key_from_flow(&parms, buf);
 
