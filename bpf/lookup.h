@@ -42,7 +42,7 @@ static inline void ovs_execute_actions(struct __sk_buff *skb,
         break;
 
     case OVS_ACTION_ATTR_OUTPUT: {  //1
-        printt("output action port = %d\n", action->u.port);
+        printt("output action port = %d\n", action->u.out.port);
         bpf_tail_call(skb, &tailcalls, OVS_ACTION_ATTR_OUTPUT);
         break;
     }

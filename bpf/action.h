@@ -114,6 +114,7 @@ static int tail_action_output(struct __sk_buff *skb)
     int ret;
     struct bpf_action *action;
     struct bpf_action_batch *batch;
+    int flags;
 
     /* Deparser will update the packet content and metadata */
     ret = ovs_deparser(skb);
@@ -124,8 +125,9 @@ static int tail_action_output(struct __sk_buff *skb)
     if (!action)
         return TC_ACT_SHOT;
 
-    printt("output action port = %d\n", action->u.port);
-    bpf_clone_redirect(skb, action->u.port, BPF_F_INGRESS);
+    printt("output action port = %d\n", action->u.out.port);
+    flags = action->u.out.flags & OVS_BPF_FLAGS_TX_STACK ? BPF_F_INGRESS : 0;
+    bpf_clone_redirect(skb, action->u.out.port, flags);
 
     post_tail_action(skb, batch);
     return TC_ACT_SHOT;

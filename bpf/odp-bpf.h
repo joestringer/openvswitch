@@ -185,10 +185,15 @@ struct ovs_action_set_masked {
     } mask;
 };
 
+struct ovs_action_output {
+    uint32_t port;
+    uint32_t flags;
+};
+
 struct bpf_action {
     uint32_t type;  /* action type */
     union {
-        uint32_t port;                  /* OVS_ACTION_ATTR_OUTPUT: 4B */
+        struct ovs_action_output out;   /* OVS_ACTION_ATTR_OUTPUT: 8B */
         struct ovs_action_trunc trunc;  /* OVS_ACTION_ATTR_TRUNC: 4B */
         struct ovs_action_hash hash;    /* OVS_ACTION_ATTR_HASH: 8B */
         struct ovs_action_push_mpls mpls;   /* OVS_ACTION_ATTR_PUSH_MPLS: 6B */
