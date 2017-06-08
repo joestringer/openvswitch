@@ -1212,11 +1212,7 @@ extract_key(const struct bpf_flow_key *key, struct dp_packet *packet,
         ds_destroy(&ds);
     }
 
-    if (bpf_flow_key_to_flow(key, &flow) == ODP_FIT_ERROR) {
-        VLOG_WARN("bpf flow key parsing error");
-        return EINVAL;
-    }
-
+    bpf_flow_key_extract_metadata(key, &flow);
     flow_extract(packet, &flow);
     odp_flow_key_from_flow(&parms, buf);
 

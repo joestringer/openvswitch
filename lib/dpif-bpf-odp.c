@@ -76,14 +76,11 @@ odp_action_to_bpf_action(const struct nlattr *src, struct bpf_action *dst)
  * flow structure in 'flow'. Returns an ODP_FIT_* value that indicates how well
  * 'key' fits our expectations for what a flow key should contain.
  */
-enum odp_key_fitness
-bpf_flow_key_to_flow(const struct bpf_flow_key *key, struct flow *flow)
+void
+bpf_flow_key_extract_metadata(const struct bpf_flow_key *key,
+                              struct flow *flow)
 {
     const struct pkt_metadata_t *md = &key->mds.md;
-
-    memset(flow, 0, sizeof *flow);
-
-    /* XXX: Populate key. */
 
     /* metadata parsing */
     flow->in_port.odp_port = u32_to_odp(md->in_port);
@@ -99,6 +96,17 @@ bpf_flow_key_to_flow(const struct bpf_flow_key *key, struct flow *flow)
     flow->ct_label = md.ct_label;
     flow_tnl_copy__()
     */
+}
+
+enum odp_key_fitness
+bpf_flow_key_to_flow(const struct bpf_flow_key *key, struct flow *flow)
+{
+    memset(flow, 0, sizeof *flow);
+
+    /* XXX: Populate key. */
+
+    bpf_flow_key_extract_metadata(key, flow);
+
     return ODP_FIT_PERFECT;
 }
 
