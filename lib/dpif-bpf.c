@@ -1198,12 +1198,9 @@ static int
 extract_key(const struct bpf_flow_key *key, struct dp_packet *packet,
             struct ofpbuf *buf)
 {
-    uint64_t key_stub[1024 / 8];
-    struct ofpbuf key_buf;
     struct flow flow;
     struct odp_flow_key_parms parms = {
         .flow = &flow,
-        .key_buf = &key_buf,
     };
 
     {
@@ -1220,10 +1217,8 @@ extract_key(const struct bpf_flow_key *key, struct dp_packet *packet,
         return EINVAL;
     }
 
-    ofpbuf_use_stub(&key_buf, &key_stub, sizeof key_stub);
     flow_extract(packet, &flow);
     odp_flow_key_from_flow(&parms, buf);
-    ofpbuf_uninit(&key_buf);
 
     return 0;
 }
