@@ -37,6 +37,7 @@
 #include "ovs-numa.h"
 #include "perf-event.h"
 #include "poll-loop.h"
+#include "sset.h"
 
 VLOG_DEFINE_THIS_MODULE(dpif_bpf);
 static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(60, 60);
@@ -58,6 +59,7 @@ struct bpf_handler {
 struct dpif_bpf {
     struct dpif dpif;
     const char *const name;
+    struct ovs_refcount ref_cnt;
 
     /* Ports.
      *
@@ -157,6 +159,21 @@ dpif_bpf_init(void)
     return error;
 }
 
+static int
+dpif_bpf_enumerate(struct sset *all_dps,
+                   const struct dpif_class *dpif_class OVS_UNUSED)
+{
+    struct shash_node *node;
+
+    ovs_mutex_lock(&bpf_datapath_mutex);
+    SHASH_FOR_EACH(node, &bpf_datapaths) {
+        sset_add(all_dps, node->name);
+    }
+    ovs_mutex_unlock(&bpf_datapath_mutex);
+
+    return 0;
+}
+
 static const char
 *dpif_bpf_port_open_type(const struct dpif_class *dpif_class OVS_UNUSED,
                          const char *type)
@@ -186,6 +203,9 @@ dpif_bpf_open(const struct dpif_class *dpif_class OVS_UNUSED,
         error = create ? EEXIST : 0;
     }
     if (!error) {
+        if (!create) {
+            ovs_refcount_ref(&dp->ref_cnt);
+        }
         *dpifp = &dp->dpif;
     }
     ovs_mutex_unlock(&bpf_datapath_mutex);
@@ -247,6 +267,7 @@ create_dpif_bpf(const char *name, struct dpif_bpf **dp)
 
     dpif = xzalloc(sizeof *dpif + max_cpu * sizeof(struct perf_channel));
     dpif_init(&dpif->dpif, &dpif_bpf_class, name, netflow_id >> 8, netflow_id);
+    ovs_refcount_init(&dpif->ref_cnt);
     hmap_init(&dpif->ports_by_odp);
     hmap_init(&dpif->ports_by_ifindex);
     fat_rwlock_init(&dpif->upcall_lock);
@@ -257,7 +278,7 @@ create_dpif_bpf(const char *name, struct dpif_bpf **dp)
     dpif->n_channels = max_cpu;
     dpif->last_seq = seq_read(dpif->port_seq);
 
-    shash_add(&bpf_datapaths, name, dpif);
+    shash_add(&bpf_datapaths, name, dpif); /* XXX */
 
     error = perf_event_channels_init(dpif);
     if (error) {
@@ -292,22 +313,27 @@ static void
 dpif_bpf_close(struct dpif *dpif_)
 {
     struct dpif_bpf *dpif = dpif_bpf_cast(dpif_);
-    struct dpif_bpf_port *port, *next;
-    int i;
 
-    fat_rwlock_wrlock(&dpif->upcall_lock);
-    for (i = 0; i < dpif->n_channels; i++) {
-        struct perf_channel *channel = &dpif->channels[i];
+    ovs_mutex_lock(&bpf_datapath_mutex);
+    if (ovs_refcount_unref_relaxed(&dpif->ref_cnt) == 1) {
+        struct dpif_bpf_port *port, *next;
+        int i;
 
-        perf_channel_close(channel);
+        fat_rwlock_wrlock(&dpif->upcall_lock);
+        for (i = 0; i < dpif->n_channels; i++) {
+            struct perf_channel *channel = &dpif->channels[i];
+
+            perf_channel_close(channel);
+        }
+        fat_rwlock_unlock(&dpif->upcall_lock);
+
+        ovs_mutex_lock(&dpif->port_mutex);
+        HMAP_FOR_EACH_SAFE (port, next, odp_node, &dpif->ports_by_odp) {
+            do_del_port(dpif, port);
+        }
+        ovs_mutex_unlock(&dpif->port_mutex);
     }
-    fat_rwlock_unlock(&dpif->upcall_lock);
-
-    ovs_mutex_lock(&dpif->port_mutex);
-    HMAP_FOR_EACH_SAFE (port, next, odp_node, &dpif->ports_by_odp) {
-        do_del_port(dpif, port);
-    }
-    ovs_mutex_unlock(&dpif->port_mutex);
+    ovs_mutex_unlock(&bpf_datapath_mutex);
 }
 
 static int
@@ -1432,7 +1458,7 @@ dpif_bpf_recv_purge(struct dpif *dpif_)
 const struct dpif_class dpif_bpf_class = {
     "bpf",
     dpif_bpf_init,
-    NULL,                       /* enumerate */
+    dpif_bpf_enumerate,
     dpif_bpf_port_open_type,
     dpif_bpf_open,
     dpif_bpf_close,
