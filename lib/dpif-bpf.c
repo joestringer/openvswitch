@@ -863,6 +863,8 @@ fetch_flow(struct dpif *dpif, struct dpif_flow *flow,
     struct ofpbuf buf;
     int err;
 
+    memset(flow, 0, sizeof *flow);
+
     err = bpf_map_lookup_elem(datapath.bpf.flow_table.fd, key, &action);
     if (err) {
         return errno;
