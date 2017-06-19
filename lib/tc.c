@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017 Nicira, Inc.
+ * Copyright (c) 2009-2017 Nicira, Inc.
  * Copyright (c) 2016 Mellanox Technologies, Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +16,9 @@
  */
 
 #include <config.h>
+
 #include "tc.h"
+
 #include <errno.h>
 #include <linux/if_ether.h>
 #include <linux/rtnetlink.h>
@@ -26,6 +28,7 @@
 #include <linux/tc_act/tc_vlan.h>
 #include <linux/gen_stats.h>
 #include <net/if.h>
+
 #include "byte-order.h"
 #include "netlink-socket.h"
 #include "netlink.h"
@@ -33,7 +36,7 @@
 #include "openvswitch/vlog.h"
 #include "packets.h"
 #include "timeval.h"
-#include <unaligned.h>
+#include "unaligned.h"
 
 VLOG_DEFINE_THIS_MODULE(tc);
 
