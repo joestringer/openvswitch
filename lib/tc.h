@@ -21,7 +21,6 @@
 #include <linux/pkt_cls.h>
 #include <linux/pkt_sched.h>
 #include <linux/rtnetlink.h>
-#include <netinet/in.h>
 #include "lib/netlink-socket.h"
 #include "odp-netlink.h"
 #include "openvswitch/ofpbuf.h"
