@@ -3452,13 +3452,14 @@ put_exclude_packet_type(struct ofpbuf *buf, uint16_t type,
         size_t first_chunk_size = (uint8_t *)packet_type - (uint8_t *)data;
         size_t second_chunk_size = data_len - first_chunk_size
                                    - packet_type_len;
-        uint8_t *first_attr = NULL;
         struct nlattr *next_attr = nl_attr_next(packet_type);
+        size_t new_len;
 
-        first_attr = nl_msg_put_unspec_uninit(buf, type,
-                                              data_len - packet_type_len);
-        memcpy(first_attr, data, first_chunk_size);
-        memcpy(first_attr + first_chunk_size, next_attr, second_chunk_size);
+        new_len = data_len - packet_type_len;
+
+        nl_msg_put_unspec_uninit(buf, type, new_len);
+        nl_msg_put(buf, data, first_chunk_size);
+        nl_msg_put(buf, next_attr, second_chunk_size);
     } else {
         nl_msg_put_unspec(buf, type, data, data_len);
     }
