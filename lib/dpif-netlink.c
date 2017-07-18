@@ -3453,12 +3453,23 @@ put_exclude_packet_type(struct ofpbuf *buf, uint16_t type,
         size_t second_chunk_size = data_len - first_chunk_size
                                    - packet_type_len;
         struct nlattr *next_attr = nl_attr_next(packet_type);
+        const struct nlattr *ethernet;
         size_t new_len;
 
         new_len = data_len - packet_type_len;
+        ethernet = nl_attr_find__(data, data_len, OVS_KEY_ATTR_ETHERNET);
+        if (!ethernet) {
+            /* If there's no ethernet attribute, then we need to specify the
+             * ethertype. */
+            new_len += NL_A_U16_SIZE;
+        }
 
         nl_msg_put_unspec_uninit(buf, type, new_len);
         nl_msg_put(buf, data, first_chunk_size);
+        if (!ethernet) {
+            ovs_be32 type = nl_attr_get_be32(packet_type);
+            nl_msg_put_be16(buf, OVS_KEY_ATTR_ETHERTYPE, pt_ns_type_be(type));
+        }
         nl_msg_put(buf, next_attr, second_chunk_size);
     } else {
         nl_msg_put_unspec(buf, type, data, data_len);
