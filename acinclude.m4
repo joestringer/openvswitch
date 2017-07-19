@@ -143,7 +143,7 @@ AC_DEFUN([OVS_CHECK_LINUX], [
     AC_MSG_RESULT([$kversion])
 
     if test "$version" -ge 4; then
-       if test "$version" = 4 && test "$patchlevel" -le 11; then
+       if test "$version" = 4 && test "$patchlevel" -le 12; then
           : # Linux 4.x
        else
           AC_ERROR([Linux kernel in $KBUILD is version $kversion, but version newer than 4.11.x is not supported (please refer to the FAQ for advice)])
@@ -748,6 +748,15 @@ AC_DEFUN([OVS_CHECK_LINUX_COMPAT], [
                         [OVS_DEFINE([HAVE_DEFRAG_ENABLE_TAKES_NET])])
   OVS_GREP_IFELSE([$KSRC/include/net/genetlink.h], [family_list],
                         [OVS_DEFINE([HAVE_GENL_FAMILY_LIST])])
+  OVS_FIND_FIELD_IFELSE([$KSRC/include/linux/netdevice.h], [net_device],
+                        [needs_free_netdev],
+                        [OVS_DEFINE([HAVE_NEEDS_FREE_NETDEV])])
+  OVS_FIND_FIELD_IFELSE([$KSRC/include/net/vxlan.h], [vxlan_dev],
+                        [cfg],
+                        [OVS_DEFINE([HAVE_VXLAN_DEV_CFG])])
+  OVS_GREP_IFELSE([$KSRC/include/net/netfilter/nf_conntrack_helper.h],
+                  [nf_conntrack_helper_put],
+                  [OVS_DEFINE([HAVE_NF_CONNTRACK_HELPER_PUT])])
 
   if cmp -s datapath/linux/kcompat.h.new \
             datapath/linux/kcompat.h >/dev/null 2>&1; then
