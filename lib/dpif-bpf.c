@@ -244,15 +244,17 @@ dpif_bpf_free(struct dpif_bpf *dpif)
 {
     shash_find_and_delete(&bpf_datapaths, dpif->name);
 
-    ovs_mutex_destroy(&dpif->port_mutex);
-    seq_destroy(dpif->port_seq);
-    fat_rwlock_destroy(&dpif->upcall_lock);
-    hmap_destroy(&dpif->ports_by_ifindex);
-    hmap_destroy(&dpif->ports_by_odp);
-    if (dpif->n_handlers) {
-        free(dpif->handlers);
+    if (ovs_refcount_read(&dpif->ref_cnt) == 0) {
+        ovs_mutex_destroy(&dpif->port_mutex);
+        seq_destroy(dpif->port_seq);
+        fat_rwlock_destroy(&dpif->upcall_lock);
+        hmap_destroy(&dpif->ports_by_ifindex);
+        hmap_destroy(&dpif->ports_by_odp);
+        if (dpif->n_handlers) {
+            free(dpif->handlers);
+        }
+        free(dpif);
     }
-    free(dpif);
 }
 
 int
@@ -278,6 +280,7 @@ create_dpif_bpf(const char *name, struct dpif_bpf **dp)
     dpif->n_channels = max_cpu;
     dpif->last_seq = seq_read(dpif->port_seq);
 
+    *CONST_CAST(const char **, &dpif->name) = xstrdup(name);
     shash_add(&bpf_datapaths, name, dpif); /* XXX */
 
     error = perf_event_channels_init(dpif);
@@ -332,6 +335,7 @@ dpif_bpf_close(struct dpif *dpif_)
             do_del_port(dpif, port);
         }
         ovs_mutex_unlock(&dpif->port_mutex);
+        dpif_bpf_free(dpif);
     }
     ovs_mutex_unlock(&bpf_datapath_mutex);
 }
