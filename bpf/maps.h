@@ -44,6 +44,8 @@
 #include "openvswitch.h"
 #include "ovs-p4.h"
 
+#include "conntrack.h"
+
 /* ovs-vswitchd as a writer will update these maps.
  * bpf datapath as reader lookup and processes */
 
@@ -80,6 +82,15 @@ BPF_HASH(flow_table,
         PIN_GLOBAL_NS,
         256
 );
+/* XXX: LRU_HASH for CT? */
+BPF_HASH(ct_table4,
+         0,
+         sizeof(struct ipv4_ct_tuple),
+         sizeof(struct ct_entry),
+         PIN_GLOBAL_NS,
+         4096                   /* 4K connections? */
+);
+/* XXX: CT for IPv6? */
 BPF_PERF_OUTPUT(upcalls, PIN_GLOBAL_NS);
 
 /* XXX: Percpu */

@@ -19,8 +19,11 @@
 #include <errno.h>
 #include <stdint.h>
 #include <iproute2/bpf_elf.h>
+#include <linux/ip.h>
 
 #include "api.h"
+#include "conntrack.h"
+#include "ipv4.h"
 #include "maps.h"
 #include "helpers.h"
 
@@ -348,3 +351,103 @@ static int tail_action_trunc(struct __sk_buff *skb)
     return TC_ACT_SHOT;
 }
 
+#define SKB_DATA_CAST(x) ((void *)(long)x)
+
+__section_tail(OVS_ACTION_ATTR_CT)
+static int tail_action_ct(struct __sk_buff *skb)
+{
+    struct ipv4_ct_tuple tuple = {};
+    struct ct_state ct_state = {};
+    void *data = SKB_DATA_CAST(skb->data);
+    void *data_end = SKB_DATA_CAST(skb->data_end);
+
+    struct bpf_action_batch *batch;
+    struct ebpf_headers_t *headers;
+    struct ebpf_metadata_t *md;
+    struct bpf_action *action;
+    struct iphdr *ipv4;
+    int l4_ofs, dir;
+    bool commit;
+    int res;
+
+    action = pre_tail_action(skb, &batch);
+    if (!action)
+        return TC_ACT_SHOT;
+
+    commit = action->u.ct.commit;
+
+    headers = bpf_get_headers();
+    if (!headers) {
+        printt("no header\n");
+        return TC_ACT_SHOT;
+    }
+
+    if (headers->ethernet.etherType != 0x0800) {
+        printt("ct: dropping non-IPv4 packet\n");
+        return TC_ACT_SHOT;
+    }
+
+#define ETH_HLEN 14 /* XXX */
+
+    if (data + sizeof(*ipv4) + ETH_HLEN > data_end) {
+        printt("ct: IP packet too short\n");
+        return TC_ACT_SHOT;
+    }
+
+    ipv4 = (struct iphdr *)(data + ETH_HLEN);
+    tuple.daddr = ipv4->daddr;
+    tuple.saddr = ipv4->saddr;
+    tuple.nexthdr = ipv4->protocol;
+    l4_ofs = ETH_HLEN + ipv4_hdrlen(ipv4);
+    /* tuple l4 ports are filled by ct_lookup */
+    dir = skb->cb[OVS_CB_INGRESS] ? CT_INGRESS : CT_EGRESS;
+
+    res = ct_lookup4(&ct_table4, &tuple, skb, l4_ofs, 0, dir, &ct_state);
+    if (res < 0) {
+        /* XXX: OVS_CS_F_INVALID */
+        printt("ct() err=%d\n", res);
+        return TC_ACT_SHOT;
+    }
+    printt("ct() success=%d\n", res);
+
+    md = bpf_get_mds();
+    if (!md) {
+        printt("lookup metadata failed\n");
+        return TC_ACT_SHOT;
+    }
+    //md->md.ct_state = OVS_CS_F_TRACKED;
+
+    //switch (res) {
+    //case CT_NEW:
+    //    md->md.ct_state |= OVS_CS_F_NEW;
+    //    break;
+    //case CT_ESTABLISHED:
+    //    md->md.ct_state |= OVS_CS_F_ESTABLISHED;
+    //    break;
+    //case CT_RELATED:
+    //    md->md.ct_state |= OVS_CS_F_RELATED;
+    //    break;
+    //case CT_REPLY:
+    //    md->md.ct_state |= OVS_CS_F_REPLY_DIR;
+    //default:
+    //    return TC_ACT_SHOT;
+    //}
+
+    /* XXX: Commit, mark, label */
+    if (commit) {
+        int err;
+
+        printt("ct commit\n");
+        err = ct_create4(&ct_table4, &tuple, skb, dir, &ct_state, false);
+        if (err) {
+            printt("ct creation failed\n");
+            return TC_ACT_SHOT;
+        }
+    }
+
+    /* XXX: NAT, etc. */
+    /* XXX: OVS_CS_F_SRC_NAT; OVS_CS_F_DST_NAT */
+
+    post_tail_action(skb, batch);
+    return TC_ACT_SHOT;
+}

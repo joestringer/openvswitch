@@ -64,6 +64,10 @@ static inline void ovs_execute_actions(struct __sk_buff *skb,
         printt("set masked\n");
         break;
     }
+    case OVS_ACTION_ATTR_CT: { //12
+        printt("ct\n");
+        break;
+    }
     case OVS_ACTION_ATTR_TRUNC: { //13
         printt("truncate\n");
         break;

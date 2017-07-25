@@ -30,6 +30,7 @@ bpf_extra = \
 bpf_CFLAGS = $(AM_CFLAGS)
 bpf_CFLAGS += -target bpf -D__NR_CPUS__=$(shell nproc) -O2 -Wall -Werror
 bpf_CFLAGS += -I$(top_builddir)/include -I$(top_srcdir)/include
+bpf_CFLAGS += -Wno-error=pointer-arith  # Allow skb->data arithmetic
 
 dist_sources = $(bpf_sources)
 dist_headers = $(bpf_headers)
