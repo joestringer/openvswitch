@@ -28,6 +28,26 @@
 
 VLOG_DEFINE_THIS_MODULE(dpif_bpf_odp);
 
+static void
+ct_action_to_bpf(const struct nlattr *ct, struct bpf_action *dst)
+{
+    const struct nlattr *nla;
+    int left;
+
+    VLOG_DBG("push ct action");
+    NL_ATTR_FOR_EACH_UNSAFE(nla, left, ct, ct->nla_len) {
+        switch (nla->nla_type) {
+        case OVS_CT_ATTR_COMMIT:
+            VLOG_INFO("Found CT commit");
+            dst->u.ct.commit = true;
+            break;
+        default:
+            VLOG_INFO("Ignoring CT attribute %d", nla->nla_type);
+            break;
+        }
+    }
+}
+
 /* Converts the OVS netlink-formatted action 'src' into a BPF action in 'dst'.
  *
  * Returns 0 on success, or a positive errno value on failure.
@@ -44,6 +64,9 @@ odp_action_to_bpf_action(const struct nlattr *src, struct bpf_action *dst)
         VLOG_DBG("push vlan tpid %x tci %x", vlan->vlan_tpid, vlan->vlan_tci);
         break;
     }
+    case OVS_ACTION_ATTR_CT:
+        ct_action_to_bpf(nl_attr_get(src), dst);
+        break;
     case OVS_ACTION_ATTR_USERSPACE:
     case OVS_ACTION_ATTR_SET:
     case OVS_ACTION_ATTR_POP_VLAN:
@@ -53,7 +76,6 @@ odp_action_to_bpf_action(const struct nlattr *src, struct bpf_action *dst)
     case OVS_ACTION_ATTR_PUSH_MPLS:
     case OVS_ACTION_ATTR_POP_MPLS:
     case OVS_ACTION_ATTR_SET_MASKED:
-    case OVS_ACTION_ATTR_CT:
     case OVS_ACTION_ATTR_TRUNC:
     case OVS_ACTION_ATTR_PUSH_ETH:
     case OVS_ACTION_ATTR_POP_ETH:
