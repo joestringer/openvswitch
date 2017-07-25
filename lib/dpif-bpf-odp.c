@@ -28,6 +28,34 @@
 
 VLOG_DEFINE_THIS_MODULE(dpif_bpf_odp);
 
+static void
+ct_action_to_bpf(const struct nlattr *ct, struct bpf_action *dst)
+{
+    const struct nlattr *nla;
+    int left;
+
+    NL_ATTR_FOR_EACH_UNSAFE(nla, left, ct, ct->nla_len) {
+        switch ((enum ovs_ct_attr)nla->nla_type) {
+        case OVS_CT_ATTR_COMMIT:
+            dst->u.ct.commit = true;
+            break;
+        case OVS_CT_ATTR_ZONE:
+        case OVS_CT_ATTR_MARK:
+        case OVS_CT_ATTR_LABELS:
+        case OVS_CT_ATTR_HELPER:
+        case OVS_CT_ATTR_NAT:
+        case OVS_CT_ATTR_FORCE_COMMIT:
+        case OVS_CT_ATTR_EVENTMASK:
+        default:
+            VLOG_INFO("Ignoring CT attribute %d", nla->nla_type);
+            break;
+        case OVS_CT_ATTR_UNSPEC:
+        case __OVS_CT_ATTR_MAX:
+            OVS_NOT_REACHED();
+        }
+    }
+}
+
 /* Converts the OVS netlink-formatted action 'src' into a BPF action in 'dst'.
  *
  * Returns 0 on success, or a positive errno value on failure.
@@ -44,16 +72,20 @@ odp_action_to_bpf_action(const struct nlattr *src, struct bpf_action *dst)
         VLOG_DBG("push vlan tpid %x tci %x", vlan->vlan_tpid, vlan->vlan_tci);
         break;
     }
+    case OVS_ACTION_ATTR_CT:
+        ct_action_to_bpf(nl_attr_get(src), dst);
+        break;
+    case OVS_ACTION_ATTR_RECIRC:
+        dst->u.recirc_id = nl_attr_get_u32(src);
+        break;
     case OVS_ACTION_ATTR_USERSPACE:
     case OVS_ACTION_ATTR_SET:
     case OVS_ACTION_ATTR_POP_VLAN:
     case OVS_ACTION_ATTR_SAMPLE:
-    case OVS_ACTION_ATTR_RECIRC:
     case OVS_ACTION_ATTR_HASH:
     case OVS_ACTION_ATTR_PUSH_MPLS:
     case OVS_ACTION_ATTR_POP_MPLS:
     case OVS_ACTION_ATTR_SET_MASKED:
-    case OVS_ACTION_ATTR_CT:
     case OVS_ACTION_ATTR_TRUNC:
     case OVS_ACTION_ATTR_PUSH_ETH:
     case OVS_ACTION_ATTR_POP_ETH:

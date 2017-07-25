@@ -191,6 +191,11 @@ struct ovs_action_output {
     uint32_t flags;
 };
 
+struct ovs_action_ct {
+    int commit;
+    /* XXX: Include everything in enum ovs_ct_attr. */
+};
+
 struct bpf_action {
     uint32_t type;  /* action type */
     union {
@@ -204,6 +209,7 @@ struct bpf_action {
         uint32_t recirc_id;                 /* OVS_ACTION_ATTR_RECIRC: 4B */
         struct ovs_action_set tunnel;       /* OVS_ACTION_ATTR_SET: */
         struct ovs_action_set_masked mset;  /* OVS_ACTION_ATTR_SET_MASK: */
+        struct ovs_action_ct ct;        /* OVS_ACTION_ATTR_CT:  */
 
         uint64_t aligned[16]; // make it 128 byte
     } u;
