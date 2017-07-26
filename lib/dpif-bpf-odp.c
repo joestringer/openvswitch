@@ -67,11 +67,13 @@ odp_action_to_bpf_action(const struct nlattr *src, struct bpf_action *dst)
     case OVS_ACTION_ATTR_CT:
         ct_action_to_bpf(nl_attr_get(src), dst);
         break;
+    case OVS_ACTION_ATTR_RECIRC:
+        dst->u.recirc_id = nl_attr_get_u32(src);
+        break;
     case OVS_ACTION_ATTR_USERSPACE:
     case OVS_ACTION_ATTR_SET:
     case OVS_ACTION_ATTR_POP_VLAN:
     case OVS_ACTION_ATTR_SAMPLE:
-    case OVS_ACTION_ATTR_RECIRC:
     case OVS_ACTION_ATTR_HASH:
     case OVS_ACTION_ATTR_PUSH_MPLS:
     case OVS_ACTION_ATTR_POP_MPLS:
