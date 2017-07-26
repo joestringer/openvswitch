@@ -985,7 +985,8 @@ unlock:
 }
 
 static int
-dpif_bpf_output(struct dp_packet *packet, int ifindex, uint32_t flags)
+dpif_bpf_output(struct dp_packet *packet, const struct flow *flow, int ifindex,
+                uint32_t flags)
 {
     struct dp_packet_batch batch;
     struct bpf_downcall md = {
@@ -997,6 +998,8 @@ dpif_bpf_output(struct dp_packet *packet, int ifindex, uint32_t flags)
     int error;
 
     /* XXX: Check that ovs-system device MTU is large enough to include md. */
+    bpf_metadata_from_flow(flow, &md.md);
+    md.md.md.in_port = ifindex;
     dp_packet_put(packet, &md, sizeof md);
     dp_packet_batch_init_packet(&batch, packet);
     VLOG_INFO("Sending packet");
@@ -1041,7 +1044,8 @@ dpif_bpf_execute(struct dpif *dpif_, struct dpif_execute *execute)
             ovs_mutex_unlock(&dpif->port_mutex);
 
             if (port) {
-                error = dpif_bpf_output(execute->packet, ifindex, flags);
+                error = dpif_bpf_output(execute->packet, execute->flow,
+                                        ifindex, flags);
             } else {
                 VLOG_WARN_RL(&rl, "execute output on unknown port %d", port_no);
                 error = ENODEV;

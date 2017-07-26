@@ -123,6 +123,28 @@ bpf_flow_key_extract_metadata(const struct bpf_flow_key *key,
     */
 }
 
+/* XXX The caller must perform in_port translation. */
+void
+bpf_metadata_from_flow(const struct flow *flow, struct ebpf_metadata_t *md)
+{
+    if (flow->packet_type != htonl(PT_ETH)) {
+        VLOG_WARN("Cannot convert flow to bpf metadata: non-ethernet");
+    }
+    md->md.in_port = odp_to_u32(flow->in_port.odp_port); /* XXX */
+    md->md.recirc_id = flow->recirc_id;
+    md->md.dp_hash = flow->dp_hash;
+    md->md.skb_priority = flow->skb_priority;
+    md->md.pkt_mark = flow->pkt_mark;
+    md->md.ct_state = flow->ct_state;
+    md->md.ct_zone = flow->ct_zone;
+    md->md.ct_mark = flow->ct_mark;
+    /* TODO */
+    /*
+    md->md.ct_label = flow.ct_label;
+    flow_tnl_copy__()
+    */
+}
+
 enum odp_key_fitness
 bpf_flow_key_to_flow(const struct bpf_flow_key *key, struct flow *flow)
 {
