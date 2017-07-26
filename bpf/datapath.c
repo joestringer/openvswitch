@@ -136,6 +136,7 @@ __section("downcall")
 static int execute(struct __sk_buff *skb)
 {
     struct bpf_downcall md;
+    u32 ebpf_zero = 0;
     int flags, ofs;
 
     ofs = skb->len - sizeof(md);
@@ -145,8 +146,13 @@ static int execute(struct __sk_buff *skb)
     printt("downcall from %d -> %d (%d)\n", skb->ingress_ifindex, md.ifindex,
            flags);
 
-    skb_change_tail(skb, ofs, 0);
+    bpf_map_update_elem(&percpu_metadata, &ebpf_zero, &md.md, BPF_ANY);
 
+    skb_change_tail(skb, ofs, 0);
+    skb->cb[OVS_CB_ACT_IDX] = -1; /* Skip writing the BPF metadata in parser */
+
+    /* Redirect to the device this packet came from, so it's as though the
+     * packet was freshly received. This should execute PARSER_CALL. */
     return redirect(md.ifindex, flags);
 }
 

@@ -108,6 +108,7 @@ struct bpf_downcall {
     uint32_t debug;
     uint32_t ifindex;
     uint32_t flags;
+    struct ebpf_metadata_t md;
     /* Followed by packet data. */
 };
 
