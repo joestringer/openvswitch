@@ -158,7 +158,7 @@ static inline void ct6_cilium_trace_tuple(struct __sk_buff *skb, __u8 type,
 
 /* Offset must point to IPv6 */
 static inline int __inline__ ct_lookup6(void *map, struct ipv6_ct_tuple *tuple,
-					struct __sk_buff *skb, int l4_off, __u32 secctx, int dir,
+					struct __sk_buff *skb, int l4_off, __u32 secctx OVS_UNUSED, int dir,
 					struct ct_state *ct_state)
 {
 	int ret = CT_NEW, action = ACTION_UNSPEC;
@@ -315,7 +315,7 @@ static inline void ct4_cilium_trace_tuple(struct __sk_buff *skb, __u8 type,
 
 /* Offset must point to IPv4 header */
 static inline int __inline__ ct_lookup4(void *map, struct ipv4_ct_tuple *tuple,
-					struct __sk_buff *skb, int off, __u32 secctx, int dir,
+					struct __sk_buff *skb, int off, __u32 secctx OVS_UNUSED, int dir,
 					struct ct_state *ct_state)
 {
 	int ret = CT_NEW, action = ACTION_UNSPEC;

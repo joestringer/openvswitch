@@ -10,16 +10,8 @@ bpf_cilium_headers = \
 	bpf/l4.h \
 	bpf/utils.h
 bpf_headers = \
-	bpf/datapath.h \
+	bpf/dbg.h \
 	bpf/odp-bpf.h \
-	bpf/ovs-p4.h \
-	bpf/helpers.h \
-	bpf/openvswitch.h \
-	bpf/maps.h \
-	bpf/parser.h \
-	bpf/lookup.h \
-	bpf/action.h \
-	bpf/deparser.h \
 	bpf/generated_headers.h \
 	$(bpf_cilium_headers)
 bpf_extra = \
