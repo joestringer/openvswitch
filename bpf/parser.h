@@ -506,6 +506,7 @@ end:
         bpf_map_update_elem(&percpu_metadata,
                             &ebpf_zero, &ebpf_metadata, BPF_ANY);
     }
+    ebpf_packet->cb[OVS_CB_ACT_IDX] = 0;
 
     /* tail call next stage */
     printt("tail call match+lookup stage\n");
