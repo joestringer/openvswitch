@@ -11,6 +11,7 @@ bpf_cilium_headers = \
 	bpf/utils.h
 bpf_headers = \
 	bpf/datapath.h \
+	bpf/dbg.h \
 	bpf/odp-bpf.h \
 	bpf/ovs-p4.h \
 	bpf/helpers.h \
