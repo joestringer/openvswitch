@@ -18,8 +18,13 @@
 #ifndef __LIB_COMMON_H_
 #define __LIB_COMMON_H_
 
-#include <bpf_features.h>
-#include <bpf/api.h>
+#define LB_RR_MAX_SEQ 31
+#define CONNTRACK 1
+#define CONNTRACK_ACCOUNTING 1
+#define NEEDS_TIMEOUT 1
+
+#include "bpf_features.h"
+#include "api.h"
 #include <linux/ipv6.h>
 #include <linux/in.h>
 #include <stdint.h>
