@@ -87,6 +87,7 @@ EXTRA_DIST = \
 	build-aux/xml2nroff \
 	$(MAN_FRAGMENTS) \
 	$(MAN_ROOTS) \
+	test.sh \
 	Vagrantfile \
 	Vagrantfile-FreeBSD \
 	.mailmap
