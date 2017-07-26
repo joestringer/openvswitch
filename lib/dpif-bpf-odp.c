@@ -278,6 +278,13 @@ odp_key_to_bpf_flow_key(const struct nlattr *nla, size_t nla_len,
             memcpy(&key->mds.md.ct_label, nl_attr_get(a),
                    sizeof(key->mds.md.ct_label));
             break;
+        case OVS_KEY_ATTR_PACKET_TYPE: {
+            ovs_be32 pt = nl_attr_get_be32(a);
+            if (pt != htonl(PT_ETH)) {
+                return ODP_FIT_ERROR;
+            }
+            break;
+        }
         case OVS_KEY_ATTR_ENCAP:
         case OVS_KEY_ATTR_ICMPV6:
         case OVS_KEY_ATTR_ND:
@@ -286,7 +293,6 @@ odp_key_to_bpf_flow_key(const struct nlattr *nla, size_t nla_len,
         case OVS_KEY_ATTR_MPLS:
         case OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV4:
         case OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV6:
-        case OVS_KEY_ATTR_PACKET_TYPE:
             return ODP_FIT_ERROR;
         case OVS_KEY_ATTR_UNSPEC:
         case __OVS_KEY_ATTR_MAX:
