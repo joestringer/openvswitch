@@ -26,7 +26,7 @@ enum ovs_cb_idx {
 };
 
 static void
-ovs_cb_init(struct __sk_buff *skb, bool ingress OVS_UNUSED)
+ovs_cb_init(struct __sk_buff *skb, bool ingress)
 {
     for (int i = 0; i < SKB_CB_U32S; i++)
         skb->cb[i] = 0;
