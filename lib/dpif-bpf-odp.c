@@ -105,6 +105,7 @@ bpf_flow_key_extract_metadata(const struct bpf_flow_key *key,
     const struct pkt_metadata_t *md = &key->mds.md;
 
     /* metadata parsing */
+    flow->packet_type = htonl(PT_ETH);
     flow->in_port.odp_port = u32_to_odp(md->in_port);
     flow->recirc_id = md->recirc_id;
     flow->dp_hash = md->dp_hash;
