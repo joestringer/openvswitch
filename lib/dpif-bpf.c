@@ -959,6 +959,27 @@ dpif_bpf_insert_flow(struct bpf_flow_key *flow_key,
 }
 
 static int
+dpif_bpf_delete_flow(struct bpf_flow_key *flow_key,
+                     struct dpif_flow_stats *stats)
+{
+    int err;
+
+    ovs_assert(datapath.bpf.flow_table.fd != -1);
+    err = bpf_map_delete_elem(datapath.bpf.flow_table.fd, flow_key);
+    if (err) {
+        VLOG_ERR("Failed to del flow into flow table, map fd %d, error %s",
+                 datapath.bpf.flow_table.fd, ovs_strerror(errno));
+        return errno;
+    }
+
+    if (stats) {
+        /* XXX: Stats */
+        memset(stats, 0, sizeof *stats);
+    }
+    return 0;
+}
+
+static int
 dpif_bpf_flow_dump_next(struct dpif_flow_dump_thread *thread_,
                         struct dpif_flow *flows, int max_flows)
 {
@@ -1241,12 +1262,18 @@ dpif_bpf_operate(struct dpif *dpif_, struct dpif_op **ops, size_t n_ops)
             op->error = err;
             break;
         }
-        case DPIF_OP_FLOW_DEL:
-            /* XXX: need to construct bpf_flow_key and
-                    remove from flow_table map */
-            //op->error = EOPNOTSUPP;
-            op->error = 0;
+        case DPIF_OP_FLOW_DEL: {
+            struct dpif_flow_del *del = &op->u.flow_del;
+            struct bpf_flow_key key;
+            int err;
+
+            err = prepare_bpf_flow(dpif, del->key, del->key_len, &key, true);
+            if (!err) {
+                err = dpif_bpf_delete_flow(&key, del->stats);
+            }
+            op->error = err;
             break;
+        }
         default:
             /* XXX: Implement */
             op->error = EOPNOTSUPP;
