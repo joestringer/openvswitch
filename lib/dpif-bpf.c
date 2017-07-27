@@ -1125,6 +1125,37 @@ dpif_bpf_serialize_actions(struct dpif_bpf *dpif,
 }
 
 static void
+log_odp_to_bpf_failure(const struct nlattr *key, size_t key_len,
+                       const struct nlattr *mask, size_t mask_len)
+{
+    struct ds ds = DS_EMPTY_INITIALIZER;
+    struct hmap *portnames = NULL;
+
+    /* XXX portnames */
+    /* XXX: Use dpif_format_flow()? */
+    odp_flow_format(key, key_len, mask, mask_len, portnames, &ds, true);
+    VLOG_WARN("Failed to translate odp key to bpf key:\n%s", ds_cstr(&ds));
+    ds_destroy(&ds);
+}
+
+static int
+set_in_port(struct dpif_bpf *dpif, struct bpf_flow_key *key, odp_port_t port)
+{
+    uint16_t ifindex = odp_port_to_ifindex(dpif, port);
+
+    if (ifindex) {
+        VLOG_INFO("Installing flow from port %"PRIu32" (ifindex %"PRIu16")",
+                  port, ifindex);
+    } else if (port) {
+        VLOG_WARN("Could not find ifindex corresponding to port %"PRIu32,
+                  port);
+        return ENODEV;
+    }
+    key->mds.md.in_port = ifindex;
+    return 0;
+}
+
+static void
 dpif_bpf_operate(struct dpif *dpif_, struct dpif_op **ops, size_t n_ops)
 {
     struct dpif_bpf *dpif = dpif_bpf_cast(dpif_);
@@ -1144,35 +1175,23 @@ dpif_bpf_operate(struct dpif *dpif_, struct dpif_op **ops, size_t n_ops)
             struct bpf_action_batch action_batch;
             struct bpf_flow_key key;
             odp_port_t in_port;
-            uint16_t ifindex;
             int err;
 
-            /* XXX: Use dpif_format_flow()? */
             memset(&key, 0, sizeof key);
             if (odp_key_to_bpf_flow_key(put->key, put->key_len, &key,
                                         &in_port, verbose)) {
-                struct ds ds = DS_EMPTY_INITIALIZER;
-                struct hmap *portnames = NULL;
-
                 op->error = EINVAL;
-                odp_flow_format(put->key, put->key_len, put->mask,
-                                put->mask_len, portnames, &ds, true);
-                VLOG_WARN("Failed to translate odp key to bpf key:\n%s",
-                          ds_cstr(&ds));
-                ds_destroy(&ds);
+                if (verbose) {
+                    log_odp_to_bpf_failure(put->key, put->key_len, put->mask,
+                                           put->mask_len);
+                }
                 break;
             }
-            ifindex = odp_port_to_ifindex(dpif, in_port);
-            if (ifindex) {
-                VLOG_INFO("Installing flow from port %"PRIu32" (ifindex %"
-                          PRIu16")", in_port, ifindex);
-            } else if (in_port) {
-                VLOG_WARN("Could not find ifindex corresponding to port %"
-                          PRIu32, in_port);
-                op->error = ENODEV;
+            err = set_in_port(dpif, &key, in_port);
+            if (err) {
+                op->error = err;
                 break;
             }
-            key.mds.md.in_port = ifindex;
             err = dpif_bpf_serialize_actions(dpif, &action_batch, put->actions,
                                              put->actions_len);
             if (err) {
