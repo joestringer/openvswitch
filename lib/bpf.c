@@ -353,7 +353,7 @@ bpf_load(const char *path)
         return error;
     }
 
-    if (!bpf_get(&state, true)) {
+    if (!bpf_get(&state, false)) {
         /* XXX: Restart; Upgrade */
         VLOG_INFO("Re-using preloaded BPF datapath");
         bpf_put(&state);
