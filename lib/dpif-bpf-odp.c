@@ -34,16 +34,24 @@ ct_action_to_bpf(const struct nlattr *ct, struct bpf_action *dst)
     const struct nlattr *nla;
     int left;
 
-    VLOG_DBG("push ct action");
     NL_ATTR_FOR_EACH_UNSAFE(nla, left, ct, ct->nla_len) {
-        switch (nla->nla_type) {
+        switch ((enum ovs_ct_attr)nla->nla_type) {
         case OVS_CT_ATTR_COMMIT:
-            VLOG_INFO("Found CT commit");
             dst->u.ct.commit = true;
             break;
+        case OVS_CT_ATTR_ZONE:
+        case OVS_CT_ATTR_MARK:
+        case OVS_CT_ATTR_LABELS:
+        case OVS_CT_ATTR_HELPER:
+        case OVS_CT_ATTR_NAT:
+        case OVS_CT_ATTR_FORCE_COMMIT:
+        case OVS_CT_ATTR_EVENTMASK:
         default:
             VLOG_INFO("Ignoring CT attribute %d", nla->nla_type);
             break;
+        case OVS_CT_ATTR_UNSPEC:
+        case __OVS_CT_ATTR_MAX:
+            OVS_NOT_REACHED();
         }
     }
 }
