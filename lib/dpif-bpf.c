@@ -1022,12 +1022,10 @@ dpif_bpf_execute(struct dpif *dpif_, struct dpif_execute *execute)
     const struct nlattr *a;
     int left, error = 0;
 
-    VLOG_INFO("%s", __func__);
-
-    /* XXX: Need to provide the list of actions to the kernel somehow.
-     * Perhaps have a dedicated map for execution, then put a short lookup
-     * key on the front of the packet which the downcall BPF program will
-     * interpret, perform lookup, and start tail calls.
+    /* XXX: Need to provide the list of actions to the kernel somehow. Perhaps
+     * have a dedicated map for execution, then put a short lookup key on the
+     * front of the packet which the downcall BPF program will interpret,
+     * perform lookup, and start tail calls.
      *
      * Little bit tricky because if there's a separate map from flow table then
      * the pre_tail_action() lookup needs to be done on the execute map for
