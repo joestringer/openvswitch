@@ -1230,10 +1230,18 @@ dpif_bpf_operate(struct dpif *dpif_, struct dpif_op **ops, size_t n_ops)
             op->error = err;
             break;
         }
-        case DPIF_OP_FLOW_GET:
-            //op->error = EOPNOTSUPP;
-            op->error = 0;
+        case DPIF_OP_FLOW_GET: {
+            struct dpif_flow_get *get = &op->u.flow_get;
+            struct bpf_flow_key key;
+            int err;
+
+            err = prepare_bpf_flow(dpif, get->key, get->key_len, &key, true);
+            if (!err) {
+                err = fetch_flow(dpif_, get->flow, &key);
+            }
+            op->error = err;
             break;
+        }
         case DPIF_OP_FLOW_DEL:
             /* XXX: need to construct bpf_flow_key and
                     remove from flow_table map */
