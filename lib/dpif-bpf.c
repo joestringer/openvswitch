@@ -1024,6 +1024,19 @@ dpif_bpf_execute(struct dpif *dpif_, struct dpif_execute *execute)
 
     VLOG_INFO("%s", __func__);
 
+    /* XXX: Need to provide the list of actions to the kernel somehow.
+     * Perhaps have a dedicated map for execution, then put a short lookup
+     * key on the front of the packet which the downcall BPF program will
+     * interpret, perform lookup, and start tail calls.
+     *
+     * Little bit tricky because if there's a separate map from flow table then
+     * the pre_tail_action() lookup needs to be done on the execute map for
+     * these packets.
+     *
+     * The below hack just allows basic "actions=output[,output][,output]" to
+     * execute correctly, but anything else will break.
+     */
+
     NL_ATTR_FOR_EACH_UNSAFE (a, left, execute->actions, execute->actions_len) {
         int type = nl_attr_type(a);
 
