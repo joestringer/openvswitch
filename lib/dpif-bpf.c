@@ -457,22 +457,34 @@ ifindex_to_odp(struct dpif_bpf *dp, int ifindex)
     return port->port_no;
 }
 
-static uint16_t
-odp_port_to_ifindex(struct dpif_bpf *dp, odp_port_t port_no)
-    OVS_REQUIRES(dp->port_mutex)
-{
-    struct dpif_bpf_port *port = bpf_lookup_port(dp, port_no);
-
-    return port ? port->ifindex : 0;
-}
-
 static bool output_to_local_stack(struct netdev *netdev)
 {
     return !strcmp(netdev_get_type(netdev), "tap");
 }
 
-/* Modelled after dpif-netdev 'port_create', minus pmd and txq logic, plus
- * bpf filter set. */
+static uint32_t
+get_port_flags(struct netdev *netdev)
+{
+    return output_to_local_stack(netdev) ? OVS_BPF_FLAGS_TX_STACK : 0;
+}
+
+static uint16_t
+odp_port_to_ifindex(struct dpif_bpf *dp, odp_port_t port_no, uint32_t *flags)
+    OVS_REQUIRES(dp->port_mutex)
+{
+    struct dpif_bpf_port *port = bpf_lookup_port(dp, port_no);
+
+    if (port) {
+        if (flags) {
+            *flags = get_port_flags(port->netdev);
+        }
+        return port->ifindex;
+    }
+    return 0;
+}
+
+/* Modelled after dpif-netdev 'port_create', minus pmd and txq logic, plus bpf
+ * filter set. */
 static int
 port_create(const char *devname, const char *type,
             odp_port_t port_no, struct dpif_bpf_port **portp)
@@ -882,7 +894,7 @@ dpif_bpf_flow_dump_thread_destroy(struct dpif_flow_dump_thread *thread_)
 }
 
 static int
-fetch_flow(struct dpif *dpif, struct dpif_flow *flow,
+fetch_flow(struct dpif_bpf *dpif, struct dpif_flow *flow,
            struct bpf_flow_key *key)
 {
     struct flow f;
@@ -905,7 +917,7 @@ fetch_flow(struct dpif *dpif, struct dpif_flow *flow,
         VLOG_WARN("%s: bpf flow key parsing error", __func__);
         return EINVAL;
     }
-    /* XXX: in_port translation */
+    f.in_port.odp_port = ifindex_to_odp(dpif, f.in_port.odp_port);
 
     /* Translate BPF flow into netlink format. */
     ofpbuf_init(&buf, 1024); /* XXX: Memory leak. Put this in percpu dump. */
@@ -920,7 +932,7 @@ fetch_flow(struct dpif *dpif, struct dpif_flow *flow,
     flow->key_len = ofpbuf_headersize(&buf);
     flow->actions = buf.msg;
     flow->actions_len = ofpbuf_msgsize(&buf);
-    dpif_flow_hash(dpif, flow->key, flow->key_len, &flow->ufid);
+    dpif_flow_hash(&dpif->dpif, flow->key, flow->key_len, &flow->ufid);
     flow->ufid_present = false; /* XXX */
 
     /* XXX: stats */
@@ -962,13 +974,15 @@ dpif_bpf_flow_dump_next(struct dpif_flow_dump_thread *thread_,
     }
 
     while (n <= max_flows) {
+        struct dpif_bpf *dpif = dpif_bpf_cast(dump->up.dpif);
+
         err = bpf_map_get_next_key(datapath.bpf.flow_table.fd,
                                    &dump->pos, &dump->pos);
         if (err) {
             err = errno;
             break;
         }
-        err = fetch_flow(dump->up.dpif, &flows[n], &dump->pos);
+        err = fetch_flow(dpif, &flows[n], &dump->pos);
         if (err == ENOENT) {
             /* Flow disappeared. Oh well, we tried. */
             continue;
@@ -1008,12 +1022,6 @@ dpif_bpf_output(struct dp_packet *packet, const struct flow *flow, int ifindex,
     return error;
 }
 
-static uint32_t
-get_port_flags(struct netdev *netdev)
-{
-    return output_to_local_stack(netdev) ? OVS_BPF_FLAGS_TX_STACK : 0;
-}
-
 static int
 dpif_bpf_execute(struct dpif *dpif_, struct dpif_execute *execute)
 {
@@ -1041,19 +1049,11 @@ dpif_bpf_execute(struct dpif *dpif_, struct dpif_execute *execute)
         switch(type) {
         case OVS_ACTION_ATTR_OUTPUT: {
             odp_port_t port_no = nl_attr_get_odp_port(a);
-            struct dpif_bpf_port *port;
             uint32_t flags;
             int ifindex;
 
-            ovs_mutex_lock(&dpif->port_mutex);
-            port = bpf_lookup_port(dpif, port_no);
-            if (port) {
-                ifindex = port->ifindex;
-                flags = get_port_flags(port->netdev);
-            }
-            ovs_mutex_unlock(&dpif->port_mutex);
-
-            if (port) {
+            ifindex = odp_port_to_ifindex(dpif, port_no, &flags);
+            if (ifindex) {
                 error = dpif_bpf_output(execute->packet, execute->flow,
                                         ifindex, flags);
             } else {
@@ -1129,7 +1129,7 @@ set_in_port(struct dpif_bpf *dpif, struct bpf_flow_key *key, odp_port_t port)
 {
     uint16_t ifindex;
 
-    ifindex = odp_port_to_ifindex(dpif, port);
+    ifindex = odp_port_to_ifindex(dpif, port, NULL);
     if (ifindex) {
         VLOG_INFO("Installing flow from port %"PRIu32" (ifindex %"PRIu16")",
                   port, ifindex);
@@ -1236,7 +1236,7 @@ dpif_bpf_operate(struct dpif *dpif_, struct dpif_op **ops, size_t n_ops)
 
             err = prepare_bpf_flow(dpif, get->key, get->key_len, &key, true);
             if (!err) {
-                err = fetch_flow(dpif_, get->flow, &key);
+                err = fetch_flow(dpif, get->flow, &key);
             }
             op->error = err;
             break;
