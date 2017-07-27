@@ -107,6 +107,9 @@ odp_action_to_bpf_action(const struct nlattr *src, struct bpf_action *dst)
 /* Extracts packet metadata from the BPF-formatted flow key in 'key' into a
  * flow structure in 'flow'. Returns an ODP_FIT_* value that indicates how well
  * 'key' fits our expectations for what a flow key should contain.
+ *
+ * Note that flow->in_port will still contain an ifindex after this call, the
+ * caller is responsible for converting it to an odp_port number.
  */
 void
 bpf_flow_key_extract_metadata(const struct bpf_flow_key *key,
