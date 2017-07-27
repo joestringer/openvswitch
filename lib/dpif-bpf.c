@@ -940,8 +940,7 @@ dpif_bpf_insert_flow(struct bpf_flow_key *flow_key,
                               actions, BPF_ANY);
     if (err) {
         VLOG_ERR("Failed to add flow into flow table, map fd %d, error %s",
-                    datapath.bpf.flow_table.fd,
-                    ovs_strerror(errno));
+                 datapath.bpf.flow_table.fd, ovs_strerror(errno));
         return errno;
     }
     return 0;
