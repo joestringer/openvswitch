@@ -1122,25 +1122,15 @@ dpif_bpf_serialize_actions(struct dpif_bpf *dpif,
     return 0;
 }
 
-static void
-log_odp_to_bpf_failure(const struct nlattr *key, size_t key_len,
-                       const struct nlattr *mask, size_t mask_len)
-{
-    struct ds ds = DS_EMPTY_INITIALIZER;
-    struct hmap *portnames = NULL;
-
-    /* XXX portnames */
-    /* XXX: Use dpif_format_flow()? */
-    odp_flow_format(key, key_len, mask, mask_len, portnames, &ds, true);
-    VLOG_WARN("Failed to translate odp key to bpf key:\n%s", ds_cstr(&ds));
-    ds_destroy(&ds);
-}
-
+/* Translates 'port' into an ifindex and sets it inside 'key'.
+ *
+ * Returns 0 on success, or a positive errno otherwise. */
 static int
 set_in_port(struct dpif_bpf *dpif, struct bpf_flow_key *key, odp_port_t port)
 {
-    uint16_t ifindex = odp_port_to_ifindex(dpif, port);
+    uint16_t ifindex;
 
+    ifindex = odp_port_to_ifindex(dpif, port);
     if (ifindex) {
         VLOG_INFO("Installing flow from port %"PRIu32" (ifindex %"PRIu16")",
                   port, ifindex);
@@ -1149,8 +1139,64 @@ set_in_port(struct dpif_bpf *dpif, struct bpf_flow_key *key, odp_port_t port)
                   port);
         return ENODEV;
     }
+
     key->mds.md.in_port = ifindex;
     return 0;
+}
+
+/* Converts 'key' (of size 'key_len') into a bpf flow key in 'key_out', and
+ * optionally 'actions' (of size 'actions_len') into 'batch'. 'mask' (of size
+ * 'mask_len') may optionally be used for logging, of which the verbosity is
+ * controlled by 'verbose'.
+ *
+ * Returns 0 on success, or a positive errno otherwise.
+ */
+static int
+prepare_bpf_flow__(struct dpif_bpf *dpif,
+                   const struct nlattr *key, size_t key_len,
+                   const struct nlattr *mask, size_t mask_len,
+                   const struct nlattr *actions, size_t actions_len,
+                   struct bpf_flow_key *key_out, struct bpf_action_batch *batch,
+                   bool verbose)
+{
+    odp_port_t in_port;
+    int err = EINVAL;
+
+    memset(key_out, 0, sizeof *key_out);
+    if (odp_key_to_bpf_flow_key(key, key_len, key_out, &in_port, verbose)) {
+        if (verbose) {
+            struct ds ds = DS_EMPTY_INITIALIZER;
+            struct hmap *portnames = NULL;
+
+            /* XXX portnames */
+            /* XXX: Use dpif_format_flow()? */
+            odp_flow_format(key, key_len, mask, mask_len, portnames, &ds,
+                            true);
+            VLOG_WARN("Failed to translate odp key to bpf key:\n%s",
+                      ds_cstr(&ds));
+            ds_destroy(&ds);
+        }
+        return err;
+    }
+    err = set_in_port(dpif, key_out, in_port);
+    if (err) {
+        return err;
+    }
+    if (batch) {
+        err = dpif_bpf_serialize_actions(dpif, batch, actions, actions_len);
+        if (err) {
+            return err;
+        }
+    }
+    return 0;
+}
+
+static int
+prepare_bpf_flow(struct dpif_bpf *dpif, const struct nlattr *key,
+                 size_t key_len, struct bpf_flow_key *key_out, bool verbose)
+{
+    return prepare_bpf_flow__(dpif, key, key_len, NULL, 0, NULL, 0, key_out,
+                              NULL, verbose);
 }
 
 static void
@@ -1172,32 +1218,16 @@ dpif_bpf_operate(struct dpif *dpif_, struct dpif_op **ops, size_t n_ops)
             bool verbose = !(put->flags & DPIF_FP_PROBE);
             struct bpf_action_batch action_batch;
             struct bpf_flow_key key;
-            odp_port_t in_port;
             int err;
 
-            memset(&key, 0, sizeof key);
-            if (odp_key_to_bpf_flow_key(put->key, put->key_len, &key,
-                                        &in_port, verbose)) {
-                op->error = EINVAL;
-                if (verbose) {
-                    log_odp_to_bpf_failure(put->key, put->key_len, put->mask,
-                                           put->mask_len);
-                }
-                break;
+            err = prepare_bpf_flow__(dpif, put->key, put->key_len,
+                                     put->mask, put->mask_len,
+                                     put->actions, put->actions_len,
+                                     &key, &action_batch, verbose);
+            if (!err) {
+                err = dpif_bpf_insert_flow(&key, &action_batch);
             }
-            err = set_in_port(dpif, &key, in_port);
-            if (err) {
-                op->error = err;
-                break;
-            }
-            err = dpif_bpf_serialize_actions(dpif, &action_batch, put->actions,
-                                             put->actions_len);
-            if (err) {
-                op->error = err;
-                break;
-            }
-
-            op->error = dpif_bpf_insert_flow(&key, &action_batch);
+            op->error = err;
             break;
         }
         case DPIF_OP_FLOW_GET:
