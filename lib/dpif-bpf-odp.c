@@ -130,6 +130,8 @@ bpf_flow_key_extract_metadata(const struct bpf_flow_key *key,
     /* TODO */
     /*
     flow->ct_label = md.ct_label;
+    ct_nw_proto
+    ct_{nw,tp}_{src,dst}
     flow_tnl_copy__()
     */
 }
