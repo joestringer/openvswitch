@@ -404,8 +404,11 @@ odp_key_to_bpf_flow_key(const struct nlattr *nla, size_t nla_len,
         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 20);
         struct ds ds = DS_EMPTY_INITIALIZER;
 
+        ds_put_format(&ds, "%s\nODP:\n", __func__);
+        odp_flow_key_format(nla, nla_len, &ds);
+        ds_put_cstr(&ds, "\nBPF:\n");
         bpf_flow_key_format(&ds, key);
-        VLOG_INFO_RL(&rl, "%s\n%s", __func__, ds_cstr(&ds));
+        VLOG_INFO_RL(&rl, "%s", ds_cstr(&ds));
         ds_destroy(&ds);
     }
 
