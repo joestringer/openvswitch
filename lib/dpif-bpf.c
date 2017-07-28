@@ -1356,8 +1356,8 @@ dpif_bpf_handlers_set(struct dpif *dpif_, uint32_t n_handlers)
 }
 
 static int
-extract_key(const struct bpf_flow_key *key, struct dp_packet *packet,
-            struct ofpbuf *buf)
+extract_key(struct dpif_bpf *dpif, const struct bpf_flow_key *key,
+            struct dp_packet *packet, struct ofpbuf *buf)
 {
     struct flow flow;
     struct odp_flow_key_parms parms = {
@@ -1374,7 +1374,7 @@ extract_key(const struct bpf_flow_key *key, struct dp_packet *packet,
     }
 
     bpf_flow_key_extract_metadata(key, &flow);
-    /* XXX: in_port translation */
+    flow.in_port.odp_port = ifindex_to_odp(dpif, flow.in_port.odp_port);
     flow_extract(packet, &flow);
     odp_flow_key_from_flow(&parms, buf);
 
@@ -1428,7 +1428,7 @@ perf_sample_to_upcall(struct dpif_bpf *dp, struct ovs_ebpf_event *e,
     pre_key_len = buffer->size;
 
     pkt_metadata_init(&upcall->packet.md, port_no);
-    err = extract_key(&e->header.key, &upcall->packet, buffer);
+    err = extract_key(dp, &e->header.key, &upcall->packet, buffer);
     if (err) {
         return err;
     }
