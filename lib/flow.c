@@ -730,12 +730,7 @@ miniflow_extract(struct dp_packet *packet, struct miniflow *dst)
         nw_tos = nh->ip_tos;
         nw_ttl = nh->ip_ttl;
         nw_proto = nh->ip_proto;
-        if (OVS_UNLIKELY(IP_IS_FRAGMENT(nh->ip_frag_off))) {
-            nw_frag = FLOW_NW_FRAG_ANY;
-            if (nh->ip_frag_off & htons(IP_FRAG_OFF_MASK)) {
-                nw_frag |= FLOW_NW_FRAG_LATER;
-            }
-        }
+        nw_frag = ip_frag_to_flow_frag(nh->ip_frag_off);
         data_pull(&data, &size, ip_len);
     } else if (dl_type == htons(ETH_TYPE_IPV6)) {
         const struct ovs_16aligned_ip6_hdr *nh;
