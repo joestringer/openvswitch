@@ -925,6 +925,7 @@ fetch_flow(struct dpif_bpf *dpif, struct dpif_flow *flow,
     ofpbuf_clear(out);
 
     /* Use 'out->header' to point to the flow key, 'out->msg' for actions */
+    /* XXX: I think that this call is generating OVS_KEY_ATTR_UNSPEC */
     odp_flow_key_from_flow(&parms, out);
     out->header = out->data;
     out->msg = ofpbuf_tail(out);
