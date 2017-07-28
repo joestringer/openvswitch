@@ -67,10 +67,6 @@ struct attr_len_tbl {
 
 static int parse_odp_key_mask_attr(const char *, const struct simap *port_names,
                               struct ofpbuf *, struct ofpbuf *);
-static void format_odp_key_attr(const struct nlattr *a,
-                                const struct nlattr *ma,
-                                const struct hmap *portno_names, struct ds *ds,
-                                bool verbose);
 
 struct geneve_scan {
     struct geneve_opt d[63];
@@ -1002,15 +998,15 @@ format_odp_action(struct ds *ds, const struct nlattr *a,
             mask->nla_len = attr->nla_len = NLA_HDRLEN + size;
             memcpy(attr + 1, (char *)(a + 1), size);
             memcpy(mask + 1, (char *)(a + 1) + size, size);
-            format_odp_key_attr(attr, mask, NULL, ds, false);
+            odp_format_key_attr(attr, mask, NULL, ds, false);
         } else {
-            format_odp_key_attr(a, NULL, NULL, ds, false);
+            odp_format_key_attr(a, NULL, NULL, ds, false);
         }
         ds_put_cstr(ds, ")");
         break;
     case OVS_ACTION_ATTR_SET:
         ds_put_cstr(ds, "set(");
-        format_odp_key_attr(nl_attr_get(a), NULL, NULL, ds, true);
+        odp_format_key_attr(nl_attr_get(a), NULL, NULL, ds, true);
         ds_put_cstr(ds, ")");
         break;
     case OVS_ACTION_ATTR_PUSH_ETH: {
@@ -3466,8 +3462,8 @@ format_odp_key_attr__(const struct nlattr *a, const struct nlattr *ma,
     ds_put_char(ds, ')');
 }
 
-static void
-format_odp_key_attr(const struct nlattr *a, const struct nlattr *ma,
+void
+odp_format_key_attr(const struct nlattr *a, const struct nlattr *ma,
                     const struct hmap *portno_names, struct ds *ds,
                     bool verbose)
 {
