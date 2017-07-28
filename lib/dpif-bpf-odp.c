@@ -328,8 +328,15 @@ odp_key_to_bpf_flow_key(const struct nlattr *nla, size_t nla_len,
         case OVS_KEY_ATTR_SCTP:
         case OVS_KEY_ATTR_MPLS:
         case OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV4:
-        case OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV6:
+        case OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV6: {
+            static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 20);
+            struct ds ds = DS_EMPTY_INITIALIZER;
+
+            odp_format_key_attr(a, NULL, NULL, &ds, verbose);
+            VLOG_INFO_RL(&rl, "Cannot convert \'%s\'", ds_cstr(&ds));
+            ds_destroy(&ds);
             return ODP_FIT_ERROR;
+        }
         case OVS_KEY_ATTR_UNSPEC:
         case __OVS_KEY_ATTR_MAX:
         default:
