@@ -1272,8 +1272,7 @@ dpif_bpf_operate(struct dpif *dpif_, struct dpif_op **ops, size_t n_ops)
             break;
         }
         default:
-            /* XXX: Implement */
-            op->error = EOPNOTSUPP;
+            OVS_NOT_REACHED();
         }
     }
 }
