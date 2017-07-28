@@ -348,4 +348,18 @@ void odp_put_push_eth_action(struct ofpbuf *odp_actions,
                              const struct eth_addr *eth_src,
                              const struct eth_addr *eth_dst);
 
+static inline uint8_t
+ip_frag_to_flow_frag(ovs_be16 ip_frag_off)
+{
+    uint8_t nw_frag = 0;
+
+    if (OVS_UNLIKELY(IP_IS_FRAGMENT(ip_frag_off))) {
+        nw_frag = FLOW_NW_FRAG_ANY;
+        if (ip_frag_off & htons(IP_FRAG_OFF_MASK)) {
+            nw_frag |= FLOW_NW_FRAG_LATER;
+        }
+    }
+    return nw_frag;
+}
+
 #endif /* odp-util.h */
