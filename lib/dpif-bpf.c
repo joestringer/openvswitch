@@ -1369,7 +1369,6 @@ extract_key(struct dpif_bpf *dpif, const struct bpf_flow_key *key,
 
         bpf_flow_key_format(&ds, key);
         VLOG_INFO("%s\n%s", __func__, ds_cstr(&ds));
-
         ds_destroy(&ds);
     }
 
