@@ -95,6 +95,10 @@ void odp_portno_names_destroy(struct hmap *portno_names);
 void odp_portno_name_format(const struct hmap *portno_names,
                             odp_port_t, struct ds *);
 
+void odp_format_key_attr(const struct nlattr *key, const struct nlattr *mask,
+                         const struct hmap *portno_names, struct ds *ds,
+                         bool verbose);
+
 /* The maximum number of bytes that odp_flow_key_from_flow() appends to a
  * buffer.  This is the upper bound on the length of a nlattr-formatted flow
  * key that ovs-vswitchd fully understands.
