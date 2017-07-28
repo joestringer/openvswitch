@@ -865,6 +865,7 @@ dpif_bpf_flow_dump_destroy(struct dpif_flow_dump *dump_)
 struct dpif_bpf_flow_dump_thread {
     struct dpif_flow_dump_thread up;
     struct dpif_bpf_flow_dump *dump;
+    struct ofpbuf buf;  /* Stores key,mask,acts for a particular dump. */
 };
 
 static struct dpif_bpf_flow_dump_thread *
@@ -882,6 +883,7 @@ dpif_bpf_flow_dump_thread_create(struct dpif_flow_dump *dump_)
     thread = xmalloc(sizeof *thread);
     dpif_flow_dump_thread_init(&thread->up, &dump->up);
     thread->dump = dump;
+    ofpbuf_init(&thread->buf, 1024);
     return &thread->up;
 }
 
@@ -890,19 +892,19 @@ dpif_bpf_flow_dump_thread_destroy(struct dpif_flow_dump_thread *thread_)
 {
     struct dpif_bpf_flow_dump_thread *thread =
         dpif_bpf_flow_dump_thread_cast(thread_);
+    ofpbuf_uninit(&thread->buf);
     free(thread);
 }
 
 static int
 fetch_flow(struct dpif_bpf *dpif, struct dpif_flow *flow,
-           struct bpf_flow_key *key)
+           struct ofpbuf *out, struct bpf_flow_key *key)
 {
     struct flow f;
     struct odp_flow_key_parms parms = {
         .flow = &f,
     };
     struct bpf_action_batch action;
-    struct ofpbuf buf;
     int err;
 
     memset(flow, 0, sizeof *flow);
@@ -920,18 +922,18 @@ fetch_flow(struct dpif_bpf *dpif, struct dpif_flow *flow,
     f.in_port.odp_port = ifindex_to_odp(dpif, f.in_port.odp_port);
 
     /* Translate BPF flow into netlink format. */
-    ofpbuf_init(&buf, 1024); /* XXX: Memory leak. Put this in percpu dump. */
+    ofpbuf_clear(out);
 
-    /* Use 'buf.header' to point to the flow key, 'buf.msg' for actions */
-    odp_flow_key_from_flow(&parms, &buf);
-    buf.header = buf.data;
-    buf.msg = ofpbuf_tail(&buf);
+    /* Use 'out->header' to point to the flow key, 'out->msg' for actions */
+    odp_flow_key_from_flow(&parms, out);
+    out->header = out->data;
+    out->msg = ofpbuf_tail(out);
     /* XXX: Serialize BPF acts -> NL */
 
-    flow->key = buf.header;
-    flow->key_len = ofpbuf_headersize(&buf);
-    flow->actions = buf.msg;
-    flow->actions_len = ofpbuf_msgsize(&buf);
+    flow->key = out->header;
+    flow->key_len = ofpbuf_headersize(out);
+    flow->actions = out->msg;
+    flow->actions_len = ofpbuf_msgsize(out);
     dpif_flow_hash(&dpif->dpif, flow->key, flow->key_len, &flow->ufid);
     flow->ufid_present = false; /* XXX */
 
@@ -983,8 +985,9 @@ static int
 dpif_bpf_flow_dump_next(struct dpif_flow_dump_thread *thread_,
                         struct dpif_flow *flows, int max_flows)
 {
-    struct dpif_bpf_flow_dump *dump =
-        dpif_bpf_flow_dump_thread_cast(thread_)->dump;
+    struct dpif_bpf_flow_dump_thread *thread =
+        dpif_bpf_flow_dump_thread_cast(thread_);
+    struct dpif_bpf_flow_dump *dump = thread->dump;
     int n = 0;
     int err;
 
@@ -1003,7 +1006,7 @@ dpif_bpf_flow_dump_next(struct dpif_flow_dump_thread *thread_,
             err = errno;
             break;
         }
-        err = fetch_flow(dpif, &flows[n], &dump->pos);
+        err = fetch_flow(dpif, &flows[n], &thread->buf, &dump->pos);
         if (err == ENOENT) {
             /* Flow disappeared. Oh well, we tried. */
             continue;
@@ -1254,7 +1257,7 @@ dpif_bpf_operate(struct dpif *dpif_, struct dpif_op **ops, size_t n_ops)
 
             err = prepare_bpf_flow(dpif, get->key, get->key_len, &key, true);
             if (!err) {
-                err = fetch_flow(dpif, get->flow, &key);
+                err = fetch_flow(dpif, get->flow, get->buffer, &key);
             }
             op->error = err;
             break;
