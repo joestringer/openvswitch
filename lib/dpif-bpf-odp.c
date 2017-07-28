@@ -161,11 +161,61 @@ bpf_metadata_from_flow(const struct flow *flow, struct ebpf_metadata_t *md)
 enum odp_key_fitness
 bpf_flow_key_to_flow(const struct bpf_flow_key *key, struct flow *flow)
 {
+    const struct ebpf_headers_t *hdrs = &key->headers;
+
     memset(flow, 0, sizeof *flow);
-
-    /* XXX: Populate key. */
-
     bpf_flow_key_extract_metadata(key, flow);
+
+    /* L2 */
+    if (hdrs->ethernet.valid) {
+        memcpy(&flow->dl_dst, &hdrs->ethernet.dstAddr, sizeof(struct eth_addr));
+        memcpy(&flow->dl_src, &hdrs->ethernet.srcAddr, sizeof(struct eth_addr));
+        flow->dl_type = htons(hdrs->ethernet.etherType);
+    }
+    if (hdrs->vlan.valid) {
+        uint16_t tci = hdrs->vlan.vid | hdrs->vlan.cfi | hdrs->vlan.pcp;
+
+        flow->vlans[0].tpid = htons(hdrs->vlan.etherType);
+        flow->vlans[0].tci = htons(tci);
+    }
+
+    /* L3 */
+    if (hdrs->ipv4.valid) {
+        ovs_be16 frags = htons(hdrs->ipv4.flags | hdrs->ipv4.fragOffset);
+
+        flow->nw_src = htons(hdrs->ipv4.srcAddr);
+        flow->nw_dst = htons(hdrs->ipv4.dstAddr);
+        flow->nw_frag = ip_frag_to_flow_frag(frags);
+        flow->nw_tos = hdrs->ipv4.diffserv;
+        flow->nw_ttl = hdrs->ipv4.ttl;
+        flow->nw_proto = hdrs->ipv4.protocol;
+    } else if (hdrs->ipv6.valid) {
+        memcpy(&flow->ipv6_src, &hdrs->ipv6.srcAddr, sizeof flow->ipv6_src);
+        memcpy(&flow->ipv6_dst, &hdrs->ipv6.dstAddr, sizeof flow->ipv6_dst);
+        flow->ipv6_label = ntohl(hdrs->ipv6.flowLabel);
+        /* XXX: flow->nw_frag */
+        flow->nw_tos = hdrs->ipv6.trafficClass;
+        flow->nw_ttl = hdrs->ipv6.hopLimit;
+        flow->nw_proto = hdrs->ipv6.nextHdr;
+    } else if (hdrs->arp.valid) {
+        flow->nw_proto = hdrs->arp.opcode & 0xFF;
+        /* XXX: flow->arp_sha */
+        /* XXX: flow->arp_tha */
+    }
+
+    /* L4 */
+    if (hdrs->tcp.valid) {
+        flow->tcp_flags = htons(hdrs->tcp.flags);
+        flow->tp_src = htons(hdrs->tcp.srcPort);
+        flow->tp_dst = htons(hdrs->tcp.dstPort);
+    } else if (hdrs->udp.valid) {
+        flow->tp_src = htons(hdrs->udp.srcPort);
+        flow->tp_dst = htons(hdrs->udp.dstPort);
+    } else if (hdrs->icmp.valid) {
+        /* XXX: validate */
+        flow->tp_src = htons(hdrs->icmp.typeCode & 0x00FF);
+        flow->tp_dst = htons(hdrs->icmp.typeCode & 0xFF00);
+    } /* XXX: IGMP */
 
     return ODP_FIT_PERFECT;
 }
