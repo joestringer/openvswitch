@@ -1151,10 +1151,7 @@ set_in_port(struct dpif_bpf *dpif, struct bpf_flow_key *key, odp_port_t port)
     uint16_t ifindex;
 
     ifindex = odp_port_to_ifindex(dpif, port, NULL);
-    if (ifindex) {
-        VLOG_INFO("Installing flow from port %"PRIu32" (ifindex %"PRIu16")",
-                  port, ifindex);
-    } else if (port) {
+    if (!ifindex && port) {
         VLOG_WARN("Could not find ifindex corresponding to port %"PRIu32,
                   port);
         return ENODEV;
