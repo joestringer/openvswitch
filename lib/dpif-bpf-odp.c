@@ -389,12 +389,7 @@ odp_key_to_bpf_flow_key(const struct nlattr *nla, size_t nla_len,
             ds_destroy(&ds);
             return ODP_FIT_ERROR;
         }
-        case OVS_KEY_ATTR_UNSPEC: {
-            static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 20);
-            VLOG_WARN_RL(&rl, "%s: Found OVS_KEY_ATTR_UNSPEC",
-                         OVS_SOURCE_LOCATOR);
-            break;
-        }
+        case OVS_KEY_ATTR_UNSPEC:
         case __OVS_KEY_ATTR_MAX:
         default:
             OVS_NOT_REACHED();
