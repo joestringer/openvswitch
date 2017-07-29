@@ -235,7 +235,7 @@ odp_key_to_bpf_flow_key(const struct nlattr *nla, size_t nla_len,
     const struct nlattr *a;
     size_t left;
 
-    NL_ATTR_FOR_EACH_UNSAFE(a, left, nla, nla_len) {
+    NL_ATTR_FOR_EACH(a, left, nla, nla_len) {
         enum ovs_key_attr type = nl_attr_type(a);
 
         switch (type) {
