@@ -104,6 +104,68 @@ odp_action_to_bpf_action(const struct nlattr *src, struct bpf_action *dst)
     return 0;
 }
 
+int
+bpf_actions_to_odp_actions(struct bpf_action_batch *batch, struct ofpbuf *out)
+{
+    int i;
+
+    for (i = 0; i < BPF_DP_MAX_ACTION; i++) {
+        struct bpf_action *act = &batch->actions[i];
+        enum ovs_action_attr type = act->type;
+
+        switch (type) {
+        case OVS_ACTION_ATTR_UNSPEC:
+            /* End of actions list. */
+            return 0;
+
+        case OVS_ACTION_ATTR_OUTPUT: {
+            /* XXX: ifindex to odp translation */
+            nl_msg_put_u32(out, type, act->u.out.port);
+            break;
+        }
+        case OVS_ACTION_ATTR_PUSH_VLAN: {
+            nl_msg_put_unspec(out, type, &act->u.push_vlan,
+                              sizeof act->u.push_vlan);
+            break;
+        }
+        case OVS_ACTION_ATTR_RECIRC:
+            nl_msg_put_u32(out, type, act->u.recirc_id);
+            break;
+        case OVS_ACTION_ATTR_TRUNC:
+            nl_msg_put_unspec(out, type, &act->u.trunc, sizeof act->u.trunc);
+            break;
+        case OVS_ACTION_ATTR_HASH:
+            nl_msg_put_unspec(out, type, &act->u.hash, sizeof act->u.hash);
+            break;
+        case OVS_ACTION_ATTR_PUSH_MPLS:
+            nl_msg_put_unspec(out, type, &act->u.mpls, sizeof act->u.mpls);
+            break;
+        case OVS_ACTION_ATTR_POP_MPLS:
+            nl_msg_put_be16(out, type, act->u.ethertype);
+            break;
+        case OVS_ACTION_ATTR_CT:
+        case OVS_ACTION_ATTR_USERSPACE:
+        case OVS_ACTION_ATTR_SET:
+        case OVS_ACTION_ATTR_POP_VLAN:
+        case OVS_ACTION_ATTR_SAMPLE:
+        case OVS_ACTION_ATTR_SET_MASKED:
+        case OVS_ACTION_ATTR_PUSH_ETH:
+        case OVS_ACTION_ATTR_POP_ETH:
+        case OVS_ACTION_ATTR_TUNNEL_PUSH:
+        case OVS_ACTION_ATTR_TUNNEL_POP:
+        case OVS_ACTION_ATTR_CLONE:
+        case OVS_ACTION_ATTR_METER:
+            VLOG_WARN("Unexpected action type %d", type);
+            return EOPNOTSUPP;
+        case __OVS_ACTION_ATTR_MAX:
+        default:
+            OVS_NOT_REACHED();
+            break;
+        }
+    }
+    return 0;
+}
+
 /* Extracts packet metadata from the BPF-formatted flow key in 'key' into a
  * flow structure in 'flow'. Returns an ODP_FIT_* value that indicates how well
  * 'key' fits our expectations for what a flow key should contain.

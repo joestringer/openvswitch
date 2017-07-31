@@ -925,10 +925,13 @@ fetch_flow(struct dpif_bpf *dpif, struct dpif_flow *flow,
     ofpbuf_clear(out);
 
     /* Use 'out->header' to point to the flow key, 'out->msg' for actions */
-    odp_flow_key_from_flow(&parms, out);
     out->header = out->data;
+    odp_flow_key_from_flow(&parms, out);
     out->msg = ofpbuf_tail(out);
-    /* XXX: Serialize BPF acts -> NL */
+    err = bpf_actions_to_odp_actions(&action, out);
+    if (err) {
+        return err;
+    }
 
     flow->key = out->header;
     flow->key_len = ofpbuf_headersize(out);

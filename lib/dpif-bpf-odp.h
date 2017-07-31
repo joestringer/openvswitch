@@ -24,8 +24,10 @@ struct nlattr;
 struct bpf_flow_key;
 struct bpf_action;
 struct ebpf_metadata_t;
+struct bpf_action_batch;
 
 int odp_action_to_bpf_action(const struct nlattr *, struct bpf_action *);
+int bpf_actions_to_odp_actions(struct bpf_action_batch *, struct ofpbuf *out);
 enum odp_key_fitness bpf_flow_key_to_flow(const struct bpf_flow_key *,
                                           struct flow *);
 void bpf_flow_key_extract_metadata(const struct bpf_flow_key *,
