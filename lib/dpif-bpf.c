@@ -972,7 +972,7 @@ dpif_bpf_delete_flow(struct bpf_flow_key *flow_key,
     ovs_assert(datapath.bpf.flow_table.fd != -1);
     err = bpf_map_delete_elem(datapath.bpf.flow_table.fd, flow_key);
     if (err) {
-        VLOG_ERR("Failed to del flow into flow table, map fd %d, error %s",
+        VLOG_ERR("Failed to del flow into flow table, map fd %d: %s",
                  datapath.bpf.flow_table.fd, ovs_strerror(errno));
         return errno;
     }
