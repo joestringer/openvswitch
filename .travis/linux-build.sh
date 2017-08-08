@@ -71,7 +71,7 @@ function install_dpdk()
 
 function configure_ovs()
 {
-    ./boot.sh && ./configure $*
+    ./boot.sh && ./configure --enable-silent-rules $*
 }
 
 if [ "$KERNEL" ] || [ "$DPDK" ]; then
@@ -101,12 +101,12 @@ if [ "$KERNEL" ] && [ ! "$TESTSUITE" ] && [ ! "$DPDK" ]; then
 fi
 
 if [ "$CC" = "clang" ]; then
-    make CFLAGS="$CFLAGS -Wno-error=unused-command-line-argument"
+    make V=0 CFLAGS="$CFLAGS -Wno-error=unused-command-line-argument"
 elif [[ $BUILD_ENV =~ "-m32" ]]; then
     # Disable sparse for 32bit builds on 64bit machine
-    make CFLAGS="$CFLAGS $BUILD_ENV"
+    make V=0 CFLAGS="$CFLAGS $BUILD_ENV"
 else
-    make CFLAGS="$CFLAGS $BUILD_ENV $SPARSE_FLAGS" C=1
+    make V=0 CFLAGS="$CFLAGS $BUILD_ENV $SPARSE_FLAGS" C=1
 fi
 
 if [ "$TESTSUITE" ] && [ "$CC" != "clang" ]; then
