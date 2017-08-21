@@ -193,9 +193,11 @@ bpfctl_load_dp(int argc OVS_UNUSED, const char *argv[])
 {
     int error;
 
-    bpf_init();
-    error = bpf_load(argv[1]);
-    return error;
+    error = bpf_init();
+    if (error) {
+        return error;
+    }
+    return bpf_load(argv[1]);
 }
 
 static const struct bpfctl_command all_commands[] = {

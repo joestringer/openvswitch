@@ -509,20 +509,24 @@ bridge_exit(bool delete_datapath)
     ovsdb_idl_destroy(idl);
 }
 
-static void
+static int
 init_ebpf(const struct ovsrec_open_vswitch *ovs_cfg OVS_UNUSED)
 {
     static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
+    static int error = 0;
 
     if (ovsthread_once_start(&once)) {
         // should we load multiple .o or merge all into one datapath.o?
         char *bpf_elf = xasprintf("%s/bpf/datapath.o", ovs_pkgdatadir());
 
-        bpf_init();
-        bpf_load(bpf_elf);
+        error = bpf_init();
+        if (!error) {
+            bpf_load(bpf_elf);
+        }
         free(bpf_elf);
         ovsthread_once_done(&once);
     }
+    return error;
 }
 
 /* Looks at the list of managers in 'ovs_cfg' and extracts their remote IP

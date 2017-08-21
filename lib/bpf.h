@@ -56,11 +56,11 @@ struct bpf_state {
 int bpf_get(struct bpf_state *state, bool verbose);
 void bpf_put(struct bpf_state *state);
 int bpf_load(const char *path);
-void bpf_init(void);
+int bpf_init(void);
 void bpf_format_state(struct ds *ds, struct bpf_state *state);
 #else /* !HAVE_BPF */
 static inline int bpf_load(const char *path OVS_UNUSED) { return EOPNOTSUPP; }
-static inline void bpf_init(void) { }
+static inline int bpf_init(void) { return 0; }
 #endif /* HAVE_BPF */
 
 #endif /* LIB_BPF_H */
