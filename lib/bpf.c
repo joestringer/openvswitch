@@ -22,8 +22,12 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 #include <linux/bpf.h>
+#include <linux/limits.h>
+#include <linux/magic.h>
 #include <iproute2/bpf_elf.h>
+#include <sys/mount.h>
 #include <sys/stat.h>
+#include <sys/vfs.h>
 #include <sys/resource.h>
 
 #include "bpf.h"
@@ -32,7 +36,8 @@
 #include "openvswitch/dynamic-string.h"
 #include "openvswitch/vlog.h"
 
-#define BPF_FS_PATH "/sys/fs/bpf/ovs"
+#define BPF_FS_PATH "/sys/fs/bpf"
+static const char *ovs_bpf_path = NULL;
 
 #define MAX_BPF_PROG_ARRAY 64 //FIXME
 VLOG_DEFINE_THIS_MODULE(bpf);
@@ -156,7 +161,7 @@ MAP_FORMAT_FUNC(bpf_format_map_tailcalls, uint32_t, uint32_t, true);//FIXME
 void
 bpf_format_state(struct ds *ds, struct bpf_state *state)
 {
-    ds_put_format(ds, "path: %s\n", BPF_FS_PATH);
+    ds_put_format(ds, "path: %s\n", ovs_bpf_path);
     ds_put_cstr(ds, "maps:\n");
     bpf_format_map_stats(ds, &state->datapath_stats, format_dp_stats);
     bpf_format_map_flows(ds, &state->flow_table, NULL);
@@ -169,7 +174,7 @@ bpf_format_state(struct ds *ds, struct bpf_state *state)
 }
 
 /* Populates 'state' with the standard set of programs and maps for openvswitch
- * datapath as sourced from pinned programs at BPF_FS_PATH.
+ * datapath as sourced from pinned programs at ovs_bpf_path.
  *
  * Returns 0 on success, or positive errno on error. If successful, the caller
  * is resposible for releasing the resources in 'state' via bpf_put().
@@ -199,7 +204,7 @@ bpf_get(struct bpf_state *state, bool verbose)
         struct stat s;
 
         //Failed to load /sys/fs/bpf/ovs/progs/ingress_0:
-        snprintf(buf, ARRAY_SIZE(buf), "%s/%s", BPF_FS_PATH, objs[i].path);
+        snprintf(buf, ARRAY_SIZE(buf), "%s/%s", ovs_bpf_path, objs[i].path);
         if (stat(buf, &s)) {
             error = errno;
             break;
@@ -225,7 +230,7 @@ bpf_get(struct bpf_state *state, bool verbose)
 
         state->tailarray[k].fd = 0;
 
-        snprintf(buf, ARRAY_SIZE(buf), "%s/tail-%d/0", BPF_FS_PATH, k);
+        snprintf(buf, ARRAY_SIZE(buf), "%s/tail-%d/0", ovs_bpf_path, k);
         if (stat(buf, &s)) {
             continue;
         }
@@ -335,7 +340,7 @@ process(struct bpf_object *obj)
 
 /* Attempts to load the BPF datapath in the form of an ELF compiled for the BPF
  * ISA in 'path', install it into the kernel, and pin it to the filesystem
- * under BPF_FS_PATH/{maps,progs}/foo.
+ * under ovs_bpf_path/{maps,progs}/foo.
  *
  * Returns 0 on success, or positive errno on error.
  */
@@ -372,9 +377,7 @@ bpf_load(const char *path)
         stage = "load";
         goto close;
     }
-    // need to load bpf fs first, otherwise mkdir fails
-    error = bpf_object__pin(obj, BPF_FS_PATH);
-    //error = bpf_object__pin(obj, "ovs");
+    error = bpf_object__pin(obj, ovs_bpf_path);
     if (error) {
         stage = "pin";
         goto close;
@@ -420,9 +423,84 @@ PRINT_FN(WARN);
 PRINT_FN(INFO);
 PRINT_FN(DBG);
 
-void
+#define stringize(x) #x
+
+static int
+mount_bpf(void)
+{
+    struct statfs st_fs;
+    char path[PATH_MAX];
+    char type[NAME_MAX];
+    int err = 0;
+    FILE *fp;
+    int idx;
+
+    fp = fopen("/proc/mounts", "r");
+    if (fp) {
+        const char *fmt;
+        int match;
+
+        fmt = "%*s %"stringize(PATH_MAX)"s %#"stringize(NAME_MAX)"s %*s\n";
+        for (match = 0; match != EOF; match = fscanf(fp, fmt, path, type)) {
+            if (match == 2 && !strcmp(type, "bpf"))
+                break;
+        }
+        if (fclose(fp)) {
+            err = errno;
+            VLOG_INFO("Failed to close /proc/mounts: %s", ovs_strerror(err));
+        }
+        if (strcmp(type, "bpf")) {
+            err = errno;
+            VLOG_DBG("Couldn't find bpf mountpoint in /proc/mounts");
+        }
+    } else {
+        err = errno;
+        VLOG_INFO("Cannot open /proc/mounts: %s", ovs_strerror(err));
+    }
+    if (err || strlen(path) == 0) {
+        VLOG_DBG("Using %s for BPF filesystem mountpoint", BPF_FS_PATH);
+        strcpy(path, BPF_FS_PATH);
+    }
+
+    if (!statfs(path, &st_fs) && st_fs.f_type == BPF_FS_MAGIC) {
+        VLOG_INFO("BPF filesystem already mounted to %s", path);
+        return 0;
+    }
+
+    if (mkdir(path, 0755) && errno != EEXIST) {
+        VLOG_WARN("Failed to create %s: %s", path, ovs_strerror(errno));
+        return errno;
+    }
+
+    if (mount("bpf", path, "bpf", 0, NULL)) {
+        VLOG_WARN("Failed to mount BPF filesystem: %s", ovs_strerror(errno));
+        return errno;
+    }
+
+    idx = strlen(path);
+    if (idx >= PATH_MAX - strlen("/ovs")) {
+        VLOG_WARN("BPF filesystem path \"%s\" is too long.", path);
+        return ENAMETOOLONG;
+    } else {
+        strncpy(&path[idx], "/ovs", strlen("/ovs"));
+    }
+
+    if (mkdir(path, 0755) && errno != EEXIST) {
+        VLOG_WARN("Failed to create %s: %s", path, ovs_strerror(errno));
+        return errno;
+    }
+
+    if (ovs_bpf_path) {
+        free(CONST_CAST(char *, ovs_bpf_path));
+    }
+    ovs_bpf_path = xstrdup(path);
+
+    return 0;
+}
+
+int
 bpf_init(void)
 {
     libbpf_set_print(print_WARN, print_INFO, print_DBG);
-    /* TODO: Mount BPF filesystem */
+    return mount_bpf();
 }
