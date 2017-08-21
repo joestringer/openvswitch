@@ -97,15 +97,7 @@ Additional information can be found in :doc:`general`.
 Setup
 -----
 
-Before running OVS, you must ensure that the BPF filesystem is available::
-
-    # mount -t bpf none /sys/fs/bpf
-    # mkdir -p /sys/fs/bpf/ovs
-
-   .. note::
-     We should get rid of this requirement on users, and just robustly ensure
-     that the filesystem is available and prepared correctly (or do so if it
-     is not).
+Open vSwitch should be started as described in :doc:`general`.
 
    .. note::
      Depending on how OVS was installed, the BPF datapath binary may or may
@@ -113,8 +105,6 @@ Before running OVS, you must ensure that the BPF filesystem is available::
      not finding bpf/datapath.o, look for this file in your OVS build tree and
      copy/symlink it across. Probably it's supposed to live in
      /usr/share/openvswitch/bpf/datapath.o.
-
-Open vSwitch should be started as described in :doc:`general`.
 
 If the linux-tools package is not installed with libbpf.so, then ensure
 that this library is available via your library path::
