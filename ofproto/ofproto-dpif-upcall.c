@@ -808,6 +808,7 @@ recv_upcalls(struct handler *handler)
                 VLOG_INFO_RL(&rl, "received packet on unassociated datapath "
                              "port %"PRIu32, flow->in_port.odp_port);
             }
+
             goto free_dupcall;
         }
 
