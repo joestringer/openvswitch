@@ -3,6 +3,7 @@ bpf_headers = \
 	bpf/generated_headers.h \
 	bpf/odp-bpf.h
 bpf_extra = \
+	bpf/compile.sh \
 	bpf/ovs-proto.p4
 
 dist_headers = $(bpf_headers)
