@@ -515,6 +515,7 @@ init_ebpf(const struct ovsrec_open_vswitch *ovs_cfg OVS_UNUSED)
     static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
 
     if (ovsthread_once_start(&once)) {
+        // should we load multiple .o or merge all into one datapath.o?
         char *bpf_elf = xasprintf("%s/bpf/datapath.o", ovs_pkgdatadir());
 
         bpf_init();

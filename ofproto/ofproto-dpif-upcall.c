@@ -782,11 +782,21 @@ recv_upcalls(struct handler *handler)
             break;
         }
 
+#ifndef HAVE_BPF
         if (odp_flow_key_to_flow(dupcall->key, dupcall->key_len, flow)
             == ODP_FIT_ERROR) {
+            VLOG_WARN("flow_key_to_flow error");
             goto free_dupcall;
         }
 
+#else
+        if (odp_bpf_flow_key_to_flow((struct bpf_flow_key *)dupcall->key,
+                                     dupcall->key_len, flow)
+            == ODP_FIT_ERROR) {
+            VLOG_WARN("bpf flow key parsing error");
+            goto free_dupcall;
+        }
+#endif
         if (dupcall->mru) {
             mru = nl_attr_get_u16(dupcall->mru);
         } else {
@@ -808,6 +818,7 @@ recv_upcalls(struct handler *handler)
                 VLOG_INFO_RL(&rl, "received packet on unassociated datapath "
                              "port %"PRIu32, flow->in_port.odp_port);
             }
+
             goto free_dupcall;
         }
 
