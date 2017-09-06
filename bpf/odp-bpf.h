@@ -41,6 +41,7 @@
 #define BPF_OPENVSWITCH_H 1
 
 #include "odp-netlink.h"
+#include "generated_headers.h"
 
 enum ovs_upcall_cmd {
     OVS_UPCALL_UNSPEC = OVS_PACKET_CMD_UNSPEC,
@@ -85,6 +86,11 @@ struct bpf_flow {
     uint64_t value;             /* XXX */
 };
 
+struct bpf_flow_key {
+    struct ebpf_headers_t headers;
+    struct ebpf_metadata_t mds;
+};
+
 struct bpf_upcall {
     uint8_t type;
     uint8_t subtype;
@@ -92,6 +98,7 @@ struct bpf_upcall {
     uint32_t cpu;
     uint32_t error;
     uint32_t skb_len;
+    struct bpf_flow_key key;
     /* Followed by 'skb_len' of packet data. */
 };
 
@@ -101,7 +108,116 @@ struct bpf_downcall {
     uint32_t debug;
     uint32_t ifindex;
     uint32_t flags;
+    struct ebpf_metadata_t md;
     /* Followed by packet data. */
+};
+
+#define ETH_ALEN 6
+
+#define OVS_ACTION_ATTR_UNSPEC      0
+#define OVS_ACTION_ATTR_OUTPUT      1
+#define OVS_ACTION_ATTR_USERSPACE   2
+#define OVS_ACTION_ATTR_SET         3
+#define OVS_ACTION_ATTR_PUSH_VLAN   4
+#define OVS_ACTION_ATTR_POP_VLAN    5
+#define OVS_ACTION_ATTR_SAMPLE      6
+#define OVS_ACTION_ATTR_RECIRC      7
+#define OVS_ACTION_ATTR_HASH        8
+#define OVS_ACTION_ATTR_PUSH_MPLS   9
+#define OVS_ACTION_ATTR_POP_MPLS    10
+#define OVS_ACTION_ATTR_SET_MASKED  11
+#define OVS_ACTION_ATTR_CT          12
+#define OVS_ACTION_ATTR_TRUNC       13
+#define OVS_ACTION_ATTR_PUSH_ETH    14
+#define OVS_ACTION_ATTR_POP_ETH     15
+
+#define VLAN_CFI_MASK       0x1000 /* Canonical Format Indicator */
+#define VLAN_TAG_PRESENT    VLAN_CFI_MASK
+
+struct flow_key {
+    __be32 src;
+    __be32 dst;
+    union {
+        __be32 ports;
+        __be16 port16[2];
+    };
+    __u32 ip_proto;
+};
+
+struct ovs_action_set {
+    /* light weight tunnel key */
+   __u32 tunnel_id;
+   union {
+        __u32 remote_ipv4;
+        __u32 remote_ipv6[4];
+   };
+   __u8 tunnel_tos;
+   __u8 tunnel_ttl;
+   __u16 tunnel_ext;
+   __u32 tunnel_label;
+   __u8 opt[64];
+};
+
+struct ovs_action_set_masked {
+    int key_type;
+    union {
+        struct ovs_key_ethernet ether;
+        struct ovs_key_mpls mpls;
+        struct ovs_key_ipv4 ipv4;
+        struct ovs_key_ipv6 ipv6;
+        struct ovs_key_tcp tcp;
+        struct ovs_key_udp udp;
+        struct ovs_key_sctp sctp;
+        struct ovs_key_icmp icmp;
+        struct ovs_key_icmpv6 icmpv6;
+        struct ovs_key_arp arp;
+    } key;
+    union {
+        struct ovs_key_ethernet ether;
+        struct ovs_key_mpls mpls;
+        struct ovs_key_ipv4 ipv4;
+        struct ovs_key_ipv6 ipv6;
+        struct ovs_key_tcp tcp;
+        struct ovs_key_udp udp;
+        struct ovs_key_sctp sctp;
+        struct ovs_key_icmp icmp;
+        struct ovs_key_icmpv6 icmpv6;
+        struct ovs_key_arp arp;
+    } mask;
+};
+
+struct ovs_action_output {
+    uint32_t port;
+    uint32_t flags;
+};
+
+struct ovs_action_ct {
+    int commit;
+    /* XXX: Include everything in enum ovs_ct_attr. */
+};
+
+struct bpf_action {
+    uint32_t type;  /* action type */
+    union {
+        struct ovs_action_output out;   /* OVS_ACTION_ATTR_OUTPUT: 8B */
+        struct ovs_action_trunc trunc;  /* OVS_ACTION_ATTR_TRUNC: 4B */
+        struct ovs_action_hash hash;    /* OVS_ACTION_ATTR_HASH: 8B */
+        struct ovs_action_push_mpls mpls;   /* OVS_ACTION_ATTR_PUSH_MPLS: 6B */
+        __be16 ethertype;                   /* OVS_ACTION_ATTR_POP_MPLS: 2B */
+        struct ovs_action_push_vlan push_vlan;  /* OVS_ACTION_ATTR_PUSH_VLAN: 4B */
+                                                /* OVS_ACTION_ATTR_POP_VLAN: 0B */
+        uint32_t recirc_id;                 /* OVS_ACTION_ATTR_RECIRC: 4B */
+        struct ovs_action_set tunnel;       /* OVS_ACTION_ATTR_SET: */
+        struct ovs_action_set_masked mset;  /* OVS_ACTION_ATTR_SET_MASK: */
+        struct ovs_action_ct ct;        /* OVS_ACTION_ATTR_CT:  */
+
+        uint64_t aligned[16]; // make it 128 byte
+    } u;
+};
+
+#define BPF_DP_MAX_ACTION 32
+struct bpf_action_batch {
+    struct bpf_action actions[BPF_DP_MAX_ACTION];
 };
 
 #endif /* BPF_OPENVSWITCH_H */
