@@ -1,5 +1,6 @@
 bpf_headers = \
-	bpf/api.h
+	bpf/api.h \
+	bpf/odp-bpf.h
 
 dist_headers = $(bpf_headers)
 build_headers = $(dist_headers))
